@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          # Valores ficticios: el build solo necesita que las vars existan.
+          VITE_API_URL: http://localhost:3000/api/v1
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
+
+      - name: Test
+        run: npm run test
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bloquear secretos en el diff
+        run: |
+          # JWT de Supabase (anon o service_role) hardcodeado en el código.
+          if grep -rInE 'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}' \
+              --include='*.ts' --include='*.tsx' --include='*.js' \
+              --include='*.json' --include='*.yml' --include='*.sql' \
+              --exclude-dir=node_modules .; then
+            echo "::error::Se encontró un JWT hardcodeado. Los secretos van en variables de entorno."
+            exit 1
+          fi
+          # Connection string de Postgres con password.
+          if grep -rInE 'postgres(ql)?://[^:\s]+:[^@\s]+@' \
+              --include='*.ts' --include='*.tsx' --include='*.js' \
+              --include='*.json' --include='*.yml' \
+              --exclude-dir=node_modules .; then
+            echo "::error::Se encontró un DATABASE_URL con password. Debe ir en variables de entorno."
+            exit 1
+          fi
+          echo "Sin secretos en el diff."

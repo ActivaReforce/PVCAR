@@ -1,0 +1,21 @@
+{
+  "name": "pvcar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma de gestión deportiva escolar de Activa Reforce — monorepo backend + frontend",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace @pvcar/backend",
+    "dev:frontend": "npm run dev --workspace @pvcar/frontend",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

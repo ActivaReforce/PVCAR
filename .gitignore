@@ -1,0 +1,43 @@
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+dist-ssr/
+build/
+.vite/
+
+# Secretos — NUNCA se versionan
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Volcados de base de datos (contienen datos reales de menores)
+*.dump
+*.sql.gz
+db/dumps/
+
+# Herramientas
+.mcp.json
+.vercel/
+.railway/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editores / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Tests
+coverage/
