@@ -14,6 +14,10 @@ build/
 *.pem
 *.key
 
+# Plan maestro — fuera del repo mientras sea publico: describe las debilidades
+# del sistema viejo que sigue en produccion. Vive en la raiz del workspace local.
+docs/Plan.md
+
 # Volcados de base de datos (contienen datos reales de menores)
 *.dump
 *.sql.gz
