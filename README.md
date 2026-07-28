@@ -2,7 +2,7 @@
 
 Plataforma de gestión deportiva escolar de **Activa Reforce**. Monorepo con backend, frontend y el schema de base de datos versionado.
 
-El plan maestro de construcción y migración está en [`docs/Plan.md`](docs/Plan.md). **Léelo antes de tocar nada.**
+El plan maestro de construcción y migración **no se versiona aquí**: describe el estado y las debilidades del sistema anterior, que sigue en producción. Se mantiene fuera del repo y se comparte por canal privado. **Léelo antes de tocar nada.**
 
 ## Estructura
 
@@ -13,7 +13,7 @@ db/
   migrations/  SQL versionado — fuente de verdad del schema
   seed/        datos mínimos sintéticos para desarrollo
   scripts/     dump, restore, backfill de auth, copia de storage
-docs/       Plan.md, API.md, RUNBOOK-cutover.md
+docs/       API.md, RUNBOOK-cutover.md (el plan maestro se mantiene fuera del repo)
 ```
 
 ## Ambientes
