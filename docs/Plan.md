@@ -138,7 +138,8 @@ Secretos reales: **solo en gestor de contraseñas + dashboards**. Ningún `.txt`
 
 **Cuentas nuevas** (todas con el correo corporativo de Activa Reforce, 2FA activo, códigos de recuperación al gestor de contraseñas):
 - [x] GitHub, Supabase, Railway y Vercel creadas por el cliente.
-- [ ] Verificar que los 4 CLIs quedaron autenticados **en las cuentas nuevas** (`gh api user`, `supabase orgs list`, `railway whoami`, `vercel whoami`).
+- [x] `gh` autenticado en la cuenta **ActivaReforce** (verificado con `gh auth status`).
+- [ ] Verificar `supabase`, `railway` y `vercel` (los ejecuta el cliente; Claude solo guía).
 - Pendiente de plan: Railway Hobby ~$5/mes para 2 ambientes; Vercel Hobby prohíbe uso comercial → Pro para el dominio propio.
 
 **Datos recopilados:**
@@ -151,7 +152,7 @@ winget install --id GitHub.cli
 npm i -g @railway/cli vercel supabase
 # añadir al PATH del usuario: C:\Program Files\PostgreSQL\17\bin
 ```
-- [ ] `gh auth login` con la cuenta **activareforce**.
+- [x] `gh auth login` con la cuenta **ActivaReforce** (`pvcar-activareforce@hotmail.com`).
 
 **Respaldo del sistema vivo (crítico, antes de tocar nada):**
 - [x] Respaldo fresco en `Backup_bd/` (2026-07-27): `prod_full_2026-07-27.dump` (custom, 0,5 MB), `prod_schema_public_2026-07-27.sql` (64 KB) y `prod_data_public_2026-07-27.sql` (1,1 MB).
@@ -165,14 +166,19 @@ npm i -g @railway/cli vercel supabase
 
 ### Fase 1 — Monorepo PVCAR
 
-1. [ ] `gh repo create activareforce/PVCAR --private` con `main` y `dev`; `main` protegida (PR + CI obligatorio).
-2. [ ] Estructura de carpetas de la sección 3 + `package.json` raíz con npm workspaces.
-3. [ ] `/frontend`: importar el código de la SPA actual **sin historia de Lovable**, quitando todo secreto embebido (`integrations/supabase/client.ts` pasa a leer `import.meta.env`), añadiendo `src/lib/api.ts` (cliente HTTP tipado con token de sesión) y `vercel.json` (rewrites SPA).
-4. [ ] `/backend`: scaffold Express + TS (`express`, `@supabase/supabase-js`, `pg`, `zod`, `cors`, `helmet`, `dotenv`; dev: `tsx`, `typescript`, `eslint`, `vitest`) + `railway.json` (build, start, healthcheck `/api/v1/health`).
-5. [ ] `.gitignore` estricto (`.env`, `dist`, `node_modules`), `.env.example` en ambos paquetes, `README.md`, `docs/Plan.md` (este archivo).
-6. [ ] `.github/workflows/ci.yml`: lint + typecheck + build + test en cada PR.
+1. [x] Repo `ActivaReforce/PVCAR` privado con `main` y `dev`. ⚠️ **`main` sin proteger:** la protección de ramas en repos privados exige GitHub Pro (403 de la API). Decisión pendiente: pagar Pro, hacer el repo público, o trabajar por disciplina (nunca push directo a `main`).
+2. [x] Estructura de carpetas de la sección 3 + `package.json` raíz con npm workspaces.
+3. [x] `/frontend`: SPA importada **sin historia de Lovable**; `integrations/supabase/client.ts` lee `import.meta.env`; `src/lib/api.ts` (fetch tipado, JWT de sesión, logout en 401); `vercel.json` con rewrites SPA. Puerto de dev movido a 5173 para no chocar con el backend.
+4. [x] `/backend`: Express + TS con `config/env.ts` (zod), supabase admin lazy, pool `pg` lazy, middlewares de auth/permisos/errores, CORS multi-origen, rate limit y `GET /api/v1/health` (verificado en local: `{"status":"ok","db":"not_configured"}`). `railway.json` con healthcheck.
+5. [x] `.gitignore` estricto, `.env.example` en ambos paquetes, `README.md`, `docs/Plan.md`.
+6. [x] `.github/workflows/ci.yml`: lint + typecheck + build + test, más un job `secrets-scan` que bloquea JWTs y connection strings en el diff. **CI verde en `main` y `dev`.**
 
-**Test de fase:** clone limpio → `npm install` → `npm run dev` en ambos paquetes sin errores; CI verde en un PR de prueba.
+**Deuda heredada de la SPA (documentada en el código, no se arrastra en silencio):**
+- `@typescript-eslint/no-explicit-any` en `warn`: ~210 usos, casi todos en el código que habla directo con Supabase y que muere en las fases 6–14. Sube a `error` cuando el conteo llegue a 0.
+- 11 tests de estudiantes en `describe.skip`: sus mocks de Supabase estaban desfasados de las queries reales y **nunca corrieron en CI** (al repo original le faltaba `@vitejs/plugin-react`). Se reescriben en la Fase 10, contra el API.
+- Bundle único de 2,2 MB (625 KB gzip) sin code-splitting. Se ataca en la Fase 15.
+
+**Test de fase:** ✅ `npm install` + `npm run typecheck/lint/build/test` limpios en la raíz; `/api/v1/health` responde en local; CI verde en ambas ramas.
 
 ---
 
@@ -180,7 +186,7 @@ npm i -g @railway/cli vercel supabase
 
 > Las DB nuevas nacen **vacías y correctas**. Los datos reales entran una sola vez, en el cutover.
 
-1. [ ] Crear proyectos Supabase `PVCAR-prod` y `PVCAR-dev` (misma región; la más cercana a Ecuador). Guardar DB passwords.
+1. [x] Proyectos Supabase creados por el cliente: **`PVCAR`** (prod) y **`PVCAR_Dev`** (dev), ambos vacíos.
 2. [ ] Extraer el **schema puro** de la prod actual (`pg_dump --schema-only --no-owner --no-privileges`) y convertirlo en la migración inicial `db/migrations/0001_baseline.sql` (26 tablas, RPCs `set_role_permissions`, `delete_student_evaluation`, `reactivate_nino_asignacion`, y el trigger de `eva_puntaje_total`).
 3. [ ] **Correcciones de diseño en el baseline** (posibles porque la DB está vacía):
    - `usuario.auth_user_id uuid UNIQUE` (nullable) + `CHECK (est_id <> 1 OR auth_user_id IS NOT NULL)` → todo usuario **activo** debe tener cuenta en Supabase Auth; los 18 inactivos no consumen una cuenta hasta que se reactiven.
@@ -312,9 +318,9 @@ npm i -g @railway/cli vercel supabase
 
 ## 6. Seguimiento
 
-- [ ] Fase 0 — Cuentas, herramientas y respaldo
-- [ ] Fase 1 — Monorepo PVCAR
-- [ ] Fase 2 — DB nueva (schema, sin datos)
+- [x] Fase 0 — Cuentas, herramientas y respaldo
+- [x] Fase 1 — Monorepo PVCAR *(salvo protección de `main`, bloqueada por el plan de GitHub)*
+- [ ] Fase 2 — DB nueva (schema, sin datos) — proyectos creados, faltan las migraciones
 - [ ] Fase 3 — Backend base + Railway
 - [ ] Fase 4 — Frontend base + Vercel
 - [ ] Fase 5 — Autenticación
@@ -436,16 +442,21 @@ Verificado contra el servidor: los roles `postgres` y `service_role` tienen `BYP
 
 # Estado y siguiente paso
 
-**Fecha de corte de este documento: 2026-07-27.**
+**Fecha de corte de este documento: 2026-07-28.**
 
-Completado: diagnóstico verificado (sección 1.1), respaldo fresco de prod, herramientas locales instaladas (gh 2.96, railway 5.30, vercel 58, supabase 2.110, psql/pg_dump 17.4 — psql agregado al PATH de usuario), limpieza del workspace, repos duplicados de Flowward eliminados.
+Completado: diagnóstico verificado (sección 1.1), respaldo fresco de prod, herramientas locales instaladas, limpieza del workspace, repos duplicados de Flowward eliminados, **Fase 1 cerrada** (monorepo `ActivaReforce/PVCAR` con CI verde en `main` y `dev`), y los dos proyectos Supabase (`PVCAR`, `PVCAR_Dev`) creados y vacíos.
+
+**Reparto de trabajo:** las acciones en Vercel, Railway y Supabase las ejecuta el cliente; Claude entrega los pasos e inspecciona Supabase en solo lectura. El código, el repo y los archivos locales los hace Claude.
 
 **Workspace local:** `C:\Users\Administrador\Documents\Flowward\Activa Reforce PVCAR`
+- `PVCAR/` — monorepo nuevo (clon de trabajo, remoto `ActivaReforce/PVCAR`).
 - `activa-forge-login/` — SPA viva en producción. **No se toca hasta la Fase 17.**
 - `Backup_bd/` — respaldos y manifiesto de conteos.
-- `_ref/` — scaffold del backend anterior (middlewares auth/permisos/errores, config, health, `railway.json`) y `api.ts`/`client.ts` del front. Material de partida para la Fase 1.
+- `_ref/` — material de partida ya consumido por la Fase 1.
 - `Cosas/` — contrato, RUC, assets de marca.
 
-**Siguiente paso concreto:** autenticar los 4 CLIs en las cuentas nuevas y verificarlo. Luego Fase 1 (crear `activareforce/PVCAR`).
+**Siguiente paso concreto (Fase 2):** extraer el schema puro de la prod vieja (solo lectura) y convertirlo en `db/migrations/0001_baseline.sql` con las correcciones de diseño, más `0002_rls.sql` y `0003_storage.sql`. El cliente los aplica en `PVCAR_Dev` primero y luego en `PVCAR`.
 
-**Decisión abierta:** región de los proyectos Supabase. Prod hoy está en `sa-east-1` (São Paulo); desde Ecuador el tráfico suele salir por Miami, así que `us-east-1` probablemente dé menos latencia. Medir antes de crear.
+**Decisiones abiertas:**
+- **Región de los proyectos Supabase:** ya están creados; confirmar en qué región quedaron. Prod vieja está en `sa-east-1` (São Paulo); desde Ecuador `us-east-1` suele dar menos latencia.
+- **Protección de `main`:** requiere GitHub Pro en repos privados. Pagar Pro, o trabajar por disciplina (PR desde `dev`, nunca push directo).
