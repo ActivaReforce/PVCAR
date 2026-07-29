@@ -7,7 +7,7 @@ El plan maestro de construcción y migración **no se versiona aquí**: describe
 ## Estructura
 
 ```
-backend/    Express + TypeScript      → Railway (root dir: backend)
+backend/    Express + TypeScript      → Railway (root dir: raíz del repo)
 frontend/   Vite + React + TypeScript → Vercel  (root dir: frontend)
 db/
   migrations/  SQL versionado — fuente de verdad del schema
@@ -20,8 +20,26 @@ docs/       API.md, RUNBOOK-cutover.md (el plan maestro se mantiene fuera del re
 
 | | Rama | Backend | Frontend | Base de datos |
 |---|---|---|---|---|
-| Producción | `main` | Railway `production` | Vercel Production | Supabase `PVCAR` |
-| Desarrollo | `dev` | Railway `development` | Vercel Preview | Supabase `PVCAR_Dev` |
+| Producción | `main` | `pvcarbackend-production.up.railway.app` | `pvcar.vercel.app` | Supabase `PVCAR` |
+| Desarrollo | `dev` | `pvcarbackend-development.up.railway.app` | `dev-pvcar.vercel.app` | Supabase `PVCAR_Dev` |
+
+Un commit a `dev` dispara CI, el preview de Vercel y el deploy de Railway `development`. A `main` se llega solo por PR.
+
+### Estado actual
+
+Los cuatro despliegues responden, pero el producto **todavía no funciona de punta a punta**:
+
+- Las dos bases están **vacías**: sin schema, sin RLS, sin usuarios. `GET /api/v1/health` devuelve `db: "not_configured"` porque aún no se sembró `DATABASE_URL`.
+- El backend solo expone `/api/v1/health`. No hay endpoints de negocio.
+- El frontend es la SPA anterior tal cual: **97 archivos** consultan Supabase directo y **ninguno** usa `lib/api.ts`. Se migra módulo por módulo; hasta entonces las pantallas no sirven datos desde el API.
+
+### Trampas de despliegue
+
+- **Railway** usa la raíz del repo como contexto de build, no `backend/`: el `package-lock.json` vive en la raíz por npm workspaces. La config está en `railway.json` (raíz), con `watchPatterns` para no redeployar por cambios de frontend.
+- **Vercel** salta el build si el commit no toca `frontend/**`. El deployment aparece como `Canceled`, sin logs de build. No es un error.
+- Las `VITE_*` se hornean en el bundle en tiempo de build; cambiarlas en el dashboard no surte efecto hasta el build siguiente.
+- Los previews están detrás de Vercel Authentication: se abren con sesión del team.
+- `FRONTEND_ORIGIN` de los backends desplegados **no incluye `localhost`**. Un frontend local debe apuntar a un backend local, o CORS lo bloquea.
 
 ## Setup local
 
