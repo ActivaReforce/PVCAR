@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { allowedOrigins, env } from './config/env.js';
-import { errorHandler, notFoundHandler } from './middleware/error.js';
+import { ApiError, errorHandler, notFoundHandler } from './middleware/error.js';
 import { healthRouter } from './modules/health/health.routes.js';
 
 export function createApp(): Application {
@@ -21,7 +21,9 @@ export function createApp(): Application {
           callback(null, true);
           return;
         }
-        callback(new Error(`Origen no permitido por CORS: ${origin}`));
+        // ApiError, no Error: un Error pelado cae al catch-all del errorHandler
+        // y devuelve 500 con ruido en los logs. Un origen no permitido es 403.
+        callback(new ApiError(403, `Origen no permitido por CORS: ${origin}`));
       },
       credentials: true,
     }),
