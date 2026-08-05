@@ -1,20 +1,58 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
+import { api, ApiError } from '@/lib/api';
 
-const SESSION_STORAGE_KEY = 'activa_reforce_session';
+/**
+ * Autenticacion contra Supabase Auth + backend PVCAR.
+ *
+ * Lo que cambio respecto al sistema viejo:
+ *   - La contrasena ya no se compara en el navegador contra usu_contrasena en
+ *     texto plano. La valida Supabase Auth (bcrypt) via POST /auth/login.
+ *   - Ya no hay blob de sesion en localStorage con el usuario y sus permisos
+ *     dentro. Quien guarda la sesion es supabase-js (y solo los tokens); el
+ *     usuario y los permisos se piden a GET /me en cada arranque. Antes se
+ *     podian editar a mano en el navegador y el frontend los creia.
+ *   - Los datos ya no salen de supabase.from(...): salen del API.
+ *
+ * El contrato del contexto se mantiene (user, permissions, permissionMap,
+ * hasPermission, ...) para no tocar los 39 archivos que lo consumen.
+ */
 
-type Usuario = Database['public']['Tables']['usuario']['Row'];
-type Rol = Database['public']['Tables']['rol']['Row'];
-
-interface UserWithRoles extends Usuario {
-  roles: Rol[];
+export interface Rol {
+  rol_id: number;
+  rol_nombre: string;
+  rol_titulo: string;
+  rol_descripcion: string | null;
 }
 
-type PermissionRow = {
+export interface Permiso {
   modulo: string;
   accion: string;
-};
+}
+
+/** Usuario de dominio tal como lo devuelve GET /me. Sin contrasena. */
+export interface UserWithRoles {
+  usu_id: number;
+  auth_user_id: string | null;
+  usu_nombre: string;
+  usu_correo: string;
+  usu_foto: string | null;
+  usu_telefono: string | null;
+  usu_fecha_creacion: string | null;
+  usu_fecha_modificacion: string | null;
+  est_id: number;
+  roles: Rol[];
+  permisos: Permiso[];
+}
 
 type PermissionMap = {
   [modulo: string]: {
@@ -24,6 +62,11 @@ type PermissionMap = {
     eliminar?: boolean;
   };
 };
+
+interface LoginResponse {
+  session: { access_token: string; refresh_token: string };
+  usuario: UserWithRoles;
+}
 
 interface AuthContextType {
   user: UserWithRoles | null;
@@ -35,7 +78,15 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ error: Error | null }>;
   logout: () => Promise<void>;
   checkSession: () => Promise<boolean>;
-  resetPassword: (email: string, newPassword: string) => Promise<boolean>;
+  /** Manda el correo con el enlace de recuperacion. No revela si existe. */
+  requestPasswordReset: (email: string) => Promise<boolean>;
+  /** Fija la contrasena con la sesion de recuperacion activa (pantalla del enlace). */
+  updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
+  /** Cambia la contrasena desde el perfil, exigiendo la actual. */
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,392 +106,229 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<UserWithRoles | null>(null);
   const [loading, setLoading] = useState(true);
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [permissionMap, setPermissionMap] = useState<PermissionMap>({});
 
-  // Save session to localStorage
-  const saveSession = (userData: UserWithRoles, perms: string[], permMap: PermissionMap) => {
+  // Espejo de user para que los callbacks no dependan del estado y conserven
+  // su identidad entre renders: ProtectedRoute tiene checkSession en las deps
+  // de un useEffect, y una identidad nueva por render lo haria girar en vacio.
+  const userRef = useRef<UserWithRoles | null>(null);
+  userRef.current = user;
+
+  // Promesa del arranque. checkSession la espera para no concluir "no hay
+  // sesion" mientras el primer GET /me todavia esta en vuelo.
+  const bootstrapRef = useRef<Promise<void> | null>(null);
+
+  /**
+   * Trae usuario + roles + permisos del backend.
+   * Distingue fallo definitivo de fallo pasajero, y eso importa: cerrarle la
+   * sesion a alguien porque se le cayo el wifi un segundo es justo el bug que
+   * el sistema viejo trataba de evitar con reintentos a mano.
+   *   401 — apiFetch ya cerro la sesion. Se limpia el usuario.
+   *   403 — inactivo o sin enlazar en Auth. Se cierra sesion explicitamente.
+   *   red — un reintento; si vuelve a fallar se deja el usuario como estaba.
+   */
+  const loadMe = useCallback(async (reintento = false): Promise<UserWithRoles | null> => {
     try {
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
-        user: userData,
-        permissions: perms,
-        permissionMap: permMap,
-        timestamp: Date.now()
-      }));
-    } catch (error) {
-      console.error('Failed to save session:', error);
-    }
-  };
-
-  // Clear session from localStorage
-  const clearSession = () => {
-    try {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
-    } catch (error) {
-      console.error('Failed to clear session:', error);
-    }
-  };
-
-  // Load session from localStorage
-  const loadStoredSession = () => {
-    try {
-      const stored = localStorage.getItem(SESSION_STORAGE_KEY);
-      if (!stored) return null;
-      const parsed = JSON.parse(stored);
-      return parsed;
-    } catch (error) {
-      console.error('Failed to load session:', error);
-      return null;
-    }
-  };
-
-  const loadPermissionsForRoles = async (roleIds: number[]) => {
-    if (!roleIds || roleIds.length === 0) {
-      setPermissions([]);
-      setPermissionMap({});
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('rol_permiso')
-      .select('modulo, accion')
-      .in('rol_id', roleIds);
-
-    if (error) {
-      setPermissions([]);
-      setPermissionMap({});
-      return;
-    }
-
-    const permissionRows = data as PermissionRow[];
-    
-    // Build permission map for granular access
-    const newPermissionMap: PermissionMap = {};
-    permissionRows.forEach(({ modulo, accion }) => {
-      if (!newPermissionMap[modulo]) {
-        newPermissionMap[modulo] = {};
-      }
-      newPermissionMap[modulo][accion as keyof PermissionMap[string]] = true;
-    });
-
-    // Keep legacy permissions array for backward compatibility (only 'ver' actions)
-    const legacyPermissions = Array.from(
-      new Set(
-        permissionRows
-          .filter(p => p.accion === 'ver')
-          .map(p => p.modulo)
-      )
-    );
-
-    setPermissions(legacyPermissions);
-    setPermissionMap(newPermissionMap);
-  };
-
-  const loadUserWithRoles = async (email: string): Promise<UserWithRoles | null> => {
-    try {
-      // Get user by email
-      const { data: userData, error: userError } = await supabase
-        .from('usuario')
-        .select('*')
-        .eq('usu_correo', email)
-        .maybeSingle();
-
-      if (userError || !userData) {
+      const me = await api.get<UserWithRoles>('/me');
+      setUser(me);
+      return me;
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 403) {
+          await supabase.auth.signOut();
+        }
+        setUser(null);
         return null;
       }
-
-      // Get user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('usuario_rol')
-        .select(`
-          rol:rol_id (
-            rol_id,
-            rol_nombre,
-            rol_titulo,
-            rol_descripcion
-          )
-        `)
-        .eq('usu_id', userData.usu_id);
-
-      if (rolesError) {
-        return null;
+      if (!reintento) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return loadMe(true);
       }
-
-      // Extract roles from the nested structure
-      const roles = (userRoles || [])
-        .map((ur: any) => ur.rol)
-        .filter(Boolean) as Rol[];
-
-      return {
-        ...userData,
-        roles
-      };
-    } catch (error) {
-      return null;
+      // Fallo de red persistente: no se toca la sesion.
+      console.error('No se pudo cargar /me:', err);
+      return userRef.current;
     }
-  };
-
-  const reloadPermissions = async (): Promise<void> => {
-    const roleIds = user?.roles?.map((r) => r.rol_id) ?? [];
-    await loadPermissionsForRoles(roleIds);
-  };
-
-  const login = async (email: string, password: string): Promise<{ error: Error | null }> => {
-    try {
-      setLoading(true);
-
-      // First verify credentials exist in our usuario table
-      const { data: userData, error: userError } = await supabase
-        .from('usuario')
-        .select('usu_id, usu_correo, usu_contrasena, est_id')
-        .eq('usu_correo', email)
-        .eq('usu_contrasena', password)
-        .maybeSingle();
-
-      if (userError) {
-        return { error: new Error('Error al conectar con el servidor') };
-      }
-
-      if (!userData) {
-        return { error: new Error('Correo o contraseña incorrectos') };
-      }
-
-      // Validate that user is active (est_id === 1)
-      if (userData.est_id !== 1) {
-        return { error: new Error('Usuario inactivo o no autorizado') };
-      }
-
-      // If credentials are valid and user is active, load user with roles
-      const userWithRoles = await loadUserWithRoles(email);
-      if (!userWithRoles) {
-        return { error: new Error('Error al cargar la información del usuario') };
-      }
-
-      setUser(userWithRoles);
-      // Load permissions from rol_permiso
-      await loadPermissionsForRoles(userWithRoles.roles.map((r) => r.rol_id));
-
-      // Persist session to localStorage
-      const roleIds = userWithRoles.roles.map((r) => r.rol_id);
-      const { data: permData } = await supabase
-        .from('rol_permiso')
-        .select('modulo, accion')
-        .in('rol_id', roleIds);
-
-      if (permData) {
-        const permissionRows = permData as PermissionRow[];
-        const newPermissionMap: PermissionMap = {};
-        permissionRows.forEach(({ modulo, accion }) => {
-          if (!newPermissionMap[modulo]) {
-            newPermissionMap[modulo] = {};
-          }
-          newPermissionMap[modulo][accion as keyof PermissionMap[string]] = true;
-        });
-        const legacyPermissions = Array.from(
-          new Set(
-            permissionRows
-              .filter(p => p.accion === 'ver')
-              .map(p => p.modulo)
-          )
-        );
-        saveSession(userWithRoles, legacyPermissions, newPermissionMap);
-      }
-
-      return { error: null };
-    } catch (error) {
-      return { error: new Error('Error durante el inicio de sesión') };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = async (): Promise<void> => {
-    setUser(null);
-    setPermissions([]);
-    setPermissionMap({});
-    clearSession();
-  };
-
-  const checkSession = async (): Promise<boolean> => {
-    // Check in-memory state first
-    if (user !== null) return true;
-
-    // Try to restore from localStorage
-    const stored = loadStoredSession();
-    if (!stored) return false;
-
-    // Helper function to validate with retry logic
-    const validateUser = async (retryCount = 0): Promise<{ valid: boolean; definitive: boolean }> => {
-      try {
-        const { data: userData, error } = await supabase
-          .from('usuario')
-          .select('usu_id, est_id')
-          .eq('usu_id', stored.user.usu_id)
-          .maybeSingle();
-
-        // If we got data, check if user is active
-        if (userData) {
-          return { valid: userData.est_id === 1, definitive: true };
-        }
-
-        // If no data and no error, user doesn't exist (definitive)
-        if (!error) {
-          return { valid: false, definitive: true };
-        }
-
-        // If there's an error, it might be transient
-        // Retry once on network/temporary errors
-        if (retryCount < 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          return validateUser(retryCount + 1);
-        }
-
-        // After retry, assume transient error - keep session but return false
-        return { valid: false, definitive: false };
-      } catch (error) {
-        // Network or unexpected error - retry once
-        if (retryCount < 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          return validateUser(retryCount + 1);
-        }
-        // After retry, assume transient - keep session
-        return { valid: false, definitive: false };
-      }
-    };
-
-    const { valid, definitive } = await validateUser();
-
-    // Only clear session if we definitively know the user is invalid
-    if (!valid && definitive) {
-      clearSession();
-      return false;
-    }
-
-    // If validation passed, restore session to state
-    if (valid) {
-      setUser(stored.user);
-      setPermissions(stored.permissions || []);
-      setPermissionMap(stored.permissionMap || {});
-      return true;
-    }
-
-    // If transient error, keep session in localStorage but return false
-    // This prevents logout but allows retry on next navigation
-    return false;
-  };
-
-  const resetPassword = async (email: string, newPassword: string): Promise<boolean> => {
-    try {
-      // Verify user exists
-      const { data: userData, error: userError } = await supabase
-        .from('usuario')
-        .select('usu_id')
-        .eq('usu_correo', email)
-        .maybeSingle();
-
-      if (userError || !userData) {
-        return false;
-      }
-
-      // Update password
-      const { error: updateError } = await supabase
-        .from('usuario')
-        .update({ 
-          usu_contrasena: newPassword,
-          usu_fecha_modificacion: new Date().toISOString()
-        })
-        .eq('usu_correo', email);
-
-      if (updateError) {
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  useEffect(() => {
-    const restoreSession = async () => {
-      const stored = loadStoredSession();
-      if (stored) {
-        // Validate user is still active with retry logic
-        const validateWithRetry = async (retryCount = 0): Promise<boolean> => {
-          try {
-            const { data: userData, error } = await supabase
-              .from('usuario')
-              .select('usu_id, est_id')
-              .eq('usu_id', stored.user.usu_id)
-              .maybeSingle();
-
-            // Successfully retrieved data
-            if (userData) {
-              return userData.est_id === 1;
-            }
-
-            // No data and no error means user doesn't exist
-            if (!error) {
-              return false;
-            }
-
-            // Error occurred - retry once if this is first attempt
-            if (retryCount < 1) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-              return validateWithRetry(retryCount + 1);
-            }
-
-            // After retry, assume transient error - restore session anyway
-            return true;
-          } catch (error) {
-            // Network error - retry once
-            if (retryCount < 1) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-              return validateWithRetry(retryCount + 1);
-            }
-            // After retry, restore session to prevent unnecessary logout
-            return true;
-          }
-        };
-
-        const isValid = await validateWithRetry();
-        
-        if (isValid) {
-          setUser(stored.user);
-          setPermissions(stored.permissions || []);
-          setPermissionMap(stored.permissionMap || {});
-        } else {
-          // Only clear if definitively invalid
-          clearSession();
-        }
-      }
-      setLoading(false);
-    };
-
-    restoreSession();
   }, []);
 
-  // Enhanced hasPermission function with optional action parameter
-  const hasPermission = (modulo: string, accion: string = 'ver') => {
-    return permissionMap[modulo]?.[accion as keyof PermissionMap[string]] === true;
-  };
+  useEffect(() => {
+    const bootstrap = (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-  const value: AuthContextType = {
-    user,
-    loading,
-    permissions,
-    permissionMap,
-    hasPermission,
-    reloadPermissions,
-    login,
-    logout,
-    checkSession,
-    resetPassword,
-  };
+      if (session) {
+        await loadMe();
+      }
+      setLoading(false);
+    })();
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+    bootstrapRef.current = bootstrap;
+
+    // Sin await dentro del callback: supabase-js lo llama con su lock tomado
+    // y esperar ahi puede trabar al cliente.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadMe]);
+
+  const permissionMap = useMemo<PermissionMap>(() => {
+    const map: PermissionMap = {};
+    for (const { modulo, accion } of user?.permisos ?? []) {
+      map[modulo] ??= {};
+      map[modulo][accion as keyof PermissionMap[string]] = true;
+    }
+    return map;
+  }, [user]);
+
+  // Array legado: solo los modulos con accion 'ver'.
+  const permissions = useMemo<string[]>(
+    () =>
+      Array.from(
+        new Set((user?.permisos ?? []).filter((p) => p.accion === 'ver').map((p) => p.modulo)),
+      ),
+    [user],
   );
+
+  const hasPermission = useCallback(
+    (modulo: string, accion: string = 'ver') =>
+      permissionMap[modulo]?.[accion as keyof PermissionMap[string]] === true,
+    [permissionMap],
+  );
+
+  const reloadPermissions = useCallback(async (): Promise<void> => {
+    await loadMe();
+  }, [loadMe]);
+
+  const login = useCallback(
+    async (email: string, password: string): Promise<{ error: Error | null }> => {
+      try {
+        // signOutOn401: false — aqui un 401 es "credenciales malas", no
+        // "sesion expirada", y no debe borrar la sesion de nadie.
+        const { session, usuario } = await api.post<LoginResponse>(
+          '/auth/login',
+          { email, password },
+          { signOutOn401: false },
+        );
+
+        // La sesion se instala en supabase-js para que el refresh del token
+        // corra por su cuenta. El backend no reimplementa eso.
+        const { error } = await supabase.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+
+        if (error) {
+          return { error: new Error('No se pudo guardar la sesion en este navegador') };
+        }
+
+        setUser(usuario);
+        return { error: null };
+      } catch (err) {
+        if (err instanceof ApiError) {
+          return { error: new Error(err.message) };
+        }
+        return { error: new Error('No se pudo conectar con el servidor') };
+      }
+    },
+    [],
+  );
+
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      // Revoca los refresh tokens en el servidor. Si falla, la sesion local
+      // se cierra igual: nunca se deja al usuario dentro por un error de red.
+      await api.post('/auth/logout');
+    } catch (err) {
+      console.error('No se pudo revocar la sesion en el servidor:', err);
+    }
+    await supabase.auth.signOut();
+    setUser(null);
+  }, []);
+
+  const checkSession = useCallback(async (): Promise<boolean> => {
+    if (bootstrapRef.current) {
+      await bootstrapRef.current;
+    }
+    if (userRef.current) {
+      return true;
+    }
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      return false;
+    }
+    return (await loadMe()) !== null;
+  }, [loadMe]);
+
+  const requestPasswordReset = useCallback(async (email: string): Promise<boolean> => {
+    try {
+      await api.post('/auth/forgot-password', { email });
+      return true;
+    } catch (err) {
+      console.error('Fallo la solicitud de recuperacion:', err);
+      return false;
+    }
+  }, []);
+
+  const updatePassword = useCallback(
+    async (newPassword: string): Promise<{ error: Error | null }> => {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      return { error: error ? new Error(error.message) : null };
+    },
+    [],
+  );
+
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string): Promise<{ error: Error | null }> => {
+      try {
+        await api.post('/auth/change-password', { currentPassword, newPassword });
+        return { error: null };
+      } catch (err) {
+        if (err instanceof ApiError) {
+          return { error: new Error(err.message) };
+        }
+        return { error: new Error('No se pudo conectar con el servidor') };
+      }
+    },
+    [],
+  );
+
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user,
+      loading,
+      permissions,
+      permissionMap,
+      hasPermission,
+      reloadPermissions,
+      login,
+      logout,
+      checkSession,
+      requestPasswordReset,
+      updatePassword,
+      changePassword,
+    }),
+    [
+      user,
+      loading,
+      permissions,
+      permissionMap,
+      hasPermission,
+      reloadPermissions,
+      login,
+      logout,
+      checkSession,
+      requestPasswordReset,
+      updatePassword,
+      changePassword,
+    ],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { allowedOrigins, env } from './config/env.js';
 import { ApiError, errorHandler, notFoundHandler } from './middleware/error.js';
 import { healthRouter } from './modules/health/health.routes.js';
+import { authRouter, meRouter } from './modules/auth/auth.routes.js';
 
 export function createApp(): Application {
   const app = express();
@@ -46,7 +47,12 @@ export function createApp(): Application {
     }),
   );
 
-  // Aqui se montan los modulos: api.use('/usuarios', usuariosRouter), etc.
+  // Autenticacion. Sus endpoints con contrasena traen su propio rate limit,
+  // mas estricto que el general (ver auth.routes.ts).
+  api.use('/auth', authRouter);
+  api.use(meRouter);
+
+  // Aqui se montan los demas modulos: api.use('/usuarios', usuariosRouter), etc.
 
   app.use('/api/v1', api);
 

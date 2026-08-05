@@ -32,8 +32,19 @@ export const allowedOrigins: string[] = env.FRONTEND_ORIGIN.split(',')
   .map((o) => o.trim())
   .filter(Boolean);
 
+/**
+ * Origen canonico del frontend: el PRIMERO de FRONTEND_ORIGIN.
+ * Con el se arma el enlace del correo de recuperacion de contrasena, asi que
+ * el orden de la variable importa: el primero debe ser el dominio real del
+ * ambiente (pvcar.vercel.app en production, dev-pvcar.vercel.app en development).
+ */
+export const frontendBaseUrl: string =
+  allowedOrigins[0] ?? 'http://localhost:5173';
+
 /** Lanza si falta un secreto que un endpoint requiere en runtime. */
-export function requireSecret(key: 'SUPABASE_SERVICE_ROLE_KEY' | 'DATABASE_URL'): string {
+export function requireSecret(
+  key: 'SUPABASE_SERVICE_ROLE_KEY' | 'SUPABASE_ANON_KEY' | 'DATABASE_URL',
+): string {
   const value = env[key];
   if (!value) {
     throw new Error(`Falta variable de entorno requerida: ${key}`);

@@ -7,19 +7,19 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { es } from "date-fns/locale";
 
 const Perfil = () => {
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: ""
   });
 
-  const { user } = useAuth();
+  const { user, changePassword } = useAuth();
   const { toast } = useToast();
 
   const getRoleBadgeColor = (role?: string) => {
@@ -73,14 +73,20 @@ const Perfil = () => {
     }));
   };
 
+  /**
+   * Cambio de contraseña contra POST /auth/change-password.
+   * Antes esto leía y escribía usu_contrasena en texto plano desde el
+   * navegador: la contraseña actual se comparaba con un .eq() y la nueva se
+   * guardaba tal cual. Ahora el backend reautentica y Supabase Auth la hashea;
+   * la validación de la nueva la hace el servidor, no solo esta pantalla.
+   */
   const handlePasswordUpdate = async () => {
     if (!user) return;
 
-    // Validate password inputs
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
       toast({
-        title: "Missing Fields",
-        description: "Please fill in all password fields",
+        title: "Campos incompletos",
+        description: "Complete los tres campos de contraseña",
         variant: "destructive"
       });
       return;
@@ -88,8 +94,8 @@ const Perfil = () => {
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast({
-        title: "Password Mismatch",
-        description: "New password and confirmation do not match",
+        title: "Las contraseñas no coinciden",
+        description: "La nueva contraseña y su confirmación son distintas",
         variant: "destructive"
       });
       return;
@@ -97,69 +103,42 @@ const Perfil = () => {
 
     if (passwordData.newPassword.length < 6) {
       toast({
-        title: "Password Too Short",
-        description: "Password must be at least 6 characters long",
+        title: "Contraseña muy corta",
+        description: "La contraseña debe tener al menos 6 caracteres",
         variant: "destructive"
       });
       return;
     }
 
-    // First verify the current password
-    try {
-      const { data, error } = await supabase
-        .from('usuario')
-        .select('usu_id')
-        .eq('usu_id', user.usu_id)
-        .eq('usu_contrasena', passwordData.currentPassword)
-        .single();
+    setIsSavingPassword(true);
 
-      if (error || !data) {
-        toast({
-          title: "Password Error",
-          description: "Current password is incorrect",
-          variant: "destructive"
-        });
-        return;
-      }
+    const { error } = await changePassword(
+      passwordData.currentPassword,
+      passwordData.newPassword
+    );
 
-      // Update the password
-      const { error: updateError } = await supabase
-        .from('usuario')
-        .update({
-          usu_contrasena: passwordData.newPassword,
-          usu_fecha_modificacion: new Date().toISOString()
-        })
-        .eq('usu_id', user.usu_id);
+    setIsSavingPassword(false);
 
-      if (updateError) {
-        toast({
-          title: "Error en la Actualización",
-          description: "Fallo al actualizar la contraseña. Porfavor intente nuevamente.",
-          variant: "destructive"
-        });
-        return;
-      }
-
+    if (error) {
       toast({
-        title: "Contraseña actualizada",
-        description: "Su contraseña fue actualizada correctamente"
-      });
-
-      // Reset form and close edit mode
-      setPasswordData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: ""
-      });
-      setIsEditingPassword(false);
-    } catch (error) {
-      console.error("Password update error:", error);
-      toast({
-        title: "Error",
-        description: "Error inesperado, comuniquese con el administrador",
+        title: "No se pudo cambiar la contraseña",
+        description: error.message,
         variant: "destructive"
       });
+      return;
     }
+
+    toast({
+      title: "Contraseña actualizada",
+      description: "Su contraseña fue actualizada correctamente"
+    });
+
+    setPasswordData({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: ""
+    });
+    setIsEditingPassword(false);
   };
 
   return (
@@ -265,11 +244,12 @@ const Perfil = () => {
                       />
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <Button 
-                        onClick={handlePasswordUpdate} 
+                      <Button
+                        onClick={handlePasswordUpdate}
+                        disabled={isSavingPassword}
                         className="bg-[#FD5757] hover:bg-[#E04747] text-white dark:bg-[#FD5757] dark:hover:bg-[#E04747] dark:text-white"
                       >
-                        Actualizar Contraseña
+                        {isSavingPassword ? "Actualizando..." : "Actualizar Contraseña"}
                       </Button>
                       <Button 
                         variant="outline" 
