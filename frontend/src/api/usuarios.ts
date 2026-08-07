@@ -107,30 +107,30 @@ function queryString(filtros: FiltrosUsuarios): string {
 
 export const usuariosApi = {
   listar: (filtros: FiltrosUsuarios) =>
-    api.get<PaginaUsuarios>(`/api/v1/usuarios${queryString(filtros)}`),
+    api.get<PaginaUsuarios>(`/usuarios${queryString(filtros)}`),
 
-  roles: () => api.get<Rol[]>('/api/v1/usuarios/roles'),
+  roles: () => api.get<Rol[]>('/usuarios/roles'),
 
-  obtener: (id: number) => api.get<UsuarioDetalle>(`/api/v1/usuarios/${id}`),
+  obtener: (id: number) => api.get<UsuarioDetalle>(`/usuarios/${id}`),
 
-  crear: (datos: DatosUsuario) => api.post<UsuarioDetalle>('/api/v1/usuarios', datos),
+  crear: (datos: DatosUsuario) => api.post<UsuarioDetalle>('/usuarios', datos),
 
   actualizar: (id: number, datos: DatosUsuario) =>
-    api.patch<UsuarioDetalle>(`/api/v1/usuarios/${id}`, datos),
+    api.patch<UsuarioDetalle>(`/usuarios/${id}`, datos),
 
-  darDeBaja: (id: number) => api.post<UsuarioDetalle>(`/api/v1/usuarios/${id}/baja`),
+  darDeBaja: (id: number) => api.post<UsuarioDetalle>(`/usuarios/${id}/baja`),
 
-  reactivar: (id: number) => api.post<UsuarioDetalle>(`/api/v1/usuarios/${id}/reactivar`),
+  reactivar: (id: number) => api.post<UsuarioDetalle>(`/usuarios/${id}/reactivar`),
 
-  impacto: (id: number) => api.get<ImpactoEliminacion>(`/api/v1/usuarios/${id}/impacto`),
+  impacto: (id: number) => api.get<ImpactoEliminacion>(`/usuarios/${id}/impacto`),
 
   /**
    * El nombre escrito por quien confirma viaja al servidor: la comprobacion
    * la hace el backend, no el modal.
    */
   eliminar: (id: number, confirmacion: string) =>
-    api.delete<ImpactoEliminacion>(`/api/v1/usuarios/${id}`, { confirmacion }),
+    api.delete<ImpactoEliminacion>(`/usuarios/${id}`, { confirmacion }),
 
   urlDeSubida: (mimeType: string) =>
-    api.post<SubidaFirmada>('/api/v1/usuarios/foto', { mimeType }),
+    api.post<SubidaFirmada>('/usuarios/foto', { mimeType }),
 };

@@ -6,6 +6,20 @@ if (!API_URL) {
   throw new Error('Falta VITE_API_URL. Revisa tu .env (ver .env.example).');
 }
 
+/**
+ * VITE_API_URL YA incluye el prefijo /api/v1 (asi esta sembrada en Vercel, en
+ * los dos ambientes). Las rutas que se le pasan a este cliente van sin el:
+ * '/usuarios', no '/api/v1/usuarios'.
+ *
+ * Duplicarlo costo una tanda de pruebas: la llamada salia a
+ * .../api/v1/api/v1/usuarios y el backend contestaba 404 "Recurso no
+ * encontrado", que parece que falta el endpoint y no que sobra el prefijo.
+ * Por si vuelve a pasar, aqui se quita.
+ */
+function normalizarRuta(path: string): string {
+  return path.startsWith('/api/v1/') ? path.slice('/api/v1'.length) : path;
+}
+
 /** Forma estandar de respuesta del backend: { data, error }. */
 export interface ApiResponse<T> {
   data: T | null;
@@ -53,7 +67,7 @@ export async function apiFetch<T>(
     headers.set('Authorization', `Bearer ${session.access_token}`);
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  const res = await fetch(`${API_URL}${normalizarRuta(path)}`, { ...init, headers });
 
   if (res.status === 401 && signOutOn401) {
     await supabase.auth.signOut();

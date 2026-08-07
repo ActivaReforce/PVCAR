@@ -24,8 +24,8 @@ export interface MatrizPermisos {
  * selector; son 97 filas en total, no vale la pena pedirlas por partes.
  */
 export const permisosApi = {
-  matriz: () => api.get<MatrizPermisos>('/api/v1/permisos'),
+  matriz: () => api.get<MatrizPermisos>('/permisos'),
 
   guardar: (rolId: number, permisos: Permiso[]) =>
-    api.put<Permiso[]>(`/api/v1/permisos/rol/${rolId}`, { permisos }),
+    api.put<Permiso[]>(`/permisos/rol/${rolId}`, { permisos }),
 };
