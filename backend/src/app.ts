@@ -6,6 +6,9 @@ import { allowedOrigins, env } from './config/env.js';
 import { ApiError, errorHandler, notFoundHandler } from './middleware/error.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { authRouter, meRouter } from './modules/auth/auth.routes.js';
+import { usuariosRouter } from './modules/usuarios/usuarios.routes.js';
+import { permisosRouter } from './modules/permisos/permisos.routes.js';
+import { perfilRouter } from './modules/perfil/perfil.routes.js';
 
 export function createApp(): Application {
   const app = express();
@@ -52,7 +55,10 @@ export function createApp(): Application {
   api.use('/auth', authRouter);
   api.use(meRouter);
 
-  // Aqui se montan los demas modulos: api.use('/usuarios', usuariosRouter), etc.
+  // Modulos de negocio (Fase 6 en adelante).
+  api.use('/usuarios', usuariosRouter);
+  api.use('/permisos', permisosRouter);
+  api.use('/perfil', perfilRouter);
 
   app.use('/api/v1', api);
 

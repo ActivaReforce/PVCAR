@@ -123,6 +123,40 @@ describe('Autenticacion — puertas que no dependen de la red', () => {
   });
 });
 
+/**
+ * Modulo de la Fase 6. Igual que arriba: solo lo que se decide antes de tocar
+ * la base. Que ninguna de estas rutas conteste sin token es la mitad del
+ * arreglo — en el sistema viejo la pantalla de usuarios consultaba la tabla
+ * entera con la anon key del bundle.
+ */
+describe('Usuarios, permisos y perfil — cerrados sin token', () => {
+  const rutas: Array<[string, string]> = [
+    ['GET', '/api/v1/usuarios'],
+    ['GET', '/api/v1/usuarios/roles'],
+    ['GET', '/api/v1/usuarios/1'],
+    ['GET', '/api/v1/usuarios/1/impacto'],
+    ['POST', '/api/v1/usuarios'],
+    ['PATCH', '/api/v1/usuarios/1'],
+    ['POST', '/api/v1/usuarios/1/baja'],
+    ['POST', '/api/v1/usuarios/1/reactivar'],
+    ['DELETE', '/api/v1/usuarios/1'],
+    ['GET', '/api/v1/permisos'],
+    ['PUT', '/api/v1/permisos/rol/1'],
+    ['GET', '/api/v1/perfil'],
+    ['PATCH', '/api/v1/perfil'],
+    ['POST', '/api/v1/perfil/foto'],
+  ];
+
+  it.each(rutas)('%s %s responde 401 sin token', async (metodo, ruta) => {
+    const res = await fetch(`${base}${ruta}`, {
+      method: metodo,
+      headers: { 'Content-Type': 'application/json' },
+      body: metodo === 'GET' ? undefined : JSON.stringify({}),
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('404', () => {
   it('devuelve 404 con la forma { data, error } en una ruta inexistente', async () => {
     const res = await fetch(`${base}/api/v1/no-existe`);
