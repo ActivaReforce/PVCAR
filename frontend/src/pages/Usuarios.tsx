@@ -200,11 +200,13 @@ const Usuarios = () => {
         getSelectedRoleNames={() => nombresDeRolesSeleccionados}
       />
 
+      {/* Ancho completo: con max-w-sm el placeholder se cortaba a media
+          palabra teniendo media pantalla libre al lado. */}
       <DebouncedSearchInput
         placeholder="Buscar por nombre o correo..."
         value={busqueda}
         onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
-        className="w-full sm:max-w-sm"
+        className="w-full"
       />
 
       <div className="space-y-4">
@@ -249,7 +251,7 @@ const Usuarios = () => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
               {editandoId !== null ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
@@ -276,7 +278,7 @@ const Usuarios = () => {
       </Dialog>
 
       <Dialog open={viendoId !== null} onOpenChange={(abierto) => !abierto && setViendoId(null)}>
-        <DialogContent className="sm:max-w-md md:max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md md:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">Detalles del Usuario</DialogTitle>
           </DialogHeader>

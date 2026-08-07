@@ -16,13 +16,8 @@ const UsuariosHeader = ({ onCreateUser }: UsuariosHeaderProps) => {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Gestión de Usuarios</h1>
-      {/* Rojo de marca fijo: el texto se fija tambien, que si no en modo
-          oscuro hereda un primary-foreground casi negro. */}
       {canCreate('usuarios') && (
-        <Button
-          onClick={onCreateUser}
-          className="bg-[#FD5757] hover:bg-[#E04747] text-white w-full sm:w-auto"
-        >
+        <Button onClick={onCreateUser} variant="brand" className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Nuevo Usuario
         </Button>

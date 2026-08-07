@@ -89,7 +89,7 @@ const EliminarUsuarioDialog = ({ usuario, onClose, onEliminado }: Props) => {
             <AlertTriangle className="h-5 w-5" />
             Eliminar permanentemente
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="break-words">
             Vas a eliminar a <strong>{usuario?.usu_nombre}</strong> ({usuario?.usu_correo}).
             <strong> Esta acción no se puede deshacer.</strong>
           </DialogDescription>
@@ -144,7 +144,9 @@ const EliminarUsuarioDialog = ({ usuario, onClose, onEliminado }: Props) => {
           </div>
         )}
 
-        <DialogFooter>
+        {/* En movil los botones se apilan y el de accion queda arriba: en una
+            pantalla estrecha, Cancelar debe ser el que cae bajo el pulgar. */}
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-0">
           <Button variant="outline" onClick={cerrar}>
             Cancelar
           </Button>
