@@ -74,7 +74,13 @@ const Usuarios = () => {
 
   const roles = useMemo(() => rolesQuery.data ?? [], [rolesQuery.data]);
   const usuarios = lista.data?.items ?? [];
-  const conteos = lista.data?.conteos ?? { total: 0, activos: 0, inactivos: 0, porRol: {} };
+  const conteos = lista.data?.conteos ?? {
+    total: 0,
+    activos: 0,
+    inactivos: 0,
+    porRol: {},
+    totalDelEstado: 0,
+  };
   const totalPages = lista.data?.totalPages ?? 0;
   const totalItems = lista.data?.total ?? 0;
 
@@ -84,14 +90,13 @@ const Usuarios = () => {
     setPage(1);
   };
 
+  /**
+   * La cabecera manda el nombre logico de la columna ('nombre', 'estado',
+   * 'creacion'); el backend lo traduce a SQL contra una lista blanca. Pulsar
+   * la columna que ya ordena invierte el sentido.
+   */
   const handleSort = (key: string) => {
-    const columnas: Record<string, FiltrosUsuarios['orden']> = {
-      usu_nombre: 'nombre',
-      usu_correo: 'correo',
-      usu_fecha_creacion: 'creacion',
-      est_id: 'estado',
-    };
-    const columna = columnas[key] ?? (key as FiltrosUsuarios['orden']);
+    const columna = key as FiltrosUsuarios['orden'];
     cambiarFiltro(() => {
       if (columna === orden) {
         setDir(dir === 'asc' ? 'desc' : 'asc');
@@ -162,7 +167,7 @@ const Usuarios = () => {
         viewMode={viewMode}
         roles={roles}
         conteosPorRol={conteos.porRol}
-        totalUsuarios={conteos.total}
+        totalUsuarios={conteos.totalDelEstado}
         totalFiltrado={totalItems}
         selectedRoles={selectedRoles}
         onRoleToggle={(rolId) =>

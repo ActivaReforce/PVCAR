@@ -8,6 +8,7 @@ import { SortDirection } from "@/hooks/useSorting";
 import { ConditionalAction } from "@/components/ui/conditional-actions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import UserActionMenu from "./UserActionMenu";
+import SortableTableHeader from "@/components/ui/sortable-table-header";
 import type { UsuarioListado } from "@/api/usuarios";
 
 /**
@@ -114,9 +115,37 @@ const UserTable = ({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[250px]">Usuario</TableHead>
+            {/*
+              El orden lo resuelve el servidor: la cabecera solo dice por que
+              columna y en que sentido. Antes estas cabeceras no ordenaban nada.
+            */}
+            <SortableTableHeader
+              sortKey="nombre"
+              currentSortKey={sortKey ?? null}
+              sortDirection={sortDirection ?? null}
+              onSort={onSort}
+              className="w-[250px]"
+            >
+              Usuario
+            </SortableTableHeader>
             <TableHead>Roles</TableHead>
-            <TableHead>Estado</TableHead>
+            <SortableTableHeader
+              sortKey="estado"
+              currentSortKey={sortKey ?? null}
+              sortDirection={sortDirection ?? null}
+              onSort={onSort}
+            >
+              Estado
+            </SortableTableHeader>
+            <SortableTableHeader
+              sortKey="creacion"
+              currentSortKey={sortKey ?? null}
+              sortDirection={sortDirection ?? null}
+              onSort={onSort}
+              className="w-[150px]"
+            >
+              Creado
+            </SortableTableHeader>
             <TableHead className="w-[150px]">Acciones</TableHead>
           </TableRow>
         </TableHeader>
@@ -153,6 +182,11 @@ const UserTable = ({
                   <Badge variant={user.est_id === 1 ? "default" : "secondary"}>
                     {user.est_id === 1 ? "Activo" : "Inactivo"}
                   </Badge>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {user.usu_fecha_creacion
+                    ? new Date(user.usu_fecha_creacion).toLocaleDateString()
+                    : '—'}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">

@@ -81,6 +81,15 @@ describe('listarUsuariosSchema', () => {
     const res = listarUsuariosSchema.safeParse({ orden: 'usu_contrasena' });
     expect(res.success).toBe(false);
   });
+
+  it('admite varios roles separados por coma', () => {
+    expect(listarUsuariosSchema.parse({ rol: '2,3' }).rol).toEqual([2, 3]);
+  });
+
+  it('ignora basura entre los roles en vez de romper la pantalla', () => {
+    expect(listarUsuariosSchema.parse({ rol: '3, ,x' }).rol).toEqual([3]);
+    expect(listarUsuariosSchema.parse({ rol: '' }).rol).toBeUndefined();
+  });
 });
 
 describe('eliminarUsuarioSchema', () => {

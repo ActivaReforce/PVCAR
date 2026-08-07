@@ -40,12 +40,21 @@ export interface UsuarioDetalle extends UsuarioListado {
   padre_sector_residencia: string | null;
 }
 
+/**
+ * Cada conteo ignora a proposito el filtro que gobierna, para que ningun boton
+ * se contradiga con el de al lado:
+ *   activos/inactivos/total  respetan los roles marcados, ignoran el estado.
+ *   porRol y totalDelEstado  respetan el estado, ignoran los roles marcados.
+ * La busqueda la respetan todos.
+ */
 export interface ConteosUsuarios {
   total: number;
   activos: number;
   inactivos: number;
   /** Usuarios por rol, contados en SQL: { "3": 49 }. */
   porRol: Record<string, number>;
+  /** El numero de "Ver Todos": cuantos hay en el estado elegido. */
+  totalDelEstado: number;
 }
 
 export interface PaginaUsuarios {

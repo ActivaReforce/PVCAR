@@ -32,12 +32,28 @@ export interface UsuarioDetalle extends UsuarioListado {
   padre_sector_residencia: string | null;
 }
 
+/**
+ * Los conteos de la pantalla, cada uno con su alcance. No es un capricho: si
+ * todos salieran del mismo filtro, cada boton se contradiria con el de al lado.
+ *
+ *   activos / inactivos / total  ignoran el filtro de ESTADO, porque son ellos
+ *       los que lo eligen. Si respetaran su propio filtro, al pulsar
+ *       "Inactivos" el boton "Activos" mostraria 0.
+ *   porRol y totalDelEstado      ignoran la seleccion de ROLES, por lo mismo:
+ *       al marcar Entrenador, los demas roles caerian a 0 y no habria forma de
+ *       ver cuantos hay en cada uno para elegir.
+ *
+ * La busqueda y el alcance del usuario los respetan todos.
+ */
 export interface ConteosUsuarios {
+  /** Con los roles seleccionados aplicados; sin el filtro de estado. */
   total: number;
   activos: number;
   inactivos: number;
-  /** Cuantos usuarios tiene cada rol, con la clave como texto: { "3": 49 }. */
+  /** Por rol, con el estado aplicado y sin la seleccion de roles. */
   porRol: Record<string, number>;
+  /** Cuantos hay en el estado elegido, sin filtrar por rol. Es el de "Ver Todos". */
+  totalDelEstado: number;
 }
 
 /**
@@ -81,18 +97,21 @@ const CTE_VISIBLES = `
 `;
 
 /**
- * Filtros comunes a la lista y a los conteos. Los parametros son siempre los
- * mismos y en el mismo orden, para que las dos consultas compartan el array:
- *   $1 global  $2 colegios  $3 yo  $4 buscar  $5 rol  $6 estado
+ * Los filtros van sueltos y se combinan segun lo que cada consulta necesite
+ * ignorar. Los parametros son siempre los mismos y en el mismo orden, para que
+ * todas las consultas compartan el array:
+ *   $1 global  $2 colegios  $3 yo  $4 buscar  $5 roles  $6 estado
  */
-const WHERE_BASE = `
-    WHERE ($1::boolean OR u.usu_id IN (SELECT usu_id FROM visibles))
-      AND ($4::text IS NULL OR u.usu_nombre ILIKE '%' || $4 || '%'
-                            OR u.usu_correo ILIKE '%' || $4 || '%')
-      AND ($5::int[] IS NULL OR EXISTS (
-              SELECT 1 FROM public.usuario_rol ur
-              WHERE ur.usu_id = u.usu_id AND ur.rol_id = ANY($5::int[])))
-`;
+const F_VISIBLE = `($1::boolean OR u.usu_id IN (SELECT usu_id FROM visibles))`;
+
+const F_BUSCAR = `($4::text IS NULL OR u.usu_nombre ILIKE '%' || $4 || '%'
+                                   OR u.usu_correo ILIKE '%' || $4 || '%')`;
+
+const F_ROL = `($5::int[] IS NULL OR EXISTS (
+                   SELECT 1 FROM public.usuario_rol ur
+                   WHERE ur.usu_id = u.usu_id AND ur.rol_id = ANY($5::int[])))`;
+
+const F_ESTADO = `($6::int IS NULL OR u.est_id = $6)`;
 
 const COLUMNAS_ORDEN: Record<string, string> = {
   nombre: 'u.usu_nombre',
@@ -151,8 +170,7 @@ export async function listarUsuarios(
         JOIN public.rol rol ON rol.rol_id = ur.rol_id
         WHERE ur.usu_id = u.usu_id
     ) r ON TRUE
-    ${WHERE_BASE}
-      AND ($6::int IS NULL OR u.est_id = $6)
+    WHERE ${F_VISIBLE} AND ${F_BUSCAR} AND ${F_ROL} AND ${F_ESTADO}
     ORDER BY ${columna} ${direccion}, u.usu_id ASC
     LIMIT $7 OFFSET $8
   `;
@@ -184,40 +202,47 @@ export async function contarUsuarios(
 ): Promise<ConteosUsuarios> {
   const sql = `
     WITH ${CTE_VISIBLES},
-    base AS (
+    -- Para los botones de estado: se aplica todo menos el propio estado.
+    sin_estado AS (
         SELECT u.usu_id, u.est_id
         FROM public.usuario u
-        ${WHERE_BASE}
+        WHERE ${F_VISIBLE} AND ${F_BUSCAR} AND ${F_ROL}
+    ),
+    -- Para las tarjetas de rol: se aplica todo menos la seleccion de roles.
+    sin_rol AS (
+        SELECT u.usu_id
+        FROM public.usuario u
+        WHERE ${F_VISIBLE} AND ${F_BUSCAR} AND ${F_ESTADO}
     )
     SELECT
-        (SELECT count(*) FROM base)                                    AS total,
-        (SELECT count(*) FROM base WHERE est_id = ${ESTADO.ACTIVO})    AS activos,
-        (SELECT count(*) FROM base WHERE est_id = ${ESTADO.INACTIVO})  AS inactivos,
+        (SELECT count(*) FROM sin_estado)                                    AS total,
+        (SELECT count(*) FROM sin_estado WHERE est_id = ${ESTADO.ACTIVO})    AS activos,
+        (SELECT count(*) FROM sin_estado WHERE est_id = ${ESTADO.INACTIVO})  AS inactivos,
+        (SELECT count(*) FROM sin_rol)                                       AS total_del_estado,
         COALESCE((
             SELECT json_object_agg(rol_id, n)
             FROM (
                 SELECT ur.rol_id, count(*) AS n
                 FROM public.usuario_rol ur
-                JOIN base b ON b.usu_id = ur.usu_id
+                JOIN sin_rol b ON b.usu_id = ur.usu_id
                 GROUP BY ur.rol_id
             ) x
         ), '{}'::json) AS por_rol
   `;
 
-  // Cinco parametros, no seis: esta consulta no filtra por estado y Postgres
-  // rechaza el bind si se le pasan mas parametros de los que el SQL nombra
-  // ("bind message supplies 6 parameters, but prepared statement requires 5").
   const { rows } = await getPool().query<{
     total: string;
     activos: string;
     inactivos: string;
+    total_del_estado: string;
     por_rol: Record<string, number>;
-  }>(sql, paramsBase(query, alcance, yo).slice(0, 5));
+  }>(sql, paramsBase(query, alcance, yo));
 
   return {
     total: Number(rows[0]?.total ?? 0),
     activos: Number(rows[0]?.activos ?? 0),
     inactivos: Number(rows[0]?.inactivos ?? 0),
+    totalDelEstado: Number(rows[0]?.total_del_estado ?? 0),
     porRol: rows[0]?.por_rol ?? {},
   };
 }
