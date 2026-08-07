@@ -1,9 +1,5 @@
-
-import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, XCircle, Users } from 'lucide-react';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { CheckCircle, Users, XCircle } from 'lucide-react';
 
 interface UserCounts {
   active: number;
@@ -17,86 +13,56 @@ interface UserStatusFiltersProps {
   userCounts: UserCounts;
 }
 
-const UserStatusFilters = ({ 
-  statusFilter, 
-  onStatusChange, 
-  userCounts 
+/**
+ * Filtro de estado.
+ *
+ * Dos arreglos respecto a la version anterior:
+ *  - Los colores salen de los tokens del tema (bg-muted, primary-foreground).
+ *    Antes eran bg-gray-50 con un dark:bg-gray-800 a mano, y el contador
+ *    dentro del boton activo se pintaba con el gris claro de siempre: en modo
+ *    oscuro quedaba texto claro sobre fondo claro, ilegible.
+ *  - Un solo bloque para movil y escritorio. Antes habia dos copias del mismo
+ *    markup y la de movil se habia quedado sin los numeros.
+ */
+const OPCIONES = [
+  { valor: 'active', etiqueta: 'Activos', Icono: CheckCircle },
+  { valor: 'inactive', etiqueta: 'Inactivos', Icono: XCircle },
+  { valor: 'all', etiqueta: 'Todos', Icono: Users },
+] as const;
+
+const UserStatusFilters = ({
+  statusFilter,
+  onStatusChange,
+  userCounts,
 }: UserStatusFiltersProps) => {
-  const isMobile = useIsMobile();
-
-  if (isMobile) {
-    return (
-      <div className="flex justify-between gap-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg min-w-0 max-w-full">
-        <Button
-          variant={statusFilter === 'active' ? "default" : "outline"}
-          size="sm"
-          onClick={() => onStatusChange('active')}
-          className="flex-1 flex items-center justify-center text-xs min-w-0 px-2"
-        >
-          <span className="truncate">Activos</span>
-        </Button>
-        
-        <Button
-          variant={statusFilter === 'inactive' ? "default" : "outline"}
-          size="sm"
-          onClick={() => onStatusChange('inactive')}
-          className="flex-1 flex items-center justify-center text-xs min-w-0 px-2"
-        >
-          <span className="truncate">Inactivos</span>
-        </Button>
-
-        <Button
-          variant={statusFilter === 'all' ? "default" : "outline"}
-          size="sm"
-          onClick={() => onStatusChange('all')}
-          className="flex-1 flex items-center justify-center text-xs min-w-0 px-2"
-        >
-          <span className="truncate">Todos</span>
-        </Button>
-      </div>
-    );
-  }
+  const cuenta = (valor: (typeof OPCIONES)[number]['valor']) =>
+    valor === 'active' ? userCounts.active : valor === 'inactive' ? userCounts.inactive : userCounts.total;
 
   return (
-    <div className="flex flex-wrap gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-      <Button
-        variant={statusFilter === 'active' ? "default" : "outline"}
-        size="sm"
-        onClick={() => onStatusChange('active')}
-        className="flex items-center gap-2"
-      >
-        <CheckCircle className="h-4 w-4" />
-        Activos
-        <Badge variant="secondary" className="ml-1">
-          {userCounts.active}
-        </Badge>
-      </Button>
-      
-      <Button
-        variant={statusFilter === 'inactive' ? "default" : "outline"}
-        size="sm"
-        onClick={() => onStatusChange('inactive')}
-        className="flex items-center gap-2"
-      >
-        <XCircle className="h-4 w-4" />
-        Inactivos
-        <Badge variant="secondary" className="ml-1">
-          {userCounts.inactive}
-        </Badge>
-      </Button>
-
-      <Button
-        variant={statusFilter === 'all' ? "default" : "outline"}
-        size="sm"
-        onClick={() => onStatusChange('all')}
-        className="flex items-center gap-2"
-      >
-        <Users className="h-4 w-4" />
-        Todos
-        <Badge variant="secondary" className="ml-1">
-          {userCounts.total}
-        </Badge>
-      </Button>
+    <div className="flex flex-wrap gap-2 sm:gap-3 p-3 sm:p-4 bg-muted/50 rounded-lg min-w-0">
+      {OPCIONES.map(({ valor, etiqueta, Icono }) => {
+        const activo = statusFilter === valor;
+        return (
+          <Button
+            key={valor}
+            variant={activo ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onStatusChange(valor)}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 min-w-0"
+          >
+            <Icono className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">{etiqueta}</span>
+            {/* Contador legible sobre los dos fondos, en claro y en oscuro. */}
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0 ${
+                activo ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {cuenta(valor)}
+            </span>
+          </Button>
+        );
+      })}
     </div>
   );
 };

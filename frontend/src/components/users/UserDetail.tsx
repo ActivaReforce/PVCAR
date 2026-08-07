@@ -35,13 +35,13 @@ const UserDetail = ({ user, onClose }: UserDetailProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-4">
-        <Avatar className="h-20 w-20">
+      <div className="flex items-center gap-4 min-w-0">
+        <Avatar className="h-20 w-20 flex-shrink-0">
           <AvatarImage src={user.usu_foto_url ?? undefined} />
           <AvatarFallback className="text-lg">{iniciales}</AvatarFallback>
         </Avatar>
-        <div>
-          <h3 className="text-xl font-semibold">{user.usu_nombre}</h3>
+        <div className="min-w-0">
+          <h3 className="text-xl font-semibold break-words">{user.usu_nombre}</h3>
           <div className="flex flex-wrap gap-1 mt-2">
             {user.roles.length > 0 ? (
               user.roles.map((rol) => (
@@ -56,40 +56,28 @@ const UserDetail = ({ user, onClose }: UserDetailProps) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label className="font-semibold">Email:</Label>
-          <p className="mt-1">{user.usu_correo}</p>
-        </div>
-
-        <div>
-          <Label className="font-semibold">Teléfono:</Label>
-          <p className="mt-1">{user.usu_telefono || '—'}</p>
-        </div>
-
-        <div>
-          <Label className="font-semibold">Fecha de creación:</Label>
-          <p className="mt-1">{fecha(user.usu_fecha_creacion)}</p>
-        </div>
-
-        <div>
-          <Label className="font-semibold">Última modificación:</Label>
-          <p className="mt-1">{fecha(user.usu_fecha_modificacion)}</p>
-        </div>
-
-        {esEntrenador && (
-          <div>
-            <Label className="font-semibold">Cédula:</Label>
-            <p className="mt-1">{user.ent_cedula || '—'}</p>
+      {/*
+        Cada dato en su celda con min-w-0 y break-words. Sin eso, un correo
+        largo no cabe en su columna, no se parte y acaba montandose encima del
+        telefono de al lado. Las celdas de una rejilla no encogen por debajo de
+        su contenido salvo que se les diga.
+      */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {[
+          { etiqueta: 'Email', valor: user.usu_correo },
+          { etiqueta: 'Teléfono', valor: user.usu_telefono || '—' },
+          { etiqueta: 'Fecha de creación', valor: fecha(user.usu_fecha_creacion) },
+          { etiqueta: 'Última modificación', valor: fecha(user.usu_fecha_modificacion) },
+          ...(esEntrenador ? [{ etiqueta: 'Cédula', valor: user.ent_cedula || '—' }] : []),
+          ...(esRepresentante
+            ? [{ etiqueta: 'Sector de residencia', valor: user.padre_sector_residencia || '—' }]
+            : []),
+        ].map(({ etiqueta, valor }) => (
+          <div key={etiqueta} className="min-w-0">
+            <Label className="font-semibold">{etiqueta}:</Label>
+            <p className="mt-1 break-words">{valor}</p>
           </div>
-        )}
-
-        {esRepresentante && (
-          <div>
-            <Label className="font-semibold">Sector de Residencia:</Label>
-            <p className="mt-1">{user.padre_sector_residencia || '—'}</p>
-          </div>
-        )}
+        ))}
       </div>
 
       <DialogFooter className="mt-6">

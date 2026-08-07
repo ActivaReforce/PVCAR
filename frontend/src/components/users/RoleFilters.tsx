@@ -1,7 +1,4 @@
-
-import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import type { Rol } from '@/api/usuarios';
 
 interface RoleFiltersProps {
@@ -17,6 +14,22 @@ interface RoleFiltersProps {
   onViewAll: () => void;
 }
 
+/**
+ * El contador va dentro del boton y tiene que leerse en los dos estados y en
+ * los dos temas: sobre el boton activo hereda el color del primario, sobre el
+ * inactivo el del muted. Con el Badge secondary de antes, el numero del boton
+ * seleccionado desaparecia en modo oscuro.
+ */
+const Contador = ({ n, activo }: { n: number; activo: boolean }) => (
+  <span
+    className={`rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0 ${
+      activo ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'
+    }`}
+  >
+    {n}
+  </span>
+);
+
 const RoleFilters = ({
   roles,
   conteosPorRol,
@@ -28,40 +41,33 @@ const RoleFilters = ({
   onSinRolToggle,
   onViewAll,
 }: RoleFiltersProps) => {
-  const getUserCountForRole = (roleId: number) => conteosPorRol[String(roleId)] ?? 0;
-
-  const isViewingAll = selectedRoles.length === 0 && !sinRolSeleccionado;
+  const cuenta = (roleId: number) => conteosPorRol[String(roleId)] ?? 0;
+  const viendoTodos = selectedRoles.length === 0 && !sinRolSeleccionado;
 
   return (
     <div className="flex flex-wrap gap-2">
       <Button
-        variant={isViewingAll ? "default" : "outline"}
+        variant={viendoTodos ? 'default' : 'outline'}
         size="sm"
         onClick={onViewAll}
         className="flex items-center gap-2"
       >
         Ver Todos
-        <Badge variant="secondary" className="ml-1">
-          {totalUsuarios}
-        </Badge>
+        <Contador n={totalUsuarios} activo={viendoTodos} />
       </Button>
-      
+
       {roles.map((role) => {
-        const userCount = getUserCountForRole(role.rol_id);
-        const isSelected = selectedRoles.includes(role.rol_id);
-        
+        const activo = selectedRoles.includes(role.rol_id);
         return (
           <Button
             key={role.rol_id}
-            variant={isSelected ? "default" : "outline"}
+            variant={activo ? 'default' : 'outline'}
             size="sm"
             onClick={() => onRoleToggle(role.rol_id)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 min-w-0"
           >
-            {role.rol_nombre}
-            <Badge variant="secondary" className="ml-1">
-              {userCount}
-            </Badge>
+            <span className="truncate">{role.rol_nombre}</span>
+            <Contador n={cuenta(role.rol_id)} activo={activo} />
           </Button>
         );
       })}
@@ -75,9 +81,7 @@ const RoleFilters = ({
           className="flex items-center gap-2"
         >
           Sin rol
-          <Badge variant="secondary" className="ml-1">
-            {sinRol}
-          </Badge>
+          <Contador n={sinRol} activo={sinRolSeleccionado} />
         </Button>
       )}
     </div>

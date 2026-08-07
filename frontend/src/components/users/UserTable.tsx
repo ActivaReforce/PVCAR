@@ -155,17 +155,26 @@ const UserTable = ({
             
             return (
               <TableRow key={user.usu_id}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
+                <TableCell className="max-w-[260px]">
+                  {/* min-w-0 en el contenedor y truncate en los textos: sin
+                      eso un correo largo empuja las columnas de al lado. */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="h-10 w-10 flex-shrink-0">
                       <AvatarImage src={user.usu_foto_url || undefined} />
                       <AvatarFallback>
                         {getInitials(user.usu_nombre)}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
-                      <div className="font-medium">{user.usu_nombre}</div>
-                      <div className="text-sm text-muted-foreground">{user.usu_correo}</div>
+                    <div className="min-w-0">
+                      <div className="font-medium truncate" title={user.usu_nombre}>
+                        {user.usu_nombre}
+                      </div>
+                      <div
+                        className="text-sm text-muted-foreground truncate"
+                        title={user.usu_correo}
+                      >
+                        {user.usu_correo}
+                      </div>
                     </div>
                   </div>
                 </TableCell>
@@ -229,7 +238,7 @@ const UserTable = ({
                           size="sm"
                           onClick={() => onReactivate(user.usu_id)}
                           title="Reactivar"
-                          className="text-green-600 hover:text-green-700"
+                          className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
                         >
                           <RotateCcw className="h-4 w-4" />
                         </Button>

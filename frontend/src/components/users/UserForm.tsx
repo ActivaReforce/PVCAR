@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { DatosUsuario, Rol, UsuarioDetalle } from '@/api/usuarios';
 import BasicUserFields from './BasicUserFields';
 import RoleSpecificFields from './RoleSpecificFields';
-import UserPhotoSection from './UserPhotoSection';
+import ImageUpload from '@/components/ImageUpload';
+import { Label } from '@/components/ui/label';
 import FormButtons from './FormButtons';
 import UserRoleSelection from './UserRoleSelection';
 import { useUserForm } from '@/hooks/useUserForm';
@@ -107,10 +108,14 @@ const UserForm = ({ user, roles, onSuccess, onCancel }: UserFormProps) => {
         />
 
         <div className="space-y-4">
-          <UserPhotoSection
-            initialImageUrl={user?.usu_foto_url}
-            onImageChange={handlePhotoChange}
-          />
+          <div>
+            <Label>Foto de Perfil</Label>
+            <ImageUpload
+              initialImageUrl={user?.usu_foto_url}
+              onImageChange={handlePhotoChange}
+              buttonText="Subir Foto"
+            />
+          </div>
 
           <UserRoleSelection
             roles={roles}

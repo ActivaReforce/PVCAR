@@ -3,13 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import UserForm from '@/components/users/UserForm';
 import UserDetail from '@/components/users/UserDetail';
 import UsuariosHeader from '@/components/users/UsuariosHeader';
-import UsuariosSearch from '@/components/users/UsuariosSearch';
 import UsuariosFilters from '@/components/users/UsuariosFilters';
-import UsuariosContent from '@/components/users/UsuariosContent';
+import UserTable from '@/components/users/UserTable';
 import UserStatusFilters from '@/components/users/UserStatusFilters';
 import { UserDeactivationDialog } from '@/components/users/UserDeactivationDialog';
 import EliminarUsuarioDialog from '@/components/users/EliminarUsuarioDialog';
-import { useDebounce } from '@/hooks/useDebounce';
+import DebouncedSearchInput from '@/components/ui/debounced-search-input';
+import { DataPagination } from '@/components/ui/data-pagination';
 import {
   useDarDeBaja,
   useReactivarUsuario,
@@ -53,8 +53,8 @@ const CONTEOS_VACIOS = {
  */
 const Usuarios = () => {
   const [page, setPage] = useState(1);
+  // El input ya trae su propio debounce de 300 ms; no hace falta otro encima.
   const [busqueda, setBusqueda] = useState('');
-  const buscarDebounced = useDebounce(busqueda, 300);
   const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
   const [sinRolSeleccionado, setSinRolSeleccionado] = useState(false);
   const [statusFilter, setStatusFilter] = useState<FiltroEstado>('active');
@@ -70,7 +70,7 @@ const Usuarios = () => {
   const filtros: FiltrosUsuarios = {
     page,
     limit: POR_PAGINA,
-    buscar: buscarDebounced || undefined,
+    buscar: busqueda || undefined,
     rol: selectedRoles.length > 0 ? selectedRoles : undefined,
     sinRol: sinRolSeleccionado || undefined,
     estado: EST_ID[statusFilter],
@@ -200,32 +200,44 @@ const Usuarios = () => {
         getSelectedRoleNames={() => nombresDeRolesSeleccionados}
       />
 
-      <UsuariosSearch
-        searchTerm={busqueda}
-        onSearchChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
+      <DebouncedSearchInput
+        placeholder="Buscar por nombre o correo..."
+        value={busqueda}
+        onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
+        className="w-full sm:max-w-sm"
       />
 
-      <UsuariosContent
-        usuarios={usuarios}
-        sortKey={orden}
-        sortDirection={dir}
-        currentPage={page}
-        totalPages={totalPages}
-        canGoNext={page < totalPages}
-        canGoPrevious={page > 1}
-        startIndex={(page - 1) * POR_PAGINA}
-        endIndex={Math.min(page * POR_PAGINA, totalItems)}
-        totalItems={totalItems}
-        onView={(user) => setViendoId(user.usu_id)}
-        onEdit={(user) => setEditandoId(user.usu_id)}
-        onDelete={(userId) => setADarDeBaja(usuarios.find((u) => u.usu_id === userId) ?? null)}
-        onReactivate={(userId) => reactivar.mutate(userId)}
-        onPermanentDelete={(userId) =>
-          setAEliminar(usuarios.find((u) => u.usu_id === userId) ?? null)
-        }
-        onSort={handleSort}
-        onPageChange={setPage}
-      />
+      <div className="space-y-4">
+        <div className="overflow-x-auto">
+          <UserTable
+            users={usuarios}
+            sortKey={orden}
+            sortDirection={dir}
+            onView={(user) => setViendoId(user.usu_id)}
+            onEdit={(user) => setEditandoId(user.usu_id)}
+            onDelete={(userId) => setADarDeBaja(usuarios.find((u) => u.usu_id === userId) ?? null)}
+            onReactivate={(userId) => reactivar.mutate(userId)}
+            onPermanentDelete={(userId) =>
+              setAEliminar(usuarios.find((u) => u.usu_id === userId) ?? null)
+            }
+            onSort={handleSort}
+          />
+        </div>
+
+        {/* La paginacion la manda el servidor: estos numeros vienen de la
+            respuesta, no de cortar un array en el navegador. */}
+        <DataPagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          canGoNext={page < totalPages}
+          canGoPrevious={page > 1}
+          startIndex={(page - 1) * POR_PAGINA}
+          endIndex={Math.min(page * POR_PAGINA, totalItems)}
+          totalItems={totalItems}
+          itemName="usuarios"
+        />
+      </div>
 
       {/* Alta y edicion comparten formulario; en edicion se espera a la ficha. */}
       <Dialog
