@@ -23,12 +23,26 @@ export class ApiError extends Error {
   }
 }
 
+export interface ApiFetchOptions {
+  /**
+   * Si es false, un 401 NO cierra la sesion local.
+   * Lo necesita /auth/login: ahi un 401 significa "contrasena incorrecta",
+   * no "tu sesion murio", y firmar la salida en ese caso borraria la sesion
+   * de quien ya estaba dentro y se equivoco al reautenticarse.
+   */
+  signOutOn401?: boolean;
+}
+
 /**
  * Cliente fetch contra el backend PVCAR.
  * Adjunta el JWT de Supabase Auth si hay sesion activa.
  * Un 401 cierra la sesion local: el token murio o fue revocado.
  */
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+  { signOutOn401 = true }: ApiFetchOptions = {},
+): Promise<T> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -41,7 +55,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });
 
-  if (res.status === 401) {
+  if (res.status === 401 && signOutOn401) {
     await supabase.auth.signOut();
   }
 
@@ -61,8 +75,12 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
 export const api = {
   get: <T>(path: string) => apiFetch<T>(path, { method: 'GET' }),
-  post: <T>(path: string, body?: unknown) =>
-    apiFetch<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
+  post: <T>(path: string, body?: unknown, options?: ApiFetchOptions) =>
+    apiFetch<T>(
+      path,
+      { method: 'POST', body: body ? JSON.stringify(body) : undefined },
+      options,
+    ),
   put: <T>(path: string, body?: unknown) =>
     apiFetch<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body?: unknown) =>

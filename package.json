@@ -15,7 +15,8 @@
     "dev:frontend": "npm run dev --workspace @pvcar/frontend",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p db/scripts/tsconfig.json --noEmit",
+    "test": "npm run test --workspaces --if-present",
+    "backfill:auth": "tsx db/scripts/backfill-auth.ts"
   }
 }

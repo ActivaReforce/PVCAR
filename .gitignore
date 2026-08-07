@@ -23,6 +23,9 @@ docs/Plan.md
 *.sql.gz
 db/dumps/
 
+# Salidas generadas por db/scripts (mapeo usu_id -> auth.users.id del cutover)
+db/scripts/out/
+
 # Herramientas
 .mcp.json
 .vercel/

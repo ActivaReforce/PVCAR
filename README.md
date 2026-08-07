@@ -29,8 +29,8 @@ Un commit a `dev` dispara CI, el preview de Vercel y el deploy de Railway `devel
 
 Los cuatro despliegues responden, pero el producto **todavía no funciona de punta a punta**:
 
-- Las dos bases están **vacías**: sin schema, sin RLS, sin usuarios. `GET /api/v1/health` devuelve `db: "not_configured"` porque aún no se sembró `DATABASE_URL`.
-- El backend solo expone `/api/v1/health`. No hay endpoints de negocio.
+- Las dos bases tienen schema, RLS (deny-by-default, sin políticas) y privilegios cerrados. `PVCAR` está **vacía de datos** a propósito: los recibe en el cutover. `GET /api/v1/health` devuelve `db: "ok"` en los dos ambientes.
+- El backend expone `/api/v1/health`, `/api/v1/auth/*` y `/api/v1/me`. Todavía no hay endpoints de negocio.
 - El frontend es la SPA anterior tal cual: **97 archivos** consultan Supabase directo y **ninguno** usa `lib/api.ts`. Se migra módulo por módulo; hasta entonces las pantallas no sirven datos desde el API.
 
 ### Trampas de despliegue

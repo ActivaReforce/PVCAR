@@ -12,6 +12,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { MandatorySurveyManager } from "@/components/surveys/MandatorySurveyManager";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import Usuarios from "@/pages/Usuarios";
 import Colegios from "@/pages/Colegios";
@@ -61,6 +62,9 @@ const App = () => {
                 {/* Public routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
+                {/* Destino del enlace del correo de recuperacion. Publica:
+                    quien llega aqui todavia no puede iniciar sesion. */}
+                <Route path="/reset-password" element={<ResetPassword />} />
                 
                 {/* Protected routes */}
                 <Route

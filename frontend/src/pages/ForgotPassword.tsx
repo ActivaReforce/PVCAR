@@ -8,19 +8,26 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeContext";
 
+/**
+ * Solo pide el correo y dispara el enlace de recuperación.
+ *
+ * Antes esta pantalla pedía correo + contraseña nueva y la escribía directo en
+ * la tabla: cualquiera podía cambiarle la contraseña a cualquiera sabiendo su
+ * correo. Ahora la contraseña se fija en /reset-password, y solo con el enlace
+ * que llega al buzón de esa persona.
+ */
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  
-  const { resetPassword } = useAuth();
+
+  const { requestPasswordReset } = useAuth();
   const { toast } = useToast();
   const { isDarkMode, toggleTheme } = useTheme();
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email) {
       toast({
         title: "Ingrese su Correo",
@@ -29,40 +36,30 @@ const ForgotPassword = () => {
       });
       return;
     }
-    
-    if (!newPassword) {
-      toast({
-        title: "Ingrese su Contraseña",
-        description: "Por favor ingrese su contraseña",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (newPassword.length < 6) {
-      toast({
-        title: "Contraseña muy simple",
-        description: "Contraseña debe contener al menos 6 caracteres",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+
     setIsSubmitting(true);
-    
+
     try {
-      const success = await resetPassword(email, newPassword);
-      
-      if (success) {
+      // Responde igual exista o no el correo: la pantalla no puede servir para
+      // averiguar quién tiene cuenta.
+      const enviado = await requestPasswordReset(email);
+
+      if (enviado) {
         setIsSuccess(true);
+      } else {
+        toast({
+          title: "No se pudo enviar",
+          description: "Revise su conexion e intentelo de nuevo",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error("Error al resetear la contraseña:", error);
+      console.error("Error al solicitar el enlace de recuperación:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <div 
       className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-[#222222] text-white' : 'bg-gray-100 text-gray-800'} py-4 sm:py-8 px-4 transition-colors duration-300`}
@@ -101,7 +98,7 @@ const ForgotPassword = () => {
         <Card className={`w-full ${isDarkMode ? 'bg-[#2A2A2A] text-white border-gray-700' : 'bg-white'} shadow-md`}>
           <CardHeader className={`${isSuccess ? "pb-4" : "pb-1"}`}>
             <CardTitle className="text-center text-lg sm:text-xl">
-              {isSuccess ? "Cambio de contraseña exitoso" : "Resetear Contraseña"}
+              {isSuccess ? "Revise su correo" : "Resetear Contraseña"}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -109,7 +106,8 @@ const ForgotPassword = () => {
               <div className="flex flex-col items-center text-center">
                 <CheckCircle className="text-green-500 h-10 w-10 sm:h-12 sm:w-12 mb-4" />
                 <p className={`${isDarkMode ? "text-gray-300 mb-4" : "text-gray-600 mb-4"} text-sm sm:text-base`}>
-                  Su contraseña fue reseteada exitosamente. Puede iniciar sesion.
+                  Si el correo esta registrado, le enviamos un enlace para crear una
+                  contraseña nueva. El enlace caduca en una hora.
                 </p>
                 <Button 
                   asChild 
@@ -135,35 +133,17 @@ const ForgotPassword = () => {
                     placeholder="Su correo aqui ..."
                     required
                   />
-                </div>
-                
-                <div>
-                  <label htmlFor="new-password" className="block text-sm font-medium mb-1">
-                    Nueva Contraseña
-                  </label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className={`w-full ${isDarkMode 
-                      ? 'bg-[#333333] border-[#444444] text-white' 
-                      : 'bg-gray-50 border-gray-200 text-gray-900'}`}
-                    placeholder="Su nueva contraseña aqui ..."
-                    required
-                    minLength={6}
-                  />
                   <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Contraseña debe contener al menos 6 caracteres
+                    Le enviaremos un enlace para crear una contraseña nueva
                   </p>
                 </div>
-                
+
                 <Button
                   type="submit"
                   className="w-full bg-[#FD5757] hover:bg-[#E04747] text-white dark:text-black"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? "Reseteando contraseña..." : "Resetear Contraseña"}
+                  {isSubmitting ? "Enviando enlace..." : "Enviar Enlace"}
                 </Button>
               </form>
             )}
