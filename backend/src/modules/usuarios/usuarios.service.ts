@@ -388,6 +388,19 @@ async function aplicarFichasDeRol(
     await repo.desactivarEntrenador(client, usuId);
   }
 
+  // Quitar el rol de coordinador con colegios a su cargo dejaria filas en
+  // colegio_coordinador sin rol que las respalde. alcanceDe ya no las cuenta
+  // sin el rol, pero el dato quedaria mintiendo: mejor rechazarlo aqui.
+  if (rolesAntes.includes(ROL.COORDINADOR) && !rolesDespues.includes(ROL.COORDINADOR)) {
+    const colegios = await repo.contarColegiosCoordinados(client, usuId);
+    if (colegios > 0) {
+      throw new ApiError(
+        409,
+        `No se puede quitar el rol de coordinador: tiene ${colegios} colegio(s) a su cargo. Quitaselos primero desde Colegios.`,
+      );
+    }
+  }
+
   if (esRepresentante) {
     await repo.upsertPadre(client, usuId, datos.sector);
   } else if (eraRepresentante) {

@@ -2,34 +2,27 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Database } from '@/integrations/supabase/types';
-
-type Rol = Database['public']['Tables']['rol']['Row'];
-
-interface UserWithRoles {
-  user_roles: Array<{ rol_id: number }>;
-}
+import type { Rol } from '@/api/usuarios';
 
 interface RoleFiltersProps {
   roles: Rol[];
-  users: UserWithRoles[];
+  /** Conteos del servidor: { "3": 49 }. Antes se contaba el array cargado. */
+  conteosPorRol: Record<string, number>;
+  totalUsuarios: number;
   selectedRoles: number[];
   onRoleToggle: (roleId: number) => void;
   onViewAll: () => void;
 }
 
-const RoleFilters = ({ 
-  roles, 
-  users, 
-  selectedRoles, 
-  onRoleToggle, 
-  onViewAll 
+const RoleFilters = ({
+  roles,
+  conteosPorRol,
+  totalUsuarios,
+  selectedRoles,
+  onRoleToggle,
+  onViewAll,
 }: RoleFiltersProps) => {
-  const getUserCountForRole = (roleId: number) => {
-    return users.filter(user => 
-      user.user_roles?.some(ur => ur.rol_id === roleId)
-    ).length;
-  };
+  const getUserCountForRole = (roleId: number) => conteosPorRol[String(roleId)] ?? 0;
 
   const isViewingAll = selectedRoles.length === 0;
 
@@ -43,7 +36,7 @@ const RoleFilters = ({
       >
         Ver Todos
         <Badge variant="secondary" className="ml-1">
-          {users.length}
+          {totalUsuarios}
         </Badge>
       </Button>
       

@@ -1,24 +1,16 @@
-
-import { DataPagination } from "@/components/ui/data-pagination";
-import UsersCardGrid from "./UsersCardGrid";
-import UserTable from "./UserTable";
-import { Database } from "@/integrations/supabase/types";
-import { SortDirection } from "@/hooks/useSorting";
-
-type Usuario = Database['public']['Tables']['usuario']['Row'];
-type Rol = Database['public']['Tables']['rol']['Row'];
-
-interface UserWithRoles extends Usuario {
-  user_roles: Array<{ rol_id: number }>;
-}
+import { DataPagination } from '@/components/ui/data-pagination';
+import UsersCardGrid from './UsersCardGrid';
+import UserTable from './UserTable';
+import type { Rol, UsuarioListado } from '@/api/usuarios';
+import { SortDirection } from '@/hooks/useSorting';
 
 interface UsuariosContentProps {
   viewMode: 'cards' | 'table';
   roles: Rol[];
-  usuarios: UserWithRoles[];
-  paginatedUsuarios: UserWithRoles[];
+  usuarios: UsuarioListado[];
+  conteosPorRol: Record<string, number>;
   selectedRoles: number[];
-  sortKey?: keyof Usuario | string | null;
+  sortKey?: string | null;
   sortDirection?: SortDirection;
   currentPage: number;
   totalPages: number;
@@ -27,22 +19,25 @@ interface UsuariosContentProps {
   startIndex: number;
   endIndex: number;
   totalItems: number;
-  statusFilter: 'active' | 'inactive' | 'all';
   onRoleSelect: (roleId: number) => void;
-  onView: (user: UserWithRoles) => void;
-  onEdit: (user: UserWithRoles) => void;
+  onView: (user: UsuarioListado) => void;
+  onEdit: (user: UsuarioListado) => void;
   onDelete: (userId: number) => void;
   onReactivate: (userId: number) => void;
   onPermanentDelete: (userId: number) => void;
-  onSort?: (key: keyof Usuario | string) => void;
+  onSort?: (key: string) => void;
   onPageChange: (page: number) => void;
 }
 
+/**
+ * La paginacion la manda el servidor: currentPage, totalPages y totalItems
+ * vienen de la respuesta del API, no de cortar un array en el navegador.
+ */
 const UsuariosContent = ({
   viewMode,
   roles,
   usuarios,
-  paginatedUsuarios,
+  conteosPorRol,
   selectedRoles,
   sortKey,
   sortDirection,
@@ -53,7 +48,6 @@ const UsuariosContent = ({
   startIndex,
   endIndex,
   totalItems,
-  statusFilter,
   onRoleSelect,
   onView,
   onEdit,
@@ -61,14 +55,14 @@ const UsuariosContent = ({
   onReactivate,
   onPermanentDelete,
   onSort,
-  onPageChange
+  onPageChange,
 }: UsuariosContentProps) => {
   if (viewMode === 'cards') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <UsersCardGrid
           roles={roles}
-          users={usuarios}
+          conteosPorRol={conteosPorRol}
           selectedRoles={selectedRoles}
           onRoleSelect={onRoleSelect}
         />
@@ -79,33 +73,29 @@ const UsuariosContent = ({
   return (
     <div className="space-y-4">
       <div className="overflow-x-auto">
-        <UserTable 
-          users={paginatedUsuarios} 
-          roles={roles} 
-          onView={onView} 
-          onEdit={onEdit} 
+        <UserTable
+          users={usuarios}
+          onView={onView}
+          onEdit={onEdit}
           onDelete={onDelete}
           onReactivate={onReactivate}
           onPermanentDelete={onPermanentDelete}
-          sortKey={sortKey} 
-          sortDirection={sortDirection} 
+          sortKey={sortKey}
+          sortDirection={sortDirection}
           onSort={onSort}
-          selectedRoles={selectedRoles}
-          statusFilter={statusFilter}
-          onRoleFilterChange={() => {}} // Not used in this mode
         />
       </div>
-      
-      <DataPagination 
-        currentPage={currentPage} 
-        totalPages={totalPages} 
-        onPageChange={onPageChange} 
-        canGoNext={canGoNext} 
-        canGoPrevious={canGoPrevious} 
-        startIndex={startIndex} 
-        endIndex={endIndex} 
-        totalItems={totalItems} 
-        itemName="usuarios" 
+
+      <DataPagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        canGoNext={canGoNext}
+        canGoPrevious={canGoPrevious}
+        startIndex={startIndex}
+        endIndex={endIndex}
+        totalItems={totalItems}
+        itemName="usuarios"
       />
     </div>
   );

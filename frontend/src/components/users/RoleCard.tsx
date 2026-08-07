@@ -3,25 +3,17 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users } from 'lucide-react';
-import { Database } from '@/integrations/supabase/types';
-
-type Rol = Database['public']['Tables']['rol']['Row'];
-
-interface UserWithRoles {
-  user_roles: Array<{ rol_id: number }>;
-}
+import type { Rol } from '@/api/usuarios';
 
 interface RoleCardProps {
   role: Rol;
-  users: UserWithRoles[];
+  /** Viene contado en SQL, no de filtrar la pagina cargada en memoria. */
+  userCount: number;
   isSelected: boolean;
   onClick: () => void;
 }
 
-const RoleCard = ({ role, users, isSelected, onClick }: RoleCardProps) => {
-  const userCount = users.filter(user => 
-    user.user_roles?.some(ur => ur.rol_id === role.rol_id)
-  ).length;
+const RoleCard = ({ role, userCount, isSelected, onClick }: RoleCardProps) => {
 
   return (
     <Card 

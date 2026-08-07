@@ -1,5 +1,5 @@
 import { getPool } from '../config/db.js';
-import { ESTADO, ROLES_GLOBALES } from './constants.js';
+import { ESTADO, ROL, ROLES_AUXILIARES, ROLES_GLOBALES } from './constants.js';
 import type { UsuarioConRoles } from '../modules/auth/auth.repository.js';
 
 /**
@@ -49,12 +49,17 @@ export interface Alcance {
  * Las disciplinas del coordinador salen de sus colegios, no al reves: un
  * coordinador ve todo lo que se imparte en su colegio, lo de un entrenador
  * concreto por si acaso tambien.
+ *
+ * Cada camino esta condicionado a que el usuario TENGA ese rol ($3 a $6). No
+ * basta con que exista la fila de pertenencia: si a alguien se le quita el rol
+ * de coordinador y su fila de colegio_coordinador sigue ahi, sin esta guarda
+ * conservaria el alcance de un rol que ya no tiene.
  */
 const SQL_ALCANCE = `
   WITH col_coordinador AS (
       SELECT cc.col_id
       FROM public.colegio_coordinador cc
-      WHERE cc.usu_id = $1
+      WHERE cc.usu_id = $1 AND $3::boolean
   ),
   disc_coordinador AS (
       SELECT cah.colacthor_id
@@ -65,6 +70,7 @@ const SQL_ALCANCE = `
       SELECT ea.colacthor_id
       FROM public.entrenador_asignacion ea
       WHERE ea.ent_id = $1
+        AND $4::boolean
         AND ea.est_id = $2
         AND ea.entasig_fecha_fin IS NULL
   ),
@@ -73,6 +79,7 @@ const SQL_ALCANCE = `
       FROM public.entrenador_auxiliar aux
       JOIN public.entrenador_asignacion ea ON ea.ent_id = aux.ent_id
       WHERE aux.usu_id = $1
+        AND $5::boolean
         AND aux.est_id = $2
         AND ea.est_id = $2
         AND ea.entasig_fecha_fin IS NULL
@@ -83,6 +90,7 @@ const SQL_ALCANCE = `
       JOIN public.nino_padre np ON np.padre_id = p.padre_id
       JOIN public.nino_asignacion na ON na.nino_id = np.nino_id
       WHERE p.usu_id = $1
+        AND $6::boolean
         AND na.est_id = $2
   ),
   disciplinas AS (
@@ -110,9 +118,18 @@ export async function alcanceDe(usuario: UsuarioConRoles): Promise<Alcance> {
     return { global: true, colegios: [], disciplinas: [] };
   }
 
+  const tiene = (rolId: number): boolean => usuario.roles.some((r) => r.rol_id === rolId);
+
   const { rows } = await getPool().query<{ colegios: number[]; disciplinas: number[] }>(
     SQL_ALCANCE,
-    [usuario.usu_id, ESTADO.ACTIVO],
+    [
+      usuario.usu_id,
+      ESTADO.ACTIVO,
+      tiene(ROL.COORDINADOR),
+      tiene(ROL.ENTRENADOR),
+      ROLES_AUXILIARES.some((r) => tiene(r)),
+      tiene(ROL.REPRESENTANTE),
+    ],
   );
 
   return {

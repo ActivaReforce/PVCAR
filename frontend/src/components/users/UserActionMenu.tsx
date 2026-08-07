@@ -7,17 +7,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Database } from '@/integrations/supabase/types';
-
-type Usuario = Database['public']['Tables']['usuario']['Row'];
+import type { UsuarioListado } from '@/api/usuarios';
 
 interface UserActionMenuProps {
-  user: Usuario;
-  onView: (user: Usuario) => void;
-  onEdit: (user: Usuario) => void;
-  onDelete: (user: Usuario) => void;
-  onReactivate: (user: Usuario) => void;
-  onPermanentDelete: (user: Usuario) => void;
+  user: UsuarioListado;
+  onView: (user: UsuarioListado) => void;
+  onEdit: (user: UsuarioListado) => void;
+  onDelete: (user: UsuarioListado) => void;
+  onReactivate: (user: UsuarioListado) => void;
+  onPermanentDelete: (user: UsuarioListado) => void;
   canEdit: boolean;
   canDelete: boolean;
 }

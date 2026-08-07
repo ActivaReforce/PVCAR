@@ -1,37 +1,29 @@
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Database } from '@/integrations/supabase/types';
-
-type Rol = Database['public']['Tables']['rol']['Row'];
-
-interface UserWithRoles {
-  user_roles: Array<{ rol_id: number }>;
-}
+import type { Rol } from '@/api/usuarios';
 
 interface MobileRoleSelectorProps {
   roles: Rol[];
-  users: UserWithRoles[];
+  conteosPorRol: Record<string, number>;
+  totalUsuarios: number;
   selectedRoles: number[];
   onRoleToggle: (roleId: number) => void;
   onViewAll: () => void;
 }
 
-const MobileRoleSelector = ({ 
-  roles, 
-  users, 
-  selectedRoles, 
-  onRoleToggle, 
-  onViewAll 
+const MobileRoleSelector = ({
+  roles,
+  conteosPorRol,
+  totalUsuarios,
+  selectedRoles,
+  onRoleToggle,
+  onViewAll,
 }: MobileRoleSelectorProps) => {
-  const getUserCountForRole = (roleId: number) => {
-    return users.filter(user => 
-      user.user_roles?.some(ur => ur.rol_id === roleId)
-    ).length;
-  };
+  const getUserCountForRole = (roleId: number) => conteosPorRol[String(roleId)] ?? 0;
 
   const getDisplayValue = () => {
     if (selectedRoles.length === 0) {
-      return `Ver Todos (${users.length})`;
+      return `Ver Todos (${totalUsuarios})`;
     }
     if (selectedRoles.length === 1) {
       const role = roles.find(r => r.rol_id === selectedRoles[0]);
@@ -57,7 +49,7 @@ const MobileRoleSelector = ({
       </SelectTrigger>
       <SelectContent className="max-w-[calc(100vw-2rem)]">
         <SelectItem value="all">
-          Ver Todos ({users.length})
+          Ver Todos ({totalUsuarios})
         </SelectItem>
         {roles.map((role) => {
           const userCount = getUserCountForRole(role.rol_id);

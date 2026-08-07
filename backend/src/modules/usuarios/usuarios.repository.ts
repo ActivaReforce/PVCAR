@@ -36,6 +36,8 @@ export interface ConteosUsuarios {
   total: number;
   activos: number;
   inactivos: number;
+  /** Cuantos usuarios tiene cada rol, con la clave como texto: { "3": 49 }. */
+  porRol: Record<string, number>;
 }
 
 /**
@@ -87,9 +89,9 @@ const WHERE_BASE = `
     WHERE ($1::boolean OR u.usu_id IN (SELECT usu_id FROM visibles))
       AND ($4::text IS NULL OR u.usu_nombre ILIKE '%' || $4 || '%'
                             OR u.usu_correo ILIKE '%' || $4 || '%')
-      AND ($5::int  IS NULL OR EXISTS (
+      AND ($5::int[] IS NULL OR EXISTS (
               SELECT 1 FROM public.usuario_rol ur
-              WHERE ur.usu_id = u.usu_id AND ur.rol_id = $5))
+              WHERE ur.usu_id = u.usu_id AND ur.rol_id = ANY($5::int[])))
 `;
 
 const COLUMNAS_ORDEN: Record<string, string> = {
@@ -105,7 +107,7 @@ function paramsBase(query: ListarUsuariosQuery, alcance: Alcance, yo: number): u
     alcance.colegios,
     yo,
     query.buscar && query.buscar.length > 0 ? query.buscar : null,
-    query.rol ?? null,
+    query.rol && query.rol.length > 0 ? query.rol : null,
     query.estado ?? null,
   ];
 }
@@ -167,9 +169,13 @@ export async function listarUsuarios(
 }
 
 /**
- * Conteos de las tarjetas. Ignoran el filtro de estado a proposito: las
- * tarjetas dicen "45 activos / 23 inactivos" y tienen que seguir diciendolo
- * cuando el usuario filtra por uno de los dos.
+ * Conteos de las tarjetas: totales por estado y usuarios por rol.
+ *
+ * Ignoran el filtro de estado a proposito — las tarjetas dicen "45 activos /
+ * 23 inactivos" y tienen que seguir diciendolo cuando se filtra por uno de los
+ * dos — y salen de SQL, no de contar el array cargado. En el sistema viejo la
+ * tarjeta de cada rol contaba sobre los usuarios que hubiera en memoria: con
+ * paginacion de verdad, ese numero seria el de la pagina actual.
  */
 export async function contarUsuarios(
   query: ListarUsuariosQuery,
@@ -177,24 +183,39 @@ export async function contarUsuarios(
   yo: number,
 ): Promise<ConteosUsuarios> {
   const sql = `
-    WITH ${CTE_VISIBLES}
+    WITH ${CTE_VISIBLES},
+    base AS (
+        SELECT u.usu_id, u.est_id
+        FROM public.usuario u
+        ${WHERE_BASE}
+    )
     SELECT
-        count(*)                                            AS total,
-        count(*) FILTER (WHERE u.est_id = ${ESTADO.ACTIVO})   AS activos,
-        count(*) FILTER (WHERE u.est_id = ${ESTADO.INACTIVO}) AS inactivos
-    FROM public.usuario u
-    ${WHERE_BASE}
+        (SELECT count(*) FROM base)                                    AS total,
+        (SELECT count(*) FROM base WHERE est_id = ${ESTADO.ACTIVO})    AS activos,
+        (SELECT count(*) FROM base WHERE est_id = ${ESTADO.INACTIVO})  AS inactivos,
+        COALESCE((
+            SELECT json_object_agg(rol_id, n)
+            FROM (
+                SELECT ur.rol_id, count(*) AS n
+                FROM public.usuario_rol ur
+                JOIN base b ON b.usu_id = ur.usu_id
+                GROUP BY ur.rol_id
+            ) x
+        ), '{}'::json) AS por_rol
   `;
 
-  const { rows } = await getPool().query<Record<string, string>>(
-    sql,
-    paramsBase(query, alcance, yo),
-  );
+  const { rows } = await getPool().query<{
+    total: string;
+    activos: string;
+    inactivos: string;
+    por_rol: Record<string, number>;
+  }>(sql, paramsBase(query, alcance, yo));
 
   return {
     total: Number(rows[0]?.total ?? 0),
     activos: Number(rows[0]?.activos ?? 0),
     inactivos: Number(rows[0]?.inactivos ?? 0),
+    porRol: rows[0]?.por_rol ?? {},
   };
 }
 
@@ -439,6 +460,17 @@ export async function contarHijosDelPadre(client: PoolClient, usuId: number): Pr
        FROM public.nino_padre np
        JOIN public.padre p ON p.padre_id = np.padre_id
       WHERE p.usu_id = $1`,
+    [usuId],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+export async function contarColegiosCoordinados(
+  client: PoolClient,
+  usuId: number,
+): Promise<number> {
+  const { rows } = await client.query<{ n: string }>(
+    'SELECT count(*) AS n FROM public.colegio_coordinador WHERE usu_id = $1',
     [usuId],
   );
   return Number(rows[0]?.n ?? 0);

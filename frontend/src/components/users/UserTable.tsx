@@ -4,49 +4,38 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Edit, UserX, RotateCcw, Trash2 } from "lucide-react";
-import { Database } from "@/integrations/supabase/types";
 import { SortDirection } from "@/hooks/useSorting";
 import { ConditionalAction } from "@/components/ui/conditional-actions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import UserActionMenu from "./UserActionMenu";
+import type { UsuarioListado } from "@/api/usuarios";
 
-type Usuario = Database['public']['Tables']['usuario']['Row'];
-type Rol = Database['public']['Tables']['rol']['Row'];
-
-interface UserWithRoles extends Usuario {
-  user_roles: Array<{ rol_id: number }>;
-}
-
+/**
+ * La fila ya viene con sus roles desde el API y con la URL firmada de la foto.
+ * Antes habia que cruzar user_roles con el catalogo de roles en el navegador.
+ */
 interface UserTableProps {
-  users: UserWithRoles[];
-  roles: Rol[];
-  onView: (user: UserWithRoles) => void;
-  onEdit: (user: UserWithRoles) => void;
+  users: UsuarioListado[];
+  onView: (user: UsuarioListado) => void;
+  onEdit: (user: UsuarioListado) => void;
   onDelete: (userId: number) => void;
   onReactivate: (userId: number) => void;
   onPermanentDelete: (userId: number) => void;
-  sortKey?: keyof Usuario | string | null;
+  sortKey?: string | null;
   sortDirection?: SortDirection;
-  onSort?: (key: keyof Usuario | string) => void;
-  selectedRoles: number[];
-  statusFilter: 'active' | 'inactive' | 'all';
-  onRoleFilterChange: () => void;
+  onSort?: (key: string) => void;
 }
 
-const UserTable = ({ 
-  users, 
-  roles, 
-  onView, 
-  onEdit, 
+const UserTable = ({
+  users,
+  onView,
+  onEdit,
   onDelete,
   onReactivate,
   onPermanentDelete,
   sortKey,
   sortDirection,
   onSort,
-  selectedRoles,
-  statusFilter,
-  onRoleFilterChange
 }: UserTableProps) => {
   const isMobile = useIsMobile();
   const getInitials = (name: string) => {
@@ -58,10 +47,7 @@ const UserTable = ({
       .slice(0, 2);
   };
 
-  const getUserRoles = (user: UserWithRoles) => {
-    const userRoleIds = user.user_roles?.map(ur => ur.rol_id) || [];
-    return roles.filter(role => userRoleIds.includes(role.rol_id));
-  };
+  const getUserRoles = (user: UsuarioListado) => user.roles;
 
   if (users.length === 0) {
     return (
@@ -91,7 +77,7 @@ const UserTable = ({
                   <TableCell className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarImage src={user.usu_foto || undefined} />
+                        <AvatarImage src={user.usu_foto_url || undefined} />
                         <AvatarFallback>
                           {getInitials(user.usu_nombre)}
                         </AvatarFallback>
@@ -143,7 +129,7 @@ const UserTable = ({
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.usu_foto || undefined} />
+                      <AvatarImage src={user.usu_foto_url || undefined} />
                       <AvatarFallback>
                         {getInitials(user.usu_nombre)}
                       </AvatarFallback>

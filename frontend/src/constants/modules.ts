@@ -12,6 +12,9 @@ export const MODULES = [
   'asistencias_entrenadores',
   'encuestas',
   'reportes',
+  // Existe en los datos reales de rol_permiso aunque el sistema viejo no lo
+  // declaraba aqui: sin el, la matriz de Permisos lo pintaba sin nombre.
+  'reporte_estudiante',
   'perfil',
   'permisos',
 ] as const;
@@ -31,6 +34,7 @@ export const MODULE_LABELS: Record<Module, string> = {
   asistencias_entrenadores: 'Asistencias Entrenadores',
   encuestas: 'Encuestas',
   reportes: 'Reportes',
+  reporte_estudiante: 'Reporte del Estudiante',
   perfil: 'Perfil',
   permisos: 'Permisos',
 };

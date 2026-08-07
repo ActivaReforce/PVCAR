@@ -9,6 +9,8 @@ import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { es } from "date-fns/locale";
+import { useQuery } from "@tanstack/react-query";
+import { perfilApi } from "@/api/perfil";
 
 const Perfil = () => {
   const [isEditingPassword, setIsEditingPassword] = useState(false);
@@ -21,6 +23,18 @@ const Perfil = () => {
 
   const { user, changePassword } = useAuth();
   const { toast } = useToast();
+
+  /**
+   * El bucket de fotos es privado desde la migracion 0003: usuario.usu_foto
+   * guarda la ruta del objeto, no una URL que sirva. GET /perfil devuelve
+   * usu_foto_url ya firmada, valida una hora, y es la unica que se puede pintar.
+   */
+  const perfil = useQuery({
+    queryKey: ['perfil'],
+    queryFn: () => perfilApi.obtener(),
+  });
+
+  const fotoUrl = perfil.data?.usu_foto_url ?? null;
 
   const getRoleBadgeColor = (role?: string) => {
     switch (role) {
@@ -153,17 +167,32 @@ const Perfil = () => {
             {/* Profile Image */}
             <div className="flex flex-col items-center gap-4">
               <Avatar className="w-32 h-32 sm:w-40 sm:h-40 border-4 border-primary">
-                {user?.usu_foto ? (
-                  <AvatarImage src={user.usu_foto} alt={user.usu_nombre} />
+                {fotoUrl ? (
+                  <AvatarImage src={fotoUrl} alt={user?.usu_nombre} />
                 ) : (
                   <AvatarFallback className="text-2xl sm:text-3xl bg-muted text-muted-foreground">
                     {user?.usu_nombre?.split(' ').map(name => name[0]).join('').toUpperCase() || "?"}
                   </AvatarFallback>
                 )}
               </Avatar>
-              <Badge className={`${getRoleBadgeColor(getPrimaryRole())} text-xs sm:text-sm px-3 sm:px-4 py-1 sm:py-2`}>
-                {getPrimaryRole()}
-              </Badge>
+              {/*
+                Todos los roles, no solo el "principal". Quien es coordinador y
+                entrenador a la vez lo es de verdad; ensenar uno solo fue parte
+                del problema que el cliente pidio arreglar (decision D2).
+              */}
+              <div className="flex flex-wrap justify-center gap-2">
+                {(user?.roles ?? []).map((rol) => (
+                  <Badge
+                    key={rol.rol_id}
+                    className={`${getRoleBadgeColor(rol.rol_titulo)} text-xs sm:text-sm px-3 sm:px-4 py-1 sm:py-2`}
+                  >
+                    {rol.rol_titulo}
+                  </Badge>
+                ))}
+                {(user?.roles?.length ?? 0) === 0 && (
+                  <Badge className={getRoleBadgeColor()}>{getPrimaryRole()}</Badge>
+                )}
+              </div>
             </div>
             
             {/* User Details - Made responsive */}

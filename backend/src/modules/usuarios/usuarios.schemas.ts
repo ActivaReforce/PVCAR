@@ -48,9 +48,26 @@ const sectorResidencia = z.string().trim().max(160).optional().or(z.literal(''))
 /** Ruta del objeto en el bucket usufoto. null borra la foto actual. */
 const foto = z.string().trim().max(255).nullable().optional();
 
+/**
+ * `rol` admite varios separados por coma (?rol=2,3): la pantalla vieja deja
+ * marcar varios roles a la vez y se mantiene. Vacio = sin filtro.
+ */
+const rolesFiltro = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .transform((valor) => {
+    if (valor === undefined) return undefined;
+    const texto = Array.isArray(valor) ? valor.join(',') : valor;
+    const ids = texto
+      .split(',')
+      .map((t) => Number(t.trim()))
+      .filter((n) => Number.isInteger(n) && n > 0);
+    return ids.length > 0 ? ids : undefined;
+  });
+
 export const listarUsuariosSchema = paginacionSchema.extend({
   buscar: z.string().trim().max(120).optional(),
-  rol: z.coerce.number().int().positive().optional(),
+  rol: rolesFiltro,
   estado: z.coerce.number().int().positive().optional(),
   orden: z.enum(['nombre', 'correo', 'creacion', 'estado']).optional(),
   dir: z.enum(['asc', 'desc']).optional(),
