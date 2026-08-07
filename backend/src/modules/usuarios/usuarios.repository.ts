@@ -204,12 +204,15 @@ export async function contarUsuarios(
         ), '{}'::json) AS por_rol
   `;
 
+  // Cinco parametros, no seis: esta consulta no filtra por estado y Postgres
+  // rechaza el bind si se le pasan mas parametros de los que el SQL nombra
+  // ("bind message supplies 6 parameters, but prepared statement requires 5").
   const { rows } = await getPool().query<{
     total: string;
     activos: string;
     inactivos: string;
     por_rol: Record<string, number>;
-  }>(sql, paramsBase(query, alcance, yo));
+  }>(sql, paramsBase(query, alcance, yo).slice(0, 5));
 
   return {
     total: Number(rows[0]?.total ?? 0),

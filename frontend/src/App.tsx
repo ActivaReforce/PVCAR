@@ -9,7 +9,6 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
-import { MandatorySurveyManager } from "@/components/surveys/MandatorySurveyManager";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
@@ -102,7 +101,14 @@ const App = () => {
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </AppLayout>
-                      <MandatorySurveyManager />
+                      {/*
+                        MandatorySurveyManager queda desmontado hasta la Fase 13.
+                        Se renderizaba en TODAS las pantallas y consultaba padre,
+                        encuesta y encuesta_respondida directo a Supabase: con RLS
+                        y sin privilegios eso son cuatro 403 en la consola cada vez
+                        que se abre cualquier pagina. Ademas no puede funcionar —
+                        esas tablas tienen cero filas en produccion.
+                      */}
                     </ProtectedRoute>
                   }
                 />
