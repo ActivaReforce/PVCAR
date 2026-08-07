@@ -65,9 +65,23 @@ const rolesFiltro = z
     return ids.length > 0 ? ids : undefined;
   });
 
+/**
+ * Filtro "sin rol". Existe porque los usuarios sin ningun rol no aparecian en
+ * ninguna tarjeta y la suma no cuadraba con el total: en los datos reales hay
+ * dos (inactivos, sin cuenta de acceso). Dejarlos invisibles era peor que
+ * ensenarlos.
+ *
+ * No se usa z.coerce.boolean(): convierte la cadena 'false' en true.
+ */
+const banderaFiltro = z
+  .enum(['true', 'false', '1', '0'])
+  .optional()
+  .transform((v) => v === 'true' || v === '1');
+
 export const listarUsuariosSchema = paginacionSchema.extend({
   buscar: z.string().trim().max(120).optional(),
   rol: rolesFiltro,
+  sinRol: banderaFiltro,
   estado: z.coerce.number().int().positive().optional(),
   orden: z.enum(['nombre', 'correo', 'creacion', 'estado']).optional(),
   dir: z.enum(['asc', 'desc']).optional(),

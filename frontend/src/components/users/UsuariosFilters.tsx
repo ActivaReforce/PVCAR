@@ -4,32 +4,34 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import type { Rol } from '@/api/usuarios';
 
 interface UsuariosFiltersProps {
-  viewMode: 'cards' | 'table';
   roles: Rol[];
   conteosPorRol: Record<string, number>;
   totalUsuarios: number;
   /** Cuantos entran en el filtro actual, segun el servidor. */
   totalFiltrado: number;
+  sinRol: number;
   selectedRoles: number[];
+  sinRolSeleccionado: boolean;
   onRoleToggle: (roleId: number) => void;
+  onSinRolToggle: () => void;
   onViewAll: () => void;
   getSelectedRoleNames: () => string;
 }
 
 const UsuariosFilters = ({
-  viewMode,
   roles,
   conteosPorRol,
   totalUsuarios,
   totalFiltrado,
+  sinRol,
   selectedRoles,
+  sinRolSeleccionado,
   onRoleToggle,
+  onSinRolToggle,
   onViewAll,
   getSelectedRoleNames,
 }: UsuariosFiltersProps) => {
   const isMobile = useIsMobile();
-
-  if (viewMode !== 'table') return null;
 
   if (isMobile) {
     return (
@@ -38,8 +40,11 @@ const UsuariosFilters = ({
           roles={roles}
           conteosPorRol={conteosPorRol}
           totalUsuarios={totalUsuarios}
+          sinRol={sinRol}
           selectedRoles={selectedRoles}
+          sinRolSeleccionado={sinRolSeleccionado}
           onRoleToggle={onRoleToggle}
+          onSinRolToggle={onSinRolToggle}
           onViewAll={onViewAll}
         />
         <div className="text-sm text-muted-foreground text-center px-2">
@@ -57,8 +62,11 @@ const UsuariosFilters = ({
         roles={roles}
         conteosPorRol={conteosPorRol}
         totalUsuarios={totalUsuarios}
+        sinRol={sinRol}
         selectedRoles={selectedRoles}
+        sinRolSeleccionado={sinRolSeleccionado}
         onRoleToggle={onRoleToggle}
+        onSinRolToggle={onSinRolToggle}
         onViewAll={onViewAll}
       />
       <div className="text-sm text-muted-foreground">

@@ -9,8 +9,11 @@ interface RoleFiltersProps {
   /** Conteos del servidor: { "3": 49 }. Antes se contaba el array cargado. */
   conteosPorRol: Record<string, number>;
   totalUsuarios: number;
+  sinRol: number;
   selectedRoles: number[];
+  sinRolSeleccionado: boolean;
   onRoleToggle: (roleId: number) => void;
+  onSinRolToggle: () => void;
   onViewAll: () => void;
 }
 
@@ -18,13 +21,16 @@ const RoleFilters = ({
   roles,
   conteosPorRol,
   totalUsuarios,
+  sinRol,
   selectedRoles,
+  sinRolSeleccionado,
   onRoleToggle,
+  onSinRolToggle,
   onViewAll,
 }: RoleFiltersProps) => {
   const getUserCountForRole = (roleId: number) => conteosPorRol[String(roleId)] ?? 0;
 
-  const isViewingAll = selectedRoles.length === 0;
+  const isViewingAll = selectedRoles.length === 0 && !sinRolSeleccionado;
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -59,6 +65,21 @@ const RoleFilters = ({
           </Button>
         );
       })}
+
+      {/* Excluyente con los roles: o unos, o los que no tienen ninguno. */}
+      {sinRol > 0 && (
+        <Button
+          variant={sinRolSeleccionado ? 'default' : 'outline'}
+          size="sm"
+          onClick={onSinRolToggle}
+          className="flex items-center gap-2"
+        >
+          Sin rol
+          <Badge variant="secondary" className="ml-1">
+            {sinRol}
+          </Badge>
+        </Button>
+      )}
     </div>
   );
 };

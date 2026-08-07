@@ -55,6 +55,11 @@ export interface ConteosUsuarios {
   porRol: Record<string, number>;
   /** El numero de "Ver Todos": cuantos hay en el estado elegido. */
   totalDelEstado: number;
+  /**
+   * Los que no tienen ningun rol. No salen en ninguna tarjeta, y por eso la
+   * suma de las tarjetas puede quedarse corta frente al total.
+   */
+  sinRol: number;
 }
 
 export interface PaginaUsuarios {
@@ -72,6 +77,8 @@ export interface FiltrosUsuarios {
   buscar?: string;
   /** Varios roles a la vez; viaja como ?rol=2,3. */
   rol?: number[];
+  /** Excluyente con `rol`: pide justo los que no tienen ninguno. */
+  sinRol?: boolean;
   estado?: number;
   orden?: 'nombre' | 'correo' | 'creacion' | 'estado';
   dir?: 'asc' | 'desc';
@@ -103,7 +110,7 @@ export interface DatosUsuario {
 function queryString(filtros: FiltrosUsuarios): string {
   const params = new URLSearchParams();
   for (const [clave, valor] of Object.entries(filtros)) {
-    if (valor === undefined || valor === null || valor === '') continue;
+    if (valor === undefined || valor === null || valor === '' || valor === false) continue;
     if (Array.isArray(valor)) {
       if (valor.length > 0) params.set(clave, valor.join(','));
       continue;

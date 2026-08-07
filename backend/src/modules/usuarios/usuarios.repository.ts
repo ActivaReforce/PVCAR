@@ -54,6 +54,13 @@ export interface ConteosUsuarios {
   porRol: Record<string, number>;
   /** Cuantos hay en el estado elegido, sin filtrar por rol. Es el de "Ver Todos". */
   totalDelEstado: number;
+  /**
+   * Los que no tienen ningun rol: no salen en ninguna tarjeta, y son la razon
+   * de que la suma de las tarjetas quede por debajo del total. Ojo, la suma
+   * tampoco tiene por que cuadrar por arriba: quien tenga dos roles cuenta en
+   * las dos tarjetas.
+   */
+  sinRol: number;
 }
 
 /**
@@ -107,9 +114,17 @@ const F_VISIBLE = `($1::boolean OR u.usu_id IN (SELECT usu_id FROM visibles))`;
 const F_BUSCAR = `($4::text IS NULL OR u.usu_nombre ILIKE '%' || $4 || '%'
                                    OR u.usu_correo ILIKE '%' || $4 || '%')`;
 
-const F_ROL = `($5::int[] IS NULL OR EXISTS (
-                   SELECT 1 FROM public.usuario_rol ur
-                   WHERE ur.usu_id = u.usu_id AND ur.rol_id = ANY($5::int[])))`;
+const SIN_NINGUN_ROL = `NOT EXISTS (SELECT 1 FROM public.usuario_rol ur WHERE ur.usu_id = u.usu_id)`;
+
+/**
+ * $7 es el filtro "sin rol": manda sobre $5 porque son excluyentes — o se
+ * piden usuarios de ciertos roles, o los que no tienen ninguno.
+ */
+const F_ROL = `(CASE WHEN $7::boolean THEN ${SIN_NINGUN_ROL}
+                     ELSE ($5::int[] IS NULL OR EXISTS (
+                               SELECT 1 FROM public.usuario_rol ur
+                               WHERE ur.usu_id = u.usu_id AND ur.rol_id = ANY($5::int[])))
+                END)`;
 
 const F_ESTADO = `($6::int IS NULL OR u.est_id = $6)`;
 
@@ -128,6 +143,7 @@ function paramsBase(query: ListarUsuariosQuery, alcance: Alcance, yo: number): u
     query.buscar && query.buscar.length > 0 ? query.buscar : null,
     query.rol && query.rol.length > 0 ? query.rol : null,
     query.estado ?? null,
+    query.sinRol === true,
   ];
 }
 
@@ -172,7 +188,7 @@ export async function listarUsuarios(
     ) r ON TRUE
     WHERE ${F_VISIBLE} AND ${F_BUSCAR} AND ${F_ROL} AND ${F_ESTADO}
     ORDER BY ${columna} ${direccion}, u.usu_id ASC
-    LIMIT $7 OFFSET $8
+    LIMIT $8 OFFSET $9
   `;
 
   const { rows } = await getPool().query<UsuarioListado & { total: string }>(sql, [
@@ -209,8 +225,10 @@ export async function contarUsuarios(
         WHERE ${F_VISIBLE} AND ${F_BUSCAR} AND ${F_ROL}
     ),
     -- Para las tarjetas de rol: se aplica todo menos la seleccion de roles.
+    -- 'ninguno' marca a los que no tienen ningun rol; son los que hacian que
+    -- la suma de las tarjetas no llegara al total del estado.
     sin_rol AS (
-        SELECT u.usu_id
+        SELECT u.usu_id, ${SIN_NINGUN_ROL} AS ninguno
         FROM public.usuario u
         WHERE ${F_VISIBLE} AND ${F_BUSCAR} AND ${F_ESTADO}
     )
@@ -219,6 +237,7 @@ export async function contarUsuarios(
         (SELECT count(*) FROM sin_estado WHERE est_id = ${ESTADO.ACTIVO})    AS activos,
         (SELECT count(*) FROM sin_estado WHERE est_id = ${ESTADO.INACTIVO})  AS inactivos,
         (SELECT count(*) FROM sin_rol)                                       AS total_del_estado,
+        (SELECT count(*) FROM sin_rol WHERE ninguno)                         AS sin_rol,
         COALESCE((
             SELECT json_object_agg(rol_id, n)
             FROM (
@@ -235,6 +254,7 @@ export async function contarUsuarios(
     activos: string;
     inactivos: string;
     total_del_estado: string;
+    sin_rol: string;
     por_rol: Record<string, number>;
   }>(sql, paramsBase(query, alcance, yo));
 
@@ -243,6 +263,7 @@ export async function contarUsuarios(
     activos: Number(rows[0]?.activos ?? 0),
     inactivos: Number(rows[0]?.inactivos ?? 0),
     totalDelEstado: Number(rows[0]?.total_del_estado ?? 0),
+    sinRol: Number(rows[0]?.sin_rol ?? 0),
     porRol: rows[0]?.por_rol ?? {},
   };
 }
