@@ -129,7 +129,7 @@ describe('Autenticacion — puertas que no dependen de la red', () => {
  * arreglo — en el sistema viejo la pantalla de usuarios consultaba la tabla
  * entera con la anon key del bundle.
  */
-describe('Usuarios, colegios, permisos y perfil — cerrados sin token', () => {
+describe('Modulos de negocio — cerrados sin token', () => {
   const rutas: Array<[string, string]> = [
     ['GET', '/api/v1/usuarios'],
     ['GET', '/api/v1/usuarios/roles'],
@@ -150,6 +150,22 @@ describe('Usuarios, colegios, permisos y perfil — cerrados sin token', () => {
     ['PATCH', '/api/v1/colegios/1'],
     ['PUT', '/api/v1/colegios/1/coordinadores'],
     ['DELETE', '/api/v1/colegios/1'],
+    ['GET', '/api/v1/actividades'],
+    ['GET', '/api/v1/actividades/categorias'],
+    ['GET', '/api/v1/actividades/1'],
+    ['POST', '/api/v1/actividades'],
+    ['PATCH', '/api/v1/actividades/1'],
+    ['DELETE', '/api/v1/actividades/1'],
+    ['GET', '/api/v1/disciplinas'],
+    ['GET', '/api/v1/disciplinas/dias'],
+    ['GET', '/api/v1/disciplinas/1'],
+    ['GET', '/api/v1/disciplinas/1/previo-baja'],
+    ['GET', '/api/v1/disciplinas/1/impacto'],
+    ['POST', '/api/v1/disciplinas'],
+    ['PATCH', '/api/v1/disciplinas/1'],
+    ['POST', '/api/v1/disciplinas/1/baja'],
+    ['POST', '/api/v1/disciplinas/1/reactivar'],
+    ['DELETE', '/api/v1/disciplinas/1'],
     ['GET', '/api/v1/permisos'],
     ['PUT', '/api/v1/permisos/rol/1'],
     ['GET', '/api/v1/perfil'],

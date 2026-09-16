@@ -3,6 +3,7 @@ import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
+import { contieneSinTildes } from '../../lib/sql.js';
 import type { ListarColegiosQuery } from './colegios.schemas.js';
 
 export interface CoordinadorResumen {
@@ -43,9 +44,9 @@ export interface ColegioDetalle extends ColegioListado {
  */
 const F_ALCANCE = `($1::boolean OR c.col_id = ANY($2::int[]))`;
 
-const F_BUSCAR = `($3::text IS NULL OR c.col_nombre ILIKE '%' || $3 || '%'
-                                    OR c.col_direccion ILIKE '%' || $3 || '%'
-                                    OR c.col_rep_nombre ILIKE '%' || $3 || '%')`;
+const F_BUSCAR = `($3::text IS NULL OR ${contieneSinTildes('c.col_nombre', '$3')}
+                                    OR ${contieneSinTildes('c.col_direccion', '$3')}
+                                    OR ${contieneSinTildes("COALESCE(c.col_rep_nombre, '')", '$3')})`;
 
 const COLUMNAS_ORDEN: Record<string, string> = {
   nombre: 'c.col_nombre',

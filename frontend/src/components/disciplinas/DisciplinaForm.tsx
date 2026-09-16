@@ -1,272 +1,178 @@
+import { useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { useColegios } from '@/hooks/useColegios';
+import { useActividades } from '@/hooks/useActividades';
+import { useActualizarDisciplina, useDias } from '@/hooks/useDisciplinas';
+import type { Disciplina } from '@/api/disciplinas';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-
-interface DisciplinaWithDetails {
-  colacthor_id: number;
-  colegio: { col_nombre: string } | null;
-  actividad: { act_nombre: string } | null;
-  dia: { dia_nombre: string } | null;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
-  colacthor_fecha_creacion: string;
-  col_id: number | null;
-  act_id: number | null;
-  dia_id: number | null;
-  est_id: number | null;
-}
-
-interface DisciplinaFormProps {
-  disciplina?: DisciplinaWithDetails | null;
+interface Props {
+  disciplina: Disciplina;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-interface Colegio {
-  col_id: number;
-  col_nombre: string;
-}
+const hhmm = (hora: string | null) => hora?.slice(0, 5) ?? '';
 
-interface Actividad {
-  act_id: number;
-  act_nombre: string;
-}
-
-interface Dia {
-  dia_id: number;
-  dia_nombre: string;
-}
-
-const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: DisciplinaFormProps) => {
-  const [formData, setFormData] = useState({
-    col_id: disciplina?.col_id || null,
-    act_id: disciplina?.act_id || null,
-    dia_id: disciplina?.dia_id || null,
-    colacthor_hora_inicio: disciplina?.colacthor_hora_inicio || "",
-    colacthor_hora_fin: disciplina?.colacthor_hora_fin || "",
-  });
-  
-  const [colegios, setColegios] = useState<Colegio[]>([]);
-  const [actividades, setActividades] = useState<Actividad[]>([]);
-  const [dias, setDias] = useState<Dia[]>([]);
-  const [loading, setLoading] = useState(false);
+/**
+ * Edición de una disciplina.
+ *
+ * Si ya tiene alumnos o evaluaciones, cambiarle el día o la hora reescribe la
+ * historia: las asistencias guardan su fecha, pero la sesión a la que
+ * pertenecen pasa a ser otra. No se bloquea —los horarios cambian de verdad—
+ * pero se avisa antes, que es lo que no hacía el sistema viejo.
+ */
+const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
   const { toast } = useToast();
+  const dias = useDias();
+  const colegios = useColegios({ limit: 200, orden: 'nombre' });
+  const actividades = useActividades({ limit: 200, orden: 'nombre' });
+  const actualizar = useActualizarDisciplina();
 
-  const isEditMode = !!disciplina;
+  const [colId, setColId] = useState(String(disciplina.col_id));
+  const [actId, setActId] = useState(String(disciplina.act_id));
+  const [diaId, setDiaId] = useState(String(disciplina.dia_id));
+  const [horaInicio, setHoraInicio] = useState(hhmm(disciplina.colacthor_hora_inicio));
+  const [horaFin, setHoraFin] = useState(hhmm(disciplina.colacthor_hora_fin));
 
-  useEffect(() => {
-    loadSelectData();
-  }, []);
+  const cambiaHorario =
+    diaId !== String(disciplina.dia_id) ||
+    horaInicio !== hhmm(disciplina.colacthor_hora_inicio) ||
+    horaFin !== hhmm(disciplina.colacthor_hora_fin);
 
-  const loadSelectData = async () => {
-    try {
-      const [colegiosResult, actividadesResult, diasResult] = await Promise.all([
-        supabase.from('colegio').select('col_id, col_nombre').order('col_nombre'),
-        supabase.from('actividad').select('act_id, act_nombre').order('act_nombre'),
-        supabase.from('dia').select('dia_id, dia_nombre').order('dia_id')
-      ]);
+  const tieneHistorial = disciplina.alumnos > 0 || disciplina.evaluaciones > 0;
 
-      if (colegiosResult.error) throw colegiosResult.error;
-      if (actividadesResult.error) throw actividadesResult.error;
-      if (diasResult.error) throw diasResult.error;
-
-      setColegios(colegiosResult.data || []);
-      setActividades(actividadesResult.data || []);
-      setDias(diasResult.data || []);
-    } catch (error) {
-      console.error("Error loading select data:", error);
-      toast({
-        title: "Error",
-        description: "Error al cargar los datos del formulario",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const isValid = await validateForm();
-    if (!isValid) return;
 
-    setLoading(true);
-    
+    if (horaFin <= horaInicio) {
+      toast({
+        title: 'La hora de fin tiene que ser posterior a la de inicio',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      const dataToSubmit = {
-        col_id: formData.col_id,
-        act_id: formData.act_id,
-        dia_id: formData.dia_id,
-        colacthor_hora_inicio: formData.colacthor_hora_inicio || null,
-        colacthor_hora_fin: formData.colacthor_hora_fin || null,
-        est_id: 1, // Default to active status
-      };
-
-      if (isEditMode && disciplina) {
-        const { error } = await supabase
-          .from("colegio_actividad_horario")
-          .update(dataToSubmit)
-          .eq('colacthor_id', disciplina.colacthor_id);
-
-        if (error) throw error;
-
-        toast({
-          title: "Éxito",
-          description: "La disciplina ha sido actualizada exitosamente.",
-        });
-      } else {
-        const { error } = await supabase
-          .from("colegio_actividad_horario")
-          .insert(dataToSubmit);
-
-        if (error) throw error;
-
-        toast({
-          title: "Éxito",
-          description: "La disciplina ha sido creada exitosamente.",
-        });
-      }
-
+      await actualizar.mutateAsync({
+        id: disciplina.colacthor_id,
+        datos: {
+          col_id: Number(colId),
+          act_id: Number(actId),
+          dia_id: Number(diaId),
+          colacthor_hora_inicio: horaInicio,
+          colacthor_hora_fin: horaFin,
+        },
+      });
       onSuccess();
-    } catch (error) {
-      console.error("Error saving disciplina:", error);
-      toast({
-        title: "Error",
-        description: "Ocurrió un error inesperado. Por favor intenta nuevamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+    } catch {
+      // El hook ya muestra el motivo.
     }
-  };
-
-  const validateForm = async () => {
-    if (!formData.col_id) {
-      toast({
-        title: "Error de validación",
-        description: "Por favor selecciona un colegio.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!formData.act_id) {
-      toast({
-        title: "Error de validación",
-        description: "Por favor selecciona una actividad.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!formData.dia_id) {
-      toast({
-        title: "Error de validación",
-        description: "Por favor selecciona un día.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    return true;
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-1 gap-4">
-        <div>
-          <Label htmlFor="col_id">Colegio *</Label>
-          <Select
-            value={formData.col_id?.toString() || ""}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, col_id: parseInt(value) }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un colegio" />
+    <form onSubmit={enviar} className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="edit_col">Colegio</Label>
+          <Select value={colId} onValueChange={setColId}>
+            <SelectTrigger id="edit_col" className="h-11 sm:h-10">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {colegios.map((colegio) => (
-                <SelectItem key={colegio.col_id} value={colegio.col_id.toString()}>
-                  {colegio.col_nombre}
+              {(colegios.data?.items ?? []).map((c) => (
+                <SelectItem key={c.col_id} value={String(c.col_id)}>
+                  {c.col_nombre}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        <div>
-          <Label htmlFor="act_id">Actividad *</Label>
-          <Select
-            value={formData.act_id?.toString() || ""}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, act_id: parseInt(value) }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona una actividad" />
+        <div className="space-y-2">
+          <Label htmlFor="edit_act">Actividad</Label>
+          <Select value={actId} onValueChange={setActId}>
+            <SelectTrigger id="edit_act" className="h-11 sm:h-10">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {actividades.map((actividad) => (
-                <SelectItem key={actividad.act_id} value={actividad.act_id.toString()}>
-                  {actividad.act_nombre}
+              {(actividades.data?.items ?? []).map((a) => (
+                <SelectItem key={a.act_id} value={String(a.act_id)}>
+                  {a.act_nombre}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        <div>
-          <Label htmlFor="dia_id">Día *</Label>
-          <Select
-            value={formData.dia_id?.toString() || ""}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, dia_id: parseInt(value) }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un día" />
+        <div className="space-y-2">
+          <Label htmlFor="edit_dia">Día</Label>
+          <Select value={diaId} onValueChange={setDiaId}>
+            <SelectTrigger id="edit_dia" className="h-11 sm:h-10">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {dias.map((dia) => (
-                <SelectItem key={dia.dia_id} value={dia.dia_id.toString()}>
-                  {dia.dia_nombre}
+              {(dias.data ?? []).map((d) => (
+                <SelectItem key={d.dia_id} value={String(d.dia_id)}>
+                  {d.dia_nombre}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="colacthor_hora_inicio">Hora Inicio</Label>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="edit_inicio">Inicio</Label>
             <Input
-              id="colacthor_hora_inicio"
+              id="edit_inicio"
               type="time"
-              value={formData.colacthor_hora_inicio}
-              onChange={(e) => setFormData(prev => ({ ...prev, colacthor_hora_inicio: e.target.value }))}
+              value={horaInicio}
+              onChange={(e) => setHoraInicio(e.target.value)}
+              className="h-11 sm:h-10"
             />
           </div>
-          <div>
-            <Label htmlFor="colacthor_hora_fin">Hora Fin</Label>
+          <div className="space-y-2">
+            <Label htmlFor="edit_fin">Fin</Label>
             <Input
-              id="colacthor_hora_fin"
+              id="edit_fin"
               type="time"
-              value={formData.colacthor_hora_fin}
-              onChange={(e) => setFormData(prev => ({ ...prev, colacthor_hora_fin: e.target.value }))}
+              value={horaFin}
+              onChange={(e) => setHoraFin(e.target.value)}
+              className="h-11 sm:h-10"
             />
           </div>
         </div>
       </div>
 
-      <div className="flex justify-end space-x-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
+      {cambiaHorario && tieneHistorial && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+          <p>
+            Esta disciplina tiene {disciplina.alumnos} alumnos
+            {disciplina.evaluaciones > 0 && ` y ${disciplina.evaluaciones} evaluaciones`}. Cambiar
+            el día o la hora no mueve las asistencias ya registradas: quedarán con su fecha
+            original pero bajo el horario nuevo.
+          </p>
+        </div>
+      )}
+
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={actualizar.isPending}>
           Cancelar
         </Button>
-        <Button 
-          type="submit" 
-          disabled={loading} 
-          className="bg-[#FD5757] hover:bg-[#E04747]"
-        >
-          {loading ? "Guardando..." : isEditMode ? "Actualizar" : "Crear Disciplina"}
+        <Button type="submit" variant="brand" disabled={actualizar.isPending}>
+          {actualizar.isPending ? 'Guardando…' : 'Guardar cambios'}
         </Button>
       </div>
     </form>

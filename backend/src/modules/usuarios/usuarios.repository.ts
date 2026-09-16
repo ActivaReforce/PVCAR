@@ -3,6 +3,7 @@ import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
+import { contieneSinTildes } from '../../lib/sql.js';
 import type { ListarUsuariosQuery } from './usuarios.schemas.js';
 
 export interface RolResumen {
@@ -111,8 +112,8 @@ const CTE_VISIBLES = `
  */
 const F_VISIBLE = `($1::boolean OR u.usu_id IN (SELECT usu_id FROM visibles))`;
 
-const F_BUSCAR = `($4::text IS NULL OR u.usu_nombre ILIKE '%' || $4 || '%'
-                                   OR u.usu_correo ILIKE '%' || $4 || '%')`;
+const F_BUSCAR = `($4::text IS NULL OR ${contieneSinTildes('u.usu_nombre', '$4')}
+                                   OR ${contieneSinTildes('u.usu_correo', '$4')})`;
 
 const SIN_NINGUN_ROL = `NOT EXISTS (SELECT 1 FROM public.usuario_rol ur WHERE ur.usu_id = u.usu_id)`;
 

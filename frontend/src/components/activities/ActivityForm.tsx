@@ -1,257 +1,196 @@
-
-import React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import MaterialesInput from './MaterialesInput';
+import { useToast } from '@/hooks/use-toast';
+import {
+  useActualizarActividad,
+  useCategorias,
+  useCrearActividad,
+} from '@/hooks/useActividades';
+import type { Actividad, DatosActividad } from '@/api/actividades';
 
-const actividadSchema = z.object({
-  act_nombre: z.string().min(1, 'El nombre es requerido'),
-  cat_id: z.number().min(1, 'La categoría es requerida'),
-  act_descripcion: z.string().optional(),
-  act_tipo_espacio: z.string().optional(),
-  act_espacio_trabajo: z.string().optional(),
-  act_espacio_secundario: z.string().optional(),
-  act_indumentaria_tipo: z.string().optional(),
-  act_materiales_alumno: z.array(z.string()).optional(),
-});
-
-type ActividadFormData = z.infer<typeof actividadSchema>;
-
-interface Actividad {
-  act_id: number;
-  act_nombre: string;
-  cat_id?: number;
-  act_descripcion?: string;
-  act_tipo_espacio?: string;
-  act_espacio_trabajo?: string;
-  act_espacio_secundario?: string;
-  act_indumentaria_tipo?: string;
-  act_materiales_alumno?: string[];
-  act_fecha_creacion?: string;
-  act_fecha_modificacion?: string;
-}
-
-interface ActivityFormProps {
+interface Props {
   actividad?: Actividad | null;
-  onSubmit: (data: ActividadFormData & { act_materiales_alumno?: string[] }) => void;
+  onSuccess: () => void;
   onCancel: () => void;
-  isLoading: boolean;
-  materialesInput: string;
-  setMaterialesInput: (value: string) => void;
 }
 
-const ActivityForm: React.FC<ActivityFormProps> = ({
-  actividad,
-  onSubmit,
-  onCancel,
-  isLoading,
-  materialesInput,
-  setMaterialesInput,
-}) => {
-  // Fetch categories
-  const { data: categorias = [], isLoading: isLoadingCategorias } = useQuery({
-    queryKey: ['categorias'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categoria')
-        .select('cat_id, cat_nombre')
-        .order('cat_nombre');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
+const SIN_CATEGORIA = 'sin-categoria';
 
-  const form = useForm<ActividadFormData>({
-    resolver: zodResolver(actividadSchema),
-    defaultValues: {
-      act_nombre: actividad?.act_nombre || '',
-      cat_id: actividad?.cat_id || undefined,
-      act_descripcion: actividad?.act_descripcion || '',
-      act_tipo_espacio: actividad?.act_tipo_espacio || '',
-      act_espacio_trabajo: actividad?.act_espacio_trabajo || '',
-      act_espacio_secundario: actividad?.act_espacio_secundario || '',
-      act_indumentaria_tipo: actividad?.act_indumentaria_tipo || '',
-    },
-  });
+/**
+ * Alta y edición de una actividad.
+ *
+ * Los campos son los mismos del sistema viejo —nombre, categoría, descripción,
+ * indumentaria, espacios y materiales— porque describen cómo se imparte y el
+ * cliente los usa. Lo que cambia es que se guardan en una sola llamada y que
+ * los materiales viajan como lista.
+ */
+const ActivityForm = ({ actividad, onSuccess, onCancel }: Props) => {
+  const esEdicion = Boolean(actividad);
+  const { toast } = useToast();
+  const categorias = useCategorias();
+  const crear = useCrearActividad();
+  const actualizar = useActualizarActividad();
 
-  const handleSubmit = (data: ActividadFormData) => {
-    const materialesArray = materialesInput
-      .split(',')
-      .map(item => item.trim())
-      .filter(item => item.length > 0);
-    
-    onSubmit({
-      ...data,
-      act_materiales_alumno: materialesArray.length > 0 ? materialesArray : undefined,
-    });
+  const [nombre, setNombre] = useState(actividad?.act_nombre ?? '');
+  const [descripcion, setDescripcion] = useState(actividad?.act_descripcion ?? '');
+  const [catId, setCatId] = useState<string>(
+    actividad?.cat_id ? String(actividad.cat_id) : SIN_CATEGORIA,
+  );
+  const [indumentaria, setIndumentaria] = useState(actividad?.act_indumentaria_tipo ?? '');
+  const [espacio, setEspacio] = useState(actividad?.act_espacio_trabajo ?? '');
+  const [tipoEspacio, setTipoEspacio] = useState(actividad?.act_tipo_espacio ?? '');
+  const [espacioSecundario, setEspacioSecundario] = useState(
+    actividad?.act_espacio_secundario ?? '',
+  );
+  const [materiales, setMateriales] = useState<string[]>(actividad?.act_materiales_alumno ?? []);
+
+  const guardando = crear.isPending || actualizar.isPending;
+
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (nombre.trim().length < 2) {
+      toast({ title: 'El nombre es obligatorio', variant: 'destructive' });
+      return;
+    }
+
+    const datos: DatosActividad = {
+      act_nombre: nombre.trim(),
+      act_descripcion: descripcion.trim(),
+      cat_id: catId === SIN_CATEGORIA ? null : Number(catId),
+      act_indumentaria_tipo: indumentaria.trim(),
+      act_espacio_trabajo: espacio.trim(),
+      act_tipo_espacio: tipoEspacio.trim(),
+      act_espacio_secundario: espacioSecundario.trim(),
+      act_materiales_alumno: materiales,
+    };
+
+    try {
+      if (esEdicion && actividad) {
+        await actualizar.mutateAsync({ id: actividad.act_id, datos });
+      } else {
+        await crear.mutateAsync(datos);
+      }
+      onSuccess();
+    } catch {
+      // El mensaje del backend ya se muestra; el formulario queda abierto.
+    }
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="act_nombre"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nombre *</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ej: Fútbol, Pintura, Matemáticas" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="cat_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Categoría *</FormLabel>
-                <Select 
-                  onValueChange={(value) => field.onChange(parseInt(value))} 
-                  value={field.value?.toString() || ''}
-                  disabled={isLoadingCategorias}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar categoría" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {categorias.map((categoria) => (
-                      <SelectItem key={categoria.cat_id} value={categoria.cat_id.toString()}>
-                        {categoria.cat_nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+    <form onSubmit={enviar} className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="act_nombre">Nombre *</Label>
+            <Input
+              id="act_nombre"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Karate"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="cat_id">Categoría</Label>
+            <Select value={catId} onValueChange={setCatId}>
+              <SelectTrigger id="cat_id" className="h-11 sm:h-10">
+                <SelectValue placeholder="Sin categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SIN_CATEGORIA}>Sin categoría</SelectItem>
+                {(categorias.data ?? []).map((c) => (
+                  <SelectItem key={c.cat_id} value={String(c.cat_id)}>
+                    {c.cat_nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="act_descripcion">Descripción</Label>
+            <Textarea
+              id="act_descripcion"
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              rows={3}
+              placeholder="Qué se trabaja en esta actividad"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="act_indumentaria">Indumentaria</Label>
+            <Input
+              id="act_indumentaria"
+              value={indumentaria}
+              onChange={(e) => setIndumentaria(e.target.value)}
+              placeholder="Uniforme deportivo, karategui…"
+              autoComplete="off"
+            />
+          </div>
         </div>
 
-        <FormField
-          control={form.control}
-          name="act_descripcion"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Descripción</FormLabel>
-              <FormControl>
-                <Textarea 
-                  placeholder="Descripción de la actividad..."
-                  className="resize-none"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="act_espacio">Espacio de trabajo</Label>
+            <Input
+              id="act_espacio"
+              value={espacio}
+              onChange={(e) => setEspacio(e.target.value)}
+              placeholder="Cancha 1, sparklab, patio…"
+              autoComplete="off"
+            />
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="act_tipo_espacio"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo de Espacio</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ej: Cancha, Aula, Laboratorio" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="act_espacio_trabajo"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Espacio de Trabajo</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ej: Cancha principal, Aula 101" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="act_tipo_espacio">Tipo de espacio</Label>
+              <Input
+                id="act_tipo_espacio"
+                value={tipoEspacio}
+                onChange={(e) => setTipoEspacio(e.target.value)}
+                placeholder="Exterior, aula…"
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="act_espacio_secundario">Espacio secundario</Label>
+              <Input
+                id="act_espacio_secundario"
+                value={espacioSecundario}
+                onChange={(e) => setEspacioSecundario(e.target.value)}
+                placeholder="Aula de apoyo"
+                autoComplete="off"
+              />
+            </div>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="act_espacio_secundario"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Espacio Secundario</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ej: Vestidores, Bodega" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="act_indumentaria_tipo"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo de Indumentaria</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ej: Uniforme deportivo, Delantal" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <MaterialesInput valor={materiales} onChange={setMateriales} />
         </div>
+      </div>
 
-        <div>
-          <Label>Materiales del Alumno</Label>
-          <Input
-            placeholder="Ej: Balón, Pinceles, Calculadora (separados por comas)"
-            value={materialesInput}
-            onChange={(e) => setMaterialesInput(e.target.value)}
-          />
-        </div>
-
-        <div className="flex justify-end space-x-2 pt-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            type="submit" 
-            disabled={isLoading}
-            className="bg-[#FD5757] hover:bg-[#E04747]"
-          >
-            {isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            {actividad ? 'Actualizar' : 'Crear'}
-          </Button>
-        </div>
-      </form>
-    </Form>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={guardando}>
+          Cancelar
+        </Button>
+        <Button type="submit" variant="brand" disabled={guardando}>
+          {guardando ? 'Guardando…' : esEdicion ? 'Guardar cambios' : 'Crear actividad'}
+        </Button>
+      </div>
+    </form>
   );
 };
 
