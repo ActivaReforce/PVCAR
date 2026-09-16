@@ -54,9 +54,24 @@ const MobileRoleSelector = ({
     onRoleToggle(Number(valor));
   };
 
+  /**
+   * Controlado. Sin `value`, Radix no vuelve a emitir onValueChange al elegir
+   * la opcion que ya estaba: el rol quedaba pegado y no habia forma de
+   * quitarlo salvo pasando por "Ver Todos". Con el valor explicito el control
+   * dice siempre lo que hay puesto.
+   *
+   * En el telefono el filtro es de un rol a la vez; para combinar varios esta
+   * la fila de botones del escritorio. "Ver Todos" limpia.
+   */
+  const valorActual = sinRolSeleccionado
+    ? 'sin-rol'
+    : selectedRoles.length === 1
+      ? String(selectedRoles[0])
+      : 'all';
+
   return (
-    <Select onValueChange={alElegir}>
-      <SelectTrigger className="w-full max-w-full min-w-0">
+    <Select value={valorActual} onValueChange={alElegir}>
+      <SelectTrigger className="h-11 w-full max-w-full min-w-0">
         <SelectValue placeholder={etiqueta()} />
       </SelectTrigger>
       <SelectContent className="max-w-[calc(100vw-2rem)]">

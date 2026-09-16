@@ -95,7 +95,7 @@ usuariosRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
-      res.json({ data: await service.impacto(id), error: null });
+      res.json({ data: await service.impacto(actor(req), id), error: null });
     } catch (err) {
       next(err);
     }

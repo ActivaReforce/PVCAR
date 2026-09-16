@@ -29,6 +29,22 @@ Verificar en `auditoria` que quedó registro de cada alta, baja, borrado y cambi
 
 ---
 
+## 1.b Revisión del 2026-09-16 (con Railway apagado)
+
+Tres fallos encontrados leyendo el módulo entero, ya corregidos:
+
+1. **`PATCH`, `baja`, `reactivar`, `impacto` y `DELETE` no comprobaban el alcance.** Solo `GET /:id` lo hacía. Con `usuarios.editar` y un id en la URL se editaba o borraba a cualquiera. Arreglado con `exigirAlcance` en las cinco.
+2. **Escalada de privilegios:** nadie impedía concederse el rol de Propietario. Reglas nuevas en `usuarios.reglas.ts` — solo un rol global reparte roles globales, y nadie se concede a sí mismo un rol que no tenía.
+3. **`UserTable` tenía dos markups** y el de móvil pasaba `canEdit`/`canDelete` en `true` fijo, además de no mostrar roles ni estado ni dejar ordenar. Ahora es uno solo, responsive, con `ConditionalAction` en los dos tamaños. `UserActionMenu` quedó huérfano y se borró.
+
+Menor: el selector de rol de móvil no era controlado y no dejaba deseleccionar.
+
+Verificado sin backend: las 6 consultas del módulo ejecutadas contra `PVCAR_Dev` por MCP con parámetros reales, los conteos cuadrados a mano, las 18 FK que deciden qué bloquea un borrado, los defaults e identidades de las 5 tablas que se insertan, y 21 pruebas automáticas nuevas (14 de reglas de roles, 7 de las puertas de alcance). Detalle en `Roadmap.md`, Fase 6.
+
+**Lo de la sección 1 sigue pendiente: necesita el backend vivo.**
+
+---
+
 ## 2. Qué se construyó
 
 ### Backend (`backend/src/`)

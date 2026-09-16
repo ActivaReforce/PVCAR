@@ -136,6 +136,7 @@ describe('Usuarios, permisos y perfil — cerrados sin token', () => {
     ['GET', '/api/v1/usuarios/1'],
     ['GET', '/api/v1/usuarios/1/impacto'],
     ['POST', '/api/v1/usuarios'],
+    ['POST', '/api/v1/usuarios/foto'],
     ['PATCH', '/api/v1/usuarios/1'],
     ['POST', '/api/v1/usuarios/1/baja'],
     ['POST', '/api/v1/usuarios/1/reactivar'],

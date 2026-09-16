@@ -10,6 +10,7 @@ import { borrarFoto, firmarFoto, firmarFotos } from '../../lib/storage.js';
 import { enTransaccion } from '../../lib/tx.js';
 import { getPool } from '../../config/db.js';
 import * as repo from './usuarios.repository.js';
+import { revisarCambioDeRoles } from './usuarios.reglas.js';
 import type {
   ActualizarUsuarioInput,
   CrearUsuarioInput,
@@ -133,6 +134,29 @@ async function esVisible(alcance: Alcance, usuId: number): Promise<boolean> {
 }
 
 /**
+ * Quien puede repartir que rol. Las reglas viven en usuarios.reglas.ts, sin
+ * base de datos, para poder probarlas; aqui solo se traduce el veredicto a un
+ * error HTTP.
+ */
+function exigirCambioDeRolesValido(
+  actor: AuthUser,
+  usuId: number,
+  rolesAntes: number[],
+  rolesDespues: number[],
+): void {
+  const veredicto = revisarCambioDeRoles({
+    actorId: actor.usuario.usu_id,
+    rolesDelActor: actor.usuario.roles.map((r) => r.rol_id),
+    usuarioEditado: usuId,
+    rolesAntes,
+    rolesDespues,
+  });
+  if (!veredicto.ok) {
+    throw new ApiError(403, veredicto.motivo ?? 'No puedes asignar esos roles');
+  }
+}
+
+/**
  * Alta.
  *
  * El orden importa: primero la cuenta de Supabase Auth, despues la fila de
@@ -150,6 +174,7 @@ async function esVisible(alcance: Alcance, usuId: number): Promise<boolean> {
  */
 export async function crear(actor: AuthUser, input: CrearUsuarioInput): Promise<UsuarioDetalleConFoto> {
   validarFoto(input.usu_foto);
+  exigirCambioDeRolesValido(actor, 0, [], input.roles);
 
   if (await repo.existeCorreo(input.usu_correo, null)) {
     throw new ApiError(409, 'Ya existe un usuario con ese correo');
@@ -235,6 +260,13 @@ export async function actualizar(
   const antes = await repo.obtenerUsuario(usuId);
   if (!antes) {
     throw new ApiError(404, 'Usuario no encontrado');
+  }
+
+  // Mismo criterio que para leer la ficha: si no lo ve, tampoco lo edita.
+  await exigirAlcance(actor, usuId);
+
+  if (input.roles) {
+    exigirCambioDeRolesValido(actor, usuId, antes.roles.map((r) => r.rol_id), input.roles);
   }
 
   if (input.usu_correo && input.usu_correo !== antes.usu_correo) {
@@ -461,6 +493,7 @@ export async function darDeBaja(actor: AuthUser, usuId: number): Promise<Usuario
     throw new ApiError(409, 'El usuario ya estaba dado de baja');
   }
 
+  await exigirAlcance(actor, usuId);
   await exigirQueNoSeQuedeSinPropietario(usuId);
 
   await enTransaccion(async (client) => {
@@ -485,6 +518,7 @@ export async function darDeBaja(actor: AuthUser, usuId: number): Promise<Usuario
 export async function reactivar(actor: AuthUser, usuId: number): Promise<UsuarioDetalleConFoto> {
   const antes = await repo.obtenerUsuario(usuId);
   if (!antes) throw new ApiError(404, 'Usuario no encontrado');
+  await exigirAlcance(actor, usuId);
   if (antes.est_id === ESTADO.ACTIVO) {
     throw new ApiError(409, 'El usuario ya estaba activo');
   }
@@ -514,9 +548,13 @@ export async function reactivar(actor: AuthUser, usuId: number): Promise<Usuario
   return conFotoFirmada(despues!);
 }
 
-export async function impacto(usuId: number): Promise<repo.ImpactoEliminacion> {
+export async function impacto(
+  actor: AuthUser,
+  usuId: number,
+): Promise<repo.ImpactoEliminacion> {
   const usuario = await repo.obtenerUsuario(usuId);
   if (!usuario) throw new ApiError(404, 'Usuario no encontrado');
+  await exigirAlcance(actor, usuId);
   return repo.calcularImpacto(usuId);
 }
 
@@ -540,6 +578,8 @@ export async function eliminar(
 
   const usuario = await repo.obtenerUsuario(usuId);
   if (!usuario) throw new ApiError(404, 'Usuario no encontrado');
+
+  await exigirAlcance(actor, usuId);
 
   if (confirmacion.trim().toLowerCase() !== usuario.usu_nombre.trim().toLowerCase()) {
     throw new ApiError(400, 'El nombre escrito no coincide con el del usuario');
