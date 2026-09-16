@@ -7,6 +7,7 @@ import { ApiError, errorHandler, notFoundHandler } from './middleware/error.js';
 import { healthRouter } from './modules/health/health.routes.js';
 import { authRouter, meRouter } from './modules/auth/auth.routes.js';
 import { usuariosRouter } from './modules/usuarios/usuarios.routes.js';
+import { colegiosRouter } from './modules/colegios/colegios.routes.js';
 import { permisosRouter } from './modules/permisos/permisos.routes.js';
 import { perfilRouter } from './modules/perfil/perfil.routes.js';
 
@@ -57,6 +58,7 @@ export function createApp(): Application {
 
   // Modulos de negocio (Fase 6 en adelante).
   api.use('/usuarios', usuariosRouter);
+  api.use('/colegios', colegiosRouter);
   api.use('/permisos', permisosRouter);
   api.use('/perfil', perfilRouter);
 

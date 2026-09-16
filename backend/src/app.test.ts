@@ -129,7 +129,7 @@ describe('Autenticacion — puertas que no dependen de la red', () => {
  * arreglo — en el sistema viejo la pantalla de usuarios consultaba la tabla
  * entera con la anon key del bundle.
  */
-describe('Usuarios, permisos y perfil — cerrados sin token', () => {
+describe('Usuarios, colegios, permisos y perfil — cerrados sin token', () => {
   const rutas: Array<[string, string]> = [
     ['GET', '/api/v1/usuarios'],
     ['GET', '/api/v1/usuarios/roles'],
@@ -141,6 +141,15 @@ describe('Usuarios, permisos y perfil — cerrados sin token', () => {
     ['POST', '/api/v1/usuarios/1/baja'],
     ['POST', '/api/v1/usuarios/1/reactivar'],
     ['DELETE', '/api/v1/usuarios/1'],
+    ['GET', '/api/v1/colegios'],
+    ['GET', '/api/v1/colegios/coordinadores'],
+    ['GET', '/api/v1/colegios/1'],
+    ['GET', '/api/v1/colegios/1/impacto'],
+    ['POST', '/api/v1/colegios'],
+    ['POST', '/api/v1/colegios/foto'],
+    ['PATCH', '/api/v1/colegios/1'],
+    ['PUT', '/api/v1/colegios/1/coordinadores'],
+    ['DELETE', '/api/v1/colegios/1'],
     ['GET', '/api/v1/permisos'],
     ['PUT', '/api/v1/permisos/rol/1'],
     ['GET', '/api/v1/perfil'],

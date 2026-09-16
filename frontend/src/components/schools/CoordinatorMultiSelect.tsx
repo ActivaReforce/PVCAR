@@ -1,134 +1,89 @@
+import { Check, Loader2, UserCog } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import type { CoordinadorResumen } from '@/api/colegios';
 
-import { useState, useEffect } from "react";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-
-interface Coordinator {
-  usu_id: number;
-  usu_nombre: string;
-  usu_correo: string;
+interface Props {
+  candidatos: CoordinadorResumen[];
+  cargando: boolean;
+  seleccionados: number[];
+  onChange: (ids: number[]) => void;
 }
 
-interface CoordinatorMultiSelectProps {
-  selectedCoordinators: number[];
-  onCoordinatorsChange: (coordinatorIds: number[]) => void;
-  excludeSchoolId?: number; // For edit mode, exclude current school's coordinators from availability check
-}
-
-const CoordinatorMultiSelect = ({
-  selectedCoordinators,
-  onCoordinatorsChange,
-  excludeSchoolId
-}: CoordinatorMultiSelectProps) => {
-  const [availableCoordinators, setAvailableCoordinators] = useState<Coordinator[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchAvailableCoordinators = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Get users with Admin Colegio role (rol_id = 2)
-        const { data: adminUsers, error: adminError } = await supabase
-          .from('usuario_rol')
-          .select(`
-            usu_id,
-            usuario:usu_id(
-              usu_id,
-              usu_nombre,
-              usu_correo
-            )
-          `)
-          .eq('rol_id', 2);
-
-        if (adminError) throw adminError;
-
-        // Extract unique users from the nested structure
-        const uniqueAdminUsers = adminUsers
-          ?.map(ur => ur.usuario)
-          .filter(Boolean)
-          .reduce((acc, user) => {
-            if (!acc.find(u => u.usu_id === user.usu_id)) {
-              acc.push(user);
-            }
-            return acc;
-          }, [] as Coordinator[]) || [];
-
-        // Show all coordinators - no filtering based on existing assignments
-        setAvailableCoordinators(uniqueAdminUsers);
-      } catch (error: any) {
-        console.error("Error fetching coordinators:", error);
-        toast({
-          title: "Error",
-          description: "Error al cargar los coordinadores disponibles",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAvailableCoordinators();
-  }, [excludeSchoolId, selectedCoordinators, toast]);
-
-  const handleCoordinatorToggle = (coordinatorId: number, checked: boolean) => {
-    if (checked) {
-      onCoordinatorsChange([...selectedCoordinators, coordinatorId]);
-    } else {
-      onCoordinatorsChange(selectedCoordinators.filter(id => id !== coordinatorId));
-    }
+/**
+ * Coordinadores del colegio.
+ *
+ * La lista la da el backend y solo trae usuarios activos con el rol de
+ * Coordinador: en el sistema viejo el selector consultaba `usuario` con la
+ * anon key y dejaba nombrar coordinador a cualquiera, incluso a alguien sin
+ * ese rol. Esa fila existia, pero el calculo de alcance no se la contaba — el
+ * colegio parecia tener responsable y esa persona no veia nada.
+ *
+ * Un solo bloque para movil y escritorio: botones que envuelven, con area
+ * tactil de 44 px.
+ */
+const CoordinatorMultiSelect = ({ candidatos, cargando, seleccionados, onChange }: Props) => {
+  const alternar = (usuId: number) => {
+    onChange(
+      seleccionados.includes(usuId)
+        ? seleccionados.filter((id) => id !== usuId)
+        : [...seleccionados, usuId],
+    );
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Label>Coordinadores del Colegio</Label>
-        <div className="text-sm text-muted-foreground">Cargando coordinadores...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <Label>Coordinadores del Colegio</Label>
-      <div className="space-y-3 max-h-40 overflow-y-auto border rounded-md p-3">
-        {availableCoordinators.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            No hay coordinadores disponibles
-          </div>
-        ) : (
-          availableCoordinators.map(coordinator => {
-            const isChecked = selectedCoordinators.includes(coordinator.usu_id);
-            return (
-              <div key={coordinator.usu_id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`coordinator-${coordinator.usu_id}`}
-                  checked={isChecked}
-                  onCheckedChange={(checked) => 
-                    handleCoordinatorToggle(coordinator.usu_id, checked as boolean)
-                  }
-                />
-                <label 
-                  htmlFor={`coordinator-${coordinator.usu_id}`} 
-                  className="text-sm cursor-pointer flex-1"
-                >
-                  <div className="font-medium">{coordinator.usu_nombre}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {coordinator.usu_correo}
-                  </div>
-                </label>
-              </div>
-            );
-          })
-        )}
-      </div>
-      {selectedCoordinators.length === 0 && (
-        <p className="text-xs text-muted-foreground">
-          Puedes seleccionar múltiples coordinadores o ninguno
+    <div className="space-y-2">
+      <Label className="flex items-center gap-2">
+        <UserCog className="h-4 w-4" />
+        Coordinadores
+      </Label>
+
+      {cargando && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Cargando candidatos…
         </p>
+      )}
+
+      {!cargando && candidatos.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          No hay usuarios activos con el rol de Coordinador. Créalos primero en Usuarios.
+        </p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {candidatos.map((candidato) => {
+          const activo = seleccionados.includes(candidato.usu_id);
+          return (
+            <button
+              key={candidato.usu_id}
+              type="button"
+              onClick={() => alternar(candidato.usu_id)}
+              aria-pressed={activo}
+              title={candidato.usu_correo}
+              className={`flex min-h-11 min-w-0 items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                activo
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
+              }`}
+            >
+              {activo && <Check className="h-4 w-4 flex-shrink-0" />}
+              <span className="truncate">{candidato.usu_nombre}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {seleccionados.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {seleccionados.length} seleccionado{seleccionados.length === 1 ? '' : 's'}. Verán
+          únicamente los datos de este colegio.
+        </p>
+      )}
+
+      {seleccionados.length === 0 && !cargando && candidatos.length > 0 && (
+        <Badge variant="outline" className="text-xs">
+          Sin coordinador asignado
+        </Badge>
       )}
     </div>
   );

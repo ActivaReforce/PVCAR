@@ -25,10 +25,23 @@ const EXTENSIONES: Record<string, string> = {
 };
 
 export interface SubidaFirmada {
-  /** Ruta que hay que guardar despues en usuario.usu_foto. */
+  /** Ruta que hay que guardar despues en la columna de foto. */
   path: string;
   signedUrl: string;
   token: string;
+}
+
+/**
+ * Carpetas del bucket. Una por tipo de sujeto: las fotos de personas y las de
+ * los contactos de un colegio no se mezclan, y asi la ruta guardada dice de
+ * quien es sin mirar la fila.
+ */
+export const CARPETAS = ['usuarios', 'colegios'] as const;
+export type Carpeta = (typeof CARPETAS)[number];
+
+/** Valida una ruta guardada: carpeta conocida y nombre sin sorpresas. */
+export function rutaValida(valor: string, carpeta: Carpeta): boolean {
+  return new RegExp(`^${carpeta}/[A-Za-z0-9._-]{1,120}$`).test(valor);
 }
 
 /**
@@ -36,13 +49,16 @@ export interface SubidaFirmada {
  * fuera fija, el navegador seguiria mostrando la foto vieja desde su cache y
  * el usuario creeria que no se guardo.
  */
-export async function firmarSubidaFoto(mimeType: string): Promise<SubidaFirmada> {
+export async function firmarSubidaFoto(
+  mimeType: string,
+  carpeta: Carpeta = 'usuarios',
+): Promise<SubidaFirmada> {
   const extension = EXTENSIONES[mimeType];
   if (!extension) {
     throw new ApiError(400, 'Formato no admitido. Solo jpeg, png o webp.');
   }
 
-  const path = `usuarios/${randomUUID()}.${extension}`;
+  const path = `${carpeta}/${randomUUID()}.${extension}`;
   const { data, error } = await getSupabaseAdmin()
     .storage.from(BUCKET)
     .createSignedUploadUrl(path);
