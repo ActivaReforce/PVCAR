@@ -28,6 +28,11 @@ export interface UsuarioListado {
   usu_foto_url: string | null;
   usu_fecha_creacion: string | null;
   est_id: number;
+  /**
+   * Si tiene cuenta en Supabase Auth. Los 23 inactivos de la carga no la
+   * tienen: reactivarlos exige crearsela, y por eso el modal pide contrasena.
+   */
+  tiene_acceso: boolean;
   roles: RolResumen[];
 }
 
@@ -136,7 +141,9 @@ export const usuariosApi = {
 
   darDeBaja: (id: number) => api.post<UsuarioDetalle>(`/usuarios/${id}/baja`),
 
-  reactivar: (id: number) => api.post<UsuarioDetalle>(`/usuarios/${id}/reactivar`),
+  /** `password` solo cuando el usuario no tiene cuenta de acceso todavia. */
+  reactivar: (id: number, password?: string) =>
+    api.post<UsuarioDetalle>(`/usuarios/${id}/reactivar`, password ? { password } : {}),
 
   impacto: (id: number) => api.get<ImpactoEliminacion>(`/usuarios/${id}/impacto`),
 

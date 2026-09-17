@@ -10,6 +10,7 @@ import {
   eliminarUsuarioSchema,
   idParamSchema,
   listarUsuariosSchema,
+  reactivarUsuarioSchema,
 } from './usuarios.schemas.js';
 import * as service from './usuarios.service.js';
 
@@ -153,7 +154,8 @@ usuariosRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
-      res.json({ data: await service.reactivar(actor(req), id), error: null });
+      const { password } = reactivarUsuarioSchema.parse(req.body ?? {});
+      res.json({ data: await service.reactivar(actor(req), id, password), error: null });
     } catch (err) {
       next(err);
     }

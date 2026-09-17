@@ -113,7 +113,11 @@ export function useDarDeBaja() {
 }
 
 export function useReactivarUsuario() {
-  return useMutacionDeUsuario((id: number) => usuariosApi.reactivar(id), 'Usuario reactivado');
+  return useMutacionDeUsuario(
+    ({ id, password }: { id: number; password?: string }) =>
+      usuariosApi.reactivar(id, password),
+    'Usuario reactivado',
+  );
 }
 
 export function useEliminarUsuario() {

@@ -122,6 +122,21 @@ export const actualizarUsuarioSchema = z
 export type ActualizarUsuarioInput = z.infer<typeof actualizarUsuarioSchema>;
 
 /**
+ * Reactivar.
+ *
+ * `password` solo hace falta cuando el usuario no tiene cuenta de Supabase
+ * Auth. Pasa con los 23 inactivos que trae la carga: el backfill solo creo
+ * cuentas para los activos, porque una cuenta que nadie usa es una cuenta de
+ * mas. Al reactivarlo hay que creársela, y el CHECK del baseline
+ * —`est_id <> 1 OR auth_user_id IS NOT NULL`— no admite lo contrario.
+ */
+export const reactivarUsuarioSchema = z.object({
+  password: password.optional(),
+});
+
+export type ReactivarUsuarioInput = z.infer<typeof reactivarUsuarioSchema>;
+
+/**
  * Borrado permanente. El cliente pidio (2026-08-07) que confirmar no sea un
  * clic: hay que escribir el nombre exacto. La comparacion se hace en el
  * servidor, porque si vive en el modal se la salta cualquiera.

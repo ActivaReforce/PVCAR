@@ -8,15 +8,10 @@ import UserTable from '@/components/users/UserTable';
 import UserStatusFilters from '@/components/users/UserStatusFilters';
 import { UserDeactivationDialog } from '@/components/users/UserDeactivationDialog';
 import EliminarUsuarioDialog from '@/components/users/EliminarUsuarioDialog';
+import ReactivarUsuarioDialog from '@/components/users/ReactivarUsuarioDialog';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
 import { DataPagination } from '@/components/ui/data-pagination';
-import {
-  useDarDeBaja,
-  useReactivarUsuario,
-  useRoles,
-  useUsuario,
-  useUsuarios,
-} from '@/hooks/useUsuarios';
+import { useDarDeBaja, useRoles, useUsuario, useUsuarios } from '@/hooks/useUsuarios';
 import type { FiltrosUsuarios, UsuarioListado } from '@/api/usuarios';
 
 const POR_PAGINA = 10;
@@ -66,6 +61,7 @@ const Usuarios = () => {
   const [viendoId, setViendoId] = useState<number | null>(null);
   const [aDarDeBaja, setADarDeBaja] = useState<UsuarioListado | null>(null);
   const [aEliminar, setAEliminar] = useState<UsuarioListado | null>(null);
+  const [aReactivar, setAReactivar] = useState<UsuarioListado | null>(null);
 
   const filtros: FiltrosUsuarios = {
     page,
@@ -84,7 +80,6 @@ const Usuarios = () => {
   const fichaDetalle = useUsuario(viendoId);
 
   const darDeBaja = useDarDeBaja();
-  const reactivar = useReactivarUsuario();
 
   const roles = useMemo(() => rolesQuery.data ?? [], [rolesQuery.data]);
   const usuarios = lista.data?.items ?? [];
@@ -225,7 +220,9 @@ const Usuarios = () => {
             onView={(user) => setViendoId(user.usu_id)}
             onEdit={(user) => setEditandoId(user.usu_id)}
             onDelete={(userId) => setADarDeBaja(usuarios.find((u) => u.usu_id === userId) ?? null)}
-            onReactivate={(userId) => reactivar.mutate(userId)}
+            onReactivate={(userId) =>
+              setAReactivar(usuarios.find((u) => u.usu_id === userId) ?? null)
+            }
             onPermanentDelete={(userId) =>
               setAEliminar(usuarios.find((u) => u.usu_id === userId) ?? null)
             }
@@ -303,6 +300,12 @@ const Usuarios = () => {
         onClose={() => setADarDeBaja(null)}
         onConfirm={confirmarBaja}
         userName={aDarDeBaja?.usu_nombre ?? ''}
+      />
+
+      <ReactivarUsuarioDialog
+        usuario={aReactivar}
+        onClose={() => setAReactivar(null)}
+        onReactivado={() => setAReactivar(null)}
       />
 
       <EliminarUsuarioDialog

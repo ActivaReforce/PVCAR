@@ -515,34 +515,92 @@ export async function darDeBaja(actor: AuthUser, usuId: number): Promise<Usuario
   return conFotoFirmada(despues!);
 }
 
-export async function reactivar(actor: AuthUser, usuId: number): Promise<UsuarioDetalleConFoto> {
+export async function reactivar(
+  actor: AuthUser,
+  usuId: number,
+  password?: string,
+): Promise<UsuarioDetalleConFoto> {
   const antes = await repo.obtenerUsuario(usuId);
   if (!antes) throw new ApiError(404, 'Usuario no encontrado');
   await exigirAlcance(actor, usuId);
   if (antes.est_id === ESTADO.ACTIVO) {
     throw new ApiError(409, 'El usuario ya estaba activo');
   }
+
+  /**
+   * Los 23 inactivos que trae la carga no tienen cuenta de Supabase Auth: el
+   * backfill del Anexo A solo creo las de los 45 activos, porque una cuenta
+   * que nadie usa es una cuenta de mas.
+   *
+   * Reactivar a uno de ellos exige creársela en el mismo gesto — el CHECK del
+   * baseline (`est_id <> 1 OR auth_user_id IS NOT NULL`) no admite un usuario
+   * activo sin cuenta. Antes esto era un callejon sin salida: el mensaje
+   * mandaba a "crear una cuenta primero" y no habia ninguna pantalla para
+   * hacerlo.
+   */
+  let authCreada: string | null = null;
+
   if (!antes.auth_user_id) {
-    // El CHECK del baseline lo rechazaria con un error de constraint ilegible.
-    throw new ApiError(
-      409,
-      'No se puede reactivar: el usuario no tiene cuenta de acceso. Creale una primero.',
-    );
+    if (!password) {
+      throw new ApiError(
+        409,
+        'Este usuario no tiene cuenta de acceso. Para reactivarlo hay que crearle una: indica una contrasena.',
+        { requierePassword: true },
+      );
+    }
+
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.auth.admin.createUser({
+      email: antes.usu_correo,
+      password,
+      email_confirm: true,
+    });
+    if (error || !data.user) {
+      throw new ApiError(
+        400,
+        `No se pudo crear la cuenta de acceso: ${error?.message ?? 'sin detalle'}`,
+      );
+    }
+    authCreada = data.user.id;
   }
 
-  await enTransaccion(async (client) => {
-    await repo.cambiarEstado(client, usuId, ESTADO.ACTIVO);
-    const roles = await repo.rolesDe(usuId, client);
-    if (roles.includes(ROL.ENTRENADOR)) {
-      // La ficha vuelve a activa; las asignaciones cerradas NO se reabren:
-      // se vuelven a asignar desde Entrenadores, que es donde se decide.
-      await repo.upsertEntrenador(client, usuId, null, ESTADO.ACTIVO);
+  try {
+    await enTransaccion(async (client) => {
+      if (authCreada) {
+        await repo.fijarAuthUserId(client, usuId, authCreada);
+      }
+      await repo.cambiarEstado(client, usuId, ESTADO.ACTIVO);
+      const roles = await repo.rolesDe(usuId, client);
+      if (roles.includes(ROL.ENTRENADOR)) {
+        // La ficha vuelve a activa; las asignaciones cerradas NO se reabren:
+        // se vuelven a asignar desde Entrenadores, que es donde se decide.
+        await repo.upsertEntrenador(client, usuId, null, ESTADO.ACTIVO);
+      }
+      await auditar(
+        {
+          actor,
+          accion: 'reactivar',
+          entidad: 'usuario',
+          entidadId: usuId,
+          detalle: { cuentaDeAccesoCreada: authCreada !== null },
+        },
+        client,
+      );
+    });
+  } catch (err) {
+    // Compensacion: la cuenta de Auth ya existe y el usuario sigue inactivo.
+    if (authCreada) {
+      try {
+        await getSupabaseAdmin().auth.admin.deleteUser(authCreada);
+      } catch (limpieza) {
+        console.error(
+          `Quedo una cuenta de Auth huerfana (${authCreada}) tras fallar la reactivacion de usu_id=${usuId}:`,
+          limpieza,
+        );
+      }
     }
-    await auditar(
-      { actor, accion: 'reactivar', entidad: 'usuario', entidadId: usuId },
-      client,
-    );
-  });
+    throw err;
+  }
 
   const despues = await repo.obtenerUsuario(usuId);
   return conFotoFirmada(despues!);

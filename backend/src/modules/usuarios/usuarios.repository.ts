@@ -21,6 +21,12 @@ export interface UsuarioListado {
   usu_foto: string | null;
   usu_fecha_creacion: string | null;
   est_id: number;
+  /**
+   * Si tiene cuenta en Supabase Auth. Los 23 inactivos de la carga no la
+   * tienen —el backfill solo cubrio a los activos— y reactivarlos exige
+   * creársela. La pantalla necesita saberlo para pedir la contrasena.
+   */
+  tiene_acceso: boolean;
   roles: RolResumen[];
 }
 
@@ -172,6 +178,7 @@ export async function listarUsuarios(
         u.usu_foto,
         u.usu_fecha_creacion,
         u.est_id,
+        (u.auth_user_id IS NOT NULL) AS tiene_acceso,
         COALESCE(r.roles, '[]'::json) AS roles,
         count(*) OVER() AS total
     FROM public.usuario u
@@ -287,6 +294,7 @@ export async function obtenerUsuario(
         u.usu_fecha_creacion,
         u.usu_fecha_modificacion,
         u.est_id,
+        (u.auth_user_id IS NOT NULL) AS tiene_acceso,
         e.ent_cedula,
         e.est_id  AS ent_est_id,
         p.padre_id,
@@ -528,6 +536,18 @@ export async function contarColegiosCoordinados(
 
 export async function borrarPadre(client: PoolClient, usuId: number): Promise<void> {
   await client.query('DELETE FROM public.padre WHERE usu_id = $1', [usuId]);
+}
+
+/** Enlaza una cuenta de Auth recien creada a un usuario que no la tenia. */
+export async function fijarAuthUserId(
+  client: PoolClient,
+  usuId: number,
+  authUserId: string,
+): Promise<void> {
+  await client.query(
+    'UPDATE public.usuario SET auth_user_id = $2, usu_fecha_modificacion = now() WHERE usu_id = $1',
+    [usuId, authUserId],
+  );
 }
 
 export async function cambiarEstado(
