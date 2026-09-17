@@ -23,15 +23,7 @@ import Evaluaciones from "@/pages/Evaluaciones";
 import AsistenciasAlumnos from "@/pages/AsistenciasAlumnos";
 import AsistenciasEntrenadores from "@/pages/AsistenciasEntrenadores";
 import Reportes from "@/pages/Reportes";
-import ReportesUsuarios from "@/pages/ReportesUsuarios";
-import ReportesColegios from "@/pages/ReportesColegios";
-import ReportesActividades from "@/pages/ReportesActividades";
-import ReportesDisciplinas from "@/pages/ReportesDisciplinas";
-import ReportesEntrenadores from "@/pages/ReportesEntrenadores";
-import ReportesEstudiantes from "@/pages/ReportesEstudiantes";
-import ReportesEncuestas from "@/pages/ReportesEncuestas";
-import ReportesAsistencias from "@/pages/ReportesAsistencias";
-import ReportesEvaluaciones from "@/pages/ReportesEvaluaciones";
+import ReporteDetalle from "@/pages/ReporteDetalle";
 import Encuestas from "@/pages/Encuestas";
 import { SurveyBuilder } from "@/components/surveys/SurveyBuilder";
 import Perfil from "@/pages/Perfil";
@@ -84,15 +76,7 @@ const App = () => {
                           <Route path="/asistencias" element={<AsistenciasAlumnos />} />
                           <Route path="/asistencias/entrenadores" element={<AsistenciasEntrenadores />} />
                           <Route path="/reportes" element={<Reportes />} />
-                          <Route path="/reportes/usuarios" element={<ReportesUsuarios />} />
-                          <Route path="/reportes/colegios" element={<ReportesColegios />} />
-                          <Route path="/reportes/actividades" element={<ReportesActividades />} />
-                          <Route path="/reportes/disciplinas" element={<ReportesDisciplinas />} />
-                          <Route path="/reportes/entrenadores" element={<ReportesEntrenadores />} />
-                          <Route path="/reportes/estudiantes" element={<ReportesEstudiantes />} />
-                          <Route path="/reportes/encuestas" element={<ReportesEncuestas />} />
-                          <Route path="/reportes/asistencias" element={<ReportesAsistencias />} />
-                          <Route path="/reportes/evaluaciones" element={<ReportesEvaluaciones />} />
+                          <Route path="/reportes/:modulo" element={<ReporteDetalle />} />
                           <Route path="/encuestas" element={<Encuestas />} />
                           <Route path="/encuestas/nueva" element={<SurveyBuilder />} />
                           <Route path="/encuestas/:id" element={<SurveyBuilder />} />

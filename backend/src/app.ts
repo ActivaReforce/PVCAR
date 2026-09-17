@@ -14,6 +14,8 @@ import { entrenadoresRouter } from './modules/entrenadores/entrenadores.routes.j
 import { estudiantesRouter } from './modules/estudiantes/estudiantes.routes.js';
 import { asistenciasRouter } from './modules/asistencias/asistencias.routes.js';
 import { evaluacionesRouter } from './modules/evaluaciones/evaluaciones.routes.js';
+import { tableroRouter } from './modules/tablero/tablero.routes.js';
+import { reportesRouter } from './modules/reportes/reportes.routes.js';
 import { permisosRouter } from './modules/permisos/permisos.routes.js';
 import { perfilRouter } from './modules/perfil/perfil.routes.js';
 
@@ -71,6 +73,8 @@ export function createApp(): Application {
   api.use('/estudiantes', estudiantesRouter);
   api.use('/asistencias', asistenciasRouter);
   api.use('/evaluaciones', evaluacionesRouter);
+  api.use('/tablero', tableroRouter);
+  api.use('/reportes', reportesRouter);
   api.use('/permisos', permisosRouter);
   api.use('/perfil', perfilRouter);
 

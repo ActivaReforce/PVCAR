@@ -106,4 +106,59 @@ export const api = {
    */
   delete: <T>(path: string, body?: unknown) =>
     apiFetch<T>(path, { method: 'DELETE', body: body ? JSON.stringify(body) : undefined }),
+
+  /**
+   * Descarga un archivo que genera el backend.
+   *
+   * No pasa por `apiFetch` porque la respuesta no es `{ data, error }`: es el
+   * binario. Lo que sí comparte es el token, y la comprobación de que lo que
+   * llegó **no** es un JSON de error disfrazado de descarga — sin eso el
+   * navegador guardaría un .xlsx que en realidad dice "403 Sin permiso".
+   */
+  descargar: async (path: string, body: unknown, nombrePorDefecto: string): Promise<void> => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (session?.access_token) {
+      headers.set('Authorization', `Bearer ${session.access_token}`);
+    }
+
+    const res = await fetch(`${API_URL}${normalizarRuta(path)}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body ?? {}),
+    });
+
+    if (!res.ok) {
+      let mensaje = `No se pudo generar el archivo (${res.status})`;
+      try {
+        const cuerpo = (await res.json()) as ApiResponse<unknown>;
+        if (cuerpo.error?.message) mensaje = cuerpo.error.message;
+      } catch {
+        // La respuesta no era JSON: se queda el mensaje generico.
+      }
+      throw new ApiError(res.status, mensaje);
+    }
+
+    const tipo = res.headers.get('content-type') ?? '';
+    if (tipo.includes('application/json')) {
+      throw new ApiError(500, 'El servidor devolvio un error en vez del archivo');
+    }
+
+    // El nombre lo manda el backend en Content-Disposition; si no, el de aqui.
+    const disposicion = res.headers.get('content-disposition') ?? '';
+    const encontrado = /filename="([^"]+)"/.exec(disposicion)?.[1];
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = encontrado ?? nombrePorDefecto;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(url);
+  },
 };
