@@ -2,6 +2,7 @@ import type { Writable } from 'node:stream';
 import ExcelJS from 'exceljs';
 import { getPool } from '../../config/db.js';
 import { alcanceDe } from '../../lib/alcance.js';
+import { auditar } from '../../lib/auditoria.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
 import {
@@ -38,6 +39,8 @@ export interface ReporteDisponible {
   columnas: Columna[];
   /** Cuántas gráficas tiene su pestaña de análisis. 0 = no tiene. */
   graficas: number;
+  /** Columnas que solo salen si se piden. Vacío en casi todos. */
+  columnasSensibles: Columna[];
 }
 
 function puedeVer(actor: AuthUser, definicion: Definicion): boolean {
@@ -57,8 +60,9 @@ export function catalogo(actor: AuthUser): ReporteDisponible[] {
     titulo: d.titulo,
     descripcion: d.descripcion,
     exigeRango: d.exigeRango,
-    columnas: d.columnas,
+    columnas: columnasVisibles(d, false),
     graficas: (GRAFICAS[d.id] ?? []).length,
+    columnasSensibles: d.columnas.filter((c) => (d.columnasSensibles ?? []).includes(c.clave)),
   }));
 }
 
@@ -82,6 +86,20 @@ function exigirRango(definicion: Definicion, filtros: FiltrosQuery): FiltrosRepo
     throw new ApiError(400, `El reporte "${definicion.titulo}" necesita un rango de fechas`);
   }
   return filtros;
+}
+
+/**
+ * Las columnas que salen esta vez.
+ *
+ * Las sensibles se caen salvo que se pidan. La consulta no cambia —sigue
+ * trayendo la columna— porque quitarla del SQL obligaría a construir la
+ * consulta dos veces; lo que se recorta es lo que se enseña y lo que se
+ * exporta, que es donde está el riesgo.
+ */
+function columnasVisibles(definicion: Definicion, incluirSensibles: boolean): Columna[] {
+  const sensibles = definicion.columnasSensibles ?? [];
+  if (sensibles.length === 0 || incluirSensibles) return definicion.columnas;
+  return definicion.columnas.filter((c) => !sensibles.includes(c.clave));
 }
 
 async function contextoDe(actor: AuthUser): Promise<ContextoReporte> {
@@ -139,12 +157,13 @@ export async function ejecutar(
   ]);
 
   const total = Number(cuenta.rows[0]?.total ?? 0);
+  const columnas = columnasVisibles(definicion, query.incluirSensibles === true);
 
   return {
     id: definicion.id,
     titulo: definicion.titulo,
-    columnas: definicion.columnas,
-    filas: pagina.rows.map((f) => proyectar(f, definicion.columnas)),
+    columnas,
+    filas: pagina.rows.map((f) => proyectar(f, columnas)),
     total,
     page: query.page,
     limit: query.limit,
@@ -185,8 +204,11 @@ export async function exportar(
   libro.creator = 'Activa Reforce — PVCAR';
   libro.created = new Date();
 
+  const conSensibles = filtrosQuery.incluirSensibles === true;
+  const columnas = columnasVisibles(definicion, conSensibles);
+
   const hoja = libro.addWorksheet(definicion.titulo.slice(0, 31));
-  hoja.columns = definicion.columnas.map((c) => ({
+  hoja.columns = columnas.map((c) => ({
     header: c.cabecera,
     key: c.clave,
     width: c.ancho,
@@ -200,7 +222,7 @@ export async function exportar(
   );
 
   for (const fila of rows) {
-    hoja.addRow(proyectar(fila, definicion.columnas)).commit();
+    hoja.addRow(proyectar(fila, columnas)).commit();
   }
   hoja.commit();
 
@@ -222,6 +244,14 @@ export async function exportar(
     ['Estado', filtros.estado ? String(filtros.estado) : 'Todos'],
     ['Desde', filtros.desde ?? '—'],
     ['Hasta', filtros.hasta ?? '—'],
+    [
+      'Columnas sensibles',
+      (definicion.columnasSensibles ?? []).length === 0
+        ? 'El reporte no tiene'
+        : conSensibles
+          ? 'INCLUIDAS'
+          : 'Excluidas',
+    ],
   ];
   if (rows.length === TOPE_EXPORTACION) {
     lineas.push(['Aviso', `Cortado en el tope de ${TOPE_EXPORTACION} filas. Acota el rango.`]);
@@ -230,6 +260,26 @@ export async function exportar(
   portada.commit();
 
   await libro.commit();
+
+  /**
+   * Sacar datos sensibles queda registrado. No es desconfianza: es que un
+   * Excel con información médica de menores se reenvía, y dentro de un año
+   * hay que poder decir quién lo generó y con qué filtros.
+   */
+  if (conSensibles && (definicion.columnasSensibles ?? []).length > 0) {
+    await auditar({
+      actor,
+      accion: 'crear',
+      entidad: 'reporte_sensible',
+      entidadId: definicion.id,
+      detalle: {
+        reporte: definicion.titulo,
+        columnas: definicion.columnasSensibles,
+        filas: rows.length,
+        filtros: { ...filtros },
+      },
+    });
+  }
 
   const sello = new Date().toISOString().slice(0, 10);
   return { nombreArchivo: `${definicion.id}-${sello}.xlsx`, filas: rows.length };

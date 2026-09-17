@@ -40,6 +40,13 @@ export const filtrosSchema = z
     estado: z.coerce.number().int().positive().optional(),
     desde: fecha.optional(),
     hasta: fecha.optional(),
+    /** Incluir las columnas sensibles del reporte. Por defecto, no. */
+    incluirSensibles: z
+      .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
+      .optional()
+      /* Se deja `undefined` cuando no viene, para que el filtro sea opcional
+         de verdad: el servicio compara contra `true`. */
+      .transform((v) => (v === undefined ? undefined : v === true || v === 'true' || v === '1')),
   })
   .refine((f) => !f.desde || !f.hasta || f.desde <= f.hasta, {
     path: ['desde'],

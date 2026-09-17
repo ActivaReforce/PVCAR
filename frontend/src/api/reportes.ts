@@ -24,6 +24,12 @@ export interface ReporteDisponible {
   columnas: ColumnaReporte[];
   /** Cuántas gráficas tiene su pestaña de análisis. 0 = no tiene. */
   graficas: number;
+  /**
+   * Columnas que **no salen si no se piden**: datos que son útiles tenerlos a
+   * mano pero que no deben viajar en cada Excel que alguien reenvía. Hoy solo
+   * la información de salud del alumno.
+   */
+  columnasSensibles: ColumnaReporte[];
 }
 
 export type FormaGrafica = 'linea' | 'barras' | 'apilada100' | 'histograma';
@@ -74,6 +80,8 @@ export interface FiltrosReporte {
   estado?: number;
   desde?: string;
   hasta?: string;
+  /** Incluir las columnas sensibles. Por defecto, no. */
+  incluirSensibles?: boolean;
 }
 
 function queryString(filtros: object): string {

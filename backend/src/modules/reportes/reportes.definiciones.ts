@@ -72,6 +72,15 @@ export interface Definicion {
   /** Sin rango de fechas el reporte no significa nada: se exige. */
   exigeRango: boolean;
   columnas: Columna[];
+  /**
+   * Columnas que **no salen si no se piden**.
+   *
+   * Un reporte se manda por correo y se reenvía. Lo que es útil tenerlo a mano
+   * —la información de salud de un alumno, para organizar una salida— no tiene
+   * por qué viajar en cada Excel que alguien saque para contar inscripciones.
+   * Siguen estando; hay que marcar la casilla, y la exportación queda auditada.
+   */
+  columnasSensibles?: string[];
   construir: (f: FiltrosReporte, ctx: ContextoReporte) => ConsultaReporte;
 }
 
@@ -327,6 +336,8 @@ const estudiantes: Definicion = {
   descripcion: 'Los alumnos con su colegio, su grado y sus disciplinas.',
   modulo: 'estudiantes',
   exigeRango: false,
+  /** Dato médico de un menor: se incluye a propósito, no por defecto. */
+  columnasSensibles: ['nino_info_salud'],
   columnas: [
     { clave: 'nino_id', cabecera: 'ID', ancho: 8 },
     { clave: 'nino_nombre', cabecera: 'Alumno', ancho: 34 },

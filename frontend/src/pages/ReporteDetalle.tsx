@@ -4,6 +4,7 @@ import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -49,6 +50,7 @@ const ReporteDetalle = () => {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [page, setPage] = useState(1);
+  const [conSensibles, setConSensibles] = useState(false);
 
   const catalogo = useCatalogoReportes();
   const definicion = catalogo.data?.find((r) => r.id === modulo);
@@ -61,6 +63,7 @@ const ReporteDetalle = () => {
     estado: estado === TODOS ? undefined : Number(estado),
     desde: desde || undefined,
     hasta: hasta || undefined,
+    incluirSensibles: conSensibles || undefined,
   };
 
   const faltanFechas = Boolean(definicion?.exigeRango) && (!desde || !hasta);
@@ -198,6 +201,27 @@ const ReporteDetalle = () => {
           </SelectContent>
         </Select>
       </div>
+
+      {/*
+        Las columnas sensibles siguen ahí, pero hay que pedirlas. Un reporte se
+        manda por correo y se reenvía: la información médica de un menor no
+        tiene por qué viajar en el Excel que alguien saca para contar
+        inscripciones. Al exportarlas marcadas, queda registro en auditoría.
+      */}
+      {definicion.columnasSensibles.length > 0 && (
+        <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          <Checkbox
+            checked={conSensibles}
+            onCheckedChange={(v) => cambiarFiltro(() => setConSensibles(v === true))}
+            className="mt-0.5"
+          />
+          <span>
+            Incluir {definicion.columnasSensibles.map((c) => c.cabecera.toLowerCase()).join(', ')}.
+            Son datos personales de menores: se incluyen solo cuando hacen falta, y la
+            exportación queda registrada.
+          </span>
+        </label>
+      )}
 
       {faltanFechas && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">

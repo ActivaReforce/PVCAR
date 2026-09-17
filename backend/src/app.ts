@@ -16,6 +16,8 @@ import { asistenciasRouter } from './modules/asistencias/asistencias.routes.js';
 import { evaluacionesRouter } from './modules/evaluaciones/evaluaciones.routes.js';
 import { tableroRouter } from './modules/tablero/tablero.routes.js';
 import { reportesRouter } from './modules/reportes/reportes.routes.js';
+import { representantesRouter } from './modules/representantes/representantes.routes.js';
+import { encuestasRouter } from './modules/encuestas/encuestas.routes.js';
 import { permisosRouter } from './modules/permisos/permisos.routes.js';
 import { perfilRouter } from './modules/perfil/perfil.routes.js';
 
@@ -75,6 +77,8 @@ export function createApp(): Application {
   api.use('/evaluaciones', evaluacionesRouter);
   api.use('/tablero', tableroRouter);
   api.use('/reportes', reportesRouter);
+  api.use('/representantes', representantesRouter);
+  api.use('/encuestas', encuestasRouter);
   api.use('/permisos', permisosRouter);
   api.use('/perfil', perfilRouter);
 

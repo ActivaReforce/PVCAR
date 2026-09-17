@@ -317,3 +317,34 @@ describe('las graficas del analisis', () => {
     });
   });
 });
+
+describe('columnas sensibles', () => {
+  it('la informacion de salud no sale si no se pide', async () => {
+    const r = await service.ejecutar(TODO, 'estudiantes', { page: 1, limit: 10 });
+    expect(r.columnas.map((c) => c.clave)).not.toContain('nino_info_salud');
+  });
+
+  it('sale cuando se pide', async () => {
+    const r = await service.ejecutar(TODO, 'estudiantes', {
+      page: 1,
+      limit: 10,
+      incluirSensibles: true,
+    });
+    expect(r.columnas.map((c) => c.clave)).toContain('nino_info_salud');
+  });
+
+  it('el catalogo dice cuales son, para poder ofrecer la casilla', () => {
+    const alumnos = service.catalogo(TODO).find((r) => r.id === 'estudiantes');
+    expect(alumnos?.columnasSensibles.map((c) => c.clave)).toEqual(['nino_info_salud']);
+    expect(alumnos?.columnas.map((c) => c.clave)).not.toContain('nino_info_salud');
+  });
+
+  it('los reportes sin columnas sensibles no pierden ninguna', () => {
+    for (const r of service.catalogo(TODO)) {
+      if (r.columnasSensibles.length === 0) {
+        const definicion = DEFINICIONES.find((d) => d.id === r.id);
+        expect(r.columnas.length, r.id).toBe(definicion?.columnas.length);
+      }
+    }
+  });
+});

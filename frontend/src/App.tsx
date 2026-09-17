@@ -25,7 +25,7 @@ import AsistenciasEntrenadores from "@/pages/AsistenciasEntrenadores";
 import Reportes from "@/pages/Reportes";
 import ReporteDetalle from "@/pages/ReporteDetalle";
 import Encuestas from "@/pages/Encuestas";
-import { SurveyBuilder } from "@/components/surveys/SurveyBuilder";
+import Representantes from "@/pages/Representantes";
 import Perfil from "@/pages/Perfil";
 import NotFound from "@/pages/NotFound";
 import Permisos from "@/pages/Permisos";
@@ -78,21 +78,12 @@ const App = () => {
                           <Route path="/reportes" element={<Reportes />} />
                           <Route path="/reportes/:modulo" element={<ReporteDetalle />} />
                           <Route path="/encuestas" element={<Encuestas />} />
-                          <Route path="/encuestas/nueva" element={<SurveyBuilder />} />
-                          <Route path="/encuestas/:id" element={<SurveyBuilder />} />
+                          <Route path="/representantes" element={<Representantes />} />
                           <Route path="/perfil" element={<Perfil />} />
                           <Route path="/permisos" element={<Permisos />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </AppLayout>
-                      {/*
-                        MandatorySurveyManager queda desmontado hasta la Fase 13.
-                        Se renderizaba en TODAS las pantallas y consultaba padre,
-                        encuesta y encuesta_respondida directo a Supabase: con RLS
-                        y sin privilegios eso son cuatro 403 en la consola cada vez
-                        que se abre cualquier pagina. Ademas no puede funcionar —
-                        esas tablas tienen cero filas en produccion.
-                      */}
                     </ProtectedRoute>
                   }
                 />
