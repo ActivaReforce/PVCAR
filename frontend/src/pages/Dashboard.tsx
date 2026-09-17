@@ -11,6 +11,7 @@ import {
   PanelGeneral,
   PanelRepresentante,
 } from '@/components/tablero/Paneles';
+import Grafica from '@/components/graficas/Grafica';
 import { useTablero } from '@/hooks/useTablero';
 import type {
   TableroCoordinador,
@@ -71,6 +72,7 @@ const Dashboard = () => {
   const disponibles = datos?.disponibles ?? [];
   const actual = datos?.actual ?? null;
   const periodo = datos?.periodo;
+  const tendencia = datos?.tendencia ?? [];
 
   return (
     <div className="container mx-auto min-w-0 max-w-7xl space-y-6 p-4 lg:p-6">
@@ -149,6 +151,28 @@ const Dashboard = () => {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/*
+        La tendencia. Es lo que el tablero viejo no decía: no "cuánta
+        asistencia hay" sino si sube o baja. Se reusa el mismo componente de
+        gráfica de los reportes, así que los ejes, el tooltip y la vista de
+        tabla son exactamente los mismos.
+      */}
+      {tendencia.length > 1 && (
+        <Grafica
+          grafica={{
+            id: 'tendencia-asistencia',
+            titulo: 'Asistencia en el tiempo',
+            descripcion: 'Porcentaje de alumnos presentes en cada fecha del periodo.',
+            forma: 'linea',
+            etiqueta: 'fecha',
+            series: [{ clave: 'tasa', nombre: '% presentes' }],
+            formato: 'porcentaje',
+            nota: 'Cada punto es una fecha con clases. Los días sin registros no aparecen.',
+            datos: tendencia as unknown as Array<Record<string, unknown>>,
+          }}
+        />
       )}
 
       {actual === 'general' && datos?.datos && (

@@ -51,6 +51,21 @@ export function useReporte(
 }
 
 /**
+ * Las gráficas del reporte.
+ *
+ * Van por su cuenta y no bloquean la tabla: si el análisis tarda, la pestaña de
+ * datos ya está en pantalla.
+ */
+export function useAnalisisReporte(modulo: string, filtros: FiltrosReporte, habilitado: boolean) {
+  return useQuery({
+    queryKey: ['reportes', modulo, 'analisis', filtros],
+    queryFn: () => reportesApi.analisis(modulo, filtros),
+    enabled: habilitado,
+    placeholderData: (anterior) => anterior,
+  });
+}
+
+/**
  * La exportación no es una consulta: descarga un archivo y no cachea nada.
  *
  * El aviso de error importa más de lo que parece. Si el backend contesta un

@@ -12,6 +12,7 @@ import {
   type Definicion,
   type FiltrosReporte,
 } from './reportes.definiciones.js';
+import { GRAFICAS, type DefinicionGrafica, type FormaGrafica, type SerieGrafica } from './reportes.analisis.js';
 import type { ConsultaQuery, FiltrosQuery } from './reportes.schemas.js';
 
 /**
@@ -35,6 +36,8 @@ export interface ReporteDisponible {
   descripcion: string;
   exigeRango: boolean;
   columnas: Columna[];
+  /** Cuántas gráficas tiene su pestaña de análisis. 0 = no tiene. */
+  graficas: number;
 }
 
 function puedeVer(actor: AuthUser, definicion: Definicion): boolean {
@@ -55,6 +58,7 @@ export function catalogo(actor: AuthUser): ReporteDisponible[] {
     descripcion: d.descripcion,
     exigeRango: d.exigeRango,
     columnas: d.columnas,
+    graficas: (GRAFICAS[d.id] ?? []).length,
   }));
 }
 
@@ -229,4 +233,62 @@ export async function exportar(
 
   const sello = new Date().toISOString().slice(0, 10);
   return { nombreArchivo: `${definicion.id}-${sello}.xlsx`, filas: rows.length };
+}
+
+// ---------------------------------------------------------------------------
+// Análisis
+
+export interface GraficaConDatos {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  forma: FormaGrafica;
+  etiqueta: string;
+  series: SerieGrafica[];
+  formato: 'porcentaje' | 'entero';
+  escala?: 'asistencia';
+  nota?: string;
+  datos: Array<Record<string, unknown>>;
+}
+
+/**
+ * Las gráficas de un reporte, ya con sus datos.
+ *
+ * Cada una es **una consulta agregada**: lo que viaja son las diez o veinte
+ * filas que se van a dibujar, no las 13 202 marcas de asistencia que el sistema
+ * viejo se descargaba para contarlas en el navegador.
+ *
+ * Las consultas van en paralelo —son independientes y de solo lectura— así que
+ * la pestaña entera cuesta lo que la más lenta, no la suma.
+ */
+export async function analisis(
+  actor: AuthUser,
+  id: string,
+  filtrosQuery: FiltrosQuery,
+): Promise<GraficaConDatos[]> {
+  const definicion = exigirDefinicion(actor, id);
+  const filtros = exigirRango(definicion, filtrosQuery);
+  const graficas: DefinicionGrafica[] = GRAFICAS[id] ?? [];
+  if (graficas.length === 0) return [];
+
+  const contexto = await contextoDe(actor);
+
+  return Promise.all(
+    graficas.map(async (g) => {
+      const { sql, params } = g.construir(filtros, contexto);
+      const { rows } = await getPool().query<Record<string, unknown>>(sql, params);
+      return {
+        id: g.id,
+        titulo: g.titulo,
+        descripcion: g.descripcion,
+        forma: g.forma,
+        etiqueta: g.etiqueta,
+        series: g.series,
+        formato: g.formato,
+        ...(g.escala ? { escala: g.escala } : {}),
+        ...(g.nota ? { nota: g.nota } : {}),
+        datos: rows,
+      };
+    }),
+  );
 }

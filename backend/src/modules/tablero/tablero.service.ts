@@ -90,6 +90,11 @@ export interface RespuestaTablero {
   /** El que se devuelve en `datos`. */
   actual: TableroId | null;
   periodo: Periodo;
+  /**
+   * El % de presentes por fecha del periodo. Va aparte de `datos` porque lo
+   * comparten tres de los cuatro tableros y es lo único que dibuja una gráfica.
+   */
+  tendencia: repo.PuntoTendencia[];
   /** Los inventarios son de hoy; solo la asistencia depende del periodo. */
   datos:
     | repo.TableroGeneral
@@ -104,7 +109,7 @@ export async function tablero(actor: AuthUser, query: TableroQuery): Promise<Res
   const periodo = await periodoDe(query);
 
   if (disponibles.length === 0) {
-    return { disponibles, actual: null, periodo, datos: null };
+    return { disponibles, actual: null, periodo, tendencia: [], datos: null };
   }
 
   const pedido = query.rol ?? disponibles[0]!.id;
@@ -115,12 +120,28 @@ export async function tablero(actor: AuthUser, query: TableroQuery): Promise<Res
   const alcance = await alcanceDe(actor.usuario);
   const usuId = actor.usuario.usu_id;
 
+  /**
+   * El representante no la lleva: su panel enseña la asistencia de cada hijo
+   * por separado, y una media de dos niños no dice nada.
+   */
+  const tendencia =
+    pedido === TABLERO.REPRESENTANTE
+      ? []
+      : await repo.tendenciaAsistencia(
+          periodo.desde,
+          periodo.hasta,
+          alcance.global,
+          alcance.colegios,
+          alcance.disciplinas,
+        );
+
   switch (pedido) {
     case TABLERO.GENERAL:
       return {
         disponibles,
         actual: pedido,
         periodo,
+        tendencia,
         datos: await repo.tableroGeneral(periodo.desde, periodo.hasta),
       };
 
@@ -129,6 +150,7 @@ export async function tablero(actor: AuthUser, query: TableroQuery): Promise<Res
         disponibles,
         actual: pedido,
         periodo,
+        tendencia,
         datos: await repo.tableroCoordinador(
           periodo.desde,
           periodo.hasta,
@@ -151,6 +173,7 @@ export async function tablero(actor: AuthUser, query: TableroQuery): Promise<Res
         disponibles,
         actual: pedido,
         periodo,
+        tendencia,
         datos: await repo.tableroEntrenador(
           periodo.desde,
           periodo.hasta,
@@ -166,6 +189,7 @@ export async function tablero(actor: AuthUser, query: TableroQuery): Promise<Res
         disponibles,
         actual: pedido,
         periodo,
+        tendencia,
         datos: await repo.tableroRepresentante(periodo.desde, periodo.hasta, usuId),
       };
 

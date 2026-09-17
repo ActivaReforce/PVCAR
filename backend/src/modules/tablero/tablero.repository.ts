@@ -288,6 +288,44 @@ export async function tableroRepresentante(
   return { hijos: rows[0]?.hijos ?? [] };
 }
 
+export interface PuntoTendencia {
+  fecha: string;
+  tasa: number;
+  registros: number;
+}
+
+/**
+ * El porcentaje de presentes en cada fecha del periodo.
+ *
+ * Es la gráfica que el tablero viejo no tenía y que es justo lo que se quiere
+ * saber: no "cuánta asistencia hay" sino **si está subiendo o bajando**. Una
+ * fila por fecha con clases; los días sin registros no inventan un cero.
+ *
+ * Global entra con `$3 = true` y los arrays vacíos; el resto filtra por sus
+ * disciplinas o sus colegios.
+ */
+export async function tendenciaAsistencia(
+  desde: string,
+  hasta: string,
+  global: boolean,
+  colegios: number[],
+  disciplinas: number[],
+): Promise<PuntoTendencia[]> {
+  const { rows } = await getPool().query<PuntoTendencia>(
+    `SELECT to_char(an.asisnino_fecha, 'DD/MM') AS fecha,
+            round(count(*) FILTER (WHERE an.asisest_id = 1) * 100.0 / NULLIF(count(*), 0), 1)::float8 AS tasa,
+            count(*)::int AS registros
+       FROM public.asistencia_nino an
+       JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = an.colacthor_id
+      WHERE an.asisnino_fecha BETWEEN $1::date AND $2::date
+        AND ($3::boolean OR an.colacthor_id = ANY($5::int[]) OR cah.col_id = ANY($4::int[]))
+      GROUP BY an.asisnino_fecha
+      ORDER BY an.asisnino_fecha`,
+    [desde, hasta, global, colegios, disciplinas],
+  );
+  return rows;
+}
+
 /** Hoy en Ecuador, para que el periodo por defecto no salga del navegador. */
 export async function hoyEnEcuador(): Promise<string> {
   const { rows } = await getPool().query<{ hoy: string }>(

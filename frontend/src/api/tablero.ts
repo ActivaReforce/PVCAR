@@ -82,10 +82,18 @@ export interface TableroRepresentante {
   hijos: HijoDelRepresentante[];
 }
 
+export interface PuntoTendencia {
+  fecha: string;
+  tasa: number;
+  registros: number;
+}
+
 export interface RespuestaTablero {
   disponibles: Array<{ id: TableroId; titulo: string }>;
   actual: TableroId | null;
   periodo: { desde: string; hasta: string };
+  /** % de presentes por fecha del periodo. Vacío en el tablero del representante. */
+  tendencia: PuntoTendencia[];
   datos:
     | TableroGeneral
     | TableroCoordinador

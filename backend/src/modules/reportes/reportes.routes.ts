@@ -36,6 +36,21 @@ reportesRouter.get(
   },
 );
 
+/** Las gráficas del reporte, ya agregadas. Mismos filtros que la tabla. */
+reportesRouter.get(
+  '/:modulo/analisis',
+  requirePermission('reportes', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { modulo } = idParamSchema.parse(req.params);
+      const filtros = filtrosSchema.parse(req.query);
+      res.json({ data: await service.analisis(actor(req), modulo, filtros), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 reportesRouter.get(
   '/:modulo',
   requirePermission('reportes', 'ver'),

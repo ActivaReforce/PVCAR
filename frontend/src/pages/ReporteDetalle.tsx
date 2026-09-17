@@ -11,11 +11,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
+import Grafica from '@/components/graficas/Grafica';
 import { DataPagination } from '@/components/ui/data-pagination';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { useColegios } from '@/hooks/useColegios';
-import { useCatalogoReportes, useExportarReporte, useReporte } from '@/hooks/useTablero';
+import {
+  useAnalisisReporte,
+  useCatalogoReportes,
+  useExportarReporte,
+  useReporte,
+} from '@/hooks/useTablero';
 import type { FiltrosReporte } from '@/api/reportes';
 
 const POR_PAGINA = 50;
@@ -60,6 +67,7 @@ const ReporteDetalle = () => {
   const listo = Boolean(definicion) && !faltanFechas;
 
   const reporte = useReporte(modulo, filtros, page, POR_PAGINA, listo);
+  const analisis = useAnalisisReporte(modulo, filtros, listo && (definicion?.graficas ?? 0) > 0);
 
   const cambiarFiltro = (accion: () => void) => {
     accion();
@@ -87,6 +95,7 @@ const ReporteDetalle = () => {
     );
   }
 
+  const tieneGraficas = (definicion.graficas ?? 0) > 0;
   const columnas = reporte.data?.columnas ?? definicion.columnas;
   const filas = reporte.data?.filas ?? [];
   const total = reporte.data?.total ?? 0;
@@ -211,10 +220,46 @@ const ReporteDetalle = () => {
         </div>
       )}
 
-      {filas.length > 0 && (
-        <>
-          {/* La tabla desborda en horizontal a propósito: un reporte tiene las
-              columnas que tiene, y en el teléfono se mira desplazándose. */}
+      {filas.length > 0 && tieneGraficas && (
+        <Tabs defaultValue="analisis">
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="analisis" className="flex-1 sm:flex-none">
+              Análisis
+            </TabsTrigger>
+            <TabsTrigger value="datos" className="flex-1 sm:flex-none">
+              Datos
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="analisis" className="mt-4 space-y-3">
+            {analisis.isLoading && (
+              <p className="py-12 text-center text-muted-foreground">Calculando…</p>
+            )}
+            {analisis.isError && (
+              <p className="py-8 text-center text-destructive">
+                {(analisis.error as Error).message}
+              </p>
+            )}
+            {(analisis.data ?? []).map((g) => (
+              <Grafica key={g.id} grafica={g} />
+            ))}
+          </TabsContent>
+
+          <TabsContent value="datos" className="mt-4 space-y-4">
+            <TablaDelReporte />
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {filas.length > 0 && !tieneGraficas && <TablaDelReporte />}
+    </div>
+  );
+
+  function TablaDelReporte() {
+    return (
+      <>
+        {/* La tabla desborda en horizontal a propósito: un reporte tiene las
+            columnas que tiene, y en el teléfono se mira desplazándose. */}
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
@@ -243,21 +288,20 @@ const ReporteDetalle = () => {
             </table>
           </div>
 
-          <DataPagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-            canGoNext={page < totalPages}
-            canGoPrevious={page > 1}
-            startIndex={(page - 1) * POR_PAGINA}
-            endIndex={Math.min(page * POR_PAGINA, total)}
-            totalItems={total}
-            itemName="filas"
-          />
-        </>
-      )}
-    </div>
-  );
+        <DataPagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          canGoNext={page < totalPages}
+          canGoPrevious={page > 1}
+          startIndex={(page - 1) * POR_PAGINA}
+          endIndex={Math.min(page * POR_PAGINA, total)}
+          totalItems={total}
+          itemName="filas"
+        />
+      </>
+    );
+  }
 };
 
 export default ReporteDetalle;
