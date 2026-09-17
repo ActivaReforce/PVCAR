@@ -198,6 +198,13 @@ const Usuarios = () => {
         onSinRolToggle={alternarSinRol}
         onViewAll={verTodos}
         getSelectedRoleNames={() => nombresDeRolesSeleccionados}
+        statusFilter={statusFilter}
+        onStatusChange={(estado) => cambiarFiltro(() => setStatusFilter(estado))}
+        userCounts={{
+          active: conteos.activos,
+          inactive: conteos.inactivos,
+          total: conteos.total,
+        }}
       />
 
       {/* Ancho completo: con max-w-sm el placeholder se cortaba a media

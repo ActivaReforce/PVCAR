@@ -210,36 +210,35 @@ const UserTable = ({
                   </div>
                 </div>
 
-                {/* Roles */}
-                <div className="flex flex-wrap gap-1 min-w-0">
-                  {user.roles.length > 0 ? (
-                    user.roles.map((rol) => (
-                      <Badge key={rol.rol_id} variant="outline" className="text-xs max-w-full">
-                        <span className="truncate">{rol.rol_titulo}</span>
-                      </Badge>
-                    ))
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Sin rol</span>
-                  )}
-                </div>
-
-                {/* Estado y fecha: en el telefono van juntos en una linea. */}
-                <div className="md:contents">
-                  <div className="flex items-center gap-3 md:block">
+                {/* Roles y estado.
+                    En el telefono comparten una sola linea; desde md el
+                    `contents` disuelve este contenedor y cada uno vuelve a ser
+                    su columna de la rejilla. Un solo markup, sin copias. */}
+                <div className="flex min-w-0 flex-wrap items-center gap-2 md:contents">
+                  <div className="flex min-w-0 flex-wrap gap-1">
+                    {user.roles.length > 0 ? (
+                      user.roles.map((rol) => (
+                        <Badge key={rol.rol_id} variant="outline" className="text-xs max-w-full">
+                          <span className="truncate">{rol.rol_titulo}</span>
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sin rol</span>
+                    )}
+                  </div>
+                  <div>
                     <Badge variant={activo ? 'default' : 'secondary'}>
                       {activo ? 'Activo' : 'Inactivo'}
                     </Badge>
-                    <span className="text-sm text-muted-foreground md:hidden">
-                      Creado {user.usu_fecha_creacion
-                        ? new Date(user.usu_fecha_creacion).toLocaleDateString()
-                        : '—'}
-                    </span>
                   </div>
-                  <div className="hidden md:block text-sm text-muted-foreground">
-                    {user.usu_fecha_creacion
-                      ? new Date(user.usu_fecha_creacion).toLocaleDateString()
-                      : '—'}
-                  </div>
+                </div>
+
+                {/* La fecha de creacion solo desde md: en 360 px se comia una
+                    linea entera para un dato que casi nunca se mira. */}
+                <div className="hidden text-sm text-muted-foreground md:block">
+                  {user.usu_fecha_creacion
+                    ? new Date(user.usu_fecha_creacion).toLocaleDateString()
+                    : '—'}
                 </div>
 
                 {/* Acciones: las mismas y con los mismos permisos en los dos

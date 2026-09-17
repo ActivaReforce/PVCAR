@@ -1,5 +1,6 @@
 import RoleFilters from './RoleFilters';
 import MobileRoleSelector from './MobileRoleSelector';
+import { EstadoSelect, type FiltroEstado } from './UserStatusFilters';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { Rol } from '@/api/usuarios';
 
@@ -16,6 +17,10 @@ interface UsuariosFiltersProps {
   onSinRolToggle: () => void;
   onViewAll: () => void;
   getSelectedRoleNames: () => string;
+  /** El filtro de estado viaja hasta aqui para que en movil compartan fila. */
+  statusFilter: FiltroEstado;
+  onStatusChange: (estado: FiltroEstado) => void;
+  userCounts: { active: number; inactive: number; total: number };
 }
 
 const UsuariosFilters = ({
@@ -30,23 +35,36 @@ const UsuariosFilters = ({
   onSinRolToggle,
   onViewAll,
   getSelectedRoleNames,
+  statusFilter,
+  onStatusChange,
+  userCounts,
 }: UsuariosFiltersProps) => {
   const isMobile = useIsMobile();
 
   if (isMobile) {
     return (
       <div className="space-y-4 min-w-0 max-w-full">
-        <MobileRoleSelector
-          roles={roles}
-          conteosPorRol={conteosPorRol}
-          totalUsuarios={totalUsuarios}
-          sinRol={sinRol}
-          selectedRoles={selectedRoles}
-          sinRolSeleccionado={sinRolSeleccionado}
-          onRoleToggle={onRoleToggle}
-          onSinRolToggle={onSinRolToggle}
-          onViewAll={onViewAll}
-        />
+        {/* Estado y rol comparten fila: son los dos filtros que se usan a la
+            vez, y cada uno ocupando una fila entera dejaba la lista bajo el
+            pliegue. */}
+        <div className="grid grid-cols-2 gap-2">
+          <EstadoSelect
+            statusFilter={statusFilter}
+            onStatusChange={onStatusChange}
+            userCounts={userCounts}
+          />
+          <MobileRoleSelector
+            roles={roles}
+            conteosPorRol={conteosPorRol}
+            totalUsuarios={totalUsuarios}
+            sinRol={sinRol}
+            selectedRoles={selectedRoles}
+            sinRolSeleccionado={sinRolSeleccionado}
+            onRoleToggle={onRoleToggle}
+            onSinRolToggle={onSinRolToggle}
+            onViewAll={onViewAll}
+          />
+        </div>
         <div className="text-sm text-muted-foreground text-center px-2">
           <span className="truncate block">
             Mostrando: {getSelectedRoleNames()} ({totalFiltrado} usuarios)
