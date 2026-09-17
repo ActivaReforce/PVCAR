@@ -13,6 +13,7 @@ import { disciplinasRouter } from './modules/disciplinas/disciplinas.routes.js';
 import { entrenadoresRouter } from './modules/entrenadores/entrenadores.routes.js';
 import { estudiantesRouter } from './modules/estudiantes/estudiantes.routes.js';
 import { asistenciasRouter } from './modules/asistencias/asistencias.routes.js';
+import { evaluacionesRouter } from './modules/evaluaciones/evaluaciones.routes.js';
 import { permisosRouter } from './modules/permisos/permisos.routes.js';
 import { perfilRouter } from './modules/perfil/perfil.routes.js';
 
@@ -69,6 +70,7 @@ export function createApp(): Application {
   api.use('/entrenadores', entrenadoresRouter);
   api.use('/estudiantes', estudiantesRouter);
   api.use('/asistencias', asistenciasRouter);
+  api.use('/evaluaciones', evaluacionesRouter);
   api.use('/permisos', permisosRouter);
   api.use('/perfil', perfilRouter);
 
