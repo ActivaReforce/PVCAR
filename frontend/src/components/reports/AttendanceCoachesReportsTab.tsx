@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
-import { formatTimeForDisplay } from '@/components/attendance/TimezoneUtils';
+import { horaCorta } from '@/lib/hora';
 
 const AttendanceCoachesReportsTab = () => {
   const { toast } = useToast();
@@ -242,7 +242,7 @@ const AttendanceCoachesReportsTab = () => {
           'Día': getDayNameFromDate(record.asisent_fecha),
           'Nombre del Entrenador': trainerNames[record.ent_id] || '',
           'Estado de Asistencia': statusNames[record.asisest_id] || '',
-          'Hora de Llegada Tarde': record.asisent_hora_tarde ? formatTimeForDisplay(record.asisent_hora_tarde) : '',
+          'Hora de Llegada Tarde': record.asisent_hora_tarde ? horaCorta(record.asisent_hora_tarde) : '',
           'Justificación': record.asisent_razon_justificado || ''
         };
 

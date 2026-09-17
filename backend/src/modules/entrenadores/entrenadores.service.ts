@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { alcanceDe, alcanzaColegio, type Alcance } from '../../lib/alcance.js';
+import { alcanceDe, alcanzaColegio } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';

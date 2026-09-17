@@ -20,7 +20,7 @@ import Disciplinas from "@/pages/Disciplinas";
 import Entrenadores from "@/pages/Entrenadores";
 import Estudiantes from "@/pages/Estudiantes";
 import Evaluaciones from "@/pages/Evaluaciones";
-import Asistencias from "@/pages/Asistencias";
+import AsistenciasAlumnos from "@/pages/AsistenciasAlumnos";
 import AsistenciasEntrenadores from "@/pages/AsistenciasEntrenadores";
 import Reportes from "@/pages/Reportes";
 import ReportesUsuarios from "@/pages/ReportesUsuarios";
@@ -81,8 +81,8 @@ const App = () => {
                           <Route path="/entrenadores" element={<Entrenadores />} />
                           <Route path="/estudiantes" element={<Estudiantes />} />
                           <Route path="/evaluaciones" element={<Evaluaciones />} />
-                          <Route path="/asistencias" element={<Asistencias />} />
-                          <Route path="/attendance/coaches" element={<AsistenciasEntrenadores />} />
+                          <Route path="/asistencias" element={<AsistenciasAlumnos />} />
+                          <Route path="/asistencias/entrenadores" element={<AsistenciasEntrenadores />} />
                           <Route path="/reportes" element={<Reportes />} />
                           <Route path="/reportes/usuarios" element={<ReportesUsuarios />} />
                           <Route path="/reportes/colegios" element={<ReportesColegios />} />
