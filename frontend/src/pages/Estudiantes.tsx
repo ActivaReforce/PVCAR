@@ -1,455 +1,298 @@
+import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import DebouncedSearchInput from '@/components/ui/debounced-search-input';
+import { DataPagination } from '@/components/ui/data-pagination';
+import EstudiantesLista from '@/components/estudiantes/EstudiantesLista';
+import EstudianteForm from '@/components/estudiantes/EstudianteForm';
+import EstudianteFicha from '@/components/estudiantes/EstudianteFicha';
+import EliminarEstudianteDialog from '@/components/estudiantes/EliminarEstudianteDialog';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useColegios } from '@/hooks/useColegios';
+import {
+  useDarDeBajaEstudiante,
+  useEstudiantes,
+  useFichaEstudiante,
+  useGrados,
+  useReactivarEstudiante,
+} from '@/hooks/useEstudiantes';
+import type { Estudiante, FiltrosEstudiantes } from '@/api/estudiantes';
 
-import React, { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowLeft, Search } from "lucide-react";
-import { useEstudiantesModals } from "@/hooks/useEstudiantesModals";
-import { useStudentsPagination } from "@/hooks/useStudentsPagination";
-import { useStudentCounts } from "@/hooks/useStudentCounts";
-import { useSchoolCounts } from "@/hooks/useSchoolCounts";
-import EstudiantesHeader from "@/components/estudiantes/EstudiantesHeader";
-import EstudiantesDataTable from "@/components/estudiantes/EstudiantesDataTable";
-import EstudiantesModalsManager from "@/components/estudiantes/EstudiantesModalsManager";
-import EstudiantesSchoolCardGrid from "@/components/estudiantes/EstudiantesSchoolCardGrid";
-import EstudiantesResponsiveFilters from "@/components/estudiantes/EstudiantesResponsiveFilters";
-import StudentStatusFilters from "@/components/estudiantes/StudentStatusFilters";
-import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+const POR_PAGINA = 20;
+const TODOS = 'todos';
 
+/**
+ * Estudiantes.
+ *
+ * 796 alumnos: búsqueda, filtros, orden, paginación y conteos los resuelve el
+ * servidor. El sistema viejo pedía los 796 con sus relaciones anidadas y
+ * contaba con `.filter()` en el navegador — y, como el filtro por alcance
+ * también vivía allí, cuando la lista de colegios permitidos salía vacía
+ * devolvía **todos**.
+ */
 const Estudiantes = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSchool, setSelectedSchool] = useState<string | null>(null);
-  const [selectedDiscipline, setSelectedDiscipline] = useState<number | null>(null);
-  const [showUnassigned, setShowUnassigned] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
-  const { user } = useAuth();
-  const { toast } = useToast();
-  
-  // Check if user is a trainer (role 3) or auxiliary (roles 6/7)
-  const isTrainer = user?.roles?.some(role => role.rol_id === 3);
-  const isAuxiliary = user?.roles?.some(role => role.rol_id === 6 || role.rol_id === 7);
-  
-  // Use new optimized hooks
-  const { schoolCounts, loading: schoolCountsLoading, trainerContext, refreshSchoolCounts } = useSchoolCounts();
-  
-  // Get student counts for status filters (without discipline filters)
-  const { counts: studentCounts, loading: countsLoading, refetch: refreshStudentCounts } = useStudentCounts({
-    selectedSchool,
-    searchQuery
-  });
-  
-  const {
-    students,
-    loading: studentsLoading,
-    currentPage,
-    totalPages,
-    totalCount,
-    startIndex,
-    endIndex,
-    canGoNext,
-    canGoPrevious,
-    goToPage,
-    loadStudents,
-    refreshStudents
-  } = useStudentsPagination({
-    itemsPerPage: 7,
-    selectedSchool,
-    selectedDiscipline,
-    searchQuery,
-    statusFilter,
-    showUnassigned
-  });
+  const { canCreate } = usePermissions();
 
-  const {
-    modalStates,
-    selectedEstudiante,
-    setModalState,
-    closeAllModals,
-    handleCreate,
-    handleEdit,
-    handleView,
-    handleAttach,
-    handleLinkDisciplines,
-    handleViewEdit,
-    handleViewAttach,
-    handleViewLinkDisciplines
-  } = useEstudiantesModals();
+  const [page, setPage] = useState(1);
+  const [busqueda, setBusqueda] = useState('');
+  const [colegio, setColegio] = useState(TODOS);
+  const [grado, setGrado] = useState(TODOS);
+  const [estado, setEstado] = useState('1');
+  const [sinAsignar, setSinAsignar] = useState(false);
 
-  // Check if trainer/coordinator has only one colegio and auto-select it
-  // For auxiliary roles, always auto-select the first colegio to skip cards view
-  useEffect(() => {
-    const isCoordinator = user?.roles?.some(role => role.rol_id === 2);
-    
-    if (isCoordinator && schoolCounts.length === 1 && !selectedSchool) {
-      // If coordinator has exactly one colegio, auto-select it
-      setSelectedSchool(schoolCounts[0].col_nombre);
-    } else if (isAuxiliary && trainerContext.resolved && schoolCounts.length > 0 && !selectedSchool) {
-      // For auxiliary roles, always auto-select the first colegio to skip cards view
-      setSelectedSchool(schoolCounts[0].col_nombre);
-    } else if (isTrainer && schoolCounts.length === 1 && !selectedSchool) {
-      // If trainer has exactly one colegio, auto-select it
-      setSelectedSchool(schoolCounts[0].col_nombre);
-    }
-  }, [schoolCounts, user, selectedSchool, isTrainer, isAuxiliary, trainerContext.resolved]);
+  const [creando, setCreando] = useState(false);
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [viendoId, setViendoId] = useState<number | null>(null);
+  const [aDarDeBaja, setADarDeBaja] = useState<Estudiante | null>(null);
+  const [aEliminar, setAEliminar] = useState<Estudiante | null>(null);
 
-  // Load students when filters change (use ref for stable loadStudents reference)
-  useEffect(() => {
-    if (selectedSchool) {
-      loadStudents(1); // Reset to first page when filters change
-    }
-  }, [selectedSchool, selectedDiscipline, searchQuery, statusFilter, showUnassigned]); // Removed loadStudents from deps
+  const colegios = useColegios({ limit: 200, orden: 'nombre' });
+  const grados = useGrados();
+  const baja = useDarDeBajaEstudiante();
+  const reactivar = useReactivarEstudiante();
+  const fichaEdicion = useFichaEstudiante(editandoId, false);
 
-  const handleStatusChange = (status: 'active' | 'inactive' | 'all') => {
-    setStatusFilter(status);
+  const filtros: FiltrosEstudiantes = {
+    page,
+    limit: POR_PAGINA,
+    buscar: busqueda || undefined,
+    colegio: colegio === TODOS ? undefined : [Number(colegio)],
+    grado: grado === TODOS ? undefined : Number(grado),
+    estado: estado === TODOS ? undefined : Number(estado),
+    sinAsignar: sinAsignar || undefined,
+    orden: 'nombre',
   };
 
-  const handleDelete = async (estudiante: any) => {
-    try {
-      const { error: studentError } = await supabase
-        .from('nino')
-        .update({ 
-          est_id: 2,
-          nino_fecha_modificacion: new Date().toISOString()
-        })
-        .eq('nino_id', estudiante.nino_id);
+  const lista = useEstudiantes(filtros);
+  const estudiantes = lista.data?.items ?? [];
+  const conteos = lista.data?.conteos;
+  const totalItems = lista.data?.total ?? 0;
+  const totalPages = lista.data?.totalPages ?? 0;
 
-      if (studentError) throw studentError;
-
-      const { error: assignmentError } = await supabase
-        .from('nino_asignacion')
-        .update({ 
-          est_id: 2,
-          ninoasig_fecha_baja: new Date().toISOString()
-        })
-        .eq('nino_id', estudiante.nino_id)
-        .eq('est_id', 1);
-
-      if (assignmentError) throw assignmentError;
-
-      toast({
-        title: "Éxito",
-        description: "Estudiante y disciplinas desactivados correctamente",
-      });
-
-      refreshStudents();
-    } catch (error) {
-      console.error("Error deactivating estudiante:", error);
-      toast({
-        title: "Error",
-        description: "Error al desactivar estudiante",
-        variant: "destructive",
-      });
-    }
+  const cambiarFiltro = (accion: () => void) => {
+    accion();
+    setPage(1);
   };
 
-  const handleReactivate = async (estudiante: any) => {
-    try {
-      const { error } = await supabase
-        .from('nino')
-        .update({ 
-          est_id: 1,
-          nino_fecha_modificacion: new Date().toISOString()
-        })
-        .eq('nino_id', estudiante.nino_id);
+  if (lista.isLoading && !lista.data) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-lg">Cargando estudiantes...</div>
+      </div>
+    );
+  }
 
-      if (error) throw error;
-
-      toast({
-        title: "Éxito",
-        description: "Estudiante reactivado correctamente",
-      });
-
-      setStatusFilter('active');
-      refreshStudents();
-    } catch (error) {
-      console.error("Error reactivating estudiante:", error);
-      toast({
-        title: "Error",
-        description: "Error al reactivar estudiante",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handlePermanentDelete = async (estudiante: any) => {
-    try {
-      const { error } = await supabase
-        .from('nino')
-        .delete()
-        .eq('nino_id', estudiante.nino_id);
-
-      if (error) {
-        if (error.code === '23503') {
-          toast({
-            title: "No se puede eliminar",
-            description: "No se puede eliminar el estudiante porque tiene registros relacionados.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: `Error al eliminar permanentemente el estudiante: ${error.message}`,
-            variant: "destructive",
-          });
-        }
-        return;
-      }
-
-      toast({
-        title: "Éxito",
-        description: "Estudiante eliminado permanentemente",
-      });
-
-      refreshStudents();
-    } catch (error) {
-      console.error("Error permanently deleting estudiante:", error);
-      toast({
-        title: "Error",
-        description: "Error inesperado al eliminar permanentemente el estudiante",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleModalSuccess = () => {
-    closeAllModals();
-    refreshStudents();
-    refreshStudentCounts(); // Refresh student counts for status filters and "Sin Asignar" badge
-    refreshSchoolCounts(); // Refresh school counts for dropdown updates
-  };
-
-  // Combined refresh function for colegios in modal dropdowns
-  const handleColegiosRefresh = () => {
-    refreshSchoolCounts();
-  };
-
-  const handleViewDelete = async () => {
-    setModalState('viewModalOpen', false);
-    if (selectedEstudiante) {
-      await handleDelete(selectedEstudiante);
-    }
-  };
-
-  const handleSchoolSelect = (schoolName: string) => {
-    setSelectedSchool(schoolName);
-    setSelectedDiscipline(null);
-    setShowUnassigned(false);
-    setSearchQuery('');
-  };
-
-  const handleBackToCards = () => {
-    setSelectedSchool(null);
-    setSelectedDiscipline(null);
-    setShowUnassigned(false);
-    setSearchQuery(''); // Clear search when going back
-  };
-
-  const handleDisciplineSelect = (disciplineId: number | null) => {
-    setSelectedDiscipline(disciplineId);
-  };
-
-  const handleUnassignedSelect = (showUnassigned: boolean) => {
-    setShowUnassigned(showUnassigned);
-  };
-
-  const handleCollegeFilterSelect = (schoolName: string) => {
-    setSelectedSchool(schoolName);
-    setSelectedDiscipline(null);
-    setShowUnassigned(false);
-    setSearchQuery('');
-  };
+  if (lista.isError) {
+    return (
+      <div className="container mx-auto p-6">
+        <p className="text-destructive">
+          No se pudieron cargar los estudiantes: {(lista.error as Error).message}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Always show header */}
-      <EstudiantesHeader
-        searchQuery=""
-        onSearchChange={() => {}}
-        onCreateNew={handleCreate}
-        showSearch={false}
-      />
-
-      {/* Add informational title for roles 6 and 7 */}
-      {isAuxiliary && trainerContext.trainerName && (
-        <div className="container mx-auto px-4 lg:px-6 pb-2">
-          <p className="text-sm text-muted-foreground">
-            Estudiantes del entrenador {trainerContext.trainerName}
-          </p>
+    <div className="container mx-auto min-w-0 space-y-6 p-4 lg:p-6">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Gestión de Alumnos</h1>
+          {conteos && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {conteos.total} alumnos · {conteos.activos} activos
+              {conteos.inactivos > 0 && ` · ${conteos.inactivos} inactivos`} ·{' '}
+              <span className={conteos.sinAsignar > 0 ? 'text-amber-700 dark:text-amber-400' : ''}>
+                {conteos.sinAsignar} sin disciplinas
+              </span>
+            </p>
+          )}
         </div>
-      )}
 
-      <div className="container mx-auto p-4 lg:p-6">
-        {selectedSchool ? (
-          // List view with filters
-          <div className="space-y-4">
-            {/* Mobile Layout */}
-            <div className="sm:hidden space-y-3">
-              {/* Back to cards button - Full width */}
-              {!(isAuxiliary && trainerContext.trainerId) && !((user?.roles?.some(role => role.rol_id === 2 || role.rol_id === 3)) && schoolCounts.length === 1) && (
-                <Button variant="outline" onClick={handleBackToCards} className="w-full flex items-center justify-center gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Volver a Tarjetas
-                </Button>
-              )}
-              
-              
-              {/* Status filters - Hide icons and badges on mobile */}
-              {!isTrainer && !isAuxiliary && (
-                <div className="flex justify-between gap-1">
-                  <Button
-                    variant={statusFilter === 'active' ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setStatusFilter('active')}
-                    className="flex-1 text-xs px-2"
-                  >
-                    Activos
-                  </Button>
-                  
-                  <Button
-                    variant={statusFilter === 'inactive' ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setStatusFilter('inactive')}
-                    className="flex-1 text-xs px-2"
-                  >
-                    Inactivos
-                  </Button>
-
-                  <Button
-                    variant={statusFilter === 'all' ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setStatusFilter('all')}
-                    className="flex-1 text-xs px-2"
-                  >
-                    Todos
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Desktop Layout */}
-            <div className="hidden sm:block">
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                {/* Show back button only if not auxiliary and not single colegio scenario */}
-                {!(isAuxiliary && trainerContext.trainerId) && !((user?.roles?.some(role => role.rol_id === 2 || role.rol_id === 3)) && schoolCounts.length === 1) && (
-                  <Button variant="outline" onClick={handleBackToCards} className="flex items-center gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    Volver a tarjetas
-                  </Button>
-                )}
-                
-                {/* Hide status filters for trainers (role 3) and auxiliaries (roles 6/7) */}
-                {!isTrainer && !isAuxiliary && (
-                  <StudentStatusFilters
-                    statusFilter={statusFilter}
-                    onStatusChange={setStatusFilter}
-                    studentCounts={studentCounts}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Responsive Filters */}
-            <EstudiantesResponsiveFilters
-        colegios={schoolCounts.map(school => ({ 
-          col_id: school.col_id, 
-          col_nombre: school.col_nombre,
-          col_direccion: '',
-          col_fecha_creacion: '',
-          col_fecha_modificacion: '',
-          col_rep_email: '',
-          col_rep_foto: '',
-          col_rep_nombre: '',
-          col_rep_telefono: ''
-        }))}
-              selectedSchool={selectedSchool}
-              selectedDiscipline={selectedDiscipline}
-              showUnassigned={showUnassigned}
-              statusFilter={statusFilter}
-              onCollegeFilterSelect={handleCollegeFilterSelect}
-              onDisciplineSelect={handleDisciplineSelect}
-              onUnassignedSelect={handleUnassignedSelect}
-              searchQuery={searchQuery}
-            />
-
-            {/* Search bar */}
-            <div className="relative w-full sm:max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar alumnos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-full"
-              />
-            </div>
-
-            {/* Students Table */}
-            <EstudiantesDataTable
-              estudiantes={students}
-              loading={studentsLoading}
-              searchQuery=""
-              selectedDiscipline={selectedDiscipline}
-              showUnassigned={showUnassigned}
-              statusFilter={statusFilter}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalCount={totalCount}
-              startIndex={startIndex}
-              endIndex={endIndex}
-              canGoNext={canGoNext}
-              canGoPrevious={canGoPrevious}
-              onPageChange={goToPage}
-              onEdit={handleEdit}
-              onView={handleView}
-              onDelete={handleDelete}
-              onReactivate={handleReactivate}
-              onPermanentDelete={handlePermanentDelete}
-              onAttach={handleAttach}
-              onLinkDisciplines={handleLinkDisciplines}
-            />
-          </div>
-        ) : (
-          // Card grid view (only show for non-auxiliary roles with multiple colegios)
-          <div className="space-y-4">
-            {/* Hide status filters for trainers (role 3) and auxiliaries (roles 6/7) */}
-            {!isTrainer && !isAuxiliary && (
-              <StudentStatusFilters
-                statusFilter={statusFilter}
-                onStatusChange={setStatusFilter}
-                studentCounts={studentCounts}
-              />
-            )}
-            
-            <EstudiantesSchoolCardGrid
-              estudiantes={[]}
-              colegios={schoolCounts}
-              onSchoolSelect={handleSchoolSelect}
-            />
-          </div>
+        {canCreate('estudiantes') && (
+          <Button variant="brand" className="w-full sm:w-auto" onClick={() => setCreando(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Alumno
+          </Button>
         )}
       </div>
 
-      <EstudiantesModalsManager
-        modalStates={modalStates}
-        onModalStateChange={setModalState}
-        selectedEstudiante={selectedEstudiante}
-        colegios={schoolCounts.map(school => ({ 
-          col_id: school.col_id, 
-          col_nombre: school.col_nombre,
-          col_direccion: '',
-          col_fecha_creacion: '',
-          col_fecha_modificacion: '',
-          col_rep_email: '',
-          col_rep_foto: '',
-          col_rep_nombre: '',
-          col_rep_telefono: ''
-        }))}
-        onSuccess={handleModalSuccess}
-        onEdit={handleViewEdit}
-        onDelete={handleViewDelete}
-        onAttach={handleViewAttach}
-        onLinkDisciplines={handleViewLinkDisciplines}
-        onColegiosRefresh={handleColegiosRefresh}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <DebouncedSearchInput
+          placeholder="Buscar por nombre o cédula..."
+          value={busqueda}
+          onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
+          className="w-full xl:col-span-2"
+        />
+
+        <Select value={colegio} onValueChange={(v) => cambiarFiltro(() => setColegio(v))}>
+          <SelectTrigger className="h-11 sm:h-10">
+            <SelectValue placeholder="Todos los colegios" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos los colegios</SelectItem>
+            {(colegios.data?.items ?? []).map((c) => (
+              <SelectItem key={c.col_id} value={String(c.col_id)}>
+                {c.col_nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={grado} onValueChange={(v) => cambiarFiltro(() => setGrado(v))}>
+          <SelectTrigger className="h-11 sm:h-10">
+            <SelectValue placeholder="Todos los grados" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos los grados</SelectItem>
+            {(grados.data ?? []).map((g) => (
+              <SelectItem key={g.catninograd_id} value={String(g.catninograd_id)}>
+                {g.catninograd_nombre} ({g.estudiantes})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="grid grid-cols-2 gap-3 sm:col-span-2 xl:col-span-4 xl:w-96">
+          <Select value={estado} onValueChange={(v) => cambiarFiltro(() => setEstado(v))}>
+            <SelectTrigger className="h-11 sm:h-10">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Activos</SelectItem>
+              <SelectItem value="2">Inactivos</SelectItem>
+              <SelectItem value={TODOS}>Todos</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant={sinAsignar ? 'default' : 'outline'}
+            className="h-11 sm:h-10"
+            onClick={() => cambiarFiltro(() => setSinAsignar((v) => !v))}
+          >
+            Sin disciplinas
+          </Button>
+        </div>
+      </div>
+
+      <EstudiantesLista
+        estudiantes={estudiantes}
+        onVer={(e) => setViendoId(e.nino_id)}
+        onEditar={(e) => setEditandoId(e.nino_id)}
+        onBaja={setADarDeBaja}
+        onReactivar={(e) => reactivar.mutate(e.nino_id)}
+        onEliminar={setAEliminar}
+      />
+
+      {estudiantes.length > 0 && (
+        <DataPagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          canGoNext={page < totalPages}
+          canGoPrevious={page > 1}
+          startIndex={(page - 1) * POR_PAGINA}
+          endIndex={Math.min(page * POR_PAGINA, totalItems)}
+          totalItems={totalItems}
+          itemName="alumnos"
+        />
+      )}
+
+      {/* Alta y edición comparten formulario; en edición se espera la ficha. */}
+      <Dialog
+        open={creando || editandoId !== null}
+        onOpenChange={(abierto) => {
+          if (!abierto) {
+            setCreando(false);
+            setEditandoId(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl">
+              {editandoId !== null ? 'Editar Alumno' : 'Nuevo Alumno'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {editandoId !== null && fichaEdicion.isLoading ? (
+            <p className="py-6 text-center text-muted-foreground">Cargando ficha…</p>
+          ) : (
+            <EstudianteForm
+              estudiante={editandoId !== null ? fichaEdicion.data?.estudiante : null}
+              onSuccess={() => {
+                setCreando(false);
+                setEditandoId(null);
+              }}
+              onCancel={() => {
+                setCreando(false);
+                setEditandoId(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viendoId !== null} onOpenChange={(abierto) => !abierto && setViendoId(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="break-words text-lg sm:text-xl">
+              Ficha del alumno
+            </DialogTitle>
+          </DialogHeader>
+          {viendoId !== null && <EstudianteFicha ninoId={viendoId} />}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={aDarDeBaja !== null}
+        onOpenChange={(abierto) => !abierto && setADarDeBaja(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Dar de baja al alumno</AlertDialogTitle>
+            <AlertDialogDescription className="break-words">
+              <strong>{aDarDeBaja?.nino_nombre}</strong> dejará de aparecer en las listas de
+              asistencia. Sus <strong>{aDarDeBaja?.disciplinas ?? 0}</strong> inscripciones activas
+              se cerrarán con la fecha de hoy. El historial se conserva y se puede reactivar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-0">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (aDarDeBaja) baja.mutate(aDarDeBaja.nino_id);
+                setADarDeBaja(null);
+              }}
+            >
+              Dar de baja
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <EliminarEstudianteDialog
+        estudiante={aEliminar}
+        onClose={() => setAEliminar(null)}
+        onEliminado={() => setAEliminar(null)}
       />
     </div>
   );

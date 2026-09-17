@@ -36,7 +36,7 @@ export interface SubidaFirmada {
  * los contactos de un colegio no se mezclan, y asi la ruta guardada dice de
  * quien es sin mirar la fila.
  */
-export const CARPETAS = ['usuarios', 'colegios'] as const;
+export const CARPETAS = ['usuarios', 'colegios', 'estudiantes'] as const;
 export type Carpeta = (typeof CARPETAS)[number];
 
 /** Valida una ruta guardada: carpeta conocida y nombre sin sorpresas. */

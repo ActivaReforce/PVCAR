@@ -11,6 +11,7 @@ import { colegiosRouter } from './modules/colegios/colegios.routes.js';
 import { actividadesRouter } from './modules/actividades/actividades.routes.js';
 import { disciplinasRouter } from './modules/disciplinas/disciplinas.routes.js';
 import { entrenadoresRouter } from './modules/entrenadores/entrenadores.routes.js';
+import { estudiantesRouter } from './modules/estudiantes/estudiantes.routes.js';
 import { permisosRouter } from './modules/permisos/permisos.routes.js';
 import { perfilRouter } from './modules/perfil/perfil.routes.js';
 
@@ -65,6 +66,7 @@ export function createApp(): Application {
   api.use('/actividades', actividadesRouter);
   api.use('/disciplinas', disciplinasRouter);
   api.use('/entrenadores', entrenadoresRouter);
+  api.use('/estudiantes', estudiantesRouter);
   api.use('/permisos', permisosRouter);
   api.use('/perfil', perfilRouter);
 
