@@ -17,6 +17,7 @@ Estado al **2026-09-16**. Construido y en `dev`. **Las pruebas contra el API est
 | Alcance | Entrando como coordinador: ve **solo sus colegios**; `GET /colegios/:id` de otro → 403; `PATCH` de otro → 403 |
 | Borrar uno con datos | Modal con el recuento exacto (disciplinas, alumnos, asistencias) y botón bloqueado |
 | Borrar uno vacío | Exige escribir el nombre, se borra, y queda registro en `auditoria` |
+| **Heredada de la Fase 6** — quitar el rol de Coordinador con colegios a su cargo | Asigna un colegio a un coordinador, vete a Usuarios y quítale el rol **Coordinador**: debe dar **409** diciendo cuántos colegios tiene a su cargo, y no tocar nada |
 | Móvil 360 px | Tarjetas en una columna, filtros apilados, botones de 44 px, modal sin desbordes |
 | Modo oscuro | Tarjetas, badges y modal legibles |
 

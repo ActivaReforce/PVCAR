@@ -26,6 +26,8 @@ Este módulo no da de alta personas — un entrenador **es** un usuario con el r
 | Soltar auxiliar | Baja lógica (`est_id = 2`), no DELETE; deja de heredar el alcance |
 | Alcance | Coordinador: solo entrenadores de sus colegios. Ficha ajena → 403. Asignar disciplina ajena → 403 |
 | Entrar como auxiliar | Ve exactamente lo de su titular; al soltarlo, deja de verlo |
+| **Heredada de la Fase 6** — quitar el rol de Entrenador con asignaciones activas | Con un entrenador que tenga disciplinas abiertas, vete a Usuarios y quítale el rol **Entrenador**: **409** con el número de asignaciones, y sin tocar nada |
+| **Devolverle sus disciplinas a Alex (usu_id 60)** | Quedó de baja en la prueba 15 de la Fase 6 y sus 4 asignaciones se cerraron con fecha. Reactivado el usuario, hay que volver a asignárselas desde aquí: las cerradas siguen en su historial y las nuevas se abren con la fecha de hoy |
 | Móvil 360 px | Tarjetas en una columna, ficha y modal de asignar usables |
 | Modo oscuro | Avisos ámbar y badges legibles |
 
