@@ -10,6 +10,7 @@ import { usuariosRouter } from './modules/usuarios/usuarios.routes.js';
 import { colegiosRouter } from './modules/colegios/colegios.routes.js';
 import { actividadesRouter } from './modules/actividades/actividades.routes.js';
 import { disciplinasRouter } from './modules/disciplinas/disciplinas.routes.js';
+import { entrenadoresRouter } from './modules/entrenadores/entrenadores.routes.js';
 import { permisosRouter } from './modules/permisos/permisos.routes.js';
 import { perfilRouter } from './modules/perfil/perfil.routes.js';
 
@@ -63,6 +64,7 @@ export function createApp(): Application {
   api.use('/colegios', colegiosRouter);
   api.use('/actividades', actividadesRouter);
   api.use('/disciplinas', disciplinasRouter);
+  api.use('/entrenadores', entrenadoresRouter);
   api.use('/permisos', permisosRouter);
   api.use('/perfil', perfilRouter);
 

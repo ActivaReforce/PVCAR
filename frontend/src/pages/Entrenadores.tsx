@@ -1,370 +1,197 @@
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import DebouncedSearchInput from '@/components/ui/debounced-search-input';
+import { DataPagination } from '@/components/ui/data-pagination';
+import EntrenadorCard from '@/components/entrenadores/EntrenadorCard';
+import EntrenadorFicha from '@/components/entrenadores/EntrenadorFicha';
+import AsignarDisciplinaModal from '@/components/entrenadores/AsignarDisciplinaModal';
+import { useColegios } from '@/hooks/useColegios';
+import { useEntrenadores } from '@/hooks/useEntrenadores';
+import type { Entrenador, FiltrosEntrenadores } from '@/api/entrenadores';
 
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { useSorting } from "@/hooks/useSorting";
-import { useEntrenadoresData } from "@/hooks/useEntrenadoresData";
-import { useEntrenadoresFiltering } from "@/hooks/useEntrenadoresFiltering";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { EntrenadorWithDetails } from "@/components/entrenadores/EntrenadorTypes";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import EntrenadorHeader from "@/components/entrenadores/EntrenadorHeader";
-import EntrenadorDetail from "@/components/entrenadores/EntrenadorDetail";
-import AtarEntrenadorModal from "@/components/entrenadores/AtarEntrenadorModal";
-import AtarAuxiliarModal from "@/components/entrenadores/AtarAuxiliarModal";
-import EntrenadorTable from "@/components/entrenadores/EntrenadorTable";
-import MobileSchoolSelector from "@/components/entrenadores/MobileSchoolSelector";
+const POR_PAGINA = 9;
+const TODOS = 'todos';
 
+/**
+ * Entrenadores.
+ *
+ * La lista llega filtrada por alcance: un coordinador ve solo a quienes dan
+ * clase en sus colegios. Antes el filtro por colegio del sistema viejo usaba
+ * un **hash del nombre del colegio** como identificador y el alcance se
+ * resolvía cruzando arrays de nombres en el navegador.
+ */
 const Entrenadores = () => {
-  const isMobile = useIsMobile();
-  const [showDetails, setShowDetails] = useState(false);
-  const [showAtarModal, setShowAtarModal] = useState(false);
-  const [showAuxiliarModal, setShowAuxiliarModal] = useState(false);
-  const [viewingEntrenador, setViewingEntrenador] = useState<EntrenadorWithDetails | null>(null);
-  const [selectedEntrenador, setSelectedEntrenador] = useState<EntrenadorWithDetails | null>(null);
-  const [auxiliarEntrenador, setAuxiliarEntrenador] = useState<EntrenadorWithDetails | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState<number | 'unassigned' | 'all' | null>('all');
-  const [coordinatorSchools, setCoordinatorSchools] = useState<Array<{ col_id: number; col_nombre: string; count?: number }>>([]);
-  const { user } = useAuth();
+  const [page, setPage] = useState(1);
+  const [busqueda, setBusqueda] = useState('');
+  const [colegio, setColegio] = useState(TODOS);
+  const [estado, setEstado] = useState('1');
+  const [sinAsignar, setSinAsignar] = useState(false);
 
-  // Data management
-  const {
-    entrenadores,
-    loading,
-    loadEntrenadores
-  } = useEntrenadoresData();
+  const [viendo, setViendo] = useState<Entrenador | null>(null);
+  const [asignando, setAsignando] = useState<Entrenador | null>(null);
 
-  // Filtering and sorting
-  const {
-    filteredEntrenadores,
-    customSort
-  } = useEntrenadoresFiltering(entrenadores, searchTerm);
+  const colegios = useColegios({ limit: 200, orden: 'nombre' });
 
-  // Sorting for filtered entrenadores
-  const {
-    sortKey,
-    sortDirection,
-    handleSort
-  } = useSorting({
-    data: filteredEntrenadores,
-    defaultSortKey: 'ent_fecha_creacion',
-    defaultSortDirection: 'desc'
-  });
-
-  // Apply custom sorting
-  const sortedEntrenadores = sortKey ? customSort(filteredEntrenadores, sortKey, sortDirection) : filteredEntrenadores;
-
-  // Check if user is coordinator
-  const isCoordinator = () => {
-    return user?.roles?.some(role => role.rol_id === 2);
+  const filtros: FiltrosEntrenadores = {
+    page,
+    limit: POR_PAGINA,
+    buscar: busqueda || undefined,
+    colegio: colegio === TODOS ? undefined : [Number(colegio)],
+    estado: estado === TODOS ? undefined : Number(estado),
+    sinAsignar: sinAsignar || undefined,
+    orden: 'nombre',
   };
 
-  // Load coordinator schools
-  useEffect(() => {
-    const loadCoordinatorSchools = async () => {
-      if (!isCoordinator() || !user?.usu_id) {
-        return;
-      }
+  const lista = useEntrenadores(filtros);
+  const entrenadores = lista.data?.items ?? [];
+  const conteos = lista.data?.conteos;
+  const totalItems = lista.data?.total ?? 0;
+  const totalPages = lista.data?.totalPages ?? 0;
 
-      try {
-        const { data, error } = await supabase
-          .from('colegio_coordinador')
-          .select(`
-            col_id,
-            colegio:col_id (
-              col_id,
-              col_nombre
-            )
-          `)
-          .eq('usu_id', user.usu_id);
-
-        if (error) {
-          console.error("Error loading coordinator schools:", error);
-          return;
-        }
-
-        const schools = (data || [])
-          .map(item => ({
-            col_id: (item.colegio as any)?.col_id || 0,
-            col_nombre: (item.colegio as any)?.col_nombre || '',
-            count: 0
-          }))
-          .filter(school => school.col_nombre);
-
-        console.log("Loaded coordinator schools:", schools);
-        setCoordinatorSchools(schools);
-      } catch (error) {
-        console.error("Error in loadCoordinatorSchools:", error);
-      }
-    };
-
-    loadCoordinatorSchools();
-  }, [user]);
-
-  // Get available schools with counts - consistent ID generation
-  const getAvailableSchools = () => {
-    const schoolCounts = new Map<string, number>();
-    
-    entrenadores.forEach(trainer => {
-      trainer.colegios.forEach(school => {
-        schoolCounts.set(school, (schoolCounts.get(school) || 0) + 1);
-      });
-    });
-    
-    // Create consistent ID from school name hash
-    const hashString = (str: string) => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-      }
-      return Math.abs(hash);
-    };
-    
-    const schoolsWithCounts = Array.from(schoolCounts.entries())
-      .map(([schoolName, count]) => ({
-        col_id: hashString(schoolName),
-        col_nombre: schoolName,
-        count
-      }))
-      .sort((a, b) => a.col_nombre.localeCompare(b.col_nombre));
-    
-    console.log("Available schools with counts:", schoolsWithCounts);
-    
-    if (isCoordinator()) {
-      const filtered = schoolsWithCounts.filter(school => 
-        coordinatorSchools.some(cs => cs.col_nombre === school.col_nombre)
-      );
-      console.log("Coordinator filtered schools:", filtered);
-      return filtered;
-    }
-    
-    return schoolsWithCounts;
+  const cambiarFiltro = (accion: () => void) => {
+    accion();
+    setPage(1);
   };
 
-  // Filter trainers based on selected filter
-  const getFilteredTrainers = () => {
-    console.log("Filtering trainers with selectedFilter:", selectedFilter);
-    console.log("Total sortedEntrenadores:", sortedEntrenadores.length);
-    
-    if (selectedFilter === 'all') {
-      if (isCoordinator()) {
-        const filtered = sortedEntrenadores.filter(trainer => 
-          trainer.colegios.length === 0 || 
-          trainer.colegios.some(school => coordinatorSchools.some(cs => 
-            typeof cs === 'string' ? cs === school : cs.col_nombre === school
-          ))
-        );
-        console.log("Coordinator 'all' filtered trainers:", filtered.length);
-        return filtered;
-      }
-      console.log("Returning all trainers for non-coordinator:", sortedEntrenadores.length);
-      return sortedEntrenadores;
-    }
-    if (selectedFilter === 'unassigned') {
-      const filtered = sortedEntrenadores.filter(trainer => trainer.disciplinas_count === 0);
-      console.log("Unassigned trainers:", filtered.length);
-      return filtered;
-    }
-    if (typeof selectedFilter === 'number') {
-      const schoolName = getAvailableSchools().find(s => s.col_id === selectedFilter)?.col_nombre;
-      console.log("Filtering by school:", schoolName, "for ID:", selectedFilter);
-      const filtered = schoolName ? sortedEntrenadores.filter(trainer => trainer.colegios.includes(schoolName)) : [];
-      console.log("School filtered trainers:", filtered.length);
-      return filtered;
-    }
-    return sortedEntrenadores;
-  };
-
-  const handleViewEntrenador = (entrenador: EntrenadorWithDetails) => {
-    setViewingEntrenador(entrenador);
-    setShowDetails(true);
-  };
-
-  const handleAtarEntrenador = (entrenador: EntrenadorWithDetails) => {
-    setSelectedEntrenador(entrenador);
-    setShowAtarModal(true);
-  };
-
-  const handleAgregarAuxiliar = (entrenador: EntrenadorWithDetails) => {
-    setAuxiliarEntrenador(entrenador);
-    setShowAuxiliarModal(true);
-  };
-
-  const handleDetailsClose = () => {
-    setShowDetails(false);
-    setViewingEntrenador(null);
-  };
-
-  const handleAtarModalClose = () => {
-    setShowAtarModal(false);
-    setSelectedEntrenador(null);
-  };
-
-  const handleAuxiliarModalClose = () => {
-    setShowAuxiliarModal(false);
-    setAuxiliarEntrenador(null);
-  };
-
-  const handleAtarSuccess = () => {
-    loadEntrenadores();
-    handleAtarModalClose();
-  };
-
-  const handleAuxiliarSuccess = () => {
-    loadEntrenadores();
-    handleAuxiliarModalClose();
-  };
-
-  const handleSchoolChange = (schoolId: number | 'unassigned' | 'all' | null) => {
-    console.log("School filter changed to:", schoolId);
-    setSelectedFilter(schoolId);
-  };
-
-  if (loading) {
+  if (lista.isLoading && !lista.data) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-lg">Cargando entrenadores...</div>
       </div>
     );
   }
 
+  if (lista.isError) {
+    return (
+      <div className="container mx-auto p-6">
+        <p className="text-destructive">
+          No se pudieron cargar los entrenadores: {(lista.error as Error).message}
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto p-4 lg:p-6 space-y-6 max-w-full min-w-0">
-      <EntrenadorHeader title="Gestión de Entrenadores" />
-
-      {/* Trainers list view */}
-      <div className="space-y-4">
-        {isMobile ? (
-          <div className="space-y-4">
-            <MobileSchoolSelector
-              schools={getAvailableSchools()}
-              selectedSchool={selectedFilter}
-              onSchoolChange={handleSchoolChange}
-              isCoordinator={isCoordinator()}
-            />
-            <div className="flex items-center space-x-2">
-              <Search className="h-4 w-4 text-muted-foreground shrink-0 dark:text-black" />
-              <Input
-                placeholder="Buscar por nombre o cédula..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-white dark:bg-gray-200 dark:text-black"
-              />
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Filter Buttons */}
-            <div className="flex flex-wrap gap-2 bg-gray-100 p-4 dark:bg-gray-100">
-              <Button
-                variant={selectedFilter === 'unassigned' ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFilter('unassigned')}
-                className="flex items-center gap-2"
-              >
-                Sin asignar
-                <Badge variant="secondary" className="text-xs">
-                  {entrenadores.filter(e => e.disciplinas_count === 0).length}
-                </Badge>
-              </Button>
-              
-              {!isCoordinator() && (
-                <Button
-                  variant={selectedFilter === 'all' ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedFilter('all')}
-                  className="flex items-center gap-2"
-                >
-                  Ver todos
-                  <Badge variant="secondary" className="text-xs">
-                    {entrenadores.length}
-                  </Badge>
-                </Button>
-              )}
-              
-              {getAvailableSchools().map((school) => (
-                <Button
-                  key={school.col_id}
-                  variant={selectedFilter === school.col_id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedFilter(school.col_id)}
-                  className="flex items-center gap-2"
-                >
-                  {school.col_nombre}
-                  <Badge variant="secondary" className="text-xs">
-                    {school.count}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
-
-            {/* Search Bar */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nombre o cédula..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-full sm:max-w-sm bg-white dark:bg-gray-200 dark:text-black"
-              />
-            </div>
-          </>
+    <div className="container mx-auto min-w-0 space-y-6 p-4 lg:p-6">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Gestión de Entrenadores</h1>
+        {conteos && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {conteos.total} entrenadores · {conteos.activos} activos
+            {conteos.inactivos > 0 && ` · ${conteos.inactivos} inactivos`} ·{' '}
+            <span className={conteos.sinAsignar > 0 ? 'text-amber-700 dark:text-amber-400' : ''}>
+              {conteos.sinAsignar} sin disciplinas
+            </span>
+          </p>
         )}
+      </div>
 
-        {/* Trainers Table */}
-        <div className="bg-white rounded-lg">
-          <EntrenadorTable
-            entrenadores={getFilteredTrainers()}
-            onView={handleViewEntrenador}
-            onAtar={handleAtarEntrenador}
-            onAgregarAuxiliar={handleAgregarAuxiliar}
-            sortKey={sortKey}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-          />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <DebouncedSearchInput
+          placeholder="Buscar por nombre o cédula..."
+          value={busqueda}
+          onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
+          className="w-full xl:col-span-2"
+        />
+
+        <Select value={colegio} onValueChange={(v) => cambiarFiltro(() => setColegio(v))}>
+          <SelectTrigger className="h-11 sm:h-10">
+            <SelectValue placeholder="Todos los colegios" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos los colegios</SelectItem>
+            {(colegios.data?.items ?? []).map((c) => (
+              <SelectItem key={c.col_id} value={String(c.col_id)}>
+                {c.col_nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Select value={estado} onValueChange={(v) => cambiarFiltro(() => setEstado(v))}>
+            <SelectTrigger className="h-11 sm:h-10">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Activos</SelectItem>
+              <SelectItem value="2">Inactivos</SelectItem>
+              <SelectItem value={TODOS}>Todos</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant={sinAsignar ? 'default' : 'outline'}
+            className="h-11 sm:h-10"
+            onClick={() => cambiarFiltro(() => setSinAsignar((v) => !v))}
+          >
+            Sin asignar
+          </Button>
         </div>
       </div>
 
-      {/* Entrenador Details Modal */}
-      <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent className="sm:max-w-md md:max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Detalles del Entrenador</DialogTitle>
-          </DialogHeader>
+      {entrenadores.length === 0 ? (
+        <div className="py-12 text-center text-muted-foreground">
+          <p className="text-lg">No hay entrenadores que mostrar</p>
+          <p className="mt-2 text-sm">
+            Los entrenadores se crean desde Usuarios, dándole a alguien el rol de Entrenador.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {entrenadores.map((e) => (
+              <EntrenadorCard
+                key={e.ent_id}
+                entrenador={e}
+                onVer={setViendo}
+                onAsignar={setAsignando}
+              />
+            ))}
+          </div>
 
-          {viewingEntrenador && (
-            <EntrenadorDetail
-              entrenador={viewingEntrenador}
-              onClose={handleDetailsClose}
+          <DataPagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            canGoNext={page < totalPages}
+            canGoPrevious={page > 1}
+            startIndex={(page - 1) * POR_PAGINA}
+            endIndex={Math.min(page * POR_PAGINA, totalItems)}
+            totalItems={totalItems}
+            itemName="entrenadores"
+          />
+        </>
+      )}
+
+      <Dialog open={viendo !== null} onOpenChange={(abierto) => !abierto && setViendo(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="break-words text-lg sm:text-xl">
+              {viendo?.usu_nombre}
+            </DialogTitle>
+          </DialogHeader>
+          {viendo && (
+            <EntrenadorFicha
+              entId={viendo.ent_id}
+              onAsignar={() => {
+                setAsignando(viendo);
+                setViendo(null);
+              }}
             />
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Atar Entrenador Modal */}
-      <AtarEntrenadorModal
-        open={showAtarModal}
-        onOpenChange={setShowAtarModal}
-        entrenador={selectedEntrenador}
-        onClose={handleAtarModalClose}
-        onSuccess={handleAtarSuccess}
-      />
-
-      {/* Atar Auxiliar Modal */}
-      <AtarAuxiliarModal
-        open={showAuxiliarModal}
-        onOpenChange={setShowAuxiliarModal}
-        entrenador={auxiliarEntrenador}
-        onClose={handleAuxiliarModalClose}
-        onSuccess={handleAuxiliarSuccess}
-      />
+      <AsignarDisciplinaModal entrenador={asignando} onClose={() => setAsignando(null)} />
     </div>
   );
 };
