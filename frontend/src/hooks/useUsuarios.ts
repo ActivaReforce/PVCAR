@@ -70,6 +70,16 @@ function mensajeDe(error: unknown): string {
   return 'Error inesperado';
 }
 
+/**
+ * Listas que dependen del catalogo de usuarios pero cuya clave cuelga de otro
+ * modulo. Si se anade otra lista de candidatos, va aqui.
+ */
+const CLAVES_DEPENDIENTES_DE_USUARIOS = [
+  ['colegios', 'candidatos'],
+  ['entrenadores', 'candidatos-auxiliar'],
+  ['estudiantes', 'candidatos-representante'],
+] as const;
+
 function useMutacionDeUsuario<TVars, TData>(
   fn: (vars: TVars) => Promise<TData>,
   exito: string,
@@ -82,6 +92,26 @@ function useMutacionDeUsuario<TVars, TData>(
     onSuccess: async () => {
       // Una sola clave raiz: cualquier lista, ficha o conteo se recarga.
       await queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+
+      /**
+       * Y las tres listas de candidatos, que viven bajo OTRAS claves raiz.
+       *
+       * Salen de `usuario` + `usuario_rol`, asi que crear a alguien, cambiarle
+       * los roles, darlo de baja o reactivarlo cambia quien sale en ellas --
+       * pero sus claves cuelgan de 'colegios', 'entrenadores' y 'estudiantes',
+       * que esta mutacion no tocaba. El sintoma: se crea un usuario con rol de
+       * Coordinador, se va a Colegios a asignarlo y NO aparece hasta recargar
+       * la pagina. Salio en la prueba 7 de la Fase 7.
+       *
+       * Antes se intentaba tapar con un staleTime corto, que es la solucion
+       * equivocada: no arregla nada, solo acorta la ventana en la que esta mal.
+       */
+      await Promise.all(
+        CLAVES_DEPENDIENTES_DE_USUARIOS.map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      );
+
       toast({ title: exito });
     },
     onError: (error: unknown) => {

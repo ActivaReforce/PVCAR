@@ -40,16 +40,20 @@ export function useColegio(id: number | null) {
 }
 
 /**
- * Candidatos a coordinador. Es un catalogo corto y estable durante la sesion,
- * pero no inmutable: si se acaba de crear un usuario con rol 2 tiene que
- * aparecer, asi que 5 minutos y no 30.
+ * Candidatos a coordinador: usuarios activos con el rol 2.
+ *
+ * Cambia solo cuando cambia el catalogo de usuarios, y de eso se encarga
+ * `useUsuarios`, que invalida esta clave en cada alta, edicion, baja y
+ * reactivacion. Por eso puede cachearse de verdad: antes llevaba un staleTime
+ * de 5 minutos como parche, y durante esos 5 minutos un coordinador recien
+ * creado no aparecia aqui hasta recargar la pagina.
  */
 export function useCandidatosACoordinador(habilitado: boolean) {
   return useQuery({
     queryKey: CLAVE.candidatos,
     queryFn: () => colegiosApi.candidatos(),
     enabled: habilitado,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 }
 
