@@ -31,7 +31,6 @@ import {
   useRepresentantes,
 } from '@/hooks/useEncuestas';
 import { iniciales } from '@/components/evaluaciones/metodos';
-import type { Representante } from '@/api/representantes';
 
 const TODOS = 'todos';
 

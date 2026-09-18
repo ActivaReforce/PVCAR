@@ -27,12 +27,20 @@ function mensajeDe(error: unknown): string {
   return 'Error inesperado';
 }
 
+/** La clave y la consulta, sueltas, para poder precargarlas desde el layout. */
+export const CATALOGO_REPORTES = {
+  queryKey: ['reportes', 'catalogo'] as const,
+  queryFn: () => reportesApi.catalogo(),
+  /**
+   * No caduca en toda la sesion: son las 9 definiciones de reporte, que el
+   * backend arma en memoria sin tocar la base y solo cambian si cambia el
+   * codigo. Lo que costaba era el viaje, no la consulta.
+   */
+  staleTime: Infinity,
+};
+
 export function useCatalogoReportes() {
-  return useQuery({
-    queryKey: ['reportes', 'catalogo'],
-    queryFn: () => reportesApi.catalogo(),
-    staleTime: 30 * 60 * 1000,
-  });
+  return useQuery(CATALOGO_REPORTES);
 }
 
 export function useReporte(

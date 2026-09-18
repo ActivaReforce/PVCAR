@@ -109,10 +109,10 @@ Eso lo convierte en **el único sitio del sistema donde el esquema se puede corr
 
 ---
 
-## 4. Dos cosas que decidir
+## 4. Decidido el 2026-09-17
 
-**1. Permisos.** Igual que en Asistencias: en `rol_permiso` el módulo `encuestas` **solo tiene la acción `ver`** (Propietario, Coordinador y Admin). Así que `ver` habilita también crear, publicar y borrar. Si quieres separar "mirar encuestas" de "crear y publicar", se conceden las acciones desde Permisos y se cambian unas líneas de `encuestas.routes.ts`.
+**1. Permisos — en pendiente.** En `rol_permiso` el módulo `encuestas` **solo tiene la acción `ver`** (Propietario, Coordinador y Admin), así que `ver` habilita también crear, publicar y borrar. Lo mismo pasa en Asistencias y Evaluaciones. Se queda así hasta tener el sistema en marcha; separarlo es conceder las acciones desde Permisos y cambiar dos líneas por módulo.
 
-Lo mismo con Representantes: **no existe** un módulo `representantes` en el catálogo y no me lo inventé. Ver la lista pide `usuarios:ver` y atar representados pide `estudiantes:editar`, que es el permiso que ya pedía el endpoint gemelo en Estudiantes.
+Representantes **no existe** como módulo del catálogo y no me lo inventé: ver la lista pide `usuarios:ver` y atar representados pide `estudiantes:editar`, el mismo permiso que ya pedía el endpoint gemelo en Estudiantes.
 
-**2. Publicar no avisa a nadie.** El sistema viejo tampoco lo hacía: la encuesta le aparece al representante la próxima vez que entra. Mandar un correo al publicar es posible —Supabase Auth ya manda correos— pero es una decisión tuya y tiene infraestructura detrás (plantilla, remitente, qué pasa con los que no tienen correo válido). Dime si lo quieres y lo monto en la Fase 15, junto con las plantillas en español que ya están pendientes.
+**2. Publicar no manda correo. Cerrado.** La encuesta le aparece al representante la próxima vez que entra, que es lo que ya hace el código. No se monta ningún envío, ni al publicar ni después.

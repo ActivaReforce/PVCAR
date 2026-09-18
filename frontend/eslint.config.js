@@ -23,12 +23,18 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
-      "@typescript-eslint/no-unused-vars": "off",
-      // Deuda heredada de la SPA original: ~210 usos de `any`, casi todos en el
-      // codigo que habla directo con Supabase y que se elimina en las fases 6-14
-      // al pasar cada modulo al API. Queda en "warn" para que CI no bloquee por
-      // codigo que ya esta condenado; sube a "error" cuando el conteo llegue a 0.
-      "@typescript-eslint/no-explicit-any": "warn",
+      // Estaba en "off" heredado del andamiaje original, y con el apagado un
+      // import huerfano o una variable muerta no se veian: asi sobrevivieron
+      // hasta la Fase 15 cuatro archivos que ya no usaba nadie. Los `_` al
+      // principio siguen permitidos para lo que se descarta a proposito.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none" },
+      ],
+      // Eran ~210 usos heredados de la SPA vieja, casi todos en el codigo que
+      // hablaba directo con Supabase. Al cerrar la Fase 14 quedaban 10 y en la
+      // 15 llegaron a 0, asi que sube a "error": el conteo no vuelve a subir.
+      "@typescript-eslint/no-explicit-any": "error",
     },
   }
 );

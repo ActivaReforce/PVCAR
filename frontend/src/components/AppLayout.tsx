@@ -1,14 +1,39 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import EncuestaPendiente from "@/components/encuestas/EncuestaPendiente";
+import { CATALOGO_REPORTES } from "@/hooks/useTablero";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
+  const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const puedeVerReportes = hasPermission("reportes", "ver");
+
+  /**
+   * El catálogo de reportes, pedido al entrar y no al abrir un reporte.
+   *
+   * Entrar en frío a /reportes/alumnos costaba **tres viajes en serie** desde
+   * Ecuador: `/me`, luego el catálogo, y solo entonces los datos — porque para
+   * saber si ese reporte exige rango de fechas hay que tener su definición. A
+   * ~150 ms de ida y vuelta, ese salto de en medio se ve.
+   *
+   * El catálogo son 9 definiciones que el backend arma en memoria sin tocar la
+   * base, así que traerlo aquí lo pone en paralelo con la pantalla que sea y
+   * lo deja cacheado el resto de la sesión (`staleTime: Infinity`).
+   */
+  useEffect(() => {
+    if (puedeVerReportes) {
+      void queryClient.prefetchQuery(CATALOGO_REPORTES);
+    }
+  }, [queryClient, puedeVerReportes]);
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
