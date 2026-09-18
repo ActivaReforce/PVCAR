@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ConditionalAction } from '@/components/ui/conditional-actions';
+import MenuAcciones from '@/components/ui/menu-acciones';
 import type { UsuarioListado } from '@/api/usuarios';
 
 /**
@@ -25,9 +25,10 @@ import type { UsuarioListado } from '@/api/usuarios';
  * markup divergen siempre.
  *
  * Ahora la fila es una rejilla: en pantalla ancha son columnas, en el telefono
- * se apila como tarjeta. Las acciones son botones visibles (no un menu
- * escondido) con area tactil de 44 px, y las tres que escriben pasan por
- * ConditionalAction en los dos tamanos.
+ * se apila como tarjeta. "Ver detalles" se queda a la vista porque es lo que
+ * se hace casi siempre; editar, dar de baja, reactivar y eliminar viven en el
+ * menu de ajustes de la fila, que ya filtra por permiso y separa lo
+ * destructivo. Area tactil de 44 px en los dos tamanos.
  */
 
 interface UserTableProps {
@@ -255,62 +256,47 @@ const UserTable = ({
                     <Eye className="h-4 w-4" />
                   </Button>
 
-                  <ConditionalAction module="usuarios" action="editar">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 md:h-9 md:w-9"
-                      onClick={() => onEdit(user)}
-                      title="Editar"
-                      aria-label={`Editar ${user.usu_nombre}`}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </ConditionalAction>
-
-                  {activo ? (
-                    <ConditionalAction module="usuarios" action="eliminar">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-11 w-11 md:h-9 md:w-9 text-destructive hover:text-destructive"
-                        onClick={() => onDelete(user.usu_id)}
-                        title="Dar de baja"
-                        aria-label={`Dar de baja a ${user.usu_nombre}`}
-                      >
-                        <UserX className="h-4 w-4" />
-                      </Button>
-                    </ConditionalAction>
-                  ) : (
-                    <>
-                      {/* Reactivar escribe: exige el mismo permiso que editar,
-                          que es lo que pide el backend. Antes no lo pedia. */}
-                      <ConditionalAction module="usuarios" action="editar">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-11 w-11 md:h-9 md:w-9 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
-                          onClick={() => onReactivate(user.usu_id)}
-                          title="Reactivar"
-                          aria-label={`Reactivar a ${user.usu_nombre}`}
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                      </ConditionalAction>
-                      <ConditionalAction module="usuarios" action="eliminar">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-11 w-11 md:h-9 md:w-9 text-destructive hover:text-destructive"
-                          onClick={() => onPermanentDelete(user.usu_id)}
-                          title="Eliminar permanentemente"
-                          aria-label={`Eliminar permanentemente a ${user.usu_nombre}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </ConditionalAction>
-                    </>
-                  )}
+                  <MenuAcciones
+                    nombre={user.usu_nombre}
+                    acciones={[
+                      {
+                        etiqueta: 'Editar',
+                        icono: Edit,
+                        onSelect: () => onEdit(user),
+                        modulo: 'usuarios',
+                        accion: 'editar',
+                      },
+                      {
+                        /* Reactivar escribe: exige el mismo permiso que
+                           editar, que es lo que pide el backend. Antes no lo
+                           pedia. */
+                        etiqueta: 'Reactivar',
+                        icono: RotateCcw,
+                        onSelect: () => onReactivate(user.usu_id),
+                        modulo: 'usuarios',
+                        accion: 'editar',
+                        visible: !activo,
+                      },
+                      {
+                        etiqueta: 'Dar de baja',
+                        icono: UserX,
+                        onSelect: () => onDelete(user.usu_id),
+                        modulo: 'usuarios',
+                        accion: 'eliminar',
+                        destructivo: true,
+                        visible: activo,
+                      },
+                      {
+                        etiqueta: 'Eliminar',
+                        icono: Trash2,
+                        onSelect: () => onPermanentDelete(user.usu_id),
+                        modulo: 'usuarios',
+                        accion: 'eliminar',
+                        destructivo: true,
+                        visible: !activo,
+                      },
+                    ]}
+                  />
                 </div>
               </li>
             );

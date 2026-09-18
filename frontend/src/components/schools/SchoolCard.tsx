@@ -1,9 +1,8 @@
 import { CalendarDays, GraduationCap, Mail, MapPin, Pencil, Phone, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { ConditionalAction } from '@/components/ui/conditional-actions';
+import MenuAcciones from '@/components/ui/menu-acciones';
 import type { ColegioListado } from '@/api/colegios';
 
 interface Props {
@@ -39,14 +38,37 @@ const SchoolCard = ({ colegio, onEdit, onDelete }: Props) => {
   return (
     <Card className="flex h-full flex-col">
       <CardHeader className="space-y-3 pb-3">
-        <div className="min-w-0">
-          <h3 className="text-lg font-semibold leading-tight break-words">
-            {colegio.col_nombre}
-          </h3>
-          <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-            <span className="break-words">{colegio.col_direccion}</span>
-          </p>
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-semibold leading-tight break-words">
+              {colegio.col_nombre}
+            </h3>
+            <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              <span className="break-words">{colegio.col_direccion}</span>
+            </p>
+          </div>
+
+          <MenuAcciones
+            nombre={colegio.col_nombre}
+            acciones={[
+              {
+                etiqueta: 'Editar',
+                icono: Pencil,
+                onSelect: () => onEdit(colegio),
+                modulo: 'colegios',
+                accion: 'editar',
+              },
+              {
+                etiqueta: 'Eliminar',
+                icono: Trash2,
+                onSelect: () => onDelete(colegio),
+                modulo: 'colegios',
+                accion: 'eliminar',
+                destructivo: true,
+              },
+            ]}
+          />
         </div>
 
         <div className="flex flex-wrap gap-3 text-sm">
@@ -108,32 +130,6 @@ const SchoolCard = ({ colegio, onEdit, onDelete }: Props) => {
             </div>
           </div>
         )}
-
-        {/* Las acciones quedan abajo del todo, alineadas entre tarjetas. */}
-        <div className="mt-auto flex flex-wrap justify-end gap-2 pt-2">
-          <ConditionalAction module="colegios" action="editar">
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11 flex-1 sm:flex-none"
-              onClick={() => onEdit(colegio)}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Editar
-            </Button>
-          </ConditionalAction>
-          <ConditionalAction module="colegios" action="eliminar">
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11 flex-1 text-destructive hover:text-destructive sm:flex-none"
-              onClick={() => onDelete(colegio)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar
-            </Button>
-          </ConditionalAction>
-        </div>
       </CardContent>
     </Card>
   );

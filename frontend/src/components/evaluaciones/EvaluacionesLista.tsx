@@ -1,7 +1,6 @@
 import { Link2, Pencil, RotateCcw, Trash2, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ConditionalAction } from '@/components/ui/conditional-actions';
+import MenuAcciones from '@/components/ui/menu-acciones';
 import type { Evaluacion } from '@/api/evaluaciones';
 
 interface Props {
@@ -113,74 +112,50 @@ const EvaluacionesLista = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-1">
-                <ConditionalAction module="evaluaciones" action="editar">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-11 w-11 lg:h-9 lg:w-9"
-                    onClick={() => onEditar(e)}
-                    title="Editar y configurar parámetros"
-                    aria-label={`Editar ${e.eva_titulo}`}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </ConditionalAction>
-
-                <ConditionalAction module="evaluaciones" action="editar">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-11 w-11 lg:h-9 lg:w-9"
-                    onClick={() => onVincular(e)}
-                    title="Vincular a disciplinas"
-                    aria-label={`Vincular ${e.eva_titulo} a disciplinas`}
-                  >
-                    <Link2 className="h-4 w-4" />
-                  </Button>
-                </ConditionalAction>
-
-                {activa ? (
-                  <ConditionalAction module="evaluaciones" action="editar">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 text-destructive hover:text-destructive lg:h-9 lg:w-9"
-                      onClick={() => onBaja(e)}
-                      title="Dar de baja"
-                      aria-label={`Dar de baja ${e.eva_titulo}`}
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                  </ConditionalAction>
-                ) : (
-                  <ConditionalAction module="evaluaciones" action="editar">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 lg:h-9 lg:w-9"
-                      onClick={() => onReactivar(e)}
-                      title="Reactivar"
-                      aria-label={`Reactivar ${e.eva_titulo}`}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  </ConditionalAction>
-                )}
-
-                <ConditionalAction module="evaluaciones" action="eliminar">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-11 w-11 text-destructive hover:text-destructive lg:h-9 lg:w-9"
-                    onClick={() => onEliminar(e)}
-                    title="Eliminar permanentemente"
-                    aria-label={`Eliminar ${e.eva_titulo}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </ConditionalAction>
-              </div>
+              <MenuAcciones
+                nombre={e.eva_titulo}
+                acciones={[
+                  {
+                    etiqueta: 'Editar y parámetros',
+                    icono: Pencil,
+                    onSelect: () => onEditar(e),
+                    modulo: 'evaluaciones',
+                    accion: 'editar',
+                  },
+                  {
+                    etiqueta: 'Vincular a disciplinas',
+                    icono: Link2,
+                    onSelect: () => onVincular(e),
+                    modulo: 'evaluaciones',
+                    accion: 'editar',
+                  },
+                  {
+                    etiqueta: 'Reactivar',
+                    icono: RotateCcw,
+                    onSelect: () => onReactivar(e),
+                    modulo: 'evaluaciones',
+                    accion: 'editar',
+                    visible: !activa,
+                  },
+                  {
+                    etiqueta: 'Dar de baja',
+                    icono: XCircle,
+                    onSelect: () => onBaja(e),
+                    modulo: 'evaluaciones',
+                    accion: 'editar',
+                    destructivo: true,
+                    visible: activa,
+                  },
+                  {
+                    etiqueta: 'Eliminar',
+                    icono: Trash2,
+                    onSelect: () => onEliminar(e),
+                    modulo: 'evaluaciones',
+                    accion: 'eliminar',
+                    destructivo: true,
+                  },
+                ]}
+              />
             </li>
           );
         })}

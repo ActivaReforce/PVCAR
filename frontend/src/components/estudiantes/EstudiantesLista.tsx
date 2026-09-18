@@ -2,7 +2,7 @@ import { Eye, Pencil, RotateCcw, Trash2, UserX } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ConditionalAction } from '@/components/ui/conditional-actions';
+import MenuAcciones from '@/components/ui/menu-acciones';
 import type { Estudiante } from '@/api/estudiantes';
 
 interface Props {
@@ -124,60 +124,44 @@ const EstudiantesLista = ({
                   <Eye className="h-4 w-4" />
                 </Button>
 
-                <ConditionalAction module="estudiantes" action="editar">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-11 w-11 md:h-9 md:w-9"
-                    onClick={() => onEditar(e)}
-                    title="Editar"
-                    aria-label={`Editar a ${e.nino_nombre}`}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </ConditionalAction>
-
-                {activo ? (
-                  <ConditionalAction module="estudiantes" action="editar">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 text-destructive hover:text-destructive md:h-9 md:w-9"
-                      onClick={() => onBaja(e)}
-                      title="Dar de baja"
-                      aria-label={`Dar de baja a ${e.nino_nombre}`}
-                    >
-                      <UserX className="h-4 w-4" />
-                    </Button>
-                  </ConditionalAction>
-                ) : (
-                  <>
-                    <ConditionalAction module="estudiantes" action="editar">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-11 w-11 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 md:h-9 md:w-9"
-                        onClick={() => onReactivar(e)}
-                        title="Reactivar"
-                        aria-label={`Reactivar a ${e.nino_nombre}`}
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    </ConditionalAction>
-                    <ConditionalAction module="estudiantes" action="eliminar">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-11 w-11 text-destructive hover:text-destructive md:h-9 md:w-9"
-                        onClick={() => onEliminar(e)}
-                        title="Eliminar permanentemente"
-                        aria-label={`Eliminar a ${e.nino_nombre}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </ConditionalAction>
-                  </>
-                )}
+                <MenuAcciones
+                  nombre={e.nino_nombre}
+                  acciones={[
+                    {
+                      etiqueta: 'Editar',
+                      icono: Pencil,
+                      onSelect: () => onEditar(e),
+                      modulo: 'estudiantes',
+                      accion: 'editar',
+                    },
+                    {
+                      etiqueta: 'Reactivar',
+                      icono: RotateCcw,
+                      onSelect: () => onReactivar(e),
+                      modulo: 'estudiantes',
+                      accion: 'editar',
+                      visible: !activo,
+                    },
+                    {
+                      etiqueta: 'Dar de baja',
+                      icono: UserX,
+                      onSelect: () => onBaja(e),
+                      modulo: 'estudiantes',
+                      accion: 'editar',
+                      destructivo: true,
+                      visible: activo,
+                    },
+                    {
+                      etiqueta: 'Eliminar',
+                      icono: Trash2,
+                      onSelect: () => onEliminar(e),
+                      modulo: 'estudiantes',
+                      accion: 'eliminar',
+                      destructivo: true,
+                      visible: !activo,
+                    },
+                  ]}
+                />
               </div>
             </li>
           );

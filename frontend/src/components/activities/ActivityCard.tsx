@@ -1,8 +1,7 @@
 import { CalendarDays, MapPin, Pencil, School, Shirt, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { ConditionalAction } from '@/components/ui/conditional-actions';
+import MenuAcciones from '@/components/ui/menu-acciones';
 import type { Actividad } from '@/api/actividades';
 
 interface Props {
@@ -25,8 +24,8 @@ const ActivityCard = ({ actividad, onEdit, onDelete }: Props) => {
   return (
     <Card className="flex h-full flex-col">
       <CardHeader className="space-y-2 pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="min-w-0 break-words text-lg font-semibold leading-tight">
+        <div className="flex items-start gap-2">
+          <h3 className="min-w-0 flex-1 break-words text-lg font-semibold leading-tight">
             {actividad.act_nombre}
           </h3>
           {actividad.cat_nombre ? (
@@ -38,6 +37,27 @@ const ActivityCard = ({ actividad, onEdit, onDelete }: Props) => {
               Sin categoría
             </Badge>
           )}
+
+          <MenuAcciones
+            nombre={actividad.act_nombre}
+            acciones={[
+              {
+                etiqueta: 'Editar',
+                icono: Pencil,
+                onSelect: () => onEdit(actividad),
+                modulo: 'actividades',
+                accion: 'editar',
+              },
+              {
+                etiqueta: 'Eliminar',
+                icono: Trash2,
+                onSelect: () => onDelete(actividad),
+                modulo: 'actividades',
+                accion: 'eliminar',
+                destructivo: true,
+              },
+            ]}
+          />
         </div>
 
         {actividad.act_descripcion && (
@@ -91,30 +111,6 @@ const ActivityCard = ({ actividad, onEdit, onDelete }: Props) => {
           </div>
         )}
 
-        <div className="mt-auto flex flex-wrap justify-end gap-2 pt-2">
-          <ConditionalAction module="actividades" action="editar">
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11 flex-1 sm:flex-none"
-              onClick={() => onEdit(actividad)}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Editar
-            </Button>
-          </ConditionalAction>
-          <ConditionalAction module="actividades" action="eliminar">
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11 flex-1 text-destructive hover:text-destructive sm:flex-none"
-              onClick={() => onDelete(actividad)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar
-            </Button>
-          </ConditionalAction>
-        </div>
       </CardContent>
     </Card>
   );

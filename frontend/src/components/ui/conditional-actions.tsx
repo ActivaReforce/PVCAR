@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -8,49 +7,22 @@ interface ConditionalActionProps {
   children: React.ReactNode;
 }
 
+/**
+ * Pinta a sus hijos solo si el usuario tiene el permiso.
+ *
+ * Es una comodidad de la interfaz, **no una medida de seguridad**: quien
+ * decide de verdad es el backend. Aquí solo sirve para no enseñar un botón que
+ * va a dar 403.
+ *
+ * Para las acciones de una tarjeta o una fila está `MenuAcciones`, que ya
+ * filtra por permiso y además esconde el menú entero si no queda ninguna.
+ */
 export const ConditionalAction = ({ module, action, children }: ConditionalActionProps) => {
   const { hasPermission } = usePermissions();
-  const permission = hasPermission(module, action);
 
-  if (!permission) {
+  if (!hasPermission(module, action)) {
     return null;
   }
 
   return <>{children}</>;
-};
-
-interface ConditionalActionsProps {
-  module: string;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  editButton?: React.ReactNode;
-  deleteButton?: React.ReactNode;
-  children?: React.ReactNode;
-}
-
-export const ConditionalActions = ({ 
-  module, 
-  onEdit, 
-  onDelete, 
-  editButton, 
-  deleteButton,
-  children 
-}: ConditionalActionsProps) => {
-  const { canEdit, canDelete } = usePermissions();
-  
-  return (
-    <div className="flex items-center gap-2">
-      {children}
-      {canEdit(module) && (editButton || (onEdit && (
-        <button onClick={onEdit} className="text-blue-600 hover:text-blue-800">
-          Editar
-        </button>
-      )))}
-      {canDelete(module) && (deleteButton || (onDelete && (
-        <button onClick={onDelete} className="text-red-600 hover:text-red-800">
-          Eliminar
-        </button>
-      )))}
-    </div>
-  );
 };

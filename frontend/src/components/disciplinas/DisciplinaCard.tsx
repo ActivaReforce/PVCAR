@@ -1,7 +1,6 @@
 import { Clock, GraduationCap, Pencil, RotateCcw, School, Trash2, UserCog, UserX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ConditionalAction } from '@/components/ui/conditional-actions';
+import MenuAcciones from '@/components/ui/menu-acciones';
 import type { Disciplina } from '@/api/disciplinas';
 
 interface Props {
@@ -68,62 +67,45 @@ const DisciplinaCard = ({ disciplina, onEdit, onBaja, onReactivar, onEliminar }:
         {disciplina.evaluaciones > 0 && ` · ${disciplina.evaluaciones} evaluaciones`}
       </p>
 
-      {/* Las acciones caben en una fila en escritorio y envuelven en móvil. */}
-      <div className="mt-1 flex flex-wrap gap-1">
-        <ConditionalAction module="disciplinas" action="editar">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-11 w-11 md:h-9 md:w-9"
-            onClick={() => onEdit(disciplina)}
-            title="Editar"
-            aria-label={`Editar ${disciplina.act_nombre}`}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-        </ConditionalAction>
-
-        {activa ? (
-          <ConditionalAction module="disciplinas" action="editar">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 text-destructive hover:text-destructive md:h-9 md:w-9"
-              onClick={() => onBaja(disciplina)}
-              title="Dar de baja"
-              aria-label={`Dar de baja ${disciplina.act_nombre}`}
-            >
-              <UserX className="h-4 w-4" />
-            </Button>
-          </ConditionalAction>
-        ) : (
-          <>
-            <ConditionalAction module="disciplinas" action="editar">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 md:h-9 md:w-9"
-                onClick={() => onReactivar(disciplina)}
-                title="Reactivar"
-                aria-label={`Reactivar ${disciplina.act_nombre}`}
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </ConditionalAction>
-            <ConditionalAction module="disciplinas" action="eliminar">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 text-destructive hover:text-destructive md:h-9 md:w-9"
-                onClick={() => onEliminar(disciplina)}
-                title="Eliminar permanentemente"
-                aria-label={`Eliminar ${disciplina.act_nombre}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </ConditionalAction>
-          </>
-        )}
+      <div className="mt-1 flex justify-end">
+        <MenuAcciones
+          nombre={disciplina.act_nombre}
+          acciones={[
+            {
+              etiqueta: 'Editar',
+              icono: Pencil,
+              onSelect: () => onEdit(disciplina),
+              modulo: 'disciplinas',
+              accion: 'editar',
+            },
+            {
+              etiqueta: 'Reactivar',
+              icono: RotateCcw,
+              onSelect: () => onReactivar(disciplina),
+              modulo: 'disciplinas',
+              accion: 'editar',
+              visible: !activa,
+            },
+            {
+              etiqueta: 'Dar de baja',
+              icono: UserX,
+              onSelect: () => onBaja(disciplina),
+              modulo: 'disciplinas',
+              accion: 'editar',
+              destructivo: true,
+              visible: activa,
+            },
+            {
+              etiqueta: 'Eliminar',
+              icono: Trash2,
+              onSelect: () => onEliminar(disciplina),
+              modulo: 'disciplinas',
+              accion: 'eliminar',
+              destructivo: true,
+              visible: !activa,
+            },
+          ]}
+        />
       </div>
     </div>
   );
