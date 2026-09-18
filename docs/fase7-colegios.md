@@ -1,27 +1,34 @@
 # Fase 7 — Colegios
 
-Estado al **2026-09-16**. Construido y en `dev`. **Las pruebas contra el API están pendientes: Railway estaba apagado.**
+Estado al **2026-09-17**. Construido y en `dev`. **Ronda de pruebas abierta.**
 
 ---
 
-## 1. Qué hay que probar cuando Railway esté arriba
+## 1. Las 13 pruebas
 
-| Prueba | Qué tiene que pasar |
-|---|---|
-| Crear colegio | Con dirección, contacto, foto y dos coordinadores. Aparece la fila en `colegio` y dos en `colegio_coordinador` |
-| Nombre repetido | 409 claro. Probar también con otra caja y espacios (`  innova schools quitumbe `) |
-| Editar | Cambiar dirección y datos de contacto. Los conteos de la tarjeta no cambian |
-| Cambiar coordinadores | Quitar uno y añadir otro. En la base debe verse **una** baja y **un** alta, no un borrado total |
-| Coordinador inválido | Mandar el id de un entrenador o de un usuario inactivo → 400 diciendo qué id falla |
-| Foto | Subir una, verla firmada en la tarjeta, reemplazarla y comprobar que la anterior desaparece del bucket |
-| Alcance | Entrando como coordinador: ve **solo sus colegios**; `GET /colegios/:id` de otro → 403; `PATCH` de otro → 403 |
-| Borrar uno con datos | Modal con el recuento exacto (disciplinas, alumnos, asistencias) y botón bloqueado |
-| Borrar uno vacío | Exige escribir el nombre, se borra, y queda registro en `auditoria` |
-| **Heredada de la Fase 6** — quitar el rol de Coordinador con colegios a su cargo | Asigna un colegio a un coordinador, vete a Usuarios y quítale el rol **Coordinador**: debe dar **409** diciendo cuántos colegios tiene a su cargo, y no tocar nada |
-| Móvil 360 px | Tarjetas en una columna, filtros apilados, botones de 44 px, modal sin desbordes |
-| Modo oscuro | Tarjetas, badges y modal legibles |
+Ronda abierta el **2026-09-17** contra `dev-pvcar.vercel.app`. Se responden por número.
 
----
+**Estado de la base antes de empezar** (medido por MCP): 8 colegios, 5 vínculos en `colegio_coordinador`, 13 filas en `auditoria`. El único colegio vacío es `col_id 1` "Colegio de Pruebas Dev" — no se toca; el de la prueba 11 es el que se crea en la 1.
+
+| # | Prueba | Qué tiene que pasar | Estado |
+|---|---|---|---|
+| 1 | **Crear** "Colegio Prueba Fase 7" con dirección, contacto y **dos** coordinadores: Ana Karina (58) y Rodrigo (107) | Se crea. En la base, 1 fila en `colegio` y 2 en `colegio_coordinador` | ⬜ |
+| 2 | **Nombre repetido**: crear otro escribiendo `  colegio prueba fase 7 ` (minúsculas y con espacios) | **409** con mensaje claro. No se crea nada | ⬜ |
+| 3 | **Editar**: cambiar dirección y datos de contacto | Se guarda. Los conteos de la tarjeta (disciplinas y alumnos) no cambian | ⬜ |
+| 4 | **Cambiar coordinadores**: quitar a Rodrigo (107) y añadir a Johanna (112) | Quedan 2. En la base **la fila de Ana Karina conserva su `colcoor_id`**: es una baja y un alta, no borrar todo y reinsertar | ⬜ |
+| 5 | **Coordinador inválido** (consola, ver abajo): mandar el id 60 (entrenador, sin rol 2) y el 56 (usuario inactivo) | **400** diciendo **qué id** falla. No se guarda nada | ⬜ |
+| 6 | **Foto**: subir una, verla en la tarjeta, reemplazarla por otra | Se ve firmada. Al reemplazar, **la anterior desaparece del bucket** | ⬜ |
+| 7 | **Alcance**: entrar como coordinador (p. ej. Johanna, 112) e ir a Colegios | Ve **solo los suyos**, no los 9. Sin botón de crear | ⬜ |
+| 8 | **Alcance por API** (consola, como coordinador): pedir la ficha y editar un colegio que no es suyo | **403** en los dos | ⬜ |
+| 9 | **Borrar uno con datos**: intentar borrar Innova Schools Calderón | Modal con el recuento exacto (**22 disciplinas, 184 alumnos, 605 asistencias**) y el botón bloqueado | ⬜ |
+| 10 | **Heredada de la Fase 6**: en Usuarios, quitarle a Johanna (112) el rol **Coordinador**, que ya tiene 2 colegios a cargo | **409** diciendo cuántos colegios tiene. No toca nada | ⬜ |
+| 11 | **Borrar el de prueba**, que está vacío | Exige **escribir el nombre**. Se borra, y queda fila en `auditoria` | ⬜ |
+| 12 | **Móvil 360 px** | Tarjetas en una columna, filtros apilados, botones de 44 px, modal sin desbordes | ⬜ |
+| 13 | **Modo oscuro** | Tarjetas, badges y modal legibles | ⬜ |
+
+### Las dos de consola (5 y 8)
+
+Con la sesión abierta en `dev-pvcar.vercel.app`, F12 → Console. Pega el bloque que toque de `docs/fase7-pruebas-consola.js`. Imprime el código y la respuesta de cada llamada.
 
 ## 2. Qué se construyó
 
@@ -41,7 +48,7 @@ Estado al **2026-09-16**. Construido y en `dev`. **Las pruebas contra el API est
 
 ### Base de datos
 
-`0007_colegio_unicidad.sql` — índice único sobre `lower(trim(col_nombre))`. **Pendiente en las dos bases.** Ya está en `SQL/` con su explicación en `ORDEN.md`.
+`0007_colegio_unicidad.sql` — índice único sobre `lower(trim(col_nombre))`. **Aplicada en dev y prod el 2026-09-17**, verificada por MCP.
 
 ### Frontend
 
