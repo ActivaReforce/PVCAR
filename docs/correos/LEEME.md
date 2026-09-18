@@ -10,24 +10,42 @@ genérico.
 
 ---
 
-## 1. Pegar las plantillas
+## 1. Pegar la plantilla
 
-Dashboard de Supabase → **Authentication → Emails → Templates**. Se hace en los
-**dos** proyectos, `PVCAR_Dev` y `PVCAR`.
+Dashboard de Supabase → **Authentication → Emails → Templates**.
 
-| Pestaña de Supabase | Archivo | ¿Se usa hoy? |
+**Solo hay que pegar una: `recuperar-contrasena.html`, en la pestaña "Reset
+Password".** Asunto: `Cambia tu contraseña de Activa Reforce`.
+
+### Por qué las otras dos no
+
+Porque no se disparan nunca. Crear un usuario en Activa Reforce funciona igual
+que en el sistema viejo: **el admin lo crea y escribe él la contraseña**. El
+backend llama a `createUser` con `email_confirm: true` — "este correo ya está
+dado por bueno, no preguntes" — así que Supabase no manda nada. Reactivar a un
+usuario inactivo hace lo mismo.
+
+| Plantilla | Cuándo se dispararía | ¿Pegarla? |
 |---|---|---|
-| **Reset Password** | `recuperar-contrasena.html` | **Sí.** Es el único. Lo dispara «Olvidé mi contraseña» |
-| Confirm signup | `confirmar-correo.html` | No. Las cuentas se crean con el correo ya confirmado |
-| Invite user | `invitacion.html` | No. Al crear a alguien se le pone la contraseña en el acto |
+| **Reset Password** | Al pulsar «Olvidé mi contraseña» | **Sí** |
+| Confirm signup | Si alguien se registrara solo. No existe registro público | No |
+| Invite user | Si el código llamara a `inviteUserByEmail()`. No lo hace | No |
 
-Los dos que no se usan van igual: el día que se activen, que no salgan en inglés.
+`confirmar-correo.html` e `invitacion.html` se quedan en esta carpeta por si
+algún día se cambia el flujo de alta. Mientras tanto no tocan el dashboard.
 
-El **asunto** de cada uno se escribe en su campo, encima del cuerpo:
+---
 
-- Reset Password → `Cambia tu contraseña de Activa Reforce`
-- Confirm signup → `Confirma tu correo`
-- Invite user → `Te damos acceso a Activa Reforce`
+## Una decisión abierta, sin prisa
+
+Con el flujo de hoy **el admin conoce la contraseña de todos los usuarios**. El
+flujo de invitación lo arregla: el admin crea la cuenta sin contraseña, a la
+persona le llega un correo y la elige ella, sin que nadie más la sepa nunca.
+
+El precio es que el alta queda atada al correo: si el SMTP falla, el usuario no
+puede entrar. Hoy, si el correo falla, no pasa nada — el admin le dice la
+contraseña y ya. Por eso esta decisión va **después** de que Resend esté
+funcionando, no antes.
 
 ---
 
@@ -37,13 +55,12 @@ El SMTP que trae Supabase de serie **está limitado a unos pocos correos por
 hora y no es para producción**. Con 70 usuarios, un día en que varios pidan
 recuperar la contraseña se queda corto y los correos simplemente no salen.
 
-Hace falta **SMTP propio** en *Authentication → Emails → SMTP Settings*, con un
-proveedor (Resend, SendGrid, Mailgun, Brevo) y el dominio de Activa Reforce
-verificado. Sin eso la Fase 15 no cierra de verdad, aunque las plantillas ya
-estén en español.
+Hace falta **SMTP propio** en *Authentication → Emails → SMTP Settings*.
+**Decidido: Resend**, con el dominio de Activa Reforce verificado. Sin eso la
+Fase 15 no cierra, aunque la plantilla ya esté en español.
 
-Decisión tuya: qué proveedor y qué dirección de salida
-(`no-responder@<dominio>` es lo habitual).
+Queda por elegir la dirección de salida; `no-responder@<dominio>` es lo
+habitual, y encaja con el pie del correo, que ya dice que no se responda.
 
 ---
 
@@ -54,6 +71,10 @@ Decisión tuya: qué proveedor y qué dirección de salida
 `https://dev-pvcar.vercel.app/reset-password` en `PVCAR_Dev`. Si falta, el
 enlace del correo rebota al Site URL y la pantalla de cambiar contraseña nunca
 se abre.
+
+Trampa ya conocida: `dev-pvcar.vercel.app` está detrás de Vercel
+Authentication, así que el enlace de prueba hay que abrirlo en un navegador con
+sesión de Vercel. Desde el móvil rebota.
 
 ---
 
