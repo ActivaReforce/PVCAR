@@ -30,3 +30,27 @@ export function sinTildes(expresion: string): string {
 export function contieneSinTildes(columna: string, parametro: string): string {
   return `${sinTildes(columna)} LIKE '%' || ${sinTildes(parametro)} || '%'`;
 }
+
+/**
+ * Recorta el array de parametros a los que la consulta usa de verdad.
+ *
+ * Los modulos con filtros comparten un unico array de parametros entre la
+ * consulta de la pagina y la de los conteos, porque los filtros se escriben
+ * una sola vez. Pero los conteos **ignoran a proposito** los ultimos filtros
+ * (estado, "sin entrenador", "sin asignar"): cada tarjeta tiene que seguir
+ * diciendo su numero cuando se filtra por ella. Al no mencionarlos, Postgres
+ * deduce menos parametros de los que se le mandan y rechaza la consulta entera
+ * con `bind message supplies 8 parameters, but prepared statement "" requires
+ * 6` — un 500 en toda la pantalla. Es lo que tumbo Disciplinas y Entrenadores.
+ *
+ * Aqui se cuenta el marcador mas alto que aparece en el SQL y se corta ahi.
+ * Recorta de sobra, nunca de menos: si faltaran parametros, Postgres seguiria
+ * quejandose, que es lo que se quiere.
+ */
+export function paramsUsados(sql: string, valores: unknown[]): unknown[] {
+  let mayor = 0;
+  for (const [, n] of sql.matchAll(/\$(\d+)/g)) {
+    mayor = Math.max(mayor, Number(n));
+  }
+  return valores.slice(0, mayor);
+}

@@ -3,7 +3,7 @@ import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO } from '../../lib/constants.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
-import { contieneSinTildes } from '../../lib/sql.js';
+import { contieneSinTildes, paramsUsados } from '../../lib/sql.js';
 import type { ListarDisciplinasQuery } from './disciplinas.schemas.js';
 
 export interface EntrenadorDeDisciplina {
@@ -171,8 +171,7 @@ export async function contarDisciplinas(
   query: ListarDisciplinasQuery,
   alcance: Alcance,
 ): Promise<ConteosDisciplinas> {
-  const { rows } = await getPool().query<Record<string, string>>(
-    `
+  const sql = `
     WITH base AS (
         SELECT d.est_id, COALESCE(ent.n, 0) AS entrenadores, COALESCE(al.n, 0) AS alumnos
         ${DESDE}
@@ -184,8 +183,12 @@ export async function contarDisciplinas(
            count(*) FILTER (WHERE entrenadores = 0)            AS sin_entrenador,
            COALESCE(sum(alumnos), 0)                           AS alumnos
     FROM base
-    `,
-    params(query, alcance),
+  `;
+
+  // Sin estado ni "sin entrenador": esta consulta no los menciona.
+  const { rows } = await getPool().query<Record<string, string>>(
+    sql,
+    paramsUsados(sql, params(query, alcance)),
   );
 
   const n = (k: string): number => Number(rows[0]?.[k] ?? 0);

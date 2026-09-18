@@ -3,7 +3,7 @@ import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
-import { contieneSinTildes } from '../../lib/sql.js';
+import { contieneSinTildes, paramsUsados } from '../../lib/sql.js';
 import type { ListarEstudiantesQuery } from './estudiantes.schemas.js';
 
 export interface EstudianteListado {
@@ -204,8 +204,7 @@ export async function contarEstudiantes(
   query: ListarEstudiantesQuery,
   alcance: Alcance,
 ): Promise<ConteosEstudiantes> {
-  const { rows } = await getPool().query<Record<string, string>>(
-    `
+  const sql = `
     WITH base AS (
         SELECT n.est_id, COALESCE(insc.n, 0) AS inscripciones
         ${DESDE}
@@ -216,8 +215,12 @@ export async function contarEstudiantes(
            count(*) FILTER (WHERE est_id <> ${ESTADO.ACTIVO})  AS inactivos,
            count(*) FILTER (WHERE inscripciones = 0)           AS sin_asignar
     FROM base
-    `,
-    params(query, alcance),
+  `;
+
+  // Sin disciplina, "sin asignar" ni estado: esta consulta no los menciona.
+  const { rows } = await getPool().query<Record<string, string>>(
+    sql,
+    paramsUsados(sql, params(query, alcance)),
   );
 
   const n = (k: string): number => Number(rows[0]?.[k] ?? 0);

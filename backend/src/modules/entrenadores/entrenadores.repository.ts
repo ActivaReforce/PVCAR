@@ -3,7 +3,7 @@ import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO, ROL, ROLES_AUXILIARES } from '../../lib/constants.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
-import { contieneSinTildes } from '../../lib/sql.js';
+import { contieneSinTildes, paramsUsados } from '../../lib/sql.js';
 import type { ListarEntrenadoresQuery } from './entrenadores.schemas.js';
 
 export interface ColegioResumen {
@@ -203,8 +203,7 @@ export async function contarEntrenadores(
   query: ListarEntrenadoresQuery,
   alcance: Alcance,
 ): Promise<ConteosEntrenadores> {
-  const { rows } = await getPool().query<Record<string, string>>(
-    `
+  const sql = `
     WITH base AS (
         SELECT e.est_id, COALESCE(d.n, 0) AS disciplinas
         FROM public.entrenador e
@@ -217,8 +216,12 @@ export async function contarEntrenadores(
            count(*) FILTER (WHERE est_id <> ${ESTADO.ACTIVO}) AS inactivos,
            count(*) FILTER (WHERE disciplinas = 0)            AS sin_asignar
     FROM base
-    `,
-    params(query, alcance),
+  `;
+
+  // Sin "sin asignar" ni estado: esta consulta no los menciona.
+  const { rows } = await getPool().query<Record<string, string>>(
+    sql,
+    paramsUsados(sql, params(query, alcance)),
   );
 
   const n = (k: string): number => Number(rows[0]?.[k] ?? 0);
