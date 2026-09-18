@@ -3,7 +3,7 @@ import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
-import { contieneSinTildes, paramsUsados } from '../../lib/sql.js';
+import { contieneSinTildes } from '../../lib/sql.js';
 import type { ListarEstudiantesQuery } from './estudiantes.schemas.js';
 
 export interface EstudianteListado {
@@ -102,7 +102,14 @@ const F_DISCIPLINA = `($6::int IS NULL OR EXISTS (
 ))`;
 
 const F_SIN_ASIGNAR = `(NOT $7::boolean OR COALESCE(insc.n, 0) = 0)`;
-const F_GRADO = `($8::int IS NULL OR n.catninograd_id = $8)`;
+/**
+ * El grado se numera aparte: los conteos se saltan los filtros de disciplina,
+ * "sin asignar" y estado, y Postgres no admite huecos —un $6 que no aparece en
+ * el texto no tiene tipo que deducir y tumba la consulta entera—, asi que cada
+ * consulta le pasa su propio marcador.
+ */
+const fGrado = (p: string) => `(${p}::int IS NULL OR n.catninograd_id = ${p})`;
+const F_GRADO = fGrado('$8');
 const F_ESTADO = `($9::int IS NULL OR n.est_id = $9)`;
 
 const COLUMNAS_ORDEN: Record<string, string> = {
@@ -208,7 +215,7 @@ export async function contarEstudiantes(
     WITH base AS (
         SELECT n.est_id, COALESCE(insc.n, 0) AS inscripciones
         ${DESDE}
-        WHERE ${F_ALCANCE} AND ${F_BUSCAR} AND ${F_COLEGIO} AND ${F_GRADO}
+        WHERE ${F_ALCANCE} AND ${F_BUSCAR} AND ${F_COLEGIO} AND ${fGrado('$6')}
     )
     SELECT count(*)                                            AS total,
            count(*) FILTER (WHERE est_id = ${ESTADO.ACTIVO})   AS activos,
@@ -217,11 +224,12 @@ export async function contarEstudiantes(
     FROM base
   `;
 
-  // Sin disciplina, "sin asignar" ni estado: esta consulta no los menciona.
-  const { rows } = await getPool().query<Record<string, string>>(
-    sql,
-    paramsUsados(sql, params(query, alcance)),
-  );
+  // $1-$5 son los cinco primeros del array compartido (alcance, buscar,
+  // colegio); el sexto es el grado, que aqui cambia de sitio.
+  const { rows } = await getPool().query<Record<string, string>>(sql, [
+    ...params(query, alcance).slice(0, 5),
+    query.grado ?? null,
+  ]);
 
   const n = (k: string): number => Number(rows[0]?.[k] ?? 0);
   return {

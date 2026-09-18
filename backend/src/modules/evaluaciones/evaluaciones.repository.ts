@@ -858,9 +858,10 @@ export async function marcarEstadoPendiente(
 ): Promise<void> {
   await client.query(
     `UPDATE public.evaluacion_nino_pendiente
-        SET est_id = $2,
+        SET est_id = $2::smallint,
             usu_id_registrador = $3,
-            evaninopen_fecha_finalizacion = CASE WHEN $2 = ${ESTADO.EVALUADO} THEN now() ELSE NULL END
+            evaninopen_fecha_finalizacion = CASE WHEN $2::smallint = ${ESTADO.EVALUADO}
+                                                 THEN now() ELSE NULL END
       WHERE evaninopen_id = $1`,
     [evaninopenId, evaluado ? ESTADO.EVALUADO : ESTADO.PENDIENTE, evaluado ? registrador : null],
   );
