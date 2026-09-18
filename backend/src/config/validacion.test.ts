@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fallosDeProduccion } from './env.js';
+import { fallosDeProduccion } from './validacion.js';
 
 /**
  * El guardia de arranque de produccion.
