@@ -1,12 +1,12 @@
 # Fase 8 — Actividades y Disciplinas
 
-Estado al **2026-09-16**. Construido y en `dev`. **Sin probar contra el API: Railway apagado.**
+Estado al **2026-09-18**. Construido y en `dev`. **La siguiente de la cola de pruebas**, tras cerrar la Fase 7.
 
 La disciplina (`colegio_actividad_horario`) es el eje del modelo: de ella cuelgan inscripciones, asignaciones de entrenador, evaluaciones y asistencias. Las cuatro **sin cascada**, y eso decide casi todo lo que hay aquí.
 
 ---
 
-## 1. Qué hay que probar cuando Railway esté arriba
+## 1. Las pruebas
 
 ### Actividades
 
@@ -37,6 +37,15 @@ La disciplina (`colegio_actividad_horario`) es el eje del modelo: de ella cuelga
 | Conteos | "94 disciplinas · 1326 inscripciones · 14 sin entrenador" cuadran con SQL |
 | Móvil 360 px | Calendario en una columna, filtros apilados, modal de lote usable |
 | Modo oscuro | Tarjetas, avisos y el texto "Sin entrenador" legibles |
+
+### Heredadas de la Fase 7
+
+Dos arreglos se hicieron **después** de que el cliente probara la Fase 7, así que no llegó a verlos en pantalla. Los dos son globales y se comprueban aquí sin montar nada aparte.
+
+| Prueba | Qué tiene que pasar |
+|---|---|
+| **Contraste en oscuro** | En modo oscuro, cualquier cosa seleccionada o marcada con el color primario tiene que **leerse**. El fallo era blanco sobre blanco y venía de `ThemeContext`, que pisaba seis tokens con un valor inválido; afectaba a todo `bg-primary` y dejaba el texto apagado en blanco puro. Si algo sigue ilegible, es que queda otro token mal |
+| **Texto apagado** | Las leyendas, los conteos y los mensajes secundarios tienen que verse **más tenues** que el texto normal, no igual de blancos |
 
 ---
 

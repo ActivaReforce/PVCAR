@@ -31,6 +31,14 @@ El módulo de más volumen: **796 alumnos, 1672 inscripciones, 13 202 asistencia
 
 ---
 
+### Heredada de la Fase 7
+
+| Prueba | Qué tiene que pasar |
+|---|---|
+| **Caché de candidatos** | Crea un usuario nuevo en **Usuarios** con el rol que hace falta, vuelve a Estudiantes y abre la lista de candidatos a **representante**: **tiene que aparecer sin recargar la página**. En la Fase 7 no aparecía — las tres listas de candidatos cuelgan de otra clave de caché y las mutaciones de usuario no las invalidaban. Arreglado en `8114e1f`; esta es la comprobación en pantalla |
+
+---
+
 ## 2. Qué se construyó
 
 ### Backend — `modules/estudiantes/`
