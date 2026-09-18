@@ -36,16 +36,20 @@ algún día se cambia el flujo de alta. Mientras tanto no tocan el dashboard.
 
 ---
 
-## Una decisión abierta, sin prisa
+## Pendiente: preguntarle a Activa Reforce
 
 Con el flujo de hoy **el admin conoce la contraseña de todos los usuarios**. El
 flujo de invitación lo arregla: el admin crea la cuenta sin contraseña, a la
 persona le llega un correo y la elige ella, sin que nadie más la sepa nunca.
 
-El precio es que el alta queda atada al correo: si el SMTP falla, el usuario no
-puede entrar. Hoy, si el correo falla, no pasa nada — el admin le dice la
-contraseña y ya. Por eso esta decisión va **después** de que Resend esté
-funcionando, no antes.
+El precio es que el alta queda atada al correo: si el SMTP falla o la dirección
+está mal escrita, esa persona no puede entrar. Hoy, si el correo falla, no pasa
+nada — el admin le dice la contraseña y ya.
+
+**No es decisión técnica: hay que preguntárselo a Activa Reforce.** Y va
+**después** de que Resend esté funcionando, porque sin correo fiable la
+respuesta es que no. Si dicen que sí, `invitacion.html` y `confirmar-correo.html`
+ya están listas.
 
 ---
 
