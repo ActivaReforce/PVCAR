@@ -34,6 +34,19 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
+  // Errores de body-parser (cuerpo demasiado grande, JSON mal formado). Traen
+  // su propio status 4xx; sin esto caian al 500 de abajo como fallo interno.
+  const { status, type } = (err ?? {}) as { status?: unknown; type?: unknown };
+  if (typeof type === 'string' && typeof status === 'number' && status >= 400 && status < 500) {
+    res.status(status).json({
+      data: null,
+      error: {
+        message: status === 413 ? 'El contenido enviado es demasiado grande' : 'Peticion mal formada',
+      },
+    });
+    return;
+  }
+
   console.error('Error no manejado:', err);
   res.status(500).json({ data: null, error: { message: 'Error interno del servidor' } });
 }
