@@ -16,6 +16,11 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().optional(),
 
   DATABASE_URL: z.string().optional(),
+
+  // Correo propio de la aplicacion (Resend). Opcionales: sin ellas, lo que
+  // manda correo sigue funcionando y avisa de que no salio.
+  RESEND_API_KEY: z.string().optional(),
+  CORREO_REMITENTE: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

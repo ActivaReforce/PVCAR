@@ -31,7 +31,8 @@ import {
   UserCheck,
   Users2,
   UserRound,
-  ShieldCheck
+  ShieldCheck,
+  FileSignature
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -69,6 +70,7 @@ export function AppSidebar() {
     { title: "Asistencias Alumnos", path: "/asistencias", icon: UserCheck, module: "asistencias_estudiantes" },
     { title: "Asistencias Entrenadores", path: "/asistencias/entrenadores", icon: Users2, module: "asistencias_entrenadores" },
     { title: "Representantes", path: "/representantes", icon: UserRound, module: "usuarios" },
+    { title: "Inscripciones", path: "/inscripciones", icon: FileSignature, module: "inscripciones" },
     { title: "Encuestas", path: "/encuestas", icon: MessageSquare, module: "encuestas" },
     { title: "Reportes", path: "/reportes", icon: BarChart3, module: "reportes" },
     { title: "Perfil", path: "/perfil", icon: User, module: "perfil" },

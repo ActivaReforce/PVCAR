@@ -17,7 +17,7 @@ export interface EntrenadorListado {
   usu_correo: string;
   usu_telefono: string | null;
   usu_foto: string | null;
-  ent_cedula: string | null;
+  usu_cedula: string | null;
   /** Estado de la ficha de entrenador. */
   est_id: number;
   /** Estado del usuario: puede estar inactivo con la ficha activa. */
@@ -82,7 +82,7 @@ const F_ALCANCE = `(
 )`;
 
 const F_BUSCAR = `($3::text IS NULL OR ${contieneSinTildes('u.usu_nombre', '$3')}
-                                    OR ${contieneSinTildes("COALESCE(e.ent_cedula, '')", '$3')})`;
+                                    OR ${contieneSinTildes("COALESCE(u.usu_cedula, '')", '$3')})`;
 
 const F_COLEGIO = `($4::int[] IS NULL OR EXISTS (
     SELECT 1
@@ -146,7 +146,7 @@ const COLUMNAS = `
         u.usu_correo,
         u.usu_telefono,
         u.usu_foto,
-        e.ent_cedula,
+        u.usu_cedula,
         e.est_id,
         u.est_id AS usuario_est_id,
         COALESCE(rol.tiene, false) AS tiene_rol,

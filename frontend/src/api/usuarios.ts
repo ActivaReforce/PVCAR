@@ -39,7 +39,7 @@ export interface UsuarioListado {
 export interface UsuarioDetalle extends UsuarioListado {
   auth_user_id: string | null;
   usu_fecha_modificacion: string | null;
-  ent_cedula: string | null;
+  usu_cedula: string | null;
   ent_est_id: number | null;
   padre_id: number | null;
   padre_sector_residencia: string | null;
@@ -107,7 +107,7 @@ export interface DatosUsuario {
   usu_telefono?: string;
   password?: string;
   roles?: number[];
-  ent_cedula?: string;
+  usu_cedula?: string;
   padre_sector_residencia?: string;
   usu_foto?: string | null;
 }

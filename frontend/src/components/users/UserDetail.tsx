@@ -27,7 +27,6 @@ const UserDetail = ({ user, onClose }: UserDetailProps) => {
     .toUpperCase()
     .slice(0, 2);
 
-  const esEntrenador = user.roles.some((r) => r.rol_id === ROL.ENTRENADOR);
   const esRepresentante = user.roles.some((r) => r.rol_id === ROL.REPRESENTANTE);
 
   const fecha = (valor: string | null) =>
@@ -68,7 +67,7 @@ const UserDetail = ({ user, onClose }: UserDetailProps) => {
           { etiqueta: 'Teléfono', valor: user.usu_telefono || '—' },
           { etiqueta: 'Fecha de creación', valor: fecha(user.usu_fecha_creacion) },
           { etiqueta: 'Última modificación', valor: fecha(user.usu_fecha_modificacion) },
-          ...(esEntrenador ? [{ etiqueta: 'Cédula', valor: user.ent_cedula || '—' }] : []),
+          { etiqueta: 'Cédula o pasaporte', valor: user.usu_cedula || '—' },
           ...(esRepresentante
             ? [{ etiqueta: 'Sector de residencia', valor: user.padre_sector_residencia || '—' }]
             : []),

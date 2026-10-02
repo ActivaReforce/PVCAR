@@ -33,7 +33,7 @@ export interface UsuarioListado {
 export interface UsuarioDetalle extends UsuarioListado {
   auth_user_id: string | null;
   usu_fecha_modificacion: string | null;
-  ent_cedula: string | null;
+  usu_cedula: string | null;
   ent_est_id: number | null;
   padre_id: number | null;
   padre_sector_residencia: string | null;
@@ -119,7 +119,8 @@ const CTE_VISIBLES = `
 const F_VISIBLE = `($1::boolean OR u.usu_id IN (SELECT usu_id FROM visibles))`;
 
 const F_BUSCAR = `($4::text IS NULL OR ${contieneSinTildes('u.usu_nombre', '$4')}
-                                   OR ${contieneSinTildes('u.usu_correo', '$4')})`;
+                                   OR ${contieneSinTildes('u.usu_correo', '$4')}
+                                   OR ${contieneSinTildes("COALESCE(u.usu_cedula, '')", '$4')})`;
 
 const SIN_NINGUN_ROL = `NOT EXISTS (SELECT 1 FROM public.usuario_rol ur WHERE ur.usu_id = u.usu_id)`;
 
@@ -295,7 +296,7 @@ export async function obtenerUsuario(
         u.usu_fecha_modificacion,
         u.est_id,
         (u.auth_user_id IS NOT NULL) AS tiene_acceso,
-        e.ent_cedula,
+        u.usu_cedula,
         e.est_id  AS ent_est_id,
         p.padre_id,
         p.padre_sector_residencia,
@@ -347,6 +348,23 @@ export async function existeCorreo(
   return rows.length > 0;
 }
 
+/** Indice unico uq_usuario_cedula (0014): mayusculas y sin espacios. */
+export async function existeCedula(
+  cedula: string,
+  excluyendo: number | null,
+  client?: PoolClient,
+): Promise<boolean> {
+  const ejecutor = client ?? getPool();
+  const { rows } = await ejecutor.query(
+    `SELECT 1 FROM public.usuario
+      WHERE upper(trim(usu_cedula)) = upper(trim($1))
+        AND ($2::int IS NULL OR usu_id <> $2)
+      LIMIT 1`,
+    [cedula, excluyendo],
+  );
+  return rows.length > 0;
+}
+
 export async function insertarUsuario(
   client: PoolClient,
   datos: {
@@ -355,12 +373,13 @@ export async function insertarUsuario(
     correo: string;
     telefono: string | null;
     foto: string | null;
+    cedula: string | null;
   },
 ): Promise<number> {
   const { rows } = await client.query<{ usu_id: number }>(
     `INSERT INTO public.usuario
-         (auth_user_id, usu_nombre, usu_correo, usu_telefono, usu_foto, est_id)
-     VALUES ($1, $2, $3, $4, $5, $6)
+         (auth_user_id, usu_nombre, usu_correo, usu_telefono, usu_foto, usu_cedula, est_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING usu_id`,
     [
       datos.authUserId,
@@ -368,6 +387,7 @@ export async function insertarUsuario(
       datos.correo,
       datos.telefono,
       datos.foto,
+      datos.cedula,
       ESTADO.ACTIVO,
     ],
   );
@@ -389,6 +409,8 @@ export async function actualizarUsuario(
     tocarTelefono: boolean;
     foto?: string | null;
     tocarFoto: boolean;
+    cedula?: string | null;
+    tocarCedula: boolean;
   },
 ): Promise<void> {
   await client.query(
@@ -397,6 +419,7 @@ export async function actualizarUsuario(
             usu_correo   = COALESCE($3::text, usu_correo),
             usu_telefono = CASE WHEN $4::boolean THEN $5::text ELSE usu_telefono END,
             usu_foto     = CASE WHEN $6::boolean THEN $7::text ELSE usu_foto END,
+            usu_cedula   = CASE WHEN $8::boolean THEN $9::text ELSE usu_cedula END,
             usu_fecha_modificacion = now()
       WHERE usu_id = $1`,
     [
@@ -407,6 +430,8 @@ export async function actualizarUsuario(
       campos.telefono ?? null,
       campos.tocarFoto,
       campos.foto ?? null,
+      campos.tocarCedula,
+      campos.cedula ?? null,
     ],
   );
 }
@@ -457,17 +482,15 @@ export async function contarAsignacionesActivas(
 export async function upsertEntrenador(
   client: PoolClient,
   entId: number,
-  cedula: string | null,
   estId: number,
 ): Promise<void> {
   await client.query(
-    `INSERT INTO public.entrenador (ent_id, ent_cedula, est_id)
-     VALUES ($1, $2, $3)
+    `INSERT INTO public.entrenador (ent_id, est_id)
+     VALUES ($1, $2)
      ON CONFLICT (ent_id) DO UPDATE
-        SET ent_cedula = COALESCE(EXCLUDED.ent_cedula, public.entrenador.ent_cedula),
-            est_id     = EXCLUDED.est_id,
+        SET est_id = EXCLUDED.est_id,
             ent_fecha_modificacion = now()`,
-    [entId, cedula, estId],
+    [entId, estId],
   );
 }
 

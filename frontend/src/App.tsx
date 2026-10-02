@@ -41,6 +41,8 @@ const Encuestas = lazy(() => import("@/pages/Encuestas"));
 const Representantes = lazy(() => import("@/pages/Representantes"));
 const Perfil = lazy(() => import("@/pages/Perfil"));
 const Permisos = lazy(() => import("@/pages/Permisos"));
+const Inscripciones = lazy(() => import("@/pages/Inscripciones"));
+const Inscripcion = lazy(() => import("@/pages/Inscripcion"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 /**
@@ -85,6 +87,9 @@ const App = () => {
                   {/* Destino del enlace del correo de recuperación. Pública:
                       quien llega aquí todavía no puede iniciar sesión. */}
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  {/* Formulario de inscripción: llega por correo a gente que
+                      todavía no tiene cuenta. */}
+                  <Route path="/inscripcion" element={<Inscripcion />} />
 
                   {/* Protegidas */}
                   <Route
@@ -118,6 +123,7 @@ const App = () => {
                               <Route path="/representantes" element={<Representantes />} />
                               <Route path="/perfil" element={<Perfil />} />
                               <Route path="/permisos" element={<Permisos />} />
+                              <Route path="/inscripciones" element={<Inscripciones />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
                           </Suspense>

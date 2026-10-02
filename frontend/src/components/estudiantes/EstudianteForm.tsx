@@ -55,7 +55,7 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
   const [gradoId, setGradoId] = useState(
     estudiante?.catninograd_id ? String(estudiante.catninograd_id) : SIN_GRADO,
   );
-  const [edad, setEdad] = useState(estudiante?.nino_edad ? String(estudiante.nino_edad) : '');
+  const [nacimiento, setNacimiento] = useState(estudiante?.nino_fecha_nacimiento ?? '');
   const [cedula, setCedula] = useState(estudiante?.nino_cedula ?? '');
   const [transporte, setTransporte] = useState(estudiante?.nino_toma_transporte ?? false);
   const [salud, setSalud] = useState(estudiante?.nino_info_salud ?? '');
@@ -81,10 +81,6 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
       toast({ title: 'Elige el colegio', variant: 'destructive' });
       return;
     }
-    if (edad && (Number(edad) < 4 || Number(edad) > 25)) {
-      toast({ title: 'La edad debe estar entre 4 y 25', variant: 'destructive' });
-      return;
-    }
 
     let ruta: string | null | undefined;
     if (foto) {
@@ -101,7 +97,7 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
       nino_nombre: nombre.trim(),
       col_id: Number(colId),
       catninograd_id: gradoId === SIN_GRADO ? null : Number(gradoId),
-      nino_edad: edad ? Number(edad) : null,
+      nino_fecha_nacimiento: nacimiento || null,
       nino_cedula: cedula.trim(),
       nino_toma_transporte: transporte,
       nino_info_salud: salud.trim(),
@@ -176,14 +172,13 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edad">Edad</Label>
+              <Label htmlFor="nacimiento">Fecha de nacimiento</Label>
               <Input
-                id="edad"
-                type="number"
-                min={4}
-                max={25}
-                value={edad}
-                onChange={(ev) => setEdad(ev.target.value)}
+                id="nacimiento"
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                value={nacimiento}
+                onChange={(ev) => setNacimiento(ev.target.value)}
                 className="h-11 sm:h-10"
               />
             </div>

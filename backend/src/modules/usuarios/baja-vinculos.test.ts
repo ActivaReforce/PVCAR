@@ -21,7 +21,7 @@ const ACTIVO = {
   usu_fecha_modificacion: null,
   est_id: 1,
   auth_user_id: 'auth-70',
-  ent_cedula: null,
+  usu_cedula: null,
   ent_est_id: 1,
   padre_id: null,
   padre_sector_residencia: null,

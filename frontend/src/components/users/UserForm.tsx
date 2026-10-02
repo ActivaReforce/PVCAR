@@ -29,7 +29,7 @@ interface UserFormProps {
  * viaja en el cuerpo es la ruta.
  */
 const UserForm = ({ user, roles, onSuccess, onCancel }: UserFormProps) => {
-  const { formData, handleInputChange, isEditMode, hasCoachRole, hasParentRole } = useUserForm(
+  const { formData, handleInputChange, isEditMode, hasParentRole } = useUserForm(
     user,
     roles,
   );
@@ -79,7 +79,7 @@ const UserForm = ({ user, roles, onSuccess, onCancel }: UserFormProps) => {
       usu_correo: formData.usu_correo,
       usu_telefono: formData.usu_telefono,
       roles: formData.selectedRoles,
-      ...(hasCoachRole ? { ent_cedula: formData.ent_cedula } : {}),
+      usu_cedula: formData.usu_cedula,
       ...(hasParentRole ? { padre_sector_residencia: formData.padre_sector_residencia } : {}),
       ...(rutaFoto !== undefined ? { usu_foto: rutaFoto } : {}),
       ...(formData.usu_contrasena ? { password: formData.usu_contrasena } : {}),

@@ -248,6 +248,12 @@ describe('Modulos de negocio — cerrados sin token', () => {
     ['GET', '/api/v1/perfil'],
     ['PATCH', '/api/v1/perfil'],
     ['POST', '/api/v1/perfil/foto'],
+    ['GET', '/api/v1/inscripciones'],
+    ['GET', '/api/v1/inscripciones/1'],
+    ['GET', '/api/v1/inscripciones/documentos'],
+    ['POST', '/api/v1/inscripciones/documentos'],
+    ['POST', '/api/v1/inscripciones/1/aprobar'],
+    ['DELETE', '/api/v1/inscripciones/1'],
   ];
 
   it.each(rutas)('%s %s responde 401 sin token', async (metodo, ruta) => {
@@ -257,6 +263,52 @@ describe('Modulos de negocio — cerrados sin token', () => {
       body: metodo === 'GET' ? undefined : JSON.stringify({}),
     });
     expect(res.status).toBe(401);
+  });
+});
+
+/**
+ * El formulario de inscripcion es la unica escritura publica del API. Un
+ * envio mal formado tiene que morir en la validacion, antes de tocar la base
+ * o Storage (que en las pruebas no existen: si llegara, seria un 500).
+ */
+describe('Inscripcion publica — validacion antes de tocar nada', () => {
+  it('POST /inscripcion sin las tres casillas responde 400', async () => {
+    const res = await fetch(`${base}/api/v1/inscripcion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        representante: {
+          nombre: 'Ana Pérez',
+          cedula: '1712345678',
+          correo: 'a@b.co',
+          telefono: '0991234567',
+        },
+        ninos: [],
+        documentos: { contrato: 1, terminos: 1, privacidad: 1 },
+        acepta: { contrato: true, terminos: false, privacidad: true },
+        comprobante: { mime: 'image/jpeg', base64: 'x' },
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('admite un cuerpo de mas de 1 MB (el comprobante viaja en base64)', async () => {
+    const res = await fetch(`${base}/api/v1/inscripcion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ relleno: 'A'.repeat(1_500_000) }),
+    });
+    // 400 de validacion, no 413 del limite general.
+    expect(res.status).toBe(400);
+  });
+
+  it('el resto del API sigue con el limite de 1 MB', async () => {
+    const res = await fetch(`${base}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ relleno: 'A'.repeat(1_500_000) }),
+    });
+    expect(res.status).toBe(413);
   });
 });
 

@@ -42,7 +42,19 @@ const roles = z
   .max(7)
   .refine((r) => new Set(r).size === r.length, 'Hay roles repetidos');
 
-const cedula = z.string().trim().max(20).optional().or(z.literal(''));
+/**
+ * Cedula o pasaporte, de cualquier rol (antes era solo del entrenador). Unica
+ * en la base desde la migracion 0014; en mayusculas porque un pasaporte lleva
+ * letras.
+ */
+const cedula = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .max(20)
+  .regex(/^[0-9A-Z-]*$/, 'La cedula solo admite numeros, letras y guiones')
+  .optional()
+  .or(z.literal(''));
 const sectorResidencia = z.string().trim().max(160).optional().or(z.literal(''));
 
 /** Ruta del objeto en el bucket usufoto. null borra la foto actual. */
@@ -95,7 +107,7 @@ export const crearUsuarioSchema = z.object({
   usu_telefono: telefono,
   password,
   roles,
-  ent_cedula: cedula,
+  usu_cedula: cedula,
   padre_sector_residencia: sectorResidencia,
   usu_foto: foto,
 });
@@ -113,7 +125,7 @@ export const actualizarUsuarioSchema = z
     usu_telefono: telefono,
     password: password.optional(),
     roles: roles.optional(),
-    ent_cedula: cedula,
+    usu_cedula: cedula,
     padre_sector_residencia: sectorResidencia,
     usu_foto: foto,
   })

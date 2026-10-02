@@ -68,6 +68,7 @@ export const MODULOS = [
   'reporte_estudiante',
   'perfil',
   'permisos',
+  'inscripciones',
 ] as const;
 
 export type Modulo = (typeof MODULOS)[number];

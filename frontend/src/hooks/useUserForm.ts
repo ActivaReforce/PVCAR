@@ -16,7 +16,7 @@ export interface DatosFormularioUsuario {
   usu_telefono: string;
   usu_contrasena: string;
   selectedRoles: number[];
-  ent_cedula: string;
+  usu_cedula: string;
   padre_sector_residencia: string;
 }
 
@@ -37,7 +37,7 @@ const VACIO: DatosFormularioUsuario = {
   usu_telefono: '',
   usu_contrasena: '',
   selectedRoles: [],
-  ent_cedula: '',
+  usu_cedula: '',
   padre_sector_residencia: '',
 };
 
@@ -48,7 +48,7 @@ function desdeDetalle(usuario: UsuarioDetalle): DatosFormularioUsuario {
     usu_telefono: usuario.usu_telefono ?? '',
     usu_contrasena: '',
     selectedRoles: usuario.roles.map((r) => r.rol_id),
-    ent_cedula: usuario.ent_cedula ?? '',
+    usu_cedula: usuario.usu_cedula ?? '',
     padre_sector_residencia: usuario.padre_sector_residencia ?? '',
   };
 }

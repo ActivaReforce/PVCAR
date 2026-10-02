@@ -128,7 +128,7 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
                   desde md, `contents` lo disuelve y cada dato vuelve a su columna. */}
               <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs md:contents md:text-sm">
                 <div className="min-w-0 text-muted-foreground">
-                  <span className="md:block md:truncate">{e.ent_cedula ?? 'Sin cédula'}</span>
+                  <span className="md:block md:truncate">{e.usu_cedula ?? 'Sin cédula'}</span>
                   <span className="md:hidden"> · </span>
                   <span className="md:block md:truncate">{e.usu_telefono ?? 'Sin teléfono'}</span>
                 </div>

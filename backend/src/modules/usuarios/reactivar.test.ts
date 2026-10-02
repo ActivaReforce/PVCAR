@@ -23,7 +23,7 @@ const INACTIVO_SIN_CUENTA = {
   usu_fecha_modificacion: null,
   est_id: 2,
   auth_user_id: null as string | null,
-  ent_cedula: null,
+  usu_cedula: null,
   ent_est_id: null,
   padre_id: null,
   padre_sector_residencia: null,

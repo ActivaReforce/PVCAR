@@ -18,7 +18,17 @@ const textoOpcional = (max: number) => z.string().trim().max(max).optional().or(
  * 6 a 20 anos: es el rango real de los datos (min 6, max 20). No se deja 0 ni
  * 99 porque un dedazo en la edad se arrastra a los reportes por categoria.
  */
-const edad = z.number().int().min(4).max(25).nullable().optional();
+const fechaNacimiento = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha invalida (AAAA-MM-DD)')
+  .refine((v) => {
+    const fecha = new Date(`${v}T12:00:00Z`);
+    if (Number.isNaN(fecha.getTime())) return false;
+    const anos = (Date.now() - fecha.getTime()) / (365.25 * 24 * 3600 * 1000);
+    return anos >= 2 && anos <= 25;
+  }, 'La fecha de nacimiento no corresponde a un alumno')
+  .nullable()
+  .optional();
 
 const cedula = z
   .string()
@@ -68,7 +78,7 @@ export const crearEstudianteSchema = z.object({
   nino_nombre: nombre,
   col_id: z.number().int().positive(),
   catninograd_id: z.number().int().positive().nullable().optional(),
-  nino_edad: edad,
+  nino_fecha_nacimiento: fechaNacimiento,
   nino_cedula: cedula,
   nino_toma_transporte: z.boolean().optional(),
   nino_info_salud: textoOpcional(1000),
@@ -85,7 +95,7 @@ export const actualizarEstudianteSchema = z
     nino_nombre: nombre.optional(),
     col_id: z.number().int().positive().optional(),
     catninograd_id: z.number().int().positive().nullable().optional(),
-    nino_edad: edad,
+    nino_fecha_nacimiento: fechaNacimiento,
     nino_cedula: cedula,
     nino_toma_transporte: z.boolean().optional(),
     nino_info_salud: textoOpcional(1000),

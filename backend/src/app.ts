@@ -21,6 +21,10 @@ import { representantesRouter } from './modules/representantes/representantes.ro
 import { encuestasRouter } from './modules/encuestas/encuestas.routes.js';
 import { permisosRouter } from './modules/permisos/permisos.routes.js';
 import { perfilRouter } from './modules/perfil/perfil.routes.js';
+import {
+  inscripcionPublicaRouter,
+  inscripcionesRouter,
+} from './modules/inscripciones/inscripciones.routes.js';
 
 export function createApp(): Application {
   const app = express();
@@ -44,6 +48,10 @@ export function createApp(): Application {
       credentials: true,
     }),
   );
+  // El formulario publico de inscripcion trae el comprobante en base64 (hasta
+  // 2 MB, ~2,7 MB en texto). Solo esa ruta sube el limite; body-parser no
+  // vuelve a parsear un cuerpo ya leido, asi que el de 1 MB no la toca.
+  app.use('/api/v1/inscripcion', express.json({ limit: '4mb' }));
   app.use(express.json({ limit: '1mb' }));
 
   // Rutas versionadas.
@@ -83,6 +91,8 @@ export function createApp(): Application {
   api.use('/encuestas', encuestasRouter);
   api.use('/permisos', permisosRouter);
   api.use('/perfil', perfilRouter);
+  api.use('/inscripcion', inscripcionPublicaRouter);
+  api.use('/inscripciones', inscripcionesRouter);
 
   app.use('/api/v1', api);
 

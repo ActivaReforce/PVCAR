@@ -13,6 +13,7 @@ import { ROL } from '../../lib/constants.js';
 const ESTUDIANTE = {
   nino_id: 173,
   nino_nombre: 'Adrián Arturo Pesántez Suárez',
+  nino_fecha_nacimiento: '2017-03-09',
   nino_edad: 9,
   nino_foto: null,
   col_id: 11,

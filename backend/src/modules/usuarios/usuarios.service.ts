@@ -179,6 +179,10 @@ export async function crear(actor: AuthUser, input: CrearUsuarioInput): Promise<
   if (await repo.existeCorreo(input.usu_correo, null)) {
     throw new ApiError(409, 'Ya existe un usuario con ese correo');
   }
+  const cedula = vacioANulo(input.usu_cedula);
+  if (cedula && (await repo.existeCedula(cedula, null))) {
+    throw new ApiError(409, 'Ya existe un usuario con esa cedula');
+  }
 
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.auth.admin.createUser({
@@ -201,11 +205,11 @@ export async function crear(actor: AuthUser, input: CrearUsuarioInput): Promise<
         correo: input.usu_correo,
         telefono: vacioANulo(input.usu_telefono),
         foto: vacioANulo(input.usu_foto ?? undefined),
+        cedula,
       });
 
       await repo.sincronizarRoles(client, nuevoId, input.roles);
       await aplicarFichasDeRol(client, nuevoId, [], input.roles, {
-        cedula: vacioANulo(input.ent_cedula),
         sector: vacioANulo(input.padre_sector_residencia),
         estadoUsuario: ESTADO.ACTIVO,
       });
@@ -274,6 +278,10 @@ export async function actualizar(
       throw new ApiError(409, 'Ya existe otro usuario con ese correo');
     }
   }
+  const cedulaNueva = vacioANulo(input.usu_cedula);
+  if (cedulaNueva && (await repo.existeCedula(cedulaNueva, usuId))) {
+    throw new ApiError(409, 'Ya existe otro usuario con esa cedula');
+  }
 
   if (input.roles) {
     await exigirQueNoSeQuedeSinPropietario(usuId, input.roles);
@@ -290,6 +298,8 @@ export async function actualizar(
       tocarTelefono: input.usu_telefono !== undefined,
       foto: input.usu_foto === null ? null : vacioANulo(input.usu_foto ?? undefined),
       tocarFoto: input.usu_foto !== undefined,
+      cedula: vacioANulo(input.usu_cedula),
+      tocarCedula: input.usu_cedula !== undefined,
     });
 
     let agregados: number[] = [];
@@ -301,7 +311,6 @@ export async function actualizar(
       agregados = diff.agregados;
       quitados = diff.quitados;
       await aplicarFichasDeRol(client, usuId, rolesAntes, input.roles, {
-        cedula: vacioANulo(input.ent_cedula),
         sector: vacioANulo(input.padre_sector_residencia),
         estadoUsuario: antes.est_id,
       });
@@ -309,7 +318,6 @@ export async function actualizar(
       // Sin cambio de roles, los campos de ficha siguen siendo editables.
       const rolesActuales = await repo.rolesDe(usuId, client);
       await aplicarFichasDeRol(client, usuId, rolesActuales, rolesActuales, {
-        cedula: vacioANulo(input.ent_cedula),
         sector: vacioANulo(input.padre_sector_residencia),
         estadoUsuario: antes.est_id,
       });
@@ -400,7 +408,7 @@ async function aplicarFichasDeRol(
   usuId: number,
   rolesAntes: number[],
   rolesDespues: number[],
-  datos: { cedula: string | null; sector: string | null; estadoUsuario: number },
+  datos: { sector: string | null; estadoUsuario: number },
 ): Promise<void> {
   const eraEntrenador = rolesAntes.includes(ROL.ENTRENADOR);
   const esEntrenador = rolesDespues.includes(ROL.ENTRENADOR);
@@ -408,7 +416,7 @@ async function aplicarFichasDeRol(
   const esRepresentante = rolesDespues.includes(ROL.REPRESENTANTE);
 
   if (esEntrenador) {
-    await repo.upsertEntrenador(client, usuId, datos.cedula, datos.estadoUsuario);
+    await repo.upsertEntrenador(client, usuId, datos.estadoUsuario);
   } else if (eraEntrenador) {
     const activas = await repo.contarAsignacionesActivas(client, usuId);
     if (activas > 0) {
@@ -585,7 +593,7 @@ export async function reactivar(
       if (roles.includes(ROL.ENTRENADOR)) {
         // La ficha vuelve a activa; las asignaciones cerradas NO se reabren:
         // se vuelven a asignar desde Entrenadores, que es donde se decide.
-        await repo.upsertEntrenador(client, usuId, null, ESTADO.ACTIVO);
+        await repo.upsertEntrenador(client, usuId, ESTADO.ACTIVO);
       }
       await auditar(
         {

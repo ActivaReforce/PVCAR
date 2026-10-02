@@ -287,7 +287,7 @@ const entrenadores: Definicion = {
   exigeRango: false,
   columnas: [
     { clave: 'usu_nombre', cabecera: 'Entrenador', ancho: 34 },
-    { clave: 'ent_cedula', cabecera: 'Cédula', ancho: 14 },
+    { clave: 'usu_cedula', cabecera: 'Cédula', ancho: 14 },
     { clave: 'usu_correo', cabecera: 'Correo', ancho: 30 },
     { clave: 'usu_telefono', cabecera: 'Teléfono', ancho: 14 },
     { clave: 'estado', cabecera: 'Estado de la ficha', ancho: 16 },
@@ -304,7 +304,7 @@ const entrenadores: Definicion = {
            WHERE ea.entasig_fecha_fin IS NULL AND ea.est_id = ${ESTADO.ACTIVO}
       )
       SELECT u.usu_nombre,
-             COALESCE(en.ent_cedula, '')    AS ent_cedula,
+             COALESCE(u.usu_cedula, '')     AS usu_cedula,
              u.usu_correo,
              COALESCE(u.usu_telefono, '')   AS usu_telefono,
              e.est_nombre                   AS estado,
@@ -341,6 +341,7 @@ const estudiantes: Definicion = {
   columnas: [
     { clave: 'nino_id', cabecera: 'ID', ancho: 8 },
     { clave: 'nino_nombre', cabecera: 'Alumno', ancho: 34 },
+    { clave: 'nino_fecha_nacimiento', cabecera: 'Fecha de nacimiento', ancho: 18 },
     { clave: 'nino_edad', cabecera: 'Edad', ancho: 8 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
     { clave: 'catninograd_nombre', cabecera: 'Grado', ancho: 20 },
@@ -356,7 +357,8 @@ const estudiantes: Definicion = {
     sql: `
       SELECT n.nino_id,
              n.nino_nombre,
-             n.nino_edad,
+             COALESCE(to_char(n.nino_fecha_nacimiento, 'YYYY-MM-DD'), '') AS nino_fecha_nacimiento,
+             date_part('year', age(CURRENT_DATE, n.nino_fecha_nacimiento))::int AS nino_edad,
              c.col_nombre,
              COALESCE(g.catninograd_nombre, '')                    AS catninograd_nombre,
              COALESCE(n.nino_cedula, '')                           AS nino_cedula,

@@ -12,6 +12,8 @@ import { api } from '@/lib/api';
 export interface Estudiante {
   nino_id: number;
   nino_nombre: string;
+  /** AAAA-MM-DD. La edad la calcula el backend a partir de aqui. */
+  nino_fecha_nacimiento: string | null;
   nino_edad: number | null;
   nino_foto: string | null;
   nino_foto_url: string | null;
@@ -133,7 +135,7 @@ export interface DatosEstudiante {
   nino_nombre?: string;
   col_id?: number;
   catninograd_id?: number | null;
-  nino_edad?: number | null;
+  nino_fecha_nacimiento?: string | null;
   nino_cedula?: string;
   nino_toma_transporte?: boolean;
   nino_info_salud?: string;

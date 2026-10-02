@@ -16,7 +16,7 @@ const ENTRENADOR = {
   usu_correo: 'erika@activareforce.com',
   usu_telefono: null,
   usu_foto: null,
-  ent_cedula: '1100114040',
+  usu_cedula: '1100114040',
   est_id: 1,
   usuario_est_id: 1,
   tiene_rol: true,

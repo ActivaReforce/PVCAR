@@ -20,7 +20,7 @@ export interface Entrenador {
   usu_telefono: string | null;
   usu_foto: string | null;
   usu_foto_url: string | null;
-  ent_cedula: string | null;
+  usu_cedula: string | null;
   /** Estado de la ficha de entrenador. */
   est_id: number;
   /** Estado del usuario. Puede estar de baja con la ficha activa. */

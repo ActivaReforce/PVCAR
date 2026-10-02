@@ -9,6 +9,8 @@ import type { ListarEstudiantesQuery } from './estudiantes.schemas.js';
 export interface EstudianteListado {
   nino_id: number;
   nino_nombre: string;
+  /** AAAA-MM-DD. La edad se calcula de aqui; ya no se guarda (0014). */
+  nino_fecha_nacimiento: string | null;
   nino_edad: number | null;
   nino_foto: string | null;
   col_id: number;
@@ -116,7 +118,7 @@ const COLUMNAS_ORDEN: Record<string, string> = {
   nombre: 'n.nino_nombre',
   colegio: 'col.col_nombre',
   grado: 'n.catninograd_id',
-  edad: 'n.nino_edad',
+  edad: 'age(CURRENT_DATE, n.nino_fecha_nacimiento)',
   creacion: 'n.nino_fecha_creacion',
 };
 
@@ -136,7 +138,8 @@ const LATERALES = `
 const COLUMNAS = `
         n.nino_id,
         n.nino_nombre,
-        n.nino_edad,
+        to_char(n.nino_fecha_nacimiento, 'YYYY-MM-DD') AS nino_fecha_nacimiento,
+        date_part('year', age(CURRENT_DATE, n.nino_fecha_nacimiento))::int AS nino_edad,
         n.nino_foto,
         n.col_id,
         col.col_nombre,
@@ -456,7 +459,7 @@ export async function insertarEstudiante(
     nombre: string;
     colId: number;
     gradoId: number | null;
-    edad: number | null;
+    fechaNacimiento: string | null;
     cedula: string | null;
     transporte: boolean | null;
     salud: string | null;
@@ -466,7 +469,7 @@ export async function insertarEstudiante(
 ): Promise<number> {
   const { rows } = await client.query<{ nino_id: number }>(
     `INSERT INTO public.nino
-         (nino_nombre, col_id, catninograd_id, nino_edad, nino_cedula,
+         (nino_nombre, col_id, catninograd_id, nino_fecha_nacimiento, nino_cedula,
           nino_toma_transporte, nino_info_salud, nino_otra_info, nino_foto, est_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING nino_id`,
@@ -474,7 +477,7 @@ export async function insertarEstudiante(
       datos.nombre,
       datos.colId,
       datos.gradoId,
-      datos.edad,
+      datos.fechaNacimiento,
       datos.cedula,
       datos.transporte,
       datos.salud,
@@ -494,8 +497,8 @@ export async function actualizarEstudiante(
     colId?: number;
     gradoId: number | null;
     tocarGrado: boolean;
-    edad: number | null;
-    tocarEdad: boolean;
+    fechaNacimiento: string | null;
+    tocarFechaNacimiento: boolean;
     cedula: string | null;
     tocarCedula: boolean;
     transporte: boolean | null;
@@ -513,7 +516,7 @@ export async function actualizarEstudiante(
         SET nino_nombre           = COALESCE($2::text, nino_nombre),
             col_id                = COALESCE($3::int, col_id),
             catninograd_id        = CASE WHEN $4::boolean  THEN $5::smallint ELSE catninograd_id       END,
-            nino_edad             = CASE WHEN $6::boolean  THEN $7::smallint ELSE nino_edad            END,
+            nino_fecha_nacimiento = CASE WHEN $6::boolean  THEN $7::date     ELSE nino_fecha_nacimiento END,
             nino_cedula           = CASE WHEN $8::boolean  THEN $9::text     ELSE nino_cedula          END,
             nino_toma_transporte  = CASE WHEN $10::boolean THEN $11::boolean ELSE nino_toma_transporte END,
             nino_info_salud       = CASE WHEN $12::boolean THEN $13::text    ELSE nino_info_salud      END,
@@ -527,8 +530,8 @@ export async function actualizarEstudiante(
       campos.colId ?? null,
       campos.tocarGrado,
       campos.gradoId,
-      campos.tocarEdad,
-      campos.edad,
+      campos.tocarFechaNacimiento,
+      campos.fechaNacimiento,
       campos.tocarCedula,
       campos.cedula,
       campos.tocarTransporte,

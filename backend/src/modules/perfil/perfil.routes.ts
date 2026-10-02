@@ -86,6 +86,7 @@ perfilRouter.patch(
           tocarTelefono: input.usu_telefono !== undefined,
           foto: input.usu_foto ?? null,
           tocarFoto: input.usu_foto !== undefined,
+          tocarCedula: false,
         });
         await auditar(
           {
