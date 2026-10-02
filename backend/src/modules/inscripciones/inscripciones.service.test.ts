@@ -186,8 +186,8 @@ describe('envioSchema', () => {
 
 describe('calcularCobro', () => {
   const precios = new Map([
-    [1, { precio: 28.3, descuentoHermano: 10, descuentoSoloPrimera: false }],
-    [2, { precio: 40, descuentoHermano: 50, descuentoSoloPrimera: true }],
+    [1, { precio: 28.3, descuentoHermano: 10 }],
+    [2, { precio: 40, descuentoHermano: 50 }],
   ]);
 
   it('un alumno solo paga completo, sin coma flotante', () => {
@@ -197,7 +197,7 @@ describe('calcularCobro', () => {
     expect(c.alumnos[0]!.descuento).toBe(0);
   });
 
-  it('el hermano con menos importe lleva el descuento en todas sus disciplinas', () => {
+  it('lidera el que mas disciplinas tiene, aunque vaya segundo', () => {
     const c = calcularCobro(
       [
         { colId: 1, disciplinas: 1 },
@@ -205,25 +205,52 @@ describe('calcularCobro', () => {
       ],
       precios,
     );
-    // Paga completo el segundo (56,60); el primero 28,30 - 10 % = 25,47.
     expect(c.alumnos[1]!.paga_completo).toBe(true);
-    expect(c.alumnos[0]!.descuento).toBe(2.83);
+    // El hermano: 1 disciplina, 1 con descuento. 28,30 - 10 % = 25,47.
+    expect(c.alumnos[0]!.disciplinas_con_descuento).toBe(1);
     expect(c.alumnos[0]!.total).toBe(25.47);
     expect(c.total).toBe(82.07);
   });
 
-  it('con "solo la primera", el descuento cubre una sola disciplina del hermano', () => {
+  it('lidera el de mas disciplinas aunque su colegio sea mas barato', () => {
+    const c = calcularCobro(
+      [
+        { colId: 2, disciplinas: 2 }, // 80,00
+        { colId: 1, disciplinas: 3 }, // 84,90
+      ],
+      precios,
+    );
+    expect(c.alumnos[1]!.paga_completo).toBe(true);
+    // El hermano: sus 2 disciplinas con 50 %.
+    expect(c.alumnos[0]!.disciplinas_con_descuento).toBe(2);
+    expect(c.alumnos[0]!.total).toBe(40);
+  });
+
+  it('en empate de disciplinas lidera el de importe mas alto', () => {
+    const c = calcularCobro(
+      [
+        { colId: 1, disciplinas: 2 }, // 56,60
+        { colId: 2, disciplinas: 2 }, // 80,00
+      ],
+      precios,
+    );
+    expect(c.alumnos[1]!.paga_completo).toBe(true);
+    expect(c.alumnos[0]!.descuento).toBe(5.66);
+  });
+
+  it('cada hermano tiene descuento en tantas disciplinas como el que lidera', () => {
     const c = calcularCobro(
       [
         { colId: 2, disciplinas: 3 },
+        { colId: 2, disciplinas: 1 },
         { colId: 2, disciplinas: 3 },
       ],
       precios,
     );
-    // Empate: paga completo el primero. El segundo: 120 - 50 % de 40.
     expect(c.alumnos[0]!.paga_completo).toBe(true);
-    expect(c.alumnos[1]!.total).toBe(100);
-    expect(c.total).toBe(220);
+    expect(c.alumnos[1]!.disciplinas_con_descuento).toBe(1);
+    expect(c.alumnos[2]!.disciplinas_con_descuento).toBe(3);
+    expect(c.total).toBe(120 + 20 + 60);
   });
 
   it('sin precio configurado no calcula', () => {

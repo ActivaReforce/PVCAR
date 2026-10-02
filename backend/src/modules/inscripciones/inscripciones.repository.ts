@@ -150,7 +150,6 @@ export interface PrecioListado {
   disciplinas_activas: number;
   precio: number | null;
   descuento_hermano: number | null;
-  descuento_solo_primera: boolean | null;
   fecha_modificacion: string | null;
 }
 
@@ -164,7 +163,6 @@ export async function listarPrecios(): Promise<PrecioListado[]> {
               WHERE d.col_id = c.col_id AND d.est_id = $1)::int AS disciplinas_activas,
             p.colpre_precio_disciplina      AS precio,
             p.colpre_descuento_hermano      AS descuento_hermano,
-            p.colpre_descuento_solo_primera AS descuento_solo_primera,
             p.colpre_fecha_modificacion     AS fecha_modificacion
        FROM public.colegio c
        LEFT JOIN public.colegio_precio p ON p.col_id = c.col_id
@@ -188,10 +186,8 @@ export async function preciosDe(
     col_id: number;
     precio: string;
     descuento: string;
-    solo_primera: boolean;
   }>(
-    `SELECT col_id, colpre_precio_disciplina AS precio, colpre_descuento_hermano AS descuento,
-            colpre_descuento_solo_primera AS solo_primera
+    `SELECT col_id, colpre_precio_disciplina AS precio, colpre_descuento_hermano AS descuento
        FROM public.colegio_precio WHERE col_id = ANY($1::int[])`,
     [colIds],
   );
@@ -199,7 +195,6 @@ export async function preciosDe(
     mapa.set(r.col_id, {
       precio: Number(r.precio),
       descuentoHermano: Number(r.descuento),
-      descuentoSoloPrimera: r.solo_primera,
     });
   }
   return mapa;
@@ -217,14 +212,13 @@ export async function guardarPrecio(
 ): Promise<void> {
   await client.query(
     `INSERT INTO public.colegio_precio
-         (col_id, colpre_precio_disciplina, colpre_descuento_hermano, colpre_descuento_solo_primera)
-     VALUES ($1, $2, $3, $4)
+         (col_id, colpre_precio_disciplina, colpre_descuento_hermano)
+     VALUES ($1, $2, $3)
      ON CONFLICT (col_id) DO UPDATE
         SET colpre_precio_disciplina      = EXCLUDED.colpre_precio_disciplina,
             colpre_descuento_hermano      = EXCLUDED.colpre_descuento_hermano,
-            colpre_descuento_solo_primera = EXCLUDED.colpre_descuento_solo_primera,
             colpre_fecha_modificacion     = now()`,
-    [colId, precio.precio, precio.descuentoHermano, precio.descuentoSoloPrimera],
+    [colId, precio.precio, precio.descuentoHermano],
   );
 }
 
@@ -251,7 +245,6 @@ export interface ColegioOfertado {
   col_nombre: string;
   precio: number;
   descuento_hermano: number;
-  descuento_solo_primera: boolean;
   disciplinas: DisciplinaOfertada[];
 }
 
@@ -265,7 +258,6 @@ export async function ofertaPublica(): Promise<ColegioOfertado[]> {
     `SELECT col.col_id, col.col_nombre,
             pre.colpre_precio_disciplina      AS precio,
             pre.colpre_descuento_hermano      AS descuento_hermano,
-            pre.colpre_descuento_solo_primera AS descuento_solo_primera,
             json_agg(json_build_object(
                 'colacthor_id', d.colacthor_id,
                 'col_id',       d.col_id,
@@ -284,7 +276,7 @@ export async function ofertaPublica(): Promise<ColegioOfertado[]> {
        LEFT JOIN public.categoria cat ON cat.cat_id = act.cat_id
       WHERE d.est_id = $1
       GROUP BY col.col_id, col.col_nombre, pre.colpre_precio_disciplina,
-               pre.colpre_descuento_hermano, pre.colpre_descuento_solo_primera
+               pre.colpre_descuento_hermano
       ORDER BY col.col_nombre`,
     [ESTADO.ACTIVO],
   );

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -9,12 +8,12 @@ import { useBorrarPrecio, useGuardarPrecio, usePrecios } from '@/hooks/useInscri
 import { dinero, type PrecioColegio } from '@/api/inscripciones';
 
 /**
- * Precio de inscripción por colegio.
+ * Precio mensual de inscripción por colegio.
  *
  * Dentro de un colegio todas las disciplinas cuestan lo mismo. Si en una
- * misma inscripción van hermanos, el que más paga va completo y los demás
- * llevan el descuento de su colegio: en todas sus disciplinas o solo en la
- * primera, según la casilla.
+ * misma inscripción van hermanos, lidera el que más disciplinas tiene (paga
+ * completo) y cada hermano lleva el descuento de su colegio en tantas
+ * disciplinas como el que lidera.
  *
  * Un colegio sin precio **no aparece** en el formulario público.
  */
@@ -35,8 +34,9 @@ const PreciosColegios = () => {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Si en una inscripción van varios hermanos, el que más paga va a precio completo y los demás
-        llevan el descuento de su colegio.
+        Precio mensual por disciplina. Si se inscriben hermanos juntos, el que más disciplinas tiene
+        paga completo, y cada hermano lleva el descuento en tantas disciplinas como él: si el
+        primero va a 1, el hermano tiene descuento en 1; si va a 5, en hasta 5.
       </p>
       {sinPrecio.length > 0 && (
         <div className="rounded-md border border-amber-600/50 bg-amber-500/10 p-3 text-sm">
@@ -63,13 +63,11 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
 
   const [precio, setPrecio] = useState('');
   const [descuento, setDescuento] = useState('');
-  const [soloPrimera, setSoloPrimera] = useState(false);
 
   useEffect(() => {
     setPrecio(fila.precio !== null ? String(fila.precio) : '');
     setDescuento(fila.descuento_hermano !== null ? String(fila.descuento_hermano) : '0');
-    setSoloPrimera(fila.descuento_solo_primera ?? false);
-  }, [fila.precio, fila.descuento_hermano, fila.descuento_solo_primera]);
+  }, [fila.precio, fila.descuento_hermano]);
 
   const nPrecio = Number(precio.replace(',', '.'));
   const nDescuento = Number(descuento.replace(',', '.') || '0');
@@ -82,8 +80,7 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
     nDescuento <= 100;
   const cambiado =
     nPrecio !== fila.precio ||
-    nDescuento !== (fila.descuento_hermano ?? 0) ||
-    soloPrimera !== (fila.descuento_solo_primera ?? false);
+    nDescuento !== (fila.descuento_hermano ?? 0);
 
   const id = (c: string) => `precio-${fila.col_id}-${c}`;
 
@@ -103,7 +100,7 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
           <Badge variant="secondary">Sin precio</Badge>
         ) : (
           <Badge variant="outline">
-            {dinero(fila.precio)} por disciplina
+            {dinero(fila.precio)} al mes
             {fila.descuento_hermano ? ` · ${fila.descuento_hermano} % hermanos` : ''}
           </Badge>
         )}
@@ -112,7 +109,7 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
       {puedeEditar && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <div className="space-y-1.5">
-            <Label htmlFor={id('precio')}>Precio por disciplina (USD)</Label>
+            <Label htmlFor={id('precio')}>Precio mensual por disciplina (USD)</Label>
             <Input
               id={id('precio')}
               inputMode="decimal"
@@ -142,7 +139,6 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
                   datos: {
                     precio: Math.round(nPrecio * 100) / 100,
                     descuento_hermano: nDescuento,
-                    descuento_solo_primera: soloPrimera,
                   },
                 })
               }
@@ -161,20 +157,6 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
               </Button>
             )}
           </div>
-          <label
-            htmlFor={id('solo')}
-            className="flex min-h-11 cursor-pointer items-center gap-3 sm:col-span-3"
-          >
-            <Checkbox
-              id={id('solo')}
-              checked={soloPrimera}
-              onCheckedChange={(v) => setSoloPrimera(v === true)}
-            />
-            <span className="text-sm">
-              El descuento solo se aplica a la <strong>primera disciplina</strong> del hermano (si no,
-              a todas)
-            </span>
-          </label>
         </div>
       )}
     </li>

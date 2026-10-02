@@ -37,7 +37,6 @@ export interface ColegioOfertado {
   col_nombre: string;
   precio: number;
   descuento_hermano: number;
-  descuento_solo_primera: boolean;
   disciplinas: DisciplinaOfertada[];
 }
 
@@ -46,7 +45,7 @@ export interface CobroAlumno {
   disciplinas: number;
   subtotal: number;
   descuento_pct: number;
-  descuento_solo_primera: boolean;
+  disciplinas_con_descuento: number;
   descuento: number;
   total: number;
   paga_completo: boolean;
@@ -198,14 +197,12 @@ export interface PrecioColegio {
   disciplinas_activas: number;
   precio: number | null;
   descuento_hermano: number | null;
-  descuento_solo_primera: boolean | null;
   fecha_modificacion: string | null;
 }
 
 export interface DatosPrecio {
   precio: number;
   descuento_hermano: number;
-  descuento_solo_primera: boolean;
 }
 
 export const inscripcionesApi = {

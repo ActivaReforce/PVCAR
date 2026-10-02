@@ -174,7 +174,6 @@ export const precioSchema = z.object({
     // Con tolerancia: 28.3 * 100 da 2830.0000000000005 en coma flotante.
     .refine((v) => Math.abs(Math.round(v * 100) - v * 100) < 1e-6, 'Como mucho dos decimales'),
   descuento_hermano: z.number().min(0).max(100),
-  descuento_solo_primera: z.boolean(),
 });
 
 /** Lo que el formulario manda para saber cuanto se paga antes de subir el comprobante. */

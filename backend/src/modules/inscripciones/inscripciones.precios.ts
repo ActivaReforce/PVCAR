@@ -1,17 +1,18 @@
 /**
- * Lo que cuesta una inscripción (migración 0015).
+ * Lo que cuesta una inscripción, al mes (migración 0015).
  *
  * Reglas del cliente (2026-10-02):
- *   - Cada colegio tiene un precio por disciplina; dentro del colegio todas
- *     cuestan lo mismo.
- *   - Si en el mismo envío se inscriben hermanos, los hermanos tienen un
- *     descuento (porcentaje del colegio de cada hermano).
- *   - Una casilla por colegio decide si el descuento cubre todas las
- *     disciplinas del hermano o solo la primera.
+ *   - Cada colegio tiene un precio mensual por disciplina; dentro del
+ *     colegio todas cuestan lo mismo.
+ *   - Si en el mismo envío se inscriben hermanos, **lidera** el que más
+ *     disciplinas tiene: paga completo, y su número de disciplinas es el
+ *     cupo de descuento de cada hermano. Si el que lidera va a 1, el hermano
+ *     tiene descuento en 1; si va a 5, el hermano lo tiene en hasta 5.
+ *   - El descuento es un porcentaje, el del colegio de cada hermano.
  *
- * Quién paga completo: el alumno con el importe más alto. Si fuera "el
- * primero del formulario", el orden en que se escriben los hijos cambiaría
- * el total, y eso no es una regla de negocio sino un accidente.
+ * Empate en disciplinas: lidera el de importe más alto, y si sigue el
+ * empate, el primero. Así el orden en que se escriben los hijos no cambia
+ * el total salvo cuando de verdad da igual.
  *
  * Todo en centavos enteros: con decimales de coma flotante, 3 × 28,30 da
  * 84,89999… y el contrato diría una cifra que no es.
@@ -20,19 +21,19 @@
 export interface PrecioColegio {
   precio: number;
   descuentoHermano: number;
-  descuentoSoloPrimera: boolean;
 }
 
 export interface CobroAlumno {
   precio_disciplina: number;
   disciplinas: number;
   subtotal: number;
-  /** Porcentaje aplicado; 0 si paga completo. */
+  /** Porcentaje aplicado; 0 si lidera o no hay hermanos. */
   descuento_pct: number;
-  descuento_solo_primera: boolean;
+  /** Cuántas de sus disciplinas llevan el descuento. */
+  disciplinas_con_descuento: number;
   descuento: number;
   total: number;
-  /** Es el que paga completo cuando hay hermanos. */
+  /** Es el que lidera (paga completo) cuando hay hermanos. */
   paga_completo: boolean;
 }
 
@@ -55,26 +56,27 @@ export function calcularCobro(
     return { p, precio, n: a.disciplinas, subtotal: precio * a.disciplinas };
   });
 
-  // El de importe más alto paga completo; en empate, el primero.
-  let principal = 0;
+  let lider = 0;
   base.forEach((b, i) => {
-    if (b.subtotal > base[principal]!.subtotal) principal = i;
+    const l = base[lider]!;
+    if (b.n > l.n || (b.n === l.n && b.subtotal > l.subtotal)) lider = i;
   });
   const hayHermanos = base.length > 1;
+  const cupo = base[lider]?.n ?? 0;
 
   const resultado = base.map((b, i) => {
-    const conDescuento = hayHermanos && i !== principal && b.p.descuentoHermano > 0;
-    const sobre = b.p.descuentoSoloPrimera ? b.precio : b.subtotal;
-    const descuento = conDescuento ? Math.round((sobre * b.p.descuentoHermano) / 100) : 0;
+    const conDescuento = hayHermanos && i !== lider && b.p.descuentoHermano > 0;
+    const cubiertas = conDescuento ? Math.min(b.n, cupo) : 0;
+    const descuento = Math.round((b.precio * cubiertas * b.p.descuentoHermano) / 100);
     return {
       precio_disciplina: aDolares(b.precio),
       disciplinas: b.n,
       subtotal: aDolares(b.subtotal),
       descuento_pct: conDescuento ? b.p.descuentoHermano : 0,
-      descuento_solo_primera: b.p.descuentoSoloPrimera,
+      disciplinas_con_descuento: cubiertas,
       descuento: aDolares(descuento),
       total: aDolares(b.subtotal - descuento),
-      paga_completo: !hayHermanos || i === principal,
+      paga_completo: !hayHermanos || i === lider,
       _centavos: b.subtotal - descuento,
     };
   });
@@ -91,8 +93,9 @@ export function dinero(dolares: number): string {
   return MONEDA.format(dolares);
 }
 
-/** "10 % por hermano, en todas sus disciplinas", o "Sin descuento". */
+/** "10 % por hermano en 2 disciplinas ($9,00)", o "Sin descuento". */
 export function textoDescuento(c: CobroAlumno): string {
   if (c.descuento_pct === 0) return 'Sin descuento';
-  return `${c.descuento_pct} % por hermano, ${c.descuento_solo_primera ? 'en su primera disciplina' : 'en todas sus disciplinas'} (${dinero(c.descuento)})`;
+  const n = c.disciplinas_con_descuento;
+  return `${c.descuento_pct} % por hermano en ${n} disciplina${n === 1 ? '' : 's'} (${dinero(c.descuento)})`;
 }

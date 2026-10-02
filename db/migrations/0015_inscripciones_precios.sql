@@ -9,11 +9,12 @@
 -- ---------------------------------------------------------------------
 -- Qué hace
 --
--- 1. `colegio_precio`: lo que cuesta inscribirse en una disciplina de un
---    colegio (todas cuestan lo mismo dentro del colegio), el descuento
---    por hermano en porcentaje, y si ese descuento cubre todas las
---    disciplinas del hermano o solo la primera. Un colegio sin fila aquí
---    no aparece en el formulario público.
+-- 1. `colegio_precio`: lo que cuesta al mes una disciplina de un colegio
+--    (todas cuestan lo mismo dentro del colegio) y el descuento por
+--    hermano en porcentaje. Con hermanos, lidera el que más disciplinas
+--    tiene y su número es el cupo de descuento de cada hermano (regla en
+--    el backend, inscripciones.precios.ts). Un colegio sin fila aquí no
+--    aparece en el formulario público.
 -- 2. `documento_legal.doc_publicado`: una versión nace en **borrador**
 --    (se puede editar y borrar) y se **publica** (desde ahí no cambia
 --    nunca). La vigente es la publicada de número más alto. El trigger
@@ -32,16 +33,13 @@ CREATE TABLE IF NOT EXISTS public.colegio_precio (
     col_id                    integer      PRIMARY KEY REFERENCES public.colegio(col_id) ON DELETE CASCADE,
     colpre_precio_disciplina  numeric(10,2) NOT NULL,
     colpre_descuento_hermano  numeric(5,2)  NOT NULL DEFAULT 0,
-    colpre_descuento_solo_primera boolean   NOT NULL DEFAULT false,
     colpre_fecha_modificacion timestamptz  NOT NULL DEFAULT now(),
     CONSTRAINT ck_colpre_precio    CHECK (colpre_precio_disciplina > 0),
     CONSTRAINT ck_colpre_descuento CHECK (colpre_descuento_hermano >= 0 AND colpre_descuento_hermano <= 100)
 );
 
 COMMENT ON TABLE public.colegio_precio IS
-    'Precio por disciplina en cada colegio y descuento por hermano (porcentaje). Sin fila, el colegio no se ofrece en el formulario público.';
-COMMENT ON COLUMN public.colegio_precio.colpre_descuento_solo_primera IS
-    'true: el descuento del hermano solo se aplica a su primera disciplina. false: a todas.';
+    'Precio mensual por disciplina en cada colegio y descuento por hermano (porcentaje). Sin fila, el colegio no se ofrece en el formulario público.';
 
 -- ---------------------------------------------------------------------
 -- 2. Borradores de documentos legales

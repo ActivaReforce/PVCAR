@@ -155,7 +155,7 @@ function rellenarContrato(
     precio_disciplina: cobro ? dinero(cobro.precio_disciplina) : pendiente,
     descuento: cobro
       ? cobro.descuento_pct > 0
-        ? `${cobro.descuento_pct} % por hermano, ${cobro.descuento_solo_primera ? 'en su primera disciplina' : 'en todas sus disciplinas'} (${dinero(cobro.descuento)})`
+        ? `${cobro.descuento_pct} % por hermano en ${cobro.disciplinas_con_descuento} disciplina${cobro.disciplinas_con_descuento === 1 ? '' : 's'} (${dinero(cobro.descuento)})`
         : 'Sin descuento'
       : pendiente,
     valor_alumno: cobro ? dinero(cobro.total) : pendiente,
@@ -725,7 +725,7 @@ const FichaAlumno = ({
             <SelectContent>
               {formulario.colegios.map((c) => (
                 <SelectItem key={c.col_id} value={String(c.col_id)}>
-                  {c.col_nombre} · {dinero(c.precio)} por disciplina
+                  {c.col_nombre} · {dinero(c.precio)} al mes por disciplina
                 </SelectItem>
               ))}
             </SelectContent>
@@ -756,7 +756,7 @@ const FichaAlumno = ({
           <legend className="text-sm font-medium">
             Disciplinas{' '}
             <span className="font-normal text-muted-foreground">
-              · {dinero(colegio.precio)} cada una
+              · {dinero(colegio.precio)} al mes cada una
             </span>
           </legend>
           {porActividad.map(([actividad, horarios]) => (
@@ -950,8 +950,7 @@ const PasoPago = ({
                     {c.descuento > 0 && (
                       <>
                         {' '}
-                        − {c.descuento_pct} % por hermano
-                        {c.descuento_solo_primera ? ' (en una disciplina)' : ''}
+                        − {c.descuento_pct} % por hermano en {c.disciplinas_con_descuento}
                       </>
                     )}
                   </p>
@@ -961,7 +960,7 @@ const PasoPago = ({
             ))}
           </ul>
           <div className="flex items-center justify-between border-t bg-muted/40 p-3">
-            <span className="font-semibold">Total a pagar</span>
+            <span className="font-semibold">Total mensual</span>
             <span className="text-lg font-bold">{dinero(cobro.total)}</span>
           </div>
         </>
@@ -1014,7 +1013,9 @@ const Exito = ({ resultado, correo }: { resultado: EnvioRecibido; correo: string
     <div className="text-center">
       <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
       <h1 className="mt-3 text-xl font-semibold">¡Inscripción enviada!</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Total: {dinero(resultado.total)}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Total mensual: {dinero(resultado.total)}
+      </p>
     </div>
     <div className="space-y-2 text-sm">
       <p>

@@ -720,7 +720,7 @@ export async function ejemploContrato(docId: number): Promise<Buffer> {
       { colId: 1, disciplinas: 2 },
       { colId: 1, disciplinas: 1 },
     ],
-    new Map([[1, { precio: 45, descuentoHermano: 10, descuentoSoloPrimera: false }]]),
+    new Map([[1, { precio: 45, descuentoHermano: 10 }]]),
   );
   const { pdf } = await generarContrato({
     titulo: doc.doc_titulo,
@@ -762,14 +762,13 @@ export async function precios() {
 export async function guardarPrecio(
   actor: AuthUser,
   colId: number,
-  input: { precio: number; descuento_hermano: number; descuento_solo_primera: boolean },
+  input: { precio: number; descuento_hermano: number },
 ): Promise<void> {
   if (!(await repo.existeColegio(colId))) throw new ApiError(404, 'Colegio no encontrado');
   await enTransaccion(async (client) => {
     await repo.guardarPrecio(client, colId, {
       precio: input.precio,
       descuentoHermano: input.descuento_hermano,
-      descuentoSoloPrimera: input.descuento_solo_primera,
     });
     await auditar(
       { actor, accion: 'editar', entidad: 'colegio_precio', entidadId: colId, detalle: { ...input } },

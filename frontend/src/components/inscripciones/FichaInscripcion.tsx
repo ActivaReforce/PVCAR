@@ -269,7 +269,7 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
           Comprobante de pago
           {datos.ins_total !== null && (
             <span className="ml-2 font-normal text-muted-foreground">
-              · debe cubrir {dinero(datos.ins_total)}
+              · debe cubrir {dinero(datos.ins_total)} al mes
             </span>
           )}
         </h3>
@@ -326,7 +326,7 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
                 {n.cobro.disciplinas} × {dinero(n.cobro.precio_disciplina)} ={' '}
                 {dinero(n.cobro.subtotal)}
                 {n.cobro.descuento > 0 &&
-                  ` − ${n.cobro.descuento_pct} % hermano (${dinero(n.cobro.descuento)})`}{' '}
+                  ` − ${n.cobro.descuento_pct} % hermano en ${n.cobro.disciplinas_con_descuento} (${dinero(n.cobro.descuento)})`}{' '}
                 → <strong>{dinero(n.cobro.total)}</strong>
               </p>
             )}

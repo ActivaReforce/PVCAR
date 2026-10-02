@@ -33,9 +33,9 @@ export const MARCADORES = {
   colegio: 'Colegio',
   grado: 'Grado',
   disciplinas: 'Disciplinas elegidas, separadas por punto y coma',
-  precio_disciplina: 'Precio de una disciplina en ese colegio',
+  precio_disciplina: 'Precio mensual de una disciplina en ese colegio',
   descuento: 'Descuento por hermano aplicado, o "Sin descuento"',
-  valor_alumno: 'Lo que paga este alumno',
+  valor_alumno: 'Lo que paga este alumno al mes',
   fecha: 'Fecha de la inscripción',
 } as const;
 
@@ -205,14 +205,14 @@ export async function generarContrato(
     doc.text(`• ${aLatin1(disciplina)}`, { indent: 12 });
   }
 
-  seccion('Valores');
+  seccion('Valores mensuales');
   const c = datos.cobro;
   fila(
     `${c.disciplinas} disciplina${c.disciplinas === 1 ? '' : 's'} a ${dinero(c.precio_disciplina)}`,
     dinero(c.subtotal),
   );
   if (c.descuento > 0) fila('Descuento', `${textoDescuento(c)}`);
-  fila('Total de este alumno', dinero(c.total));
+  fila('Total mensual de este alumno', dinero(c.total));
 
   seccion('Aceptación electrónica');
   doc
