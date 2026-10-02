@@ -160,6 +160,21 @@ it('cada consulta manda tantos valores como marcadores, y sin huecos', async () 
     }
   }
 
+  const { CONJUNTOS, construir } = await import('./historico/historico.definiciones.js');
+  for (const conjunto of CONJUNTOS) {
+    for (const [variante, f] of [
+      {},
+      {
+        buscar: 'a', colegio: 1, actividad: 1, entrenador: 1, estado: 1, asistencia: 1, rol: 1,
+        desde: '2026-01-01', hasta: '2026-09-18',
+      },
+    ].entries()) {
+      actual = { modulo: 'historico', fn: conjunto.id, variante };
+      const { sql, params } = construir(conjunto, f);
+      capturado.push({ ...actual, sql, params: params.length });
+    }
+  }
+
   if (process.env.PVCAR_VOLCAR_SQL === '1') {
     writeFileSync(
       join(aqui, '..', '..', '..', 'dump-sql.json'),

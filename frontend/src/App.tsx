@@ -36,6 +36,7 @@ const AsistenciasAlumnos = lazy(() => import("@/pages/AsistenciasAlumnos"));
 const AsistenciasEntrenadores = lazy(() => import("@/pages/AsistenciasEntrenadores"));
 const Reportes = lazy(() => import("@/pages/Reportes"));
 const ReporteDetalle = lazy(() => import("@/pages/ReporteDetalle"));
+const DataAnterior = lazy(() => import("@/pages/DataAnterior"));
 const Encuestas = lazy(() => import("@/pages/Encuestas"));
 const Representantes = lazy(() => import("@/pages/Representantes"));
 const Perfil = lazy(() => import("@/pages/Perfil"));
@@ -111,6 +112,7 @@ const App = () => {
                                 element={<AsistenciasEntrenadores />}
                               />
                               <Route path="/reportes" element={<Reportes />} />
+                              <Route path="/reportes/data-anterior" element={<DataAnterior />} />
                               <Route path="/reportes/:modulo" element={<ReporteDetalle />} />
                               <Route path="/encuestas" element={<Encuestas />} />
                               <Route path="/representantes" element={<Representantes />} />
