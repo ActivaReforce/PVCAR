@@ -17,9 +17,12 @@ interface Props {
   onOrdenar: (clave: Orden) => void;
 }
 
-/** Misma rejilla en la cabecera y en cada fila. */
-const REJILLA =
-  'grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1.8fr)_8rem_6rem_auto] md:items-center md:gap-4';
+/** Columnas desde md, las mismas en la cabecera y en cada fila. */
+const COLUMNAS_MD =
+  'md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1.8fr)_8rem_6rem_5.5rem] md:items-center md:gap-4';
+const REJILLA = `grid ${COLUMNAS_MD}`;
+/** En el teléfono: nombre y acciones en una línea, el resto debajo. */
+const FILA = `grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 ${COLUMNAS_MD}`;
 
 const iniciales = (nombre: string) =>
   nombre
@@ -67,7 +70,8 @@ function Cabecera({
  * cada fila con su información, y **borde ámbar** en quien está activo y no
  * tiene ninguna disciplina, que es a quien hay que asignar.
  *
- * Un solo markup: desde `md` las columnas; en el teléfono cada fila se apila.
+ * Un solo markup: desde `md` las columnas; en el teléfono, nombre y acciones
+ * en la primera línea y el resto en una línea compacta debajo.
  * "Asignar" solo aparece con la ficha activa — a alguien de baja el backend no
  * le deja asignar nada, y enseñar el botón para que luego falle era el fallo
  * que vio el cliente con Bernard Rosario.
@@ -96,14 +100,14 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
             <li
               key={e.ent_id}
               className={cn(
-                REJILLA,
-                'rounded-lg border bg-card px-4 py-3',
+                FILA,
+                'rounded-lg border bg-card px-3 py-2.5 md:px-4 md:py-3',
                 sinDisciplinas && 'border-2 border-amber-500 dark:border-amber-400',
                 !activo && 'border-dashed bg-muted/40',
               )}
             >
               <div className="flex min-w-0 items-center gap-3">
-                <Avatar className="h-10 w-10 flex-shrink-0">
+                <Avatar className="h-9 w-9 flex-shrink-0 md:h-10 md:w-10">
                   <AvatarImage src={e.usu_foto_url ?? undefined} alt="" />
                   <AvatarFallback>{iniciales(e.usu_nombre)}</AvatarFallback>
                 </Avatar>
@@ -111,59 +115,66 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
                   <div className="truncate font-medium" title={e.usu_nombre}>
                     {e.usu_nombre}
                   </div>
-                  <div className="truncate text-sm text-muted-foreground" title={e.usu_correo}>
+                  <div
+                    className="truncate text-xs text-muted-foreground md:text-sm"
+                    title={e.usu_correo}
+                  >
                     {e.usu_correo}
                   </div>
                 </div>
               </div>
 
-              <div className="min-w-0 text-sm text-muted-foreground">
-                <div className="truncate">{e.ent_cedula ?? 'Sin cédula'}</div>
-                <div className="truncate">{e.usu_telefono ?? 'Sin teléfono'}</div>
-              </div>
+              {/* En el teléfono todo esto va en una línea compacta bajo el nombre;
+                  desde md, `contents` lo disuelve y cada dato vuelve a su columna. */}
+              <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs md:contents md:text-sm">
+                <div className="min-w-0 text-muted-foreground">
+                  <span className="md:block md:truncate">{e.ent_cedula ?? 'Sin cédula'}</span>
+                  <span className="md:hidden"> · </span>
+                  <span className="md:block md:truncate">{e.usu_telefono ?? 'Sin teléfono'}</span>
+                </div>
 
-              <div className="flex min-w-0 flex-wrap gap-1">
-                {e.colegios.length > 0 ? (
-                  e.colegios.map((c) => (
-                    <Badge key={c.col_id} variant="secondary" className="max-w-full text-xs">
-                      <span className="truncate">{c.col_nombre}</span>
-                    </Badge>
-                  ))
-                ) : (
-                  <span
-                    className={cn(
-                      'text-xs',
-                      sinDisciplinas
-                        ? 'font-medium text-amber-700 dark:text-amber-400'
-                        : 'text-muted-foreground',
-                    )}
-                  >
-                    Sin disciplinas
+                <div className="flex min-w-0 flex-wrap gap-1">
+                  {e.colegios.length > 0 ? (
+                    e.colegios.map((c) => (
+                      <Badge key={c.col_id} variant="secondary" className="max-w-full text-xs">
+                        <span className="truncate">{c.col_nombre}</span>
+                      </Badge>
+                    ))
+                  ) : (
+                    <span
+                      className={cn(
+                        sinDisciplinas
+                          ? 'font-medium text-amber-700 dark:text-amber-400'
+                          : 'text-muted-foreground',
+                      )}
+                    >
+                      Sin disciplinas
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <strong>{e.disciplinas}</strong>
+                  <span className="text-muted-foreground">
+                    <span className="md:hidden"> disc.</span> · {e.alumnos} alumnos
+                    {e.auxiliares > 0 &&
+                      ` · ${e.auxiliares} ${e.auxiliares === 1 ? 'auxiliar' : 'auxiliares'}`}
                   </span>
-                )}
+                </div>
+
+                <div>
+                  <Badge variant={activo ? 'default' : 'secondary'} className="text-xs">
+                    {activo ? 'Activo' : 'Inactivo'}
+                  </Badge>
+                </div>
               </div>
 
-              <div className="text-sm">
-                <strong>{e.disciplinas}</strong>
-                <span className="text-muted-foreground"> · {e.alumnos} alumnos</span>
-                {e.auxiliares > 0 && (
-                  <div className="text-xs text-muted-foreground">
-                    {e.auxiliares} {e.auxiliares === 1 ? 'auxiliar' : 'auxiliares'}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <Badge variant={activo ? 'default' : 'secondary'}>
-                  {activo ? 'Activo' : 'Inactivo'}
-                </Badge>
-              </div>
-
-              <div className="flex items-center gap-1">
+              {/* Acciones: arriba a la derecha en el teléfono, última columna en md. */}
+              <div className="col-start-2 row-start-1 flex items-center gap-0.5 md:col-start-auto md:row-start-auto">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-11 w-11 md:h-9 md:w-9"
+                  className="h-10 w-10 md:h-9 md:w-9"
                   onClick={() => onVer(e)}
                   title="Ver ficha"
                   aria-label={`Ver ficha de ${e.usu_nombre}`}
@@ -173,13 +184,14 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
                 {activo && (
                   <ConditionalAction module="entrenadores" action="editar">
                     <Button
-                      variant="outline"
-                      size="sm"
-                      className="min-h-11 md:min-h-9"
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 md:h-9 md:w-9"
                       onClick={() => onAsignar(e)}
+                      title="Asignar disciplinas"
+                      aria-label={`Asignar disciplinas a ${e.usu_nombre}`}
                     >
-                      <UserPlus className="mr-1.5 h-4 w-4" />
-                      Asignar
+                      <UserPlus className="h-4 w-4" />
                     </Button>
                   </ConditionalAction>
                 )}

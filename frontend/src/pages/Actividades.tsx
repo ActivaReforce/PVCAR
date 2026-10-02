@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -79,7 +74,6 @@ const Actividades = () => {
     x === '' ? 1 : y === '' ? -1 : x.localeCompare(y, 'es'),
   );
 
-
   const cerrarFormulario = () => {
     setCreando(false);
     setEditando(null);
@@ -122,10 +116,7 @@ const Actividades = () => {
           onChange={(texto) => setBusqueda(texto)}
           className="w-full"
         />
-        <Select
-          value={categoria}
-          onValueChange={(valor) => setCategoria(valor)}
-        >
+        <Select value={categoria} onValueChange={(valor) => setCategoria(valor)}>
           <SelectTrigger className="h-11 w-full sm:h-10 sm:w-56">
             <SelectValue placeholder="Todas las categorías" />
           </SelectTrigger>
@@ -141,9 +132,7 @@ const Actividades = () => {
         </Select>
         <Select
           value={orden}
-          onValueChange={(valor) =>
-            setOrden(valor as FiltrosActividades['orden'])
-          }
+          onValueChange={(valor) => setOrden(valor as FiltrosActividades['orden'])}
         >
           <SelectTrigger className="h-11 w-full sm:h-10 sm:w-52">
             <SelectValue placeholder="Ordenar" />
@@ -169,13 +158,13 @@ const Actividades = () => {
         </div>
       ) : (
         <GrupoDesplegable>
-          <div className="space-y-6">
+          <div className="space-y-8">
             {ordenSecciones.map((clave) => {
               const delGrupo = secciones.get(clave) ?? [];
               return (
                 <section key={clave || 'sin-categoria'} className="space-y-2">
-                  <header className="flex items-baseline justify-between border-b pb-1">
-                    <h2 className="font-semibold">{clave || 'Sin categoría'}</h2>
+                  <header className="flex items-baseline justify-between border-b-2 pb-1.5">
+                    <h2 className="text-lg font-bold sm:text-xl">{clave || 'Sin categoría'}</h2>
                     <span className="text-xs text-muted-foreground">
                       {delGrupo.length} {delGrupo.length === 1 ? 'actividad' : 'actividades'}
                     </span>

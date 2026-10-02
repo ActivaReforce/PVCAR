@@ -42,7 +42,10 @@ Este módulo no da de alta personas — un entrenador **es** un usuario con el r
 | 4 | Un asistente o respaldo puede estar con **varios entrenadores** y **varias disciplinas** | ❌ **Hay que cambiarlo.** `entrenadores.service.ts` rechaza con 409 al que ya respalda a alguien y `listarCandidatosAAuxiliar` lo excluye. Cambio: quitar esa regla y poner unicidad parcial `(usu_id, ent_id) WHERE est_id = 1` (migración nueva). El alcance ya es la **unión** de las disciplinas de todos sus titulares | Atarlo a dos titulares: ve las disciplinas de los dos. Soltar uno: deja de ver solo las de ese |
 | 5 | Si un entrenador se va (le quitan la disciplina o lo dan de baja), **sus registros se quedan** y el siguiente sigue con normalidad | ✅ Diseñado así: quitar cierra con `entasig_fecha_fin`, la baja cierra todas, nada se borra; las asistencias guardan `ent_id` / `usu_registrador`; el borrado permanente se bloquea si hay historial. **Falta probarlo de punta a punta** | Entrenador A con asistencias en una disciplina → darlo de baja → asignar B a la misma disciplina → B pasa lista normal; en Reportes salen las asistencias de A **y** las de B, y A aparece con su nombre aunque esté inactivo |
 
-**Duda abierta del punto 4:** "varias disciplinas" — ¿el auxiliar hereda **todas** las de cada titular (como hoy), o hay que poder elegir solo algunas de un titular? Hoy no existe forma de ligar un auxiliar a una disciplina concreta. Preguntarle al probar la Fase 9.
+**Decidido por el cliente el 2026-10-02 (al probar la Fase 8):** el asistente con varios titulares, al entrar, **elige de quién quiere ver** —un selector arriba, con la opción **"Todos"**— y lo puede cambiar cuando quiera. Hereda todas las disciplinas de cada titular. Se construye antes de abrir la Fase 9, junto con:
+
+- quitar el 409 de "ya respalda a otro" y poner unicidad parcial `(usu_id, ent_id) WHERE est_id = 1` (migración nueva);
+- **aviso de choque de horario** al asignar: el mismo entrenador con dos disciplinas a la misma hora el mismo día, aunque sean de colegios distintos (hoy nada lo impide).
 
 ---
 
