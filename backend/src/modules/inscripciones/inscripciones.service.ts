@@ -17,6 +17,7 @@ import * as usuariosRepo from '../usuarios/usuarios.repository.js';
 import * as estudiantesRepo from '../estudiantes/estudiantes.repository.js';
 import * as repo from './inscripciones.repository.js';
 import { MARCADORES, generarContrato } from './inscripciones.contrato.js';
+import { calcularCobro, type Cobro, type CobroAlumno } from './inscripciones.precios.js';
 import {
   PARENTESCOS,
   TIPOS_DOCUMENTO,
@@ -129,8 +130,48 @@ export async function formulario(): Promise<Formulario> {
   };
 }
 
+/**
+ * Cuanto se paga. Lo calcula siempre el backend, con los precios de la base:
+ * lo que diga el navegador no cuenta. Lo usan el formulario (para ensenar el
+ * total antes del comprobante) y el envio (para congelarlo en el contrato).
+ */
+async function cobroDe(
+  ninos: Array<{ nombre: string; col_id: number; disciplinas: number[] }>,
+): Promise<{ cobro: Cobro; encontradas: Map<number, DisciplinaConEstado> }> {
+  const ids = [...new Set(ninos.flatMap((n) => n.disciplinas))];
+  const encontradas = new Map((await repo.disciplinasPorId(ids)).map((d) => [d.colacthor_id, d]));
+  const problemas = problemasDeDisciplinas(ninos, encontradas);
+  if (problemas.length > 0) {
+    throw new ApiError(409, 'Alguna disciplina elegida ya no está disponible. Recarga la página.', {
+      problemas,
+    });
+  }
+
+  const precios = await repo.preciosDe([...new Set(ninos.map((n) => n.col_id))]);
+  const sinPrecio = ninos.filter((n) => !precios.has(n.col_id));
+  if (sinPrecio.length > 0) {
+    throw new ApiError(409, 'Uno de los colegios elegidos todavía no tiene precio. Recarga la página.', {
+      problemas: sinPrecio.map((n) => `${n.nombre}: su colegio no tiene precio configurado`),
+    });
+  }
+
+  const cobro = calcularCobro(
+    ninos.map((n) => ({ colId: n.col_id, disciplinas: n.disciplinas.length })),
+    precios,
+  );
+  return { cobro, encontradas };
+}
+
+export async function cotizar(
+  ninos: Array<{ col_id: number; disciplinas: number[] }>,
+): Promise<Cobro> {
+  const { cobro } = await cobroDe(ninos.map((n, i) => ({ ...n, nombre: `Alumno ${i + 1}` })));
+  return cobro;
+}
+
 export interface EnvioRecibido {
   ins_id: number;
+  total: number;
   contratos: Array<{ alumno: string; url: string | null }>;
 }
 
@@ -158,14 +199,7 @@ export async function enviar(
     );
   }
 
-  const ids = [...new Set(input.ninos.flatMap((n) => n.disciplinas))];
-  const encontradas = new Map((await repo.disciplinasPorId(ids)).map((d) => [d.colacthor_id, d]));
-  const problemas = problemasDeDisciplinas(input.ninos, encontradas);
-  if (problemas.length > 0) {
-    throw new ApiError(409, 'Alguna disciplina elegida ya no está disponible. Recarga la página.', {
-      problemas,
-    });
-  }
+  const { cobro, encontradas } = await cobroDe(input.ninos);
 
   const comprobante = Buffer.from(input.comprobante.base64, 'base64');
   if (comprobante.length > 2 * 1024 * 1024) {
@@ -182,7 +216,7 @@ export async function enviar(
 
   // Los PDF se generan antes de tocar nada: si uno falla, no queda nada subido.
   const contratos: Array<{ pdf: Buffer; sha256: string }> = [];
-  for (const nino of input.ninos) {
+  for (const [i, nino] of input.ninos.entries()) {
     const elegidas = nino.disciplinas.map((id) => encontradas.get(id)!);
     contratos.push(
       await generarContrato({
@@ -191,7 +225,7 @@ export async function enviar(
         versionContrato: contrato.doc_version,
         versionTerminos: terminos.doc_version,
         versionPrivacidad: privacidad.doc_version,
-        representante: input.representante,
+        representante: { ...input.representante, sector: input.representante.sector_residencia },
         alumno: {
           nombre: nino.nombre,
           fechaNacimiento: nino.fecha_nacimiento,
@@ -201,6 +235,7 @@ export async function enviar(
           parentesco: nino.parentesco,
         },
         disciplinas: elegidas.map(describirDisciplina),
+        cobro: cobro.alumnos[i]!,
         fecha,
         ip: meta.ip,
       }),
@@ -228,6 +263,7 @@ export async function enviar(
       const id = await repo.insertarInscripcion(client, {
         representante: input.representante,
         comprobante: rutaComprobante,
+        total: cobro.total,
         docContrato: contrato.doc_id,
         docTerminos: terminos.doc_id,
         docPrivacidad: privacidad.doc_id,
@@ -241,6 +277,7 @@ export async function enviar(
           nino,
           contrato: rutasContrato[i]!,
           sha256: contratos[i]!.sha256,
+          cobro: cobro.alumnos[i]!,
         });
       }
       return id;
@@ -250,6 +287,7 @@ export async function enviar(
     const firmadas = await firmarArchivos(rutasContrato);
     return {
       ins_id: insId,
+      total: cobro.total,
       contratos: input.ninos.map((n, i) => ({
         alumno: n.nombre,
         url: firmadas.get(rutasContrato[i]!) ?? null,
@@ -281,6 +319,7 @@ export interface NinoDetalle {
   disciplinas: Array<{ colacthor_id: number; descripcion: string; disponible: boolean }>;
   contrato_url: string | null;
   contrato_sha256: string;
+  cobro: CobroAlumno | null;
   nino_id: number | null;
 }
 
@@ -371,6 +410,7 @@ export async function detalle(insId: number): Promise<InscripcionDetalle> {
         }),
         contrato_url: firmadas.get(n.insnino_contrato) ?? null,
         contrato_sha256: n.insnino_contrato_sha256,
+        cobro: n.insnino_precio,
         nino_id: n.nino_id,
       };
     }),
@@ -596,13 +636,19 @@ export async function rechazar(actor: AuthUser, insId: number, confirmacion: str
 
 // ---------------------------------------------------------------------------
 // Documentos legales
+//
+// Cada tipo tiene como mucho un borrador (la proxima version) y una vigente
+// (la publicada mas alta). El borrador se edita y se borra; publicarlo lo
+// congela para siempre (trigger de 0015) y pasa a ser lo que firma quien se
+// inscriba desde ese momento.
 
 export async function documentos() {
-  const [vigentes, historial] = await Promise.all([
+  const [vigentes, borradores, historial] = await Promise.all([
     repo.documentosVigentes(),
+    repo.borradores(),
     repo.historialDocumentos(),
   ]);
-  return { vigentes, historial, marcadores: MARCADORES };
+  return { vigentes, borradores, historial, marcadores: MARCADORES };
 }
 
 export async function documento(docId: number): Promise<repo.DocumentoLegal> {
@@ -611,22 +657,131 @@ export async function documento(docId: number): Promise<repo.DocumentoLegal> {
   return doc;
 }
 
-export async function publicarDocumento(
+export async function guardarBorrador(
   actor: AuthUser,
   input: { tipo: TipoDocumento; titulo: string; contenido: string },
 ): Promise<repo.DocumentoLegal> {
   return enTransaccion(async (client) => {
-    const doc = await repo.insertarDocumento(client, input.tipo, input.titulo, input.contenido);
+    const doc = await repo.guardarBorrador(client, input.tipo, input.titulo, input.contenido);
+    await auditar(
+      {
+        actor,
+        accion: 'editar',
+        entidad: 'documento_legal',
+        entidadId: doc.doc_id,
+        detalle: { tipo: doc.doc_tipo, version: doc.doc_version, borrador: true },
+      },
+      client,
+    );
+    return doc;
+  });
+}
+
+export async function publicarDocumento(actor: AuthUser, docId: number): Promise<repo.DocumentoLegal> {
+  return enTransaccion(async (client) => {
+    const doc = await repo.publicarBorrador(client, docId);
+    if (!doc) throw new ApiError(409, 'Solo se publica un borrador; ese documento ya está publicado o no existe');
     await auditar(
       {
         actor,
         accion: 'crear',
         entidad: 'documento_legal',
         entidadId: doc.doc_id,
-        detalle: { tipo: doc.doc_tipo, version: doc.doc_version },
+        detalle: { tipo: doc.doc_tipo, version: doc.doc_version, publicado: true },
       },
       client,
     );
     return doc;
+  });
+}
+
+export async function borrarBorrador(actor: AuthUser, docId: number): Promise<void> {
+  await enTransaccion(async (client) => {
+    const borrado = await repo.borrarBorrador(client, docId);
+    if (!borrado) throw new ApiError(409, 'Solo se borra un borrador; uno publicado no se toca');
+    await auditar(
+      { actor, accion: 'eliminar', entidad: 'documento_legal', entidadId: docId, detalle: { borrador: true } },
+      client,
+    );
+  });
+}
+
+/**
+ * El contrato tal como lo recibiria un representante, con datos ficticios y
+ * una marca de "EJEMPLO". Sirve para revisar un borrador antes de publicarlo:
+ * es el mismo generador que el de verdad, no una imitacion.
+ */
+export async function ejemploContrato(docId: number): Promise<Buffer> {
+  const doc = await documento(docId);
+  if (doc.doc_tipo !== 'contrato') throw new ApiError(400, 'Solo el contrato tiene ejemplo en PDF');
+
+  const cobro = calcularCobro(
+    [
+      { colId: 1, disciplinas: 2 },
+      { colId: 1, disciplinas: 1 },
+    ],
+    new Map([[1, { precio: 45, descuentoHermano: 10, descuentoSoloPrimera: false }]]),
+  );
+  const { pdf } = await generarContrato({
+    titulo: doc.doc_titulo,
+    texto: doc.doc_contenido,
+    versionContrato: doc.doc_version,
+    versionTerminos: 1,
+    versionPrivacidad: 1,
+    representante: {
+      nombre: 'María José Pérez Andrade',
+      cedula: '1712345678',
+      correo: 'maria.perez@ejemplo.com',
+      telefono: '0991234567',
+      sector: 'Cumbayá',
+    },
+    alumno: {
+      nombre: 'Martín Pérez Andrade',
+      fechaNacimiento: '2016-05-14',
+      cedula: '1755555555',
+      colegio: 'Colegio de ejemplo',
+      grado: '4to de Básica',
+      parentesco: 'Madre',
+    },
+    disciplinas: ['Fútbol — Martes 16:00 a 17:00', 'Natación — Jueves 15:00 a 16:00'],
+    cobro: cobro.alumnos[0]!,
+    fecha: new Date(),
+    ip: '190.0.0.1',
+    ejemplo: true,
+  });
+  return pdf;
+}
+
+// ---------------------------------------------------------------------------
+// Precios por colegio (0015)
+
+export async function precios() {
+  return repo.listarPrecios();
+}
+
+export async function guardarPrecio(
+  actor: AuthUser,
+  colId: number,
+  input: { precio: number; descuento_hermano: number; descuento_solo_primera: boolean },
+): Promise<void> {
+  if (!(await repo.existeColegio(colId))) throw new ApiError(404, 'Colegio no encontrado');
+  await enTransaccion(async (client) => {
+    await repo.guardarPrecio(client, colId, {
+      precio: input.precio,
+      descuentoHermano: input.descuento_hermano,
+      descuentoSoloPrimera: input.descuento_solo_primera,
+    });
+    await auditar(
+      { actor, accion: 'editar', entidad: 'colegio_precio', entidadId: colId, detalle: { ...input } },
+      client,
+    );
+  });
+}
+
+/** Quitar el precio saca el colegio del formulario publico. */
+export async function borrarPrecio(actor: AuthUser, colId: number): Promise<void> {
+  await enTransaccion(async (client) => {
+    await repo.borrarPrecio(client, colId);
+    await auditar({ actor, accion: 'eliminar', entidad: 'colegio_precio', entidadId: colId }, client);
   });
 }

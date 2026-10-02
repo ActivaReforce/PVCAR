@@ -3,6 +3,7 @@ import { getPool } from '../../config/db.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import { offsetDe } from '../../lib/paginacion.js';
+import type { CobroAlumno, PrecioColegio } from './inscripciones.precios.js';
 import type {
   ListarInscripcionesQuery,
   NinoFormulario,
@@ -28,15 +29,28 @@ export interface DocumentoLegal {
   doc_titulo: string;
   doc_contenido: string;
   doc_fecha: string;
+  /** null = borrador: se edita y se borra. Con fecha = publicado, intocable. */
+  doc_publicado: string | null;
 }
 
-/** La version mas alta de cada tipo. Puede faltar alguno si nunca se publico. */
+const COLUMNAS_DOC = 'doc_id, doc_tipo, doc_version, doc_titulo, doc_contenido, doc_fecha, doc_publicado';
+
+/** La publicada mas alta de cada tipo. Puede faltar alguno si nunca se publico. */
 export async function documentosVigentes(): Promise<DocumentoLegal[]> {
   const { rows } = await getPool().query<DocumentoLegal>(
-    `SELECT DISTINCT ON (doc_tipo)
-            doc_id, doc_tipo, doc_version, doc_titulo, doc_contenido, doc_fecha
+    `SELECT DISTINCT ON (doc_tipo) ${COLUMNAS_DOC}
        FROM public.documento_legal
+      WHERE doc_publicado IS NOT NULL
       ORDER BY doc_tipo, doc_version DESC`,
+  );
+  return rows;
+}
+
+/** El borrador de cada tipo, si lo hay (como mucho uno: indice de 0015). */
+export async function borradores(): Promise<DocumentoLegal[]> {
+  const { rows } = await getPool().query<DocumentoLegal>(
+    `SELECT ${COLUMNAS_DOC} FROM public.documento_legal
+      WHERE doc_publicado IS NULL ORDER BY doc_tipo`,
   );
   return rows;
 }
@@ -47,49 +61,175 @@ export interface VersionDocumento {
   doc_version: number;
   doc_titulo: string;
   doc_fecha: string;
+  doc_publicado: string | null;
   aceptaciones: number;
 }
 
 export async function historialDocumentos(): Promise<VersionDocumento[]> {
   const { rows } = await getPool().query<VersionDocumento>(
-    `SELECT d.doc_id, d.doc_tipo, d.doc_version, d.doc_titulo, d.doc_fecha,
+    `SELECT d.doc_id, d.doc_tipo, d.doc_version, d.doc_titulo, d.doc_fecha, d.doc_publicado,
             (SELECT count(*) FROM public.inscripcion i
               WHERE d.doc_id IN (i.doc_contrato_id, i.doc_terminos_id, i.doc_privacidad_id))::int
               AS aceptaciones
        FROM public.documento_legal d
+      WHERE d.doc_publicado IS NOT NULL
       ORDER BY d.doc_tipo, d.doc_version DESC`,
   );
   return rows;
 }
 
-export async function obtenerDocumento(docId: number): Promise<DocumentoLegal | null> {
-  const { rows } = await getPool().query<DocumentoLegal>(
-    `SELECT doc_id, doc_tipo, doc_version, doc_titulo, doc_contenido, doc_fecha
-       FROM public.documento_legal WHERE doc_id = $1`,
+export async function obtenerDocumento(
+  docId: number,
+  client?: PoolClient,
+): Promise<DocumentoLegal | null> {
+  const { rows } = await (client ?? getPool()).query<DocumentoLegal>(
+    `SELECT ${COLUMNAS_DOC} FROM public.documento_legal WHERE doc_id = $1`,
     [docId],
   );
   return rows[0] ?? null;
 }
 
 /**
- * Nueva version. El numero se calcula dentro del INSERT; si dos publican a la
- * vez, el UNIQUE (doc_tipo, doc_version) hace fallar al segundo en vez de
- * dejar dos versiones con el mismo numero.
+ * Guarda el borrador de un tipo: lo actualiza si ya hay uno, o crea la
+ * version siguiente. El numero se calcula dentro del INSERT; si dos lo crean
+ * a la vez, el indice de un-borrador-por-tipo hace fallar al segundo.
  */
-export async function insertarDocumento(
+export async function guardarBorrador(
   client: PoolClient,
   tipo: TipoDocumento,
   titulo: string,
   contenido: string,
 ): Promise<DocumentoLegal> {
+  const { rows: actualizado } = await client.query<DocumentoLegal>(
+    `UPDATE public.documento_legal
+        SET doc_titulo = $2, doc_contenido = $3, doc_fecha = now()
+      WHERE doc_tipo = $1 AND doc_publicado IS NULL
+      RETURNING ${COLUMNAS_DOC}`,
+    [tipo, titulo, contenido],
+  );
+  if (actualizado[0]) return actualizado[0];
+
   const { rows } = await client.query<DocumentoLegal>(
     `INSERT INTO public.documento_legal (doc_tipo, doc_version, doc_titulo, doc_contenido)
      SELECT $1, COALESCE(max(doc_version), 0) + 1, $2, $3
        FROM public.documento_legal WHERE doc_tipo = $1
-     RETURNING doc_id, doc_tipo, doc_version, doc_titulo, doc_contenido, doc_fecha`,
+     RETURNING ${COLUMNAS_DOC}`,
     [tipo, titulo, contenido],
   );
   return rows[0]!;
+}
+
+/** Publica un borrador. Devuelve null si no era un borrador. */
+export async function publicarBorrador(
+  client: PoolClient,
+  docId: number,
+): Promise<DocumentoLegal | null> {
+  const { rows } = await client.query<DocumentoLegal>(
+    `UPDATE public.documento_legal SET doc_publicado = now()
+      WHERE doc_id = $1 AND doc_publicado IS NULL
+      RETURNING ${COLUMNAS_DOC}`,
+    [docId],
+  );
+  return rows[0] ?? null;
+}
+
+export async function borrarBorrador(client: PoolClient, docId: number): Promise<boolean> {
+  const { rowCount } = await client.query(
+    'DELETE FROM public.documento_legal WHERE doc_id = $1 AND doc_publicado IS NULL',
+    [docId],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Precios por colegio (0015)
+
+export interface PrecioListado {
+  col_id: number;
+  col_nombre: string;
+  disciplinas_activas: number;
+  precio: number | null;
+  descuento_hermano: number | null;
+  descuento_solo_primera: boolean | null;
+  fecha_modificacion: string | null;
+}
+
+/** numeric llega de pg como texto; aqui se convierte una sola vez. */
+const aNumero = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
+
+export async function listarPrecios(): Promise<PrecioListado[]> {
+  const { rows } = await getPool().query<PrecioListado>(
+    `SELECT c.col_id, c.col_nombre,
+            (SELECT count(*) FROM public.colegio_actividad_horario d
+              WHERE d.col_id = c.col_id AND d.est_id = $1)::int AS disciplinas_activas,
+            p.colpre_precio_disciplina      AS precio,
+            p.colpre_descuento_hermano      AS descuento_hermano,
+            p.colpre_descuento_solo_primera AS descuento_solo_primera,
+            p.colpre_fecha_modificacion     AS fecha_modificacion
+       FROM public.colegio c
+       LEFT JOIN public.colegio_precio p ON p.col_id = c.col_id
+      ORDER BY c.col_nombre`,
+    [ESTADO.ACTIVO],
+  );
+  return rows.map((r) => ({
+    ...r,
+    precio: aNumero(r.precio),
+    descuento_hermano: aNumero(r.descuento_hermano),
+  }));
+}
+
+export async function preciosDe(
+  colIds: number[],
+  client?: PoolClient,
+): Promise<Map<number, PrecioColegio>> {
+  const mapa = new Map<number, PrecioColegio>();
+  if (colIds.length === 0) return mapa;
+  const { rows } = await (client ?? getPool()).query<{
+    col_id: number;
+    precio: string;
+    descuento: string;
+    solo_primera: boolean;
+  }>(
+    `SELECT col_id, colpre_precio_disciplina AS precio, colpre_descuento_hermano AS descuento,
+            colpre_descuento_solo_primera AS solo_primera
+       FROM public.colegio_precio WHERE col_id = ANY($1::int[])`,
+    [colIds],
+  );
+  for (const r of rows) {
+    mapa.set(r.col_id, {
+      precio: Number(r.precio),
+      descuentoHermano: Number(r.descuento),
+      descuentoSoloPrimera: r.solo_primera,
+    });
+  }
+  return mapa;
+}
+
+export async function existeColegio(colId: number): Promise<boolean> {
+  const { rows } = await getPool().query('SELECT 1 FROM public.colegio WHERE col_id = $1', [colId]);
+  return rows.length > 0;
+}
+
+export async function guardarPrecio(
+  client: PoolClient,
+  colId: number,
+  precio: PrecioColegio,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO public.colegio_precio
+         (col_id, colpre_precio_disciplina, colpre_descuento_hermano, colpre_descuento_solo_primera)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (col_id) DO UPDATE
+        SET colpre_precio_disciplina      = EXCLUDED.colpre_precio_disciplina,
+            colpre_descuento_hermano      = EXCLUDED.colpre_descuento_hermano,
+            colpre_descuento_solo_primera = EXCLUDED.colpre_descuento_solo_primera,
+            colpre_fecha_modificacion     = now()`,
+    [colId, precio.precio, precio.descuentoHermano, precio.descuentoSoloPrimera],
+  );
+}
+
+export async function borrarPrecio(client: PoolClient, colId: number): Promise<void> {
+  await client.query('DELETE FROM public.colegio_precio WHERE col_id = $1', [colId]);
 }
 
 // ---------------------------------------------------------------------------
@@ -109,17 +249,23 @@ export interface DisciplinaOfertada {
 export interface ColegioOfertado {
   col_id: number;
   col_nombre: string;
+  precio: number;
+  descuento_hermano: number;
+  descuento_solo_primera: boolean;
   disciplinas: DisciplinaOfertada[];
 }
 
 /**
- * Colegios con al menos una disciplina activa, y esas disciplinas. Es lo
- * unico de la base que ve alguien sin sesion: nombres y horarios. Nada de
- * direcciones, contactos ni entrenadores.
+ * Colegios con precio configurado y al menos una disciplina activa, y esas
+ * disciplinas. Es lo unico de la base que ve alguien sin sesion: nombres,
+ * horarios y precios. Nada de direcciones, contactos ni entrenadores.
  */
 export async function ofertaPublica(): Promise<ColegioOfertado[]> {
   const { rows } = await getPool().query<ColegioOfertado>(
     `SELECT col.col_id, col.col_nombre,
+            pre.colpre_precio_disciplina      AS precio,
+            pre.colpre_descuento_hermano      AS descuento_hermano,
+            pre.colpre_descuento_solo_primera AS descuento_solo_primera,
             json_agg(json_build_object(
                 'colacthor_id', d.colacthor_id,
                 'col_id',       d.col_id,
@@ -132,15 +278,21 @@ export async function ofertaPublica(): Promise<ColegioOfertado[]> {
             ) ORDER BY act.act_nombre, d.dia_id, d.colacthor_hora_inicio) AS disciplinas
        FROM public.colegio_actividad_horario d
        JOIN public.colegio   col ON col.col_id = d.col_id
+       JOIN public.colegio_precio pre ON pre.col_id = d.col_id
        JOIN public.actividad act ON act.act_id = d.act_id
        JOIN public.dia       dia ON dia.dia_id = d.dia_id
        LEFT JOIN public.categoria cat ON cat.cat_id = act.cat_id
       WHERE d.est_id = $1
-      GROUP BY col.col_id, col.col_nombre
+      GROUP BY col.col_id, col.col_nombre, pre.colpre_precio_disciplina,
+               pre.colpre_descuento_hermano, pre.colpre_descuento_solo_primera
       ORDER BY col.col_nombre`,
     [ESTADO.ACTIVO],
   );
-  return rows;
+  return rows.map((r) => ({
+    ...r,
+    precio: Number(r.precio),
+    descuento_hermano: Number(r.descuento_hermano),
+  }));
 }
 
 export interface GradoOfertado {
@@ -188,6 +340,7 @@ export async function insertarInscripcion(
   datos: {
     representante: RepresentanteFormulario;
     comprobante: string;
+    total: number;
     docContrato: number;
     docTerminos: number;
     docPrivacidad: number;
@@ -198,8 +351,8 @@ export async function insertarInscripcion(
   const { rows } = await client.query<{ ins_id: number }>(
     `INSERT INTO public.inscripcion
          (ins_representante, ins_comprobante, doc_contrato_id, doc_terminos_id,
-          doc_privacidad_id, ins_ip, ins_navegador)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+          doc_privacidad_id, ins_ip, ins_navegador, ins_total)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING ins_id`,
     [
       JSON.stringify(datos.representante),
@@ -209,6 +362,7 @@ export async function insertarInscripcion(
       datos.docPrivacidad,
       datos.ip,
       datos.navegador,
+      datos.total,
     ],
   );
   return rows[0]!.ins_id;
@@ -222,16 +376,25 @@ export async function insertarNinoDeInscripcion(
     nino: NinoFormulario;
     contrato: string;
     sha256: string;
+    cobro: CobroAlumno;
   },
 ): Promise<number> {
   const { disciplinas, ...resto } = datos.nino;
   const { rows } = await client.query<{ insnino_id: number }>(
     `INSERT INTO public.inscripcion_nino
          (ins_id, insnino_orden, insnino_datos, insnino_disciplinas,
-          insnino_contrato, insnino_contrato_sha256)
-     VALUES ($1, $2, $3, $4, $5, $6)
+          insnino_contrato, insnino_contrato_sha256, insnino_precio)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING insnino_id`,
-    [datos.insId, datos.orden, JSON.stringify(resto), disciplinas, datos.contrato, datos.sha256],
+    [
+      datos.insId,
+      datos.orden,
+      JSON.stringify(resto),
+      disciplinas,
+      datos.contrato,
+      datos.sha256,
+      JSON.stringify(datos.cobro),
+    ],
   );
   return rows[0]!.insnino_id;
 }
@@ -248,6 +411,7 @@ export interface InscripcionListada {
   representante_cedula: string;
   representante_telefono: string;
   ninos: string[];
+  total: number | null;
   /** Ya hay un usuario con ese correo o con esa cedula. */
   usuario_existente: boolean;
 }
@@ -274,7 +438,9 @@ export async function listar(
   query: ListarInscripcionesQuery,
 ): Promise<{ items: InscripcionListada[]; total: number }> {
   const buscar = query.buscar && query.buscar.length > 0 ? query.buscar : null;
-  const { rows } = await getPool().query<InscripcionListada & { total: string }>(
+  const { rows } = await getPool().query<
+    Omit<InscripcionListada, 'total'> & { total_cobro: number | null; total: string }
+  >(
     `SELECT i.ins_id, i.ins_estado, i.ins_fecha,
             i.ins_representante->>'nombre'   AS representante_nombre,
             i.ins_representante->>'correo'   AS representante_correo,
@@ -282,6 +448,7 @@ export async function listar(
             i.ins_representante->>'telefono' AS representante_telefono,
             COALESCE((SELECT json_agg(n.insnino_datos->>'nombre' ORDER BY n.insnino_orden)
                         FROM public.inscripcion_nino n WHERE n.ins_id = i.ins_id), '[]'::json) AS ninos,
+            i.ins_total::float8 AS total_cobro,
             (i.ins_estado = 'pendiente' AND ${USUARIO_EXISTENTE}) AS usuario_existente,
             count(*) OVER() AS total
        FROM public.inscripcion i
@@ -291,7 +458,10 @@ export async function listar(
     [query.estado ?? null, buscar, query.limit, offsetDe(query)],
   );
   const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
-  return { items: rows.map(({ total: _t, ...resto }) => resto), total };
+  return {
+    items: rows.map(({ total: _t, total_cobro, ...resto }) => ({ ...resto, total: total_cobro })),
+    total,
+  };
 }
 
 export async function contarPorEstado(): Promise<{ pendientes: number; aprobadas: number }> {
@@ -318,6 +488,7 @@ export interface InscripcionFila {
   ins_aprobada_por: number | null;
   aprobada_por_nombre: string | null;
   ins_fecha_aprobacion: string | null;
+  ins_total: number | null;
   versiones: { contrato: number; terminos: number; privacidad: number };
 }
 
@@ -328,6 +499,7 @@ export interface NinoDeInscripcion {
   insnino_disciplinas: number[];
   insnino_contrato: string;
   insnino_contrato_sha256: string;
+  insnino_precio: CobroAlumno | null;
   nino_id: number | null;
 }
 
@@ -341,6 +513,7 @@ export async function obtener(
             i.doc_contrato_id, i.doc_terminos_id, i.doc_privacidad_id,
             i.ins_ip, i.ins_navegador, i.usu_id, i.ins_aprobada_por,
             ap.usu_nombre AS aprobada_por_nombre, i.ins_fecha_aprobacion,
+            i.ins_total::float8 AS ins_total,
             json_build_object('contrato', dc.doc_version, 'terminos', dt.doc_version,
                               'privacidad', dp.doc_version) AS versiones
        FROM public.inscripcion i
@@ -358,7 +531,7 @@ export async function obtener(
 export async function ninosDe(insId: number, client?: PoolClient): Promise<NinoDeInscripcion[]> {
   const { rows } = await (client ?? getPool()).query<NinoDeInscripcion>(
     `SELECT insnino_id, insnino_orden, insnino_datos, insnino_disciplinas,
-            insnino_contrato, insnino_contrato_sha256, nino_id
+            insnino_contrato, insnino_contrato_sha256, insnino_precio, nino_id
        FROM public.inscripcion_nino
       WHERE ins_id = $1
       ORDER BY insnino_orden`,

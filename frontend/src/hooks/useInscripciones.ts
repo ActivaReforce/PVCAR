@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
 import {
   inscripcionesApi,
+  type DatosPrecio,
   type EstadoInscripcion,
   type TipoDocumento,
 } from '@/api/inscripciones';
@@ -91,10 +92,40 @@ export function useRechazarInscripcion() {
   );
 }
 
-export function usePublicarDocumento() {
+export function useGuardarBorrador() {
   return useMutacion(
     (datos: { tipo: TipoDocumento; titulo: string; contenido: string }) =>
-      inscripcionesApi.publicarDocumento(datos),
-    'Versión publicada',
+      inscripcionesApi.guardarBorrador(datos),
+    'Borrador guardado',
+  );
+}
+
+export function usePublicarDocumento() {
+  return useMutacion((id: number) => inscripcionesApi.publicarDocumento(id), 'Versión publicada');
+}
+
+export function useBorrarBorrador() {
+  return useMutacion((id: number) => inscripcionesApi.borrarBorrador(id), 'Borrador descartado');
+}
+
+export function usePrecios() {
+  return useQuery({
+    queryKey: ['inscripciones', 'precios'],
+    queryFn: () => inscripcionesApi.precios(),
+  });
+}
+
+export function useGuardarPrecio() {
+  return useMutacion(
+    ({ colId, datos }: { colId: number; datos: DatosPrecio }) =>
+      inscripcionesApi.guardarPrecio(colId, datos),
+    'Precio guardado',
+  );
+}
+
+export function useBorrarPrecio() {
+  return useMutacion(
+    (colId: number) => inscripcionesApi.borrarPrecio(colId),
+    'Precio quitado: el colegio ya no aparece en el formulario',
   );
 }

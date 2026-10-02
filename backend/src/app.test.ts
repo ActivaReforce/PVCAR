@@ -254,6 +254,12 @@ describe('Modulos de negocio — cerrados sin token', () => {
     ['POST', '/api/v1/inscripciones/documentos'],
     ['POST', '/api/v1/inscripciones/1/aprobar'],
     ['DELETE', '/api/v1/inscripciones/1'],
+    ['POST', '/api/v1/inscripciones/documentos/1/publicar'],
+    ['POST', '/api/v1/inscripciones/documentos/1/ejemplo'],
+    ['DELETE', '/api/v1/inscripciones/documentos/1'],
+    ['GET', '/api/v1/inscripciones/precios'],
+    ['PUT', '/api/v1/inscripciones/precios/1'],
+    ['DELETE', '/api/v1/inscripciones/precios/1'],
   ];
 
   it.each(rutas)('%s %s responde 401 sin token', async (metodo, ruta) => {

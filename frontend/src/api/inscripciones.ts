@@ -17,6 +17,8 @@ export interface DocumentoLegal {
   doc_titulo: string;
   doc_contenido: string;
   doc_fecha: string;
+  /** null = borrador. */
+  doc_publicado: string | null;
 }
 
 export interface DisciplinaOfertada {
@@ -33,7 +35,26 @@ export interface DisciplinaOfertada {
 export interface ColegioOfertado {
   col_id: number;
   col_nombre: string;
+  precio: number;
+  descuento_hermano: number;
+  descuento_solo_primera: boolean;
   disciplinas: DisciplinaOfertada[];
+}
+
+export interface CobroAlumno {
+  precio_disciplina: number;
+  disciplinas: number;
+  subtotal: number;
+  descuento_pct: number;
+  descuento_solo_primera: boolean;
+  descuento: number;
+  total: number;
+  paga_completo: boolean;
+}
+
+export interface Cobro {
+  alumnos: CobroAlumno[];
+  total: number;
 }
 
 export interface Formulario {
@@ -75,6 +96,7 @@ export interface Envio {
 
 export interface EnvioRecibido {
   ins_id: number;
+  total: number;
   contratos: Array<{ alumno: string; url: string | null }>;
 }
 
@@ -92,6 +114,7 @@ export interface InscripcionListada {
   representante_cedula: string;
   representante_telefono: string;
   ninos: string[];
+  total: number | null;
   usuario_existente: boolean;
 }
 
@@ -123,6 +146,7 @@ export interface NinoDetalle {
   disciplinas: Array<{ colacthor_id: number; descripcion: string; disponible: boolean }>;
   contrato_url: string | null;
   contrato_sha256: string;
+  cobro: CobroAlumno | null;
   nino_id: number | null;
 }
 
@@ -136,6 +160,7 @@ export interface InscripcionDetalle {
   usu_id: number | null;
   aprobada_por_nombre: string | null;
   ins_fecha_aprobacion: string | null;
+  ins_total: number | null;
   versiones: Record<TipoDocumento, number>;
   comprobante_url: string | null;
   ninos: NinoDetalle[];
@@ -156,18 +181,38 @@ export interface VersionDocumento {
   doc_version: number;
   doc_titulo: string;
   doc_fecha: string;
+  doc_publicado: string | null;
   aceptaciones: number;
 }
 
 export interface Documentos {
   vigentes: DocumentoLegal[];
+  borradores: DocumentoLegal[];
   historial: VersionDocumento[];
   marcadores: Record<string, string>;
+}
+
+export interface PrecioColegio {
+  col_id: number;
+  col_nombre: string;
+  disciplinas_activas: number;
+  precio: number | null;
+  descuento_hermano: number | null;
+  descuento_solo_primera: boolean | null;
+  fecha_modificacion: string | null;
+}
+
+export interface DatosPrecio {
+  precio: number;
+  descuento_hermano: number;
+  descuento_solo_primera: boolean;
 }
 
 export const inscripcionesApi = {
   formulario: () => api.get<Formulario>('/inscripcion/formulario'),
   enviar: (envio: Envio) => api.post<EnvioRecibido>('/inscripcion', envio),
+  cotizar: (ninos: Array<{ col_id: number; disciplinas: number[] }>) =>
+    api.post<Cobro>('/inscripcion/cotizacion', { ninos }),
 
   listar: (filtros: { estado?: EstadoInscripcion; buscar?: string; page?: number }) => {
     const qs = new URLSearchParams();
@@ -184,9 +229,24 @@ export const inscripcionesApi = {
 
   documentos: () => api.get<Documentos>('/inscripciones/documentos'),
   documento: (id: number) => api.get<DocumentoLegal>(`/inscripciones/documentos/${id}`),
-  publicarDocumento: (datos: { tipo: TipoDocumento; titulo: string; contenido: string }) =>
+  guardarBorrador: (datos: { tipo: TipoDocumento; titulo: string; contenido: string }) =>
     api.post<DocumentoLegal>('/inscripciones/documentos', datos),
+  publicarDocumento: (id: number) =>
+    api.post<DocumentoLegal>(`/inscripciones/documentos/${id}/publicar`),
+  borrarBorrador: (id: number) => api.delete<{ doc_id: number }>(`/inscripciones/documentos/${id}`),
+  /** El PDF de ejemplo se baja como archivo: no es { data, error }. */
+  ejemploContrato: (id: number) =>
+    api.descargar(`/inscripciones/documentos/${id}/ejemplo`, {}, `contrato-ejemplo-${id}.pdf`),
+
+  precios: () => api.get<PrecioColegio[]>('/inscripciones/precios'),
+  guardarPrecio: (colId: number, datos: DatosPrecio) =>
+    api.put<{ col_id: number }>(`/inscripciones/precios/${colId}`, datos),
+  borrarPrecio: (colId: number) =>
+    api.delete<{ col_id: number }>(`/inscripciones/precios/${colId}`),
 };
+
+const MONEDA = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
+export const dinero = (dolares: number) => MONEDA.format(dolares);
 
 export const NOMBRE_DOCUMENTO: Record<TipoDocumento, string> = {
   contrato: 'Contrato',

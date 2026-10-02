@@ -1,29 +1,41 @@
 import { createHash } from 'node:crypto';
 import PDFDocument from 'pdfkit';
+import { dinero, textoDescuento, type CobroAlumno } from './inscripciones.precios.js';
 
 /**
  * El contrato en PDF, uno por alumno.
  *
- * Se genera en el servidor al recibir el envio, con el texto de la version
- * vigente y los datos tal como los escribio el representante, y se guarda
- * con su sha256. Despues no se vuelve a generar: el PDF guardado es lo que
- * se firmo, aunque luego cambien la ficha del alumno o el texto del contrato.
+ * El texto lo escribe Activa Reforce en el modulo interno, con marcadores
+ * ({{alumno_nombre}}...). Se genera en el servidor al recibir el envio, ya
+ * con los datos del representante, del alumno, sus disciplinas y lo que
+ * paga, y se guarda con su sha256. Despues no se vuelve a generar: el PDF
+ * guardado es lo que se firmo, aunque luego cambien la ficha del alumno, los
+ * precios o el texto del contrato.
  *
  * Solo texto, con las fuentes estandar de PDF (sin incrustar ninguna): sale
  * en unos pocos KB, que es la "compresion" que un contrato necesita.
  */
 
 /**
- * Marcadores que el texto del contrato puede llevar. El modulo interno los
- * ensena al publicar una version nueva.
+ * Los datos que el texto del contrato puede llevar. El modulo interno los
+ * ensena como botones para insertarlos y como ejemplo rellenado.
  */
 export const MARCADORES = {
   representante_nombre: 'Nombre del representante',
   representante_cedula: 'Cédula o pasaporte del representante',
+  representante_correo: 'Correo del representante',
+  representante_telefono: 'Teléfono del representante',
+  representante_sector: 'Sector donde vive',
+  parentesco: 'Parentesco con el alumno',
   alumno_nombre: 'Nombre del alumno',
   alumno_fecha_nacimiento: 'Fecha de nacimiento del alumno',
+  alumno_cedula: 'Cédula del alumno',
   colegio: 'Colegio',
+  grado: 'Grado',
   disciplinas: 'Disciplinas elegidas, separadas por punto y coma',
+  precio_disciplina: 'Precio de una disciplina en ese colegio',
+  descuento: 'Descuento por hermano aplicado, o "Sin descuento"',
+  valor_alumno: 'Lo que paga este alumno',
   fecha: 'Fecha de la inscripción',
 } as const;
 
@@ -35,7 +47,13 @@ export interface DatosContrato {
   versionContrato: number;
   versionTerminos: number;
   versionPrivacidad: number;
-  representante: { nombre: string; cedula: string; correo: string; telefono: string };
+  representante: {
+    nombre: string;
+    cedula: string;
+    correo: string;
+    telefono: string;
+    sector?: string | null;
+  };
   alumno: {
     nombre: string;
     fechaNacimiento: string;
@@ -45,8 +63,11 @@ export interface DatosContrato {
     parentesco: string;
   };
   disciplinas: string[];
+  cobro: CobroAlumno;
   fecha: Date;
   ip: string | null;
+  /** Marca de agua de "EJEMPLO" para la vista previa del modulo interno. */
+  ejemplo?: boolean;
 }
 
 const ZONA = 'America/Guayaquil';
@@ -75,6 +96,27 @@ export function rellenar(texto: string, valores: Record<Marcador, string>): stri
   return texto.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (original, clave: string) =>
     clave in valores ? valores[clave as Marcador] : original,
   );
+}
+
+export function valoresDelContrato(datos: DatosContrato): Record<Marcador, string> {
+  return {
+    representante_nombre: datos.representante.nombre,
+    representante_cedula: datos.representante.cedula,
+    representante_correo: datos.representante.correo,
+    representante_telefono: datos.representante.telefono,
+    representante_sector: datos.representante.sector || '—',
+    parentesco: datos.alumno.parentesco,
+    alumno_nombre: datos.alumno.nombre,
+    alumno_fecha_nacimiento: fechaDeNacimiento(datos.alumno.fechaNacimiento),
+    alumno_cedula: datos.alumno.cedula || '—',
+    colegio: datos.alumno.colegio,
+    grado: datos.alumno.grado || '—',
+    disciplinas: datos.disciplinas.join('; '),
+    precio_disciplina: dinero(datos.cobro.precio_disciplina),
+    descuento: textoDescuento(datos.cobro),
+    valor_alumno: dinero(datos.cobro.total),
+    fecha: fechaLarga(datos.fecha),
+  };
 }
 
 /**
@@ -106,15 +148,17 @@ export async function generarContrato(
     doc.on('error', reject);
   });
 
-  const cuerpo = rellenar(datos.texto, {
-    representante_nombre: datos.representante.nombre,
-    representante_cedula: datos.representante.cedula,
-    alumno_nombre: datos.alumno.nombre,
-    alumno_fecha_nacimiento: fechaDeNacimiento(datos.alumno.fechaNacimiento),
-    colegio: datos.alumno.colegio,
-    disciplinas: datos.disciplinas.join('; '),
-    fecha: fechaLarga(datos.fecha),
-  });
+  if (datos.ejemplo) {
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .fillColor('#b91c1c')
+      .text('EJEMPLO CON DATOS FICTICIOS — NO ES UN CONTRATO', { align: 'center' })
+      .fillColor('#000000');
+    doc.moveDown(0.8);
+  }
+
+  const cuerpo = rellenar(datos.texto, valoresDelContrato(datos));
 
   doc.font('Helvetica-Bold').fontSize(15).text(aLatin1(datos.titulo), { align: 'center' });
   doc.moveDown(1.2);
@@ -160,6 +204,15 @@ export async function generarContrato(
   for (const disciplina of datos.disciplinas) {
     doc.text(`• ${aLatin1(disciplina)}`, { indent: 12 });
   }
+
+  seccion('Valores');
+  const c = datos.cobro;
+  fila(
+    `${c.disciplinas} disciplina${c.disciplinas === 1 ? '' : 's'} a ${dinero(c.precio_disciplina)}`,
+    dinero(c.subtotal),
+  );
+  if (c.descuento > 0) fila('Descuento', `${textoDescuento(c)}`);
+  fila('Total de este alumno', dinero(c.total));
 
   seccion('Aceptación electrónica');
   doc

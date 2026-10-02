@@ -5,10 +5,13 @@ import { requirePermission } from '../../middleware/requirePermission.js';
 import { ApiError } from '../../middleware/error.js';
 import * as service from './inscripciones.service.js';
 import {
+  borradorDocumentoSchema,
+  colIdParamSchema,
+  cotizacionSchema,
   envioSchema,
   idParamSchema,
   listarSchema,
-  publicarDocumentoSchema,
+  precioSchema,
   rechazarSchema,
 } from './inscripciones.schemas.js';
 
@@ -48,6 +51,19 @@ inscripcionPublicaRouter.get(
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({ data: await service.formulario(), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Cuanto se paga con lo elegido. Solo lee: no guarda nada. */
+inscripcionPublicaRouter.post(
+  '/cotizacion',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { ninos } = cotizacionSchema.parse(req.body);
+      res.json({ data: await service.cotizar(ninos), error: null });
     } catch (err) {
       next(err);
     }
@@ -119,14 +135,104 @@ inscripcionesRouter.get(
   },
 );
 
-/** Publicar una version nueva. Las anteriores no se tocan nunca. */
+/** Guardar el borrador de un tipo (crea la version siguiente o la actualiza). */
 inscripcionesRouter.post(
   '/documentos',
   requirePermission('inscripciones', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const input = publicarDocumentoSchema.parse(req.body);
-      res.status(201).json({ data: await service.publicarDocumento(actor(req), input), error: null });
+      const input = borradorDocumentoSchema.parse(req.body);
+      res.json({ data: await service.guardarBorrador(actor(req), input), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Publicar el borrador: desde aqui no cambia nunca. */
+inscripcionesRouter.post(
+  '/documentos/:id/publicar',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      res.json({ data: await service.publicarDocumento(actor(req), id), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Descartar un borrador. Uno publicado no se borra. */
+inscripcionesRouter.delete(
+  '/documentos/:id',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      await service.borrarBorrador(actor(req), id);
+      res.json({ data: { doc_id: id }, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** El contrato con datos ficticios, en PDF, para revisarlo antes de publicar. */
+inscripcionesRouter.post(
+  '/documentos/:id/ejemplo',
+  requirePermission('inscripciones', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      const pdf = await service.ejemploContrato(id);
+      res
+        .status(200)
+        .type('application/pdf')
+        .set('Content-Disposition', `inline; filename="contrato-ejemplo-${id}.pdf"`)
+        .send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+inscripcionesRouter.get(
+  '/precios',
+  requirePermission('inscripciones', 'ver'),
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.precios(), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+inscripcionesRouter.put(
+  '/precios/:colId',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { colId } = colIdParamSchema.parse(req.params);
+      const input = precioSchema.parse(req.body);
+      await service.guardarPrecio(actor(req), colId, input);
+      res.json({ data: { col_id: colId }, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Quitar el precio: el colegio deja de ofrecerse en el formulario. */
+inscripcionesRouter.delete(
+  '/precios/:colId',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { colId } = colIdParamSchema.parse(req.params);
+      await service.borrarPrecio(actor(req), colId);
+      res.json({ data: { col_id: colId }, error: null });
     } catch (err) {
       next(err);
     }

@@ -32,7 +32,7 @@ import {
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useAprobarInscripcion, useFichaInscripcion } from '@/hooks/useInscripciones';
-import type { InscripcionDetalle } from '@/api/inscripciones';
+import { dinero, type InscripcionDetalle } from '@/api/inscripciones';
 import RechazarInscripcionDialog from './RechazarInscripcionDialog';
 import { fechaCorta, fechaHora, fechaNacimiento, enlaceWhatsApp } from './formato';
 
@@ -265,7 +265,14 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
       </section>
 
       <section className="space-y-3">
-        <h3 className="font-semibold">Comprobante de pago</h3>
+        <h3 className="font-semibold">
+          Comprobante de pago
+          {datos.ins_total !== null && (
+            <span className="ml-2 font-normal text-muted-foreground">
+              · debe cubrir {dinero(datos.ins_total)}
+            </span>
+          )}
+        </h3>
         {datos.comprobante_url ? (
           <a
             href={datos.comprobante_url}
@@ -314,6 +321,15 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
               <Fila etiqueta="Información de salud">{n.datos.info_salud}</Fila>
             )}
             {n.datos.otra_info && <Fila etiqueta="Otra información">{n.datos.otra_info}</Fila>}
+            {n.cobro && (
+              <p className="text-sm">
+                {n.cobro.disciplinas} × {dinero(n.cobro.precio_disciplina)} ={' '}
+                {dinero(n.cobro.subtotal)}
+                {n.cobro.descuento > 0 &&
+                  ` − ${n.cobro.descuento_pct} % hermano (${dinero(n.cobro.descuento)})`}{' '}
+                → <strong>{dinero(n.cobro.total)}</strong>
+              </p>
+            )}
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Disciplinas

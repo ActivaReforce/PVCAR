@@ -156,8 +156,36 @@ export const rechazarSchema = z.object({
 export const TIPOS_DOCUMENTO = ['contrato', 'terminos', 'privacidad'] as const;
 export type TipoDocumento = (typeof TIPOS_DOCUMENTO)[number];
 
-export const publicarDocumentoSchema = z.object({
+/** Guarda el borrador del tipo (lo crea o lo actualiza). Publicar es aparte. */
+export const borradorDocumentoSchema = z.object({
   tipo: z.enum(TIPOS_DOCUMENTO),
   titulo: texto(3, 160, 'Escribe un titulo'),
   contenido: texto(20, 60_000, 'El texto es demasiado corto'),
+});
+
+export const colIdParamSchema = z.object({ colId: z.coerce.number().int().positive() });
+
+/** Dolares con dos decimales como mucho; descuento en porcentaje. */
+export const precioSchema = z.object({
+  precio: z
+    .number()
+    .positive('El precio debe ser mayor que cero')
+    .max(10_000)
+    // Con tolerancia: 28.3 * 100 da 2830.0000000000005 en coma flotante.
+    .refine((v) => Math.abs(Math.round(v * 100) - v * 100) < 1e-6, 'Como mucho dos decimales'),
+  descuento_hermano: z.number().min(0).max(100),
+  descuento_solo_primera: z.boolean(),
+});
+
+/** Lo que el formulario manda para saber cuanto se paga antes de subir el comprobante. */
+export const cotizacionSchema = z.object({
+  ninos: z
+    .array(
+      z.object({
+        col_id: z.number().int().positive(),
+        disciplinas: z.array(z.number().int().positive()).min(1).max(10),
+      }),
+    )
+    .min(1)
+    .max(8),
 });

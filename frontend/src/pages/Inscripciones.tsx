@@ -13,9 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
 import { useToast } from '@/hooks/use-toast';
 import { useInscripciones } from '@/hooks/useInscripciones';
-import type { EstadoInscripcion } from '@/api/inscripciones';
+import { dinero, type EstadoInscripcion } from '@/api/inscripciones';
 import FichaInscripcion from '@/components/inscripciones/FichaInscripcion';
 import DocumentosLegales from '@/components/inscripciones/DocumentosLegales';
+import PreciosColegios from '@/components/inscripciones/PreciosColegios';
 import { fechaHora } from '@/components/inscripciones/formato';
 
 const TODAS = 'todas';
@@ -71,14 +72,15 @@ const Inscripciones = () => {
       </div>
 
       <Tabs defaultValue="inscripciones">
-        <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="inscripciones" className="flex-1 sm:flex-none">
-            Inscripciones
-          </TabsTrigger>
-          <TabsTrigger value="documentos" className="flex-1 sm:flex-none">
-            Documentos legales
-          </TabsTrigger>
-        </TabsList>
+        {/* Cuatro pestañas no caben en 360 px: la fila se desplaza en vez de partirse. */}
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <TabsList className="w-max">
+            <TabsTrigger value="inscripciones">Inscripciones</TabsTrigger>
+            <TabsTrigger value="contrato">Contrato</TabsTrigger>
+            <TabsTrigger value="legales">Términos y privacidad</TabsTrigger>
+            <TabsTrigger value="precios">Precios</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="inscripciones" className="space-y-4 pt-2">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -158,6 +160,9 @@ const Inscripciones = () => {
                           <UserCheck className="h-3 w-3" /> Ya tiene cuenta
                         </Badge>
                       )}
+                      {i.total !== null && (
+                        <span className="text-sm font-medium">{dinero(i.total)}</span>
+                      )}
                       <Badge variant={i.ins_estado === 'pendiente' ? 'secondary' : 'default'}>
                         {i.ins_estado === 'pendiente' ? 'Pendiente' : 'Aprobada'}
                       </Badge>
@@ -198,8 +203,16 @@ const Inscripciones = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="documentos" className="pt-2">
-          <DocumentosLegales />
+        <TabsContent value="contrato" className="pt-2">
+          <DocumentosLegales tipos={['contrato']} />
+        </TabsContent>
+
+        <TabsContent value="legales" className="pt-2">
+          <DocumentosLegales tipos={['terminos', 'privacidad']} />
+        </TabsContent>
+
+        <TabsContent value="precios" className="pt-2">
+          <PreciosColegios />
         </TabsContent>
       </Tabs>
 

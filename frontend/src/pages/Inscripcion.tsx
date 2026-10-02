@@ -26,8 +26,11 @@ import {
 import { ApiError } from '@/lib/api';
 import { compressImage } from '@/lib/imageCompression';
 import {
+  dinero,
   inscripcionesApi,
   NOMBRE_DOCUMENTO,
+  type Cobro,
+  type CobroAlumno,
   type DisciplinaOfertada,
   type EnvioRecibido,
   type Formulario,
@@ -131,7 +134,10 @@ function rellenarContrato(
   rep: Representante,
   alumno: Alumno | undefined,
   formulario: Formulario,
+  cobro: CobroAlumno | undefined,
 ): string {
+  const grado = formulario.grados.find((g) => String(g.catninograd_id) === alumno?.catninograd_id);
+  const pendiente = '[se calcula al elegir disciplinas]';
   const colegio = formulario.colegios.find((c) => String(c.col_id) === alumno?.col_id);
   const disciplinas = (colegio?.disciplinas ?? [])
     .filter((d) => alumno?.disciplinas.includes(d.colacthor_id))
@@ -140,6 +146,19 @@ function rellenarContrato(
   const valores: Record<string, string> = {
     representante_nombre: rep.nombre.trim() || '[tu nombre]',
     representante_cedula: rep.cedula.trim() || '[tu cédula]',
+    representante_correo: rep.correo.trim() || '[tu correo]',
+    representante_telefono: rep.telefono.trim() || '[tu teléfono]',
+    representante_sector: rep.sector_residencia.trim() || '—',
+    parentesco: alumno?.parentesco || '[parentesco]',
+    alumno_cedula: alumno?.cedula.trim() || '—',
+    grado: grado?.catninograd_nombre ?? '—',
+    precio_disciplina: cobro ? dinero(cobro.precio_disciplina) : pendiente,
+    descuento: cobro
+      ? cobro.descuento_pct > 0
+        ? `${cobro.descuento_pct} % por hermano, ${cobro.descuento_solo_primera ? 'en su primera disciplina' : 'en todas sus disciplinas'} (${dinero(cobro.descuento)})`
+        : 'Sin descuento'
+      : pendiente,
+    valor_alumno: cobro ? dinero(cobro.total) : pendiente,
     alumno_nombre: alumno?.nombre.trim() || '[nombre del alumno]',
     alumno_fecha_nacimiento: alumno?.fecha_nacimiento
       ? fechaNacimiento(alumno.fecha_nacimiento)
@@ -190,6 +209,17 @@ const Inscripcion = () => {
   const [errores, setErrores] = useState<string[]>([]);
   const [resultado, setResultado] = useState<EnvioRecibido | null>(null);
   const arriba = useRef<HTMLDivElement>(null);
+
+  // El total lo calcula el backend con los precios de la base, para que lo
+  // que se ve aquí sea exactamente lo que dirá el contrato.
+  const seleccion = alumnos
+    .filter((a) => a.col_id && a.disciplinas.length > 0)
+    .map((a) => ({ col_id: Number(a.col_id), disciplinas: [...a.disciplinas].sort((x, y) => x - y) }));
+  const cotizacion = useQuery({
+    queryKey: ['inscripcion-publica', 'cotizacion', seleccion],
+    queryFn: () => inscripcionesApi.cotizar(seleccion),
+    enabled: paso >= 2 && seleccion.length === alumnos.length,
+  });
 
   const subir = () => arriba.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -389,6 +419,7 @@ const Inscripcion = () => {
                   formulario={formulario.data}
                   rep={rep}
                   alumnos={alumnos}
+                  cobro={cotizacion.data}
                   acepta={acepta}
                   onAcepta={(t, v) => setAcepta((a) => ({ ...a, [t]: v }))}
                 />
@@ -398,7 +429,9 @@ const Inscripcion = () => {
                   vista={vista}
                   preparando={preparando}
                   onArchivo={elegirComprobante}
-                  alumnos={alumnos.length}
+                  alumnos={alumnos}
+                  cobro={cotizacion.data}
+                  cargandoCobro={cotizacion.isFetching}
                 />
               )}
             </section>
@@ -692,7 +725,7 @@ const FichaAlumno = ({
             <SelectContent>
               {formulario.colegios.map((c) => (
                 <SelectItem key={c.col_id} value={String(c.col_id)}>
-                  {c.col_nombre}
+                  {c.col_nombre} · {dinero(c.precio)} por disciplina
                 </SelectItem>
               ))}
             </SelectContent>
@@ -720,7 +753,12 @@ const FichaAlumno = ({
 
       {colegio && (
         <fieldset className="space-y-3">
-          <legend className="text-sm font-medium">Disciplinas</legend>
+          <legend className="text-sm font-medium">
+            Disciplinas{' '}
+            <span className="font-normal text-muted-foreground">
+              · {dinero(colegio.precio)} cada una
+            </span>
+          </legend>
           {porActividad.map(([actividad, horarios]) => (
             <div key={actividad} className="rounded-md bg-muted/40 p-3">
               <p className="mb-2 text-sm font-medium">{actividad}</p>
@@ -789,15 +827,21 @@ const PasoDocumentos = ({
   alumnos,
   acepta,
   onAcepta,
+  cobro,
 }: {
   formulario: Formulario;
   rep: Representante;
   alumnos: Alumno[];
   acepta: Record<TipoDocumento, boolean>;
   onAcepta: (t: TipoDocumento, v: boolean) => void;
+  cobro: Cobro | undefined;
 }) => {
   const [alumnoContrato, setAlumnoContrato] = useState(alumnos[0]?.clave ?? 0);
-  const alumno = alumnos.find((a) => a.clave === alumnoContrato) ?? alumnos[0];
+  const indice = Math.max(
+    0,
+    alumnos.findIndex((a) => a.clave === alumnoContrato),
+  );
+  const alumno = alumnos[indice];
 
   return (
     <>
@@ -812,7 +856,7 @@ const PasoDocumentos = ({
         const doc = formulario.documentos[tipo]!;
         const texto =
           tipo === 'contrato'
-            ? rellenarContrato(doc.doc_contenido, rep, alumno, formulario)
+            ? rellenarContrato(doc.doc_contenido, rep, alumno, formulario, cobro?.alumnos[indice])
             : doc.doc_contenido;
         return (
           <div key={tipo} className="space-y-3">
@@ -873,19 +917,59 @@ const PasoPago = ({
   preparando,
   onArchivo,
   alumnos,
+  cobro,
+  cargandoCobro,
 }: {
   vista: string | null;
   preparando: boolean;
   onArchivo: (f: File | undefined) => void;
-  alumnos: number;
+  alumnos: Alumno[];
+  cobro: Cobro | undefined;
+  cargandoCobro: boolean;
 }) => (
   <>
     <div>
-      <h1 className="text-xl font-semibold">Comprobante de pago</h1>
+      <h1 className="text-xl font-semibold">Pago</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Sube una foto o captura de la transferencia o del depósito
-        {alumnos > 1 ? `, uno solo por los ${alumnos} alumnos` : ''}.
+        Transfiere o deposita el total y sube una foto o captura del comprobante
+        {alumnos.length > 1 ? `, uno solo por los ${alumnos.length} alumnos` : ''}.
       </p>
+    </div>
+
+    <div className="rounded-md border">
+      {cobro ? (
+        <>
+          <ul className="divide-y">
+            {cobro.alumnos.map((c, i) => (
+              <li key={alumnos[i]?.clave ?? i} className="flex items-start justify-between gap-3 p-3 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{alumnos[i]?.nombre.trim() || `Alumno ${i + 1}`}</p>
+                  <p className="text-muted-foreground">
+                    {c.disciplinas} disciplina{c.disciplinas === 1 ? '' : 's'} ×{' '}
+                    {dinero(c.precio_disciplina)}
+                    {c.descuento > 0 && (
+                      <>
+                        {' '}
+                        − {c.descuento_pct} % por hermano
+                        {c.descuento_solo_primera ? ' (en una disciplina)' : ''}
+                      </>
+                    )}
+                  </p>
+                </div>
+                <span className="whitespace-nowrap font-medium">{dinero(c.total)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-center justify-between border-t bg-muted/40 p-3">
+            <span className="font-semibold">Total a pagar</span>
+            <span className="text-lg font-bold">{dinero(cobro.total)}</span>
+          </div>
+        </>
+      ) : (
+        <p className="p-3 text-sm text-muted-foreground">
+          {cargandoCobro ? 'Calculando el total…' : 'No se pudo calcular el total. Vuelve al paso anterior.'}
+        </p>
+      )}
     </div>
 
     <label
@@ -930,6 +1014,7 @@ const Exito = ({ resultado, correo }: { resultado: EnvioRecibido; correo: string
     <div className="text-center">
       <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
       <h1 className="mt-3 text-xl font-semibold">¡Inscripción enviada!</h1>
+      <p className="mt-1 text-sm text-muted-foreground">Total: {dinero(resultado.total)}</p>
     </div>
     <div className="space-y-2 text-sm">
       <p>

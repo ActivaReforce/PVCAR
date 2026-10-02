@@ -33,7 +33,10 @@ El alta manual (Usuarios, Estudiantes, Representantes) se mantiene completa.
 | Documentos legales | Se publican desde **Inscripciones → Documentos legales**. Una versión publicada no se edita (lo impide la base); cambiar un texto es publicar la siguiente. **El formulario no se abre hasta que estén los tres** |
 | Rutas | Formulario público `/inscripcion`; módulo interno `/inscripciones` (solo Propietario). En dev, `dev-pvcar.vercel.app/inscripcion` solo abre con sesión de Vercel |
 | Correo | Por la API de Resend desde el backend (`RESEND_API_KEY`, `CORREO_REMITENTE`, ya en Railway). Si falla, la aprobación sigue y la pantalla avisa para llamar al representante |
-| **Pendiente del cliente** | Precio y periodo. Campos exactos del formulario. Textos del contrato, términos y privacidad |
+| Precios (0015) | Por colegio: precio por disciplina (todas iguales dentro del colegio), % de descuento por hermano y casilla "solo en la primera disciplina". Con hermanos en el mismo envío, **paga completo el de importe más alto** y los demás llevan el descuento de su colegio. Lo calcula siempre el backend y queda congelado en la inscripción y en el contrato. Un colegio sin precio no aparece en el formulario |
+| Contrato | Lo escribe Activa Reforce en **Inscripciones → Contrato**, con botones para insertar los datos del representante, vista previa con datos de ejemplo resaltados y PDF de ejemplo generado por el mismo motor. Se guarda como **borrador** y se **publica** aparte; publicado ya no cambia |
+| Términos y privacidad | Texto que escribe el admin en **Inscripciones → Términos y privacidad**, con el mismo ciclo borrador → publicado |
+| **Pendiente del cliente** | Periodo. Campos exactos del formulario. Textos del contrato, términos y privacidad. Si el descuento por hermano vale también cuando el hermano se inscribió en otro envío |
 
 ## 3. Esquema (migración `0014`, solo añade)
 
@@ -53,7 +56,7 @@ Los datos van en `jsonb` a propósito: los campos todavía no están cerrados y 
 - **`nino.nino_fecha_nacimiento`**: Estudiantes ya pide la fecha y la edad se calcula.
 - **`nino_padre.ninopadre_parentesco`** y **`nino_asignacion.insnino_id`**.
 
-**Pendiente — `0015`, cuando el código esté desplegado:** borrar `entrenador.ent_cedula` y `nino.nino_edad`, que el código nuevo ya no usa. En dev después del deploy de `dev`; en prod **solo después del PR a `main`**, porque el código de `main` todavía las lee. No está escrita.
+**Pendiente — `0016`, cuando el código esté desplegado:** borrar `entrenador.ent_cedula` y `nino.nino_edad`, que el código nuevo ya no usa. En dev después del deploy de `dev`; en prod **solo después del PR a `main`**, porque el código de `main` todavía las lee. No está escrita.
 
 ## 4. ¿Cuándo nacen la cuenta y el niño? — B, decidido el 2026-10-02
 
