@@ -10,6 +10,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAsignarDisciplina, useDisciplinasDisponibles } from '@/hooks/useEntrenadores';
 import type { DisciplinaDisponible, Entrenador } from '@/api/entrenadores';
 
@@ -29,22 +36,53 @@ const hhmm = (hora: string | null) => hora?.slice(0, 5) ?? '--:--';
  * misma transacción, que es lo que ocurre de verdad cuando alguien cambia de
  * entrenador a mitad de periodo. El sistema viejo ni lo comprobaba ni lo
  * decía: dejaba dos entrenadores activos sobre la misma disciplina.
+ *
+ * Agrupadas por colegio, con filtros de colegio y día, y por defecto **solo
+ * las que no tienen entrenador**: es lo que se busca casi siempre (pedido del
+ * cliente al probar la Fase 8). Los filtros son locales: la lista ya llega
+ * entera y acotada al alcance.
  */
+const TODOS = 'todos';
+
 const AsignarDisciplinaModal = ({ entrenador, onClose }: Props) => {
   const [busqueda, setBusqueda] = useState('');
+  const [colegio, setColegio] = useState(TODOS);
+  const [dia, setDia] = useState(TODOS);
+  const [soloLibres, setSoloLibres] = useState(true);
   const [aReemplazar, setAReemplazar] = useState<DisciplinaDisponible | null>(null);
 
   const disponibles = useDisciplinasDisponibles(entrenador?.ent_id ?? null);
   const asignar = useAsignarDisciplina();
 
-  const lista = (disponibles.data ?? []).filter((d) => {
+  const todas = disponibles.data ?? [];
+  const colegios = [...new Map(todas.map((d) => [d.col_id, d.col_nombre])).entries()].sort(
+    ([, a], [, b]) => a.localeCompare(b, 'es'),
+  );
+  const dias = [...new Map(todas.map((d) => [d.dia_id, d.dia_nombre])).entries()].sort(
+    ([a], [b]) => a - b,
+  );
+  const libres = todas.filter((d) => !d.entrenador_actual).length;
+
+  const sinTildes = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const lista = todas.filter((d) => {
+    if (soloLibres && d.entrenador_actual) return false;
+    if (colegio !== TODOS && d.col_id !== Number(colegio)) return false;
+    if (dia !== TODOS && d.dia_id !== Number(dia)) return false;
     if (!busqueda.trim()) return true;
-    const texto = `${d.act_nombre} ${d.col_nombre} ${d.dia_nombre}`.toLowerCase();
-    return texto.includes(busqueda.trim().toLowerCase());
+    return sinTildes(`${d.act_nombre} ${d.col_nombre} ${d.dia_nombre}`).includes(
+      sinTildes(busqueda.trim()),
+    );
   });
+
+  const porColegio = new Map<string, DisciplinaDisponible[]>();
+  for (const d of lista) porColegio.set(d.col_nombre, [...(porColegio.get(d.col_nombre) ?? []), d]);
+  const secciones = [...porColegio.entries()].sort(([a], [b]) => a.localeCompare(b, 'es'));
 
   const cerrar = () => {
     setBusqueda('');
+    setColegio(TODOS);
+    setDia(TODOS);
+    setSoloLibres(true);
     setAReemplazar(null);
     onClose();
   };
@@ -88,6 +126,47 @@ const AsignarDisciplinaModal = ({ entrenador, onClose }: Props) => {
           />
         </div>
 
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <Select value={colegio} onValueChange={setColegio}>
+            <SelectTrigger className="h-11 sm:h-10" aria-label="Colegio">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todos los colegios</SelectItem>
+              {colegios.map(([id, nombre]) => (
+                <SelectItem key={id} value={String(id)}>
+                  {nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={dia} onValueChange={setDia}>
+            <SelectTrigger className="h-11 sm:h-10" aria-label="Día">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todos los días</SelectItem>
+              {dias.map(([id, nombre]) => (
+                <SelectItem key={id} value={String(id)}>
+                  {nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={soloLibres ? 'libres' : 'todas'}
+            onValueChange={(v) => setSoloLibres(v === 'libres')}
+          >
+            <SelectTrigger className="h-11 sm:h-10" aria-label="Cuáles">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="libres">Sin entrenador ({libres})</SelectItem>
+              <SelectItem value="todas">Todas ({todas.length})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {disponibles.isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
 
         {disponibles.data && lista.length === 0 && (
@@ -96,46 +175,53 @@ const AsignarDisciplinaModal = ({ entrenador, onClose }: Props) => {
           </p>
         )}
 
-        <ul className="space-y-2">
-          {lista.map((d) => (
-            <li
-              key={d.colacthor_id}
-              className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="min-w-0">
-                <p className="break-words font-medium">{d.act_nombre}</p>
-                <p className="text-sm text-muted-foreground">
-                  {d.col_nombre} · {d.dia_nombre.toLowerCase()}
-                </p>
-                <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {hhmm(d.colacthor_hora_inicio)}–{hhmm(d.colacthor_hora_fin)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <GraduationCap className="h-3 w-3" />
-                    {d.alumnos} alumnos
-                  </span>
-                </p>
-                {d.entrenador_actual && (
-                  <Badge variant="outline" className="mt-1.5 max-w-full text-xs">
-                    <span className="truncate">La da {d.entrenador_actual}</span>
-                  </Badge>
-                )}
-              </div>
+        <div className="space-y-4">
+          {secciones.map(([nombreColegio, delColegio]) => (
+            <section key={nombreColegio} className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {nombreColegio} · {delColegio.length}
+              </p>
+              <ul className="space-y-2">
+                {delColegio.map((d) => (
+                  <li
+                    key={d.colacthor_id}
+                    className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="break-words font-medium">{d.act_nombre}</p>
+                      <p className="text-sm text-muted-foreground">{d.dia_nombre}</p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {hhmm(d.colacthor_hora_inicio)}–{hhmm(d.colacthor_hora_fin)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <GraduationCap className="h-3 w-3" />
+                          {d.alumnos} alumnos
+                        </span>
+                      </p>
+                      {d.entrenador_actual && (
+                        <Badge variant="outline" className="mt-1.5 max-w-full text-xs">
+                          <span className="truncate">La da {d.entrenador_actual}</span>
+                        </Badge>
+                      )}
+                    </div>
 
-              <Button
-                variant={d.entrenador_actual ? 'outline' : 'brand'}
-                size="sm"
-                className="min-h-11 w-full flex-shrink-0 sm:w-auto"
-                disabled={asignar.isPending}
-                onClick={() => pedirAsignacion(d, false)}
-              >
-                {d.entrenador_actual ? 'Reemplazar' : 'Asignar'}
-              </Button>
-            </li>
+                    <Button
+                      variant={d.entrenador_actual ? 'outline' : 'brand'}
+                      size="sm"
+                      className="min-h-11 w-full flex-shrink-0 sm:w-auto"
+                      disabled={asignar.isPending}
+                      onClick={() => pedirAsignacion(d, false)}
+                    >
+                      {d.entrenador_actual ? 'Reemplazar' : 'Asignar'}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
 
         {/* Confirmación del reemplazo: el modal no se cierra, así se pueden
             asignar varias disciplinas seguidas sin volver a abrirlo. */}
@@ -150,8 +236,8 @@ const AsignarDisciplinaModal = ({ entrenador, onClose }: Props) => {
                 <strong>{aReemplazar?.act_nombre}</strong> ({aReemplazar?.col_nombre},{' '}
                 {aReemplazar?.dia_nombre.toLowerCase()}) la da{' '}
                 <strong>{aReemplazar?.entrenador_actual}</strong>. Se cerrará su asignación con la
-                fecha de hoy y se abrirá la de {entrenador?.usu_nombre}. El historial de
-                asistencias no se toca.
+                fecha de hoy y se abrirá la de {entrenador?.usu_nombre}. El historial de asistencias
+                no se toca.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

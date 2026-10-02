@@ -1,4 +1,5 @@
 import DisciplinaCard from './DisciplinaCard';
+import { GrupoDesplegable } from '@/components/comun/TarjetaDesplegable';
 import type { Dia, Disciplina } from '@/api/disciplinas';
 
 interface Props {
@@ -11,16 +12,18 @@ interface Props {
 }
 
 /**
- * Calendario semanal.
+ * El calendario, por colegio.
  *
- * Un solo markup para los tres anchos: cada día es una sección y el contenedor
- * las reparte en columnas según quepan — apiladas en el teléfono, dos en
- * tablet, hasta cuatro en escritorio. La versión vieja era una rejilla fija de
- * siete columnas que en 360 px se salía de la pantalla.
+ * Pedido del cliente al probar la Fase 8: una sección por colegio y, dentro,
+ * su semana de lunes a domingo. Cada disciplina es una tarjeta compacta
+ * (actividad y hora) que despliega el detalle.
  *
- * Los días sin nada se enseñan igual, en gris: saber que el viernes no hay
- * nada es información, y si se ocultan la semana parece más llena de lo que
- * está.
+ * Un solo markup para todos los anchos: desde `lg` la semana son siete
+ * columnas de un ancho mínimo legible (si no caben, se desliza en horizontal
+ * en vez de estrujar los nombres); por debajo, los días se apilan y los que no tienen nada se
+ * ocultan, porque en el teléfono siete encabezados vacíos solo empujan la
+ * lista hacia abajo. En las siete columnas sí se ven los vacíos: saber que el
+ * viernes no hay nada es información.
  */
 const DisciplinaCalendar = ({
   disciplinas,
@@ -30,53 +33,72 @@ const DisciplinaCalendar = ({
   onReactivar,
   onEliminar,
 }: Props) => {
-  const porDia = new Map<number, Disciplina[]>();
-  for (const dia of dias) porDia.set(dia.dia_id, []);
+  const colegios = new Map<number, { nombre: string; lista: Disciplina[] }>();
   for (const d of disciplinas) {
-    const lista = porDia.get(d.dia_id);
-    if (lista) lista.push(d);
-    else porDia.set(d.dia_id, [d]);
+    const grupo = colegios.get(d.col_id) ?? { nombre: d.col_nombre, lista: [] };
+    grupo.lista.push(d);
+    colegios.set(d.col_id, grupo);
   }
-
-  // Un día vacío al final de la semana (domingo, casi siempre) no aporta nada;
-  // uno vacío en medio sí, porque rompe la lectura de la semana.
-  const ultimoConDatos = dias.reduce(
-    (ultimo, dia, indice) => ((porDia.get(dia.dia_id)?.length ?? 0) > 0 ? indice : ultimo),
-    -1,
+  const orden = [...colegios.entries()].sort(([, a], [, b]) =>
+    a.nombre.localeCompare(b.nombre, 'es'),
   );
-  const visibles = dias.slice(0, Math.max(ultimoConDatos + 1, 5));
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-      {visibles.map((dia) => {
-        const delDia = porDia.get(dia.dia_id) ?? [];
-        return (
-          <section key={dia.dia_id} className="min-w-0 space-y-2">
-            <header className="flex items-baseline justify-between border-b pb-1">
-              <h2 className="font-semibold">{dia.dia_nombre}</h2>
-              <span className="text-xs text-muted-foreground">
-                {delDia.length === 0
-                  ? 'sin disciplinas'
-                  : `${delDia.length} ${delDia.length === 1 ? 'disciplina' : 'disciplinas'}`}
-              </span>
-            </header>
+    <GrupoDesplegable>
+      <div className="space-y-8">
+        {orden.map(([colId, { nombre, lista }]) => {
+          const sinEntrenador = lista.filter(
+            (d) => d.est_id === 1 && d.entrenadores.length === 0,
+          ).length;
+          return (
+            <section key={colId} className="min-w-0 space-y-3">
+              <header className="flex flex-wrap items-baseline justify-between gap-x-3 border-b pb-1">
+                <h2 className="text-lg font-semibold">{nombre}</h2>
+                <span className="text-xs text-muted-foreground">
+                  {lista.length} {lista.length === 1 ? 'disciplina' : 'disciplinas'}
+                  {sinEntrenador > 0 && (
+                    <span className="text-amber-700 dark:text-amber-400">
+                      {' '}
+                      · {sinEntrenador} sin entrenador
+                    </span>
+                  )}
+                </span>
+              </header>
 
-            <div className="space-y-2">
-              {delDia.map((d) => (
-                <DisciplinaCard
-                  key={d.colacthor_id}
-                  disciplina={d}
-                  onEdit={onEdit}
-                  onBaja={onBaja}
-                  onReactivar={onReactivar}
-                  onEliminar={onEliminar}
-                />
-              ))}
-            </div>
-          </section>
-        );
-      })}
-    </div>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[repeat(7,minmax(8.5rem,1fr))] lg:gap-2 lg:overflow-x-auto lg:pb-1">
+                {dias.map((dia) => {
+                  const delDia = lista.filter((d) => d.dia_id === dia.dia_id);
+                  return (
+                    <div
+                      key={dia.dia_id}
+                      className={`min-w-0 space-y-1.5 ${delDia.length === 0 ? 'hidden lg:block' : ''}`}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {dia.dia_nombre}
+                      </p>
+                      {delDia.length === 0 ? (
+                        <p className="text-xs text-muted-foreground/60">—</p>
+                      ) : (
+                        delDia.map((d) => (
+                          <DisciplinaCard
+                            key={d.colacthor_id}
+                            disciplina={d}
+                            onEdit={onEdit}
+                            onBaja={onBaja}
+                            onReactivar={onReactivar}
+                            onEliminar={onEliminar}
+                          />
+                        ))
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </GrupoDesplegable>
   );
 };
 

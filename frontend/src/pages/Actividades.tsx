@@ -15,36 +15,37 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
-import { DataPagination } from '@/components/ui/data-pagination';
 import ActivityCard from '@/components/activities/ActivityCard';
+import { GrupoDesplegable } from '@/components/comun/TarjetaDesplegable';
 import ActivityForm from '@/components/activities/ActivityForm';
 import EliminarActividadDialog from '@/components/activities/EliminarActividadDialog';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useActividades, useCategorias } from '@/hooks/useActividades';
 import type { Actividad, FiltrosActividades } from '@/api/actividades';
 
-const POR_PAGINA = 9;
+/** Todas a la vez: son unas veinte y el tope del API es 200. Sin paginador. */
+const TODAS_DE_UNA = 200;
 const TODAS = 'todas';
+/** Valor del filtro para las que no tienen categoría (el API lo entiende como 0). */
+const SIN_CATEGORIA = '0';
 
 const ORDENES: Array<{ valor: NonNullable<FiltrosActividades['orden']>; etiqueta: string }> = [
   { valor: 'nombre', etiqueta: 'nombre' },
   { valor: 'disciplinas', etiqueta: 'más usadas' },
-  { valor: 'categoria', etiqueta: 'categoría' },
   { valor: 'creacion', etiqueta: 'más recientes' },
 ];
 
 /**
  * Actividades: el catálogo de qué se imparte.
  *
- * La pantalla vieja tenía dos vistas conmutables —"sobres" por categoría y
- * rejilla— más un modal de detalles, y todo salía de traerse la tabla entera.
- * Aquí hay una sola vista: tarjetas que ya enseñan el detalle, con el filtro
- * de categoría arriba y la búsqueda, el orden y la paginación en el servidor.
+ * Todas de una vez, en secciones por categoría, sin paginador (pedido del
+ * cliente al probar la Fase 8). Cada tarjeta enseña el nombre y su menú; el
+ * detalle se despliega al pasar el ratón y se queda abierto con un clic. La
+ * búsqueda, el filtro y el orden siguen en el servidor.
  */
 const Actividades = () => {
   const { canCreate } = usePermissions();
 
-  const [page, setPage] = useState(1);
   const [busqueda, setBusqueda] = useState('');
   const [categoria, setCategoria] = useState<string>(TODAS);
   const [orden, setOrden] = useState<FiltrosActividades['orden']>('nombre');
@@ -56,8 +57,8 @@ const Actividades = () => {
   const categorias = useCategorias();
 
   const filtros: FiltrosActividades = {
-    page,
-    limit: POR_PAGINA,
+    page: 1,
+    limit: TODAS_DE_UNA,
     buscar: busqueda || undefined,
     categoria: categoria === TODAS ? undefined : Number(categoria),
     orden,
@@ -66,13 +67,18 @@ const Actividades = () => {
 
   const lista = useActividades(filtros);
   const actividades = lista.data?.items ?? [];
-  const totalItems = lista.data?.total ?? 0;
-  const totalPages = lista.data?.totalPages ?? 0;
 
-  const cambiarFiltro = (accion: () => void) => {
-    accion();
-    setPage(1);
-  };
+  /* Secciones por categoría en el orden de la lista (alfabético por categoría);
+     "Sin categoría" siempre al final. El orden elegido manda dentro de cada una. */
+  const secciones = new Map<string, Actividad[]>();
+  for (const a of actividades) {
+    const clave = a.cat_nombre ?? '';
+    secciones.set(clave, [...(secciones.get(clave) ?? []), a]);
+  }
+  const ordenSecciones = [...secciones.keys()].sort((x, y) =>
+    x === '' ? 1 : y === '' ? -1 : x.localeCompare(y, 'es'),
+  );
+
 
   const cerrarFormulario = () => {
     setCreando(false);
@@ -113,12 +119,12 @@ const Actividades = () => {
         <DebouncedSearchInput
           placeholder="Buscar por nombre o descripción..."
           value={busqueda}
-          onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
+          onChange={(texto) => setBusqueda(texto)}
           className="w-full"
         />
         <Select
           value={categoria}
-          onValueChange={(valor) => cambiarFiltro(() => setCategoria(valor))}
+          onValueChange={(valor) => setCategoria(valor)}
         >
           <SelectTrigger className="h-11 w-full sm:h-10 sm:w-56">
             <SelectValue placeholder="Todas las categorías" />
@@ -130,12 +136,13 @@ const Actividades = () => {
                 {c.cat_nombre} ({c.actividades})
               </SelectItem>
             ))}
+            <SelectItem value={SIN_CATEGORIA}>Sin categoría</SelectItem>
           </SelectContent>
         </Select>
         <Select
           value={orden}
           onValueChange={(valor) =>
-            cambiarFiltro(() => setOrden(valor as FiltrosActividades['orden']))
+            setOrden(valor as FiltrosActividades['orden'])
           }
         >
           <SelectTrigger className="h-11 w-full sm:h-10 sm:w-52">
@@ -161,30 +168,33 @@ const Actividades = () => {
           </p>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {actividades.map((actividad) => (
-              <ActivityCard
-                key={actividad.act_id}
-                actividad={actividad}
-                onEdit={setEditando}
-                onDelete={setAEliminar}
-              />
-            ))}
+        <GrupoDesplegable>
+          <div className="space-y-6">
+            {ordenSecciones.map((clave) => {
+              const delGrupo = secciones.get(clave) ?? [];
+              return (
+                <section key={clave || 'sin-categoria'} className="space-y-2">
+                  <header className="flex items-baseline justify-between border-b pb-1">
+                    <h2 className="font-semibold">{clave || 'Sin categoría'}</h2>
+                    <span className="text-xs text-muted-foreground">
+                      {delGrupo.length} {delGrupo.length === 1 ? 'actividad' : 'actividades'}
+                    </span>
+                  </header>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {delGrupo.map((actividad) => (
+                      <ActivityCard
+                        key={actividad.act_id}
+                        actividad={actividad}
+                        onEdit={setEditando}
+                        onDelete={setAEliminar}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
-
-          <DataPagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-            canGoNext={page < totalPages}
-            canGoPrevious={page > 1}
-            startIndex={(page - 1) * POR_PAGINA}
-            endIndex={Math.min(page * POR_PAGINA, totalItems)}
-            totalItems={totalItems}
-            itemName="actividades"
-          />
-        </>
+        </GrupoDesplegable>
       )}
 
       <Dialog

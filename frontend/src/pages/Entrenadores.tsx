@@ -10,14 +10,16 @@ import {
 import { Button } from '@/components/ui/button';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
 import { DataPagination } from '@/components/ui/data-pagination';
-import EntrenadorCard from '@/components/entrenadores/EntrenadorCard';
+import EntrenadorTable from '@/components/entrenadores/EntrenadorTable';
 import EntrenadorFicha from '@/components/entrenadores/EntrenadorFicha';
 import AsignarDisciplinaModal from '@/components/entrenadores/AsignarDisciplinaModal';
 import { useColegios } from '@/hooks/useColegios';
 import { useEntrenadores } from '@/hooks/useEntrenadores';
 import type { Entrenador, FiltrosEntrenadores } from '@/api/entrenadores';
 
-const POR_PAGINA = 9;
+const POR_PAGINA = 20;
+
+type Orden = NonNullable<FiltrosEntrenadores['orden']>;
 const TODOS = 'todos';
 
 /**
@@ -34,6 +36,8 @@ const Entrenadores = () => {
   const [colegio, setColegio] = useState(TODOS);
   const [estado, setEstado] = useState('1');
   const [sinAsignar, setSinAsignar] = useState(false);
+  const [orden, setOrden] = useState<Orden>('nombre');
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc');
 
   const [viendo, setViendo] = useState<Entrenador | null>(null);
   const [asignando, setAsignando] = useState<Entrenador | null>(null);
@@ -47,7 +51,18 @@ const Entrenadores = () => {
     colegio: colegio === TODOS ? undefined : [Number(colegio)],
     estado: estado === TODOS ? undefined : Number(estado),
     sinAsignar: sinAsignar || undefined,
-    orden: 'nombre',
+    orden,
+    dir,
+  };
+
+  /** Misma columna: invierte. Otra: la nueva, y las disciplinas de más a menos. */
+  const ordenar = (clave: Orden) => {
+    if (clave === orden) setDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setOrden(clave);
+      setDir(clave === 'nombre' ? 'asc' : 'desc');
+    }
+    setPage(1);
   };
 
   const lista = useEntrenadores(filtros);
@@ -147,16 +162,14 @@ const Entrenadores = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {entrenadores.map((e) => (
-              <EntrenadorCard
-                key={e.ent_id}
-                entrenador={e}
-                onVer={setViendo}
-                onAsignar={setAsignando}
-              />
-            ))}
-          </div>
+          <EntrenadorTable
+            entrenadores={entrenadores}
+            onVer={setViendo}
+            onAsignar={setAsignando}
+            orden={orden}
+            dir={dir}
+            onOrdenar={ordenar}
+          />
 
           <DataPagination
             currentPage={page}

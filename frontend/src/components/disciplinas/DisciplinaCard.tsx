@@ -1,6 +1,18 @@
-import { Clock, GraduationCap, Pencil, RotateCcw, School, Trash2, UserCog, UserX } from 'lucide-react';
+import {
+  CalendarDays,
+  GraduationCap,
+  Pencil,
+  RotateCcw,
+  School,
+  Trash2,
+  UserCog,
+  UserX,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import MenuAcciones from '@/components/ui/menu-acciones';
+import TarjetaDesplegable from '@/components/comun/TarjetaDesplegable';
+import AsignarEntrenadorRapido from './AsignarEntrenadorRapido';
+import { usePermissions } from '@/hooks/usePermissions';
 import type { Disciplina } from '@/api/disciplinas';
 
 interface Props {
@@ -15,59 +27,34 @@ interface Props {
 const hhmm = (hora: string | null) => hora?.slice(0, 5) ?? '--:--';
 
 /**
- * Una disciplina dentro del calendario.
+ * Una disciplina dentro de su colegio y su día.
  *
- * Enseña lo que hay que saber de un vistazo: actividad, colegio, franja,
- * quién la da y cuántos alumnos tiene. "Sin entrenador" se ve como aviso, no
- * como un hueco en blanco: son 14 de las 94 en los datos reales y es lo
- * primero que hay que resolver cada periodo.
+ * A la vista, solo la actividad y la hora con su menú; el resto se despliega.
+ * **Sin entrenador** lleva borde ámbar fuerte —es lo primero que hay que
+ * resolver cada periodo— y, para quien puede asignar, el selector para
+ * resolverlo ahí mismo.
  */
 const DisciplinaCard = ({ disciplina, onEdit, onBaja, onReactivar, onEliminar }: Props) => {
+  const { canEdit } = usePermissions();
   const activa = disciplina.est_id === 1;
-  const entrenadores = disciplina.entrenadores;
+  const sinEntrenador = activa && disciplina.entrenadores.length === 0;
+  const horario = `${hhmm(disciplina.colacthor_hora_inicio)} – ${hhmm(disciplina.colacthor_hora_fin)}`;
 
   return (
-    <div
-      className={`flex flex-col gap-2 rounded-lg border p-3 ${
-        activa ? 'bg-card' : 'border-dashed bg-muted/40'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="break-words font-medium leading-tight">{disciplina.act_nombre}</p>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <School className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{disciplina.col_nombre}</span>
-          </p>
-        </div>
-        {!activa && (
-          <Badge variant="secondary" className="flex-shrink-0 text-xs">
+    <TarjetaDesplegable
+      id={`disc-${disciplina.colacthor_id}`}
+      titulo={disciplina.act_nombre}
+      subtitulo={horario}
+      aviso={sinEntrenador}
+      apagada={!activa}
+      etiqueta={
+        !activa ? (
+          <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
             De baja
           </Badge>
-        )}
-      </div>
-
-      <p className="flex items-center gap-1.5 text-sm">
-        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-        {hhmm(disciplina.colacthor_hora_inicio)} – {hhmm(disciplina.colacthor_hora_fin)}
-      </p>
-
-      <p className="flex items-start gap-1.5 text-sm">
-        <UserCog className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-        {entrenadores.length > 0 ? (
-          <span className="break-words">{entrenadores.map((e) => e.usu_nombre).join(', ')}</span>
-        ) : (
-          <span className="text-amber-700 dark:text-amber-400">Sin entrenador</span>
-        )}
-      </p>
-
-      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <GraduationCap className="h-3.5 w-3.5" />
-        {disciplina.alumnos} alumnos
-        {disciplina.evaluaciones > 0 && ` · ${disciplina.evaluaciones} evaluaciones`}
-      </p>
-
-      <div className="mt-1 flex justify-end">
+        ) : undefined
+      }
+      acciones={
         <MenuAcciones
           nombre={disciplina.act_nombre}
           acciones={[
@@ -106,8 +93,36 @@ const DisciplinaCard = ({ disciplina, onEdit, onBaja, onReactivar, onEliminar }:
             },
           ]}
         />
-      </div>
-    </div>
+      }
+    >
+      <p className="flex items-center gap-1.5">
+        <School className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        <span className="break-words">{disciplina.col_nombre}</span>
+      </p>
+      <p className="flex items-center gap-1.5">
+        <CalendarDays className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        {disciplina.dia_nombre} · {horario}
+      </p>
+      <p className="flex items-start gap-1.5">
+        <UserCog className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        {disciplina.entrenadores.length > 0 ? (
+          <span className="break-words">
+            {disciplina.entrenadores.map((e) => e.usu_nombre).join(', ')}
+          </span>
+        ) : (
+          <span className="font-medium text-amber-700 dark:text-amber-400">Sin entrenador</span>
+        )}
+      </p>
+      <p className="flex items-center gap-1.5 text-muted-foreground">
+        <GraduationCap className="h-4 w-4 flex-shrink-0" />
+        {disciplina.alumnos} alumnos
+        {disciplina.evaluaciones > 0 && ` · ${disciplina.evaluaciones} evaluaciones`}
+      </p>
+
+      {sinEntrenador && canEdit('entrenadores') && (
+        <AsignarEntrenadorRapido disciplina={disciplina} />
+      )}
+    </TarjetaDesplegable>
   );
 };
 

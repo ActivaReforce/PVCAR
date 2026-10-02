@@ -35,9 +35,9 @@ const fecha = (f: string | null) => (f ? new Date(f).toLocaleDateString() : '—
  *    ninguna pantalla que las mostrara, así que no se podía saber quién daba
  *    una disciplina en marzo — justo lo que se pregunta al revisar una
  *    asistencia vieja.
- *  - **Los auxiliares que ya no cuadran.** En los datos reales hay auxiliares
- *    cuyo usuario está de baja o que perdieron el rol; heredaban el alcance
- *    del titular en silencio.
+ *
+ * Si da clase en más de un colegio, sus disciplinas salen agrupadas por
+ * colegio (pedido del cliente al probar la Fase 8).
  */
 const EntrenadorFicha = ({ entId, onAsignar }: Props) => {
   const [historial, setHistorial] = useState(false);
@@ -57,6 +57,68 @@ const EntrenadorFicha = ({ entId, onAsignar }: Props) => {
   }
 
   const { entrenador, asignaciones, auxiliares } = ficha.data;
+  const activa = entrenador.est_id === 1;
+
+  /* Por colegio, en el orden en que llegan (el backend ya las ordena). */
+  const porColegio = new Map<string, typeof asignaciones>();
+  for (const a of asignaciones) {
+    porColegio.set(a.col_nombre, [...(porColegio.get(a.col_nombre) ?? []), a]);
+  }
+  const variosColegios = porColegio.size > 1;
+
+  const fila = (a: (typeof asignaciones)[number]) => {
+    const cerrada = a.entasig_fecha_fin !== null;
+    return (
+      <li
+        key={a.entasig_id}
+        className={`flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${
+          cerrada ? 'border-dashed bg-muted/40' : ''
+        }`}
+      >
+        <div className="min-w-0">
+          <p className="break-words font-medium">{a.act_nombre}</p>
+          <p className="text-sm text-muted-foreground">
+            {variosColegios ? a.dia_nombre : `${a.col_nombre} · ${a.dia_nombre.toLowerCase()}`}
+          </p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {hhmm(a.colacthor_hora_inicio)}–{hhmm(a.colacthor_hora_fin)}
+            </span>
+            <span className="flex items-center gap-1">
+              <GraduationCap className="h-3 w-3" />
+              {a.alumnos} alumnos
+            </span>
+            <span>
+              Desde {fecha(a.entasig_fecha_inicio)}
+              {cerrada && ` · hasta ${fecha(a.entasig_fecha_fin)}`}
+            </span>
+          </p>
+          {a.disciplina_est_id !== 1 && !cerrada && (
+            <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-3 w-3" />
+              La disciplina está dada de baja
+            </p>
+          )}
+        </div>
+
+        {!cerrada && (
+          <ConditionalAction module="entrenadores" action="editar">
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11 w-full flex-shrink-0 text-destructive hover:text-destructive sm:w-auto"
+              disabled={cerrar.isPending}
+              onClick={() => cerrar.mutate({ id: entId, entasigId: a.entasig_id })}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Quitar
+            </Button>
+          </ConditionalAction>
+        )}
+      </li>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -64,16 +126,6 @@ const EntrenadorFicha = ({ entId, onAsignar }: Props) => {
         <Badge variant={entrenador.est_id === 1 ? 'default' : 'secondary'}>
           Ficha {entrenador.est_id === 1 ? 'activa' : 'inactiva'}
         </Badge>
-        {entrenador.usuario_est_id !== 1 && (
-          <Badge variant="outline" className="border-amber-500/60">
-            Usuario dado de baja
-          </Badge>
-        )}
-        {!entrenador.tiene_rol && (
-          <Badge variant="outline" className="border-amber-500/60">
-            Sin rol de Entrenador
-          </Badge>
-        )}
         <span className="text-muted-foreground">
           {entrenador.disciplinas} disciplinas · {entrenador.alumnos} alumnos
         </span>
@@ -92,79 +144,42 @@ const EntrenadorFicha = ({ entId, onAsignar }: Props) => {
             >
               {historial ? 'Ver solo las activas' : 'Ver historial completo'}
             </Button>
-            <ConditionalAction module="entrenadores" action="editar">
-              <Button variant="brand" size="sm" className="min-h-11 sm:min-h-9" onClick={onAsignar}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Asignar
-              </Button>
-            </ConditionalAction>
+            {activa && (
+              <ConditionalAction module="entrenadores" action="editar">
+                <Button
+                  variant="brand"
+                  size="sm"
+                  className="min-h-11 sm:min-h-9"
+                  onClick={onAsignar}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Asignar
+                </Button>
+              </ConditionalAction>
+            )}
           </div>
         </div>
 
         {asignaciones.length === 0 ? (
           <p className="text-sm text-muted-foreground">No tiene disciplinas asignadas.</p>
+        ) : variosColegios ? (
+          <div className="space-y-4">
+            {[...porColegio.entries()].map(([colegio, lista]) => (
+              <div key={colegio} className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {colegio} · {lista.length}
+                </p>
+                <ul className="space-y-2">{lista.map(fila)}</ul>
+              </div>
+            ))}
+          </div>
         ) : (
-          <ul className="space-y-2">
-            {asignaciones.map((a) => {
-              const cerrada = a.entasig_fecha_fin !== null;
-              return (
-                <li
-                  key={a.entasig_id}
-                  className={`flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${
-                    cerrada ? 'border-dashed bg-muted/40' : ''
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="break-words font-medium">{a.act_nombre}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {a.col_nombre} · {a.dia_nombre.toLowerCase()}
-                    </p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {hhmm(a.colacthor_hora_inicio)}–{hhmm(a.colacthor_hora_fin)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <GraduationCap className="h-3 w-3" />
-                        {a.alumnos} alumnos
-                      </span>
-                      <span>
-                        Desde {fecha(a.entasig_fecha_inicio)}
-                        {cerrada && ` · hasta ${fecha(a.entasig_fecha_fin)}`}
-                      </span>
-                    </p>
-                    {a.disciplina_est_id !== 1 && !cerrada && (
-                      <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
-                        <AlertTriangle className="h-3 w-3" />
-                        La disciplina está dada de baja
-                      </p>
-                    )}
-                  </div>
-
-                  {!cerrada && (
-                    <ConditionalAction module="entrenadores" action="editar">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="min-h-11 w-full flex-shrink-0 text-destructive hover:text-destructive sm:w-auto"
-                        disabled={cerrar.isPending}
-                        onClick={() =>
-                          cerrar.mutate({ id: entId, entasigId: a.entasig_id })
-                        }
-                      >
-                        <X className="mr-2 h-4 w-4" />
-                        Quitar
-                      </Button>
-                    </ConditionalAction>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <ul className="space-y-2">{asignaciones.map(fila)}</ul>
         )}
         <p className="text-xs text-muted-foreground">
           Quitar una disciplina no borra nada: cierra la asignación con la fecha de hoy y queda en
-          el historial.
+          el historial. Las asistencias que registró siguen a su nombre, y la disciplina queda sin
+          entrenador hasta que se asigne otro.
         </p>
       </section>
 
@@ -186,13 +201,6 @@ const EntrenadorFicha = ({ entId, onAsignar }: Props) => {
                 <div className="min-w-0">
                   <p className="break-words font-medium">{aux.usu_nombre}</p>
                   <p className="truncate text-sm text-muted-foreground">{aux.usu_correo}</p>
-                  {(!aux.usuario_activo || !aux.tiene_rol_auxiliar) && (
-                    <p className="mt-1 flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
-                      <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" />
-                      {!aux.usuario_activo && 'El usuario está dado de baja. '}
-                      {!aux.tiene_rol_auxiliar && 'Ya no tiene el rol de Asistente ni de Respaldo.'}
-                    </p>
-                  )}
                 </div>
 
                 {aux.est_id === 1 && (
