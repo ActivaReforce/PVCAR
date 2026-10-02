@@ -471,6 +471,29 @@ export async function upsertEntrenador(
   );
 }
 
+/**
+ * Suelta los vinculos de asistente/respaldo de una persona: como titular
+ * (`ent_id`), como asistente (`usu_id`) o los dos. Baja logica, como el
+ * "soltar" de Entrenadores: la fila explica las asistencias ya registradas.
+ *
+ * Sin esto, dar de baja a un titular dejaba a sus asistentes atados a alguien
+ * que ya no da clase, y dar de baja a un asistente lo dejaba "activo" en la
+ * ficha de su titular.
+ */
+export async function soltarVinculosAuxiliares(
+  client: PoolClient,
+  usuId: number,
+  lado: 'titular' | 'asistente' | 'ambos',
+): Promise<void> {
+  const condicion =
+    lado === 'titular' ? 'ent_id = $1' : lado === 'asistente' ? 'usu_id = $1' : '(ent_id = $1 OR usu_id = $1)';
+  await client.query(
+    `UPDATE public.entrenador_auxiliar SET est_id = $2
+      WHERE ${condicion} AND est_id = $3`,
+    [usuId, ESTADO.INACTIVO, ESTADO.ACTIVO],
+  );
+}
+
 /** Baja del entrenador y cierre de sus asignaciones abiertas, en un paso. */
 export async function desactivarEntrenador(client: PoolClient, entId: number): Promise<void> {
   await client.query(

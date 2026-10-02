@@ -26,7 +26,8 @@ const materiales = z
 
 export const listarActividadesSchema = paginacionSchema.extend({
   buscar: z.string().trim().max(120).optional(),
-  categoria: z.coerce.number().int().positive().optional(),
+  /** 0 = sin categoría. */
+  categoria: z.coerce.number().int().min(0).optional(),
   orden: z.enum(['nombre', 'categoria', 'disciplinas', 'creacion']).optional(),
   dir: z.enum(['asc', 'desc']).optional(),
 });

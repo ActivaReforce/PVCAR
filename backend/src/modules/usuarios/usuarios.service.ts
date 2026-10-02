@@ -4,7 +4,7 @@ import { ApiError } from '../../middleware/error.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { alcanceDe, type Alcance } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
-import { ESTADO, ROL, ROLES_GLOBALES } from '../../lib/constants.js';
+import { ESTADO, ROL, ROLES_AUXILIARES, ROLES_GLOBALES } from '../../lib/constants.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { borrarFoto, firmarFoto, firmarFotos } from '../../lib/storage.js';
 import { enTransaccion } from '../../lib/tx.js';
@@ -418,6 +418,15 @@ async function aplicarFichasDeRol(
       );
     }
     await repo.desactivarEntrenador(client, usuId);
+    // Sin rol de entrenador ya no es titular de nadie.
+    await repo.soltarVinculosAuxiliares(client, usuId, 'titular');
+  }
+
+  // Sin rol de asistente ni de respaldo, deja de respaldar a quien respaldaba.
+  const eraAuxiliar = rolesAntes.some((r) => ROLES_AUXILIARES.includes(r));
+  const esAuxiliar = rolesDespues.some((r) => ROLES_AUXILIARES.includes(r));
+  if (eraAuxiliar && !esAuxiliar) {
+    await repo.soltarVinculosAuxiliares(client, usuId, 'asistente');
   }
 
   // Quitar el rol de coordinador con colegios a su cargo dejaria filas en
@@ -502,6 +511,8 @@ export async function darDeBaja(actor: AuthUser, usuId: number): Promise<Usuario
     if (roles.includes(ROL.ENTRENADOR)) {
       await repo.desactivarEntrenador(client, usuId);
     }
+    // Dado de baja no es titular ni asistente de nadie. Reactivar no los reabre.
+    await repo.soltarVinculosAuxiliares(client, usuId, 'ambos');
     await auditar(
       { actor, accion: 'baja', entidad: 'usuario', entidadId: usuId, detalle: { correo: antes.usu_correo } },
       client,

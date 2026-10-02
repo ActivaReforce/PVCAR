@@ -34,7 +34,8 @@ export interface ActividadListada {
 const F_BUSCAR = `($1::text IS NULL OR ${contieneSinTildes('a.act_nombre', '$1')}
                                     OR ${contieneSinTildes("COALESCE(a.act_descripcion, '')", '$1')})`;
 
-const F_CATEGORIA = `($2::int IS NULL OR a.cat_id = $2)`;
+/** 0 es "sin categoría": el filtro de la pantalla la ofrece como una más. */
+const F_CATEGORIA = `($2::int IS NULL OR a.cat_id = $2 OR ($2 = 0 AND a.cat_id IS NULL))`;
 
 const COLUMNAS_ORDEN: Record<string, string> = {
   nombre: 'a.act_nombre',
