@@ -50,27 +50,6 @@ const Reportes = () => {
         </p>
       </div>
 
-      {/* La plataforma anterior: solo para quien lo ve todo (el backend lo vuelve a exigir). */}
-      {esGlobal && (
-        <Link to="/reportes/data-anterior" className="block">
-          <Card className="transition-colors hover:border-primary/50">
-            <CardContent className="flex items-center gap-4 p-4 sm:p-5">
-              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
-                <Archive className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-foreground">Data anterior</p>
-                <p className="text-sm text-muted-foreground">
-                  Todo lo de la plataforma anterior (oct 2025 – sep 2026): cifras, gráficas, cada
-                  tabla con filtros y exportación a Excel.
-                </p>
-              </div>
-              <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-            </CardContent>
-          </Card>
-        </Link>
-      )}
-
       {reportes.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -108,6 +87,27 @@ const Reportes = () => {
           </Link>
         ))}
       </div>
+
+      {/* La plataforma anterior: solo para quien lo ve todo (el backend lo vuelve a exigir). */}
+      {esGlobal && (
+        <Link to="/reportes/data-anterior" className="block">
+          <Card className="border-amber-300/70 transition-colors hover:border-amber-400 dark:border-amber-700/60 dark:hover:border-amber-600">
+            <CardContent className="flex items-center gap-4 p-4 sm:p-5">
+              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+                <Archive className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-foreground">Data anterior</p>
+                <p className="text-sm text-muted-foreground">
+                  Todo lo de la plataforma anterior (oct 2025 – sep 2026): cifras, gráficas, cada
+                  tabla con filtros y exportación a Excel.
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </Link>
+      )}
     </div>
   );
 };
