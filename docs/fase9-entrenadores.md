@@ -19,9 +19,10 @@ Este módulo no da de alta personas — un entrenador **es** un usuario con el r
 | Asignar una disciplina de baja | 409 |
 | Quitar una disciplina | La fila **no se borra**: queda con `entasig_fecha_fin` = hoy y sale en el historial |
 | Historial | El botón muestra las 39 asignaciones cerradas de dev con sus fechas |
-| Atar auxiliar | Solo salen candidatos activos con rol 6 o 7 que no respalden a nadie |
+| Atar auxiliar | Salen los candidatos activos con rol 6 o 7, **aunque ya respalden a otro entrenador** (pedido del 2026-10-01, ver §1b) |
 | Atar a alguien sin rol 6/7 | 400 |
-| Atar a quien ya respalda a otro | 409 con el nombre del titular actual |
+| Atar a quien ya respalda a otro | **Debe dejarlo** y sumar el segundo titular. Hoy da 409: hay que cambiarlo antes de probar (§1b) |
+| Atar al mismo auxiliar dos veces al mismo titular | 409 |
 | Auto-auxiliar | 400 |
 | Soltar auxiliar | Baja lógica (`est_id = 2`), no DELETE; deja de heredar el alcance |
 | Alcance | Coordinador: solo entrenadores de sus colegios. Ficha ajena → 403. Asignar disciplina ajena → 403 |
@@ -30,6 +31,18 @@ Este módulo no da de alta personas — un entrenador **es** un usuario con el r
 | **Devolverle sus disciplinas a Alex (usu_id 60)** | Quedó de baja en la prueba 15 de la Fase 6 y sus 4 asignaciones se cerraron con fecha. Reactivado el usuario, hay que volver a asignárselas desde aquí: las cerradas siguen en su historial y las nuevas se abren con la fecha de hoy |
 | Móvil 360 px | Tarjetas en una columna, ficha y modal de asignar usables |
 | Modo oscuro | Avisos ámbar y badges legibles |
+
+---
+
+## 1b. Pedidos del cliente del 2026-10-01
+
+| # | Pedido | Estado en el código | Prueba |
+|---|---|---|---|
+| 3 | Un entrenador puede estar en **varios colegios** | ✅ Ya funciona: la asignación es por disciplina, y cada disciplina es de un colegio | Asignar a un entrenador disciplinas de dos colegios: su ficha muestra los dos y ve los dos |
+| 4 | Un asistente o respaldo puede estar con **varios entrenadores** y **varias disciplinas** | ❌ **Hay que cambiarlo.** `entrenadores.service.ts` rechaza con 409 al que ya respalda a alguien y `listarCandidatosAAuxiliar` lo excluye. Cambio: quitar esa regla y poner unicidad parcial `(usu_id, ent_id) WHERE est_id = 1` (migración nueva). El alcance ya es la **unión** de las disciplinas de todos sus titulares | Atarlo a dos titulares: ve las disciplinas de los dos. Soltar uno: deja de ver solo las de ese |
+| 5 | Si un entrenador se va (le quitan la disciplina o lo dan de baja), **sus registros se quedan** y el siguiente sigue con normalidad | ✅ Diseñado así: quitar cierra con `entasig_fecha_fin`, la baja cierra todas, nada se borra; las asistencias guardan `ent_id` / `usu_registrador`; el borrado permanente se bloquea si hay historial. **Falta probarlo de punta a punta** | Entrenador A con asistencias en una disciplina → darlo de baja → asignar B a la misma disciplina → B pasa lista normal; en Reportes salen las asistencias de A **y** las de B, y A aparece con su nombre aunque esté inactivo |
+
+**Duda abierta del punto 4:** "varias disciplinas" — ¿el auxiliar hereda **todas** las de cada titular (como hoy), o hay que poder elegir solo algunas de un titular? Hoy no existe forma de ligar un auxiliar a una disciplina concreta. Preguntarle al probar la Fase 9.
 
 ---
 
