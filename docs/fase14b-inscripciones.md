@@ -1,6 +1,6 @@
 # Fase 14B — Inscripciones
 
-Estado al **2026-10-02**. **Construida**, sin probar en pantalla. Migración `0014_inscripciones.sql` aplicada y verificada por MCP en dev y prod. Falta del cliente: precio y periodo, campos definitivos y los tres textos legales.
+Estado al **2026-10-02, noche**. **Construida y en `dev`**, sin probar en pantalla. `0014` aplicada y verificada en dev y prod; **`0015` escrita, sin correr**. **Abierto: contratos por colegio y firma (§7)** — puede cambiar cómo se genera el contrato. Falta del cliente: campos definitivos y los textos legales.
 
 ---
 
@@ -36,7 +36,8 @@ El alta manual (Usuarios, Estudiantes, Representantes) se mantiene completa.
 | Precios (0015) | Por colegio: **precio mensual** por disciplina (todas iguales dentro del colegio) y **% de descuento por hermano**. Con hermanos en el mismo envío **lidera el que más disciplinas tiene** (empate: el de importe más alto; luego el primero): paga completo, y su número de disciplinas es el cupo de descuento de cada hermano (si va a 1, el hermano tiene descuento en 1; si va a 5, en hasta 5). Solo hermanos del mismo envío, por ahora. Lo calcula el backend y queda congelado en la inscripción y el contrato. Sin precio, el colegio no aparece en el formulario |
 | Contrato | Lo escribe Activa Reforce en **Inscripciones → Contrato**, con botones para insertar los datos del representante, vista previa con datos de ejemplo resaltados y PDF de ejemplo generado por el mismo motor. Se guarda como **borrador** y se **publica** aparte. Una versión publicada **no la edita ni la borra nadie** (lo impide la base) |
 | Términos y privacidad | Texto que escribe el admin en **Inscripciones → Términos y privacidad**, con el mismo ciclo borrador → publicado |
-| **Pendiente del cliente** | El precio es mensual y "interesa la fecha": falta decidir qué fecha (inicio de clases, meses que cubre el pago). Campos exactos del formulario. Textos del contrato, términos y privacidad |
+| Fecha | La que interesa es la **de la inscripción / del pago**. La de inscripción ya se guarda y sale en el contrato. Se ofreció un campo "fecha del pago" en el paso del comprobante por si difieren; sin respuesta |
+| **Pendiente del cliente** | Contratos por colegio y firma (§7). Campos exactos del formulario. Textos de términos y privacidad |
 
 ## 3. Esquema (migración `0014`, solo añade)
 
@@ -55,6 +56,8 @@ Los datos van en `jsonb` a propósito: los campos todavía no están cerrados y 
 - **`usuario.usu_cedula`**, única, admite pasaporte. Ya es la cédula de **cualquier** usuario: en Usuarios aparece con los datos básicos, no solo para entrenadores.
 - **`nino.nino_fecha_nacimiento`**: Estudiantes ya pide la fecha y la edad se calcula.
 - **`nino_padre.ninopadre_parentesco`** y **`nino_asignacion.insnino_id`**.
+
+**`0015` (escrita, sin correr):** `colegio_precio`, borradores de documentos (`doc_publicado`; una publicada no se edita ni se borra, trigger sobre UPDATE y DELETE), `ins_total` e `insnino_precio`.
 
 **Pendiente — `0016`, cuando el código esté desplegado:** borrar `entrenador.ent_cedula` y `nino.nino_edad`, que el código nuevo ya no usa. En dev después del deploy de `dev`; en prod **solo después del PR a `main`**, porque el código de `main` todavía las lee. No está escrita.
 
@@ -84,3 +87,20 @@ Los datos van en `jsonb` a propósito: los campos todavía no están cerrados y 
 5. **Rechazar** una: desaparece de la lista.
 6. Usuarios: la cédula aparece en el formulario para cualquier rol. Estudiantes: fecha de nacimiento en vez de edad.
 7. Modo oscuro de las dos pantallas nuevas.
+
+## 7. Abierto — contratos por colegio y firma (2026-10-02, noche)
+
+El cliente avisó que **cada colegio tiene su propio contrato**, con logo y campos para llenar, y que el resultado tiene que ser un **PDF firmado**. Preguntó si se puede recrear o si el padre puede llenar directamente el archivo. **No se construyó nada todavía**; al retomar, él tiene algo que contar antes de decidir.
+
+| Opción | Qué es | Veredicto |
+|---|---|---|
+| **A — Recrearlo** | Nuestro generador actual + logo por colegio, imitando el formato | Parecido, no idéntico; un cambio de diseño toca código |
+| **B — Su PDF como plantilla** ⭐ | El admin sube el PDF de cada colegio. El padre llena **nuestro formulario web** y el sistema escribe sus datos **dentro de ese PDF** y lo guarda. Con campos rellenables (AcroForm) se llenan por nombre; si es plano o Word, se marcan las posiciones una vez por formato. Subir otro PDF = versión nueva | Recomendada: idéntico al original, datos estructurados en la base, funciona en cualquier móvil |
+| **C — Que el padre llene el PDF** | Abre el archivo, lo llena, lo devuelve | Desaconsejada: en el móvil casi ningún navegador deja escribir en un PDF, sin validación, y los datos quedan atrapados en el archivo (no se podría crear usuario ni alumno sin pedírselos otra vez) |
+
+**Firma:** hoy son las tres casillas + fecha, hora e IP en el PDF. Con B se puede añadir firma dibujada con el dedo y estampada en el PDF.
+
+**Se le pidieron los contratos del cliente en `Cosas/`** para ver si son PDF rellenable, plano o Word, y estimar B con esos archivos.
+
+Con B, el contrato por colegio encaja en lo construido: hay uno por alumno y cada alumno ya tiene su colegio; la pestaña Contrato pasaría a ser "un PDF plantilla por colegio" con su ciclo borrador → publicado.
+
