@@ -1,51 +1,103 @@
 # Fase 8 — Actividades y Disciplinas
 
-Estado al **2026-09-18**. Construido y en `dev`. **La siguiente de la cola de pruebas**, tras cerrar la Fase 7.
+Estado al **2026-10-02**. Construido y en `dev`. **En prueba.** Dos arreglos hechos al preparar las pruebas: no se puede cambiar el colegio ni la actividad de una disciplina con historia, y el nombre repetido de actividad ignora también las tildes.
 
 La disciplina (`colegio_actividad_horario`) es el eje del modelo: de ella cuelgan inscripciones, asignaciones de entrenador, evaluaciones y asistencias. Las cuatro **sin cascada**, y eso decide casi todo lo que hay aquí.
 
 ---
 
-## 1. Las pruebas
+## 1. Las pruebas (numeradas, para responder por número)
 
-### Actividades
+Reescritas el **2026-10-02** con los casos difíciles: entrenadores en dos colegios, auxiliares, varios roles, bajas y lo que arrastran. Se prueba en `dev-pvcar.vercel.app` como **Propietario** salvo que diga otra cosa. Para entrar como otra persona, se le pone contraseña desde Usuarios (`dev` es una copia).
 
-| Prueba | Qué tiene que pasar |
-|---|---|
-| Crear | Con categoría, espacios, indumentaria y dos materiales. Los materiales se guardan como lista, no como cadena |
-| Nombre repetido | 409, también con otra caja o tildes distintas |
-| Editar | Quitar la categoría (queda "Sin categoría") y vaciar la lista de materiales |
-| Borrar una en uso | Bloqueada, diciendo cuántas disciplinas la usan |
-| Borrar una sin usar | Exige escribir el nombre; se va y queda en `auditoria` |
-| Buscar sin tildes | "futbol" encuentra "Fútbol G1" |
+**Gente de `dev` que se usa:** Erika Robayo (`usu_id` 76, entrenadora de Los Chillos) · Elizabeth Mites (70, entrenadora de Calderón) · Carlos Idrobo (91, asistente de Elizabeth) · Alex López (60, entrenador sin disciplinas desde la prueba de la Fase 6) · Jean Carlo Barco (85, asistente de Alex) · **Prueba** (126, coordinador de Calderón).
 
-### Disciplinas
+### A. Arranque
 
-| Prueba | Qué tiene que pasar |
-|---|---|
-| Crear por lote | Colegio + actividad + lunes y miércoles + 15:00–16:00 → **2** disciplinas, una transacción |
-| Duplicada | Repetir una que ya existe → 409, y **ninguna** de las del lote entra |
-| Solapada | Misma actividad y colegio el mismo día de 15:30 a 16:30 → 409 diciendo con qué horario choca |
-| Hora invertida | Fin ≤ inicio → 400 |
-| Editar con historial | Cambiar el día de una con alumnos → el formulario avisa antes de guardar |
-| Dar de baja | Modal con el recuento; al confirmar, las inscripciones activas quedan cerradas con fecha y las asignaciones de entrenador con `entasig_fecha_fin` = hoy |
-| Reactivar | Vuelve al calendario; las inscripciones **no** se reabren |
-| Reactivar con el hueco ocupado | Si mientras estaba de baja se creó otra igual → 409 |
-| Borrar con historial | Bloqueada, con el recuento de inscripciones, asignaciones, evaluaciones y asistencias |
-| Borrar una recién creada | Exige escribir la actividad; se va |
-| Alcance | Coordinador: solo las de sus colegios. Entrenador: solo las suyas, sin botón de crear. `GET /disciplinas/:id` ajena → 403 |
-| Conteos | "94 disciplinas · 1326 inscripciones · 14 sin entrenador" cuadran con SQL |
-| Móvil 360 px | Calendario en una columna, filtros apilados, modal de lote usable |
-| Modo oscuro | Tarjetas, avisos y el texto "Sin entrenador" legibles |
+| # | Prueba | Qué tiene que pasar |
+|---|---|---|
+| 1 | Abrir **Disciplinas** y **Entrenadores** | Cargan sin "Error interno del servidor" (el 500 del 2026-09-18) |
+| 2 | Cabecera de Disciplinas | **94 disciplinas · 1 326 inscripciones · 18 sin entrenador** |
 
-### Heredadas de la Fase 7
+### B. Actividades
 
-Dos arreglos se hicieron **después** de que el cliente probara la Fase 7, así que no llegó a verlos en pantalla. Los dos son globales y se comprueban aquí sin montar nada aparte.
+| # | Prueba | Qué tiene que pasar |
+|---|---|---|
+| 3 | Crear "Prueba F8" con categoría, espacios, indumentaria y 2 materiales | Al reabrirla, los materiales son **2 elementos**, no una frase |
+| 4 | Crear otra llamada "FUTBOL G1" | **409**: ya existe "Fútbol G1" (sin mirar mayúsculas **ni tildes**) |
+| 5 | Editar "Prueba F8": quitar la categoría y vaciar los materiales | Queda "Sin categoría" y sin materiales |
+| 6 | Renombrar **Ajedrez** a "Ajedrez Escolar" | El nombre nuevo sale en las disciplinas de Ajedrez de **todos** los colegios. Después devolverle el nombre |
+| 7 | Borrar **Ajedrez** | Bloqueado, diciendo cuántas disciplinas la usan |
+| 8 | Borrar "Prueba F8" | Pide escribir el nombre; se borra |
+| 9 | Buscar "futbol" y "percepcion" | Encuentran "Fútbol…" y "Percepción del entrenamiento PRIMERA" |
 
-| Prueba | Qué tiene que pasar |
-|---|---|
-| **Contraste en oscuro** | En modo oscuro, cualquier cosa seleccionada o marcada con el color primario tiene que **leerse**. El fallo era blanco sobre blanco y venía de `ThemeContext`, que pisaba seis tokens con un valor inválido; afectaba a todo `bg-primary` y dejaba el texto apagado en blanco puro. Si algo sigue ilegible, es que queda otro token mal |
-| **Texto apagado** | Las leyendas, los conteos y los mensajes secundarios tienen que verse **más tenues** que el texto normal, no igual de blancos |
+### C. Disciplinas: crear
+
+| # | Prueba | Qué tiene que pasar |
+|---|---|---|
+| 10 | Lote: **Colegio de Pruebas Dev + Danza**, lunes y miércoles 15:00–16:00 | Se crean **2** |
+| 11 | Lote: Danza, lunes 15:00–16:00 **y** viernes 15:00–16:00 | **409** por el lunes, y el **viernes tampoco** se crea |
+| 12 | Lote: Danza, **martes 17:00–18:00 y martes 17:30–18:30** en el mismo envío | **409** por solape **entre las dos del mismo lote**; no se crea ninguna |
+| 13 | Danza lunes **15:30–16:30** | **409** diciendo con qué horario choca (15:00–16:00) |
+| 14 | Danza lunes **16:00–17:00** (empieza cuando la otra termina) | **Se permite** |
+| 15 | **Guitarra** lunes 15:00–16:00 en el mismo colegio | **Se permite**: otra actividad a la misma hora es otro grupo |
+| 16 | Danza lunes 15:00–16:00 en **otro** colegio | **Se permite** |
+| 17 | Hora de fin antes o igual que la de inicio | El formulario no deja; si llegara, 400 |
+| 18 | Danza **sábado** 09:00–10:00 | Sale en la columna del sábado |
+
+### D. Disciplinas: editar
+
+| # | Prueba | Qué tiene que pasar |
+|---|---|---|
+| 19 | Editar la Danza del lunes 15:00 (sin historia) y cambiarle la actividad a **Guitarra** | **409**: chocaría con la Guitarra de la 15 (el solape también se mira al editar). Cámbiala a **Fútbol** y sí se guarda |
+| 20 | Editar **Ajedrez lunes 15:00 de Quitumbe** (`#56`, 145 asistencias) | Colegio y actividad **bloqueados con un candado** y el mensaje "ya tiene historia…" (**nuevo hoy**) |
+| 21 | En esa misma, cambiar la hora a 15:30–16:30 | Aviso ámbar antes de guardar; se guarda. **Devolverla a 15:00–16:00** |
+| 22 | Editar una disciplina con historia para que pise otra de **su misma actividad y colegio** | **409** |
+
+### E. Lo cruzado: entrenadores, auxiliares, varios roles
+
+| # | Prueba | Qué tiene que pasar |
+|---|---|---|
+| 23 | En **Entrenadores**, asignarle a **Erika** (Los Chillos) una disciplina **de Calderón** | En Disciplinas su nombre sale en sus 4 de Los Chillos **y** en la de Calderón; con el filtro de colegio Calderón, aparece allí |
+| 24 | Entrar **como Erika** | Ve **sus 5** disciplinas de **los dos colegios**, sin botón de crear, y ninguna otra de Calderón |
+| 25 | Entrar **como Prueba** (coordinador de Calderón) | Ve **todas** las de Calderón, incluida la de Erika con su nombre, y **ninguna** de Los Chillos (aunque Erika dé clase allí) |
+| 26 | Entrar **como Carlos** (asistente de Elizabeth) | Ve **exactamente** las 4 de Elizabeth |
+| 27 | Darle a **Prueba** también el rol **Entrenador** (Usuarios) y asignarle una disciplina **de Quitumbe** (Entrenadores). Entrar como Prueba | Ve **todo Calderón + esa de Quitumbe** (la unión de sus dos roles), y solo puede crear en Calderón |
+| 28 | Entrar **como Alex** (entrenador sin disciplinas) | Calendario **vacío** con mensaje, **no** todas las del sistema (el fallo grave del sistema viejo) |
+| 29 | Entrar **como Jean Carlo** (asistente de Alex) | Tampoco ve nada: hereda el alcance vacío de su titular |
+
+### F. Baja, reactivación y borrado
+
+| # | Prueba | Qué tiene que pasar |
+|---|---|---|
+| 30 | Dar de baja **la disciplina de Calderón que le diste a Erika** en la 23 | El modal dice cuántos alumnos y entrenadores arrastra. Al confirmar sale del calendario activo y los conteos bajan |
+| 31 | Entrar como Erika | **Ya no la ve**; sigue viendo sus 4 de Los Chillos |
+| 32 | En Entrenadores, ficha de Erika → historial | La de Calderón sale **cerrada con fecha de hoy**, no borrada |
+| 33 | Filtro **Inactivas** en Disciplinas | Aparece la de la 30 |
+| 34 | **Reactivarla** | Vuelve al calendario **"Sin entrenador" y sin alumnos**: la baja cerró las inscripciones y la asignación, y reactivar no las reabre |
+| 35 | Dar de baja la Danza del miércoles (la 10), crear **otra** Danza miércoles 15:00–16:00 en el mismo colegio, y reactivar la vieja | **409**: el hueco ya está ocupado |
+| 36 | Borrar **Ajedrez lunes de Quitumbe** (`#56`) | Bloqueado, con el recuento de inscripciones, asignaciones, evaluaciones y asistencias |
+| 37 | Borrar una Danza creada hoy | Pide escribir "Danza"; se borra |
+| 38 | Borrar la actividad **Danza** cuando solo le quede una disciplina **de baja** | **Bloqueado**: la disciplina de baja conserva su historia |
+
+### G. Herencia de los datos viejos
+
+| # | Prueba | Qué tiene que pasar |
+|---|---|---|
+| 39 | Buscar las disciplinas de **Odalys Lema**, **Ricardo Moya**, **Willian Bone** o **Bernard Rosario** | Salen con su nombre como entrenador **aunque su usuario está de baja**, y cuentan como "con entrenador". Es dato heredado: en la plataforma nueva dar de baja a un usuario cierra sus asignaciones y no puede volver a pasar. **Dime si quieres que salgan marcados** |
+
+### H. Pantalla
+
+| # | Prueba | Qué tiene que pasar |
+|---|---|---|
+| 40 | Buscador del calendario: "calderon", "ajedrez", "lunes" | Encuentra por colegio, actividad y día, sin tildes |
+| 41 | Filtro **Sin entrenador** | Coincide con el número de la cabecera |
+| 42 | Móvil 360 px | Calendario en una columna, filtros apilados, modal de lote y de edición usables |
+| 43 | Modo oscuro | Tarjetas, aviso ámbar, candado y "Sin entrenador" legibles |
+| 44 | Modo oscuro, color primario (heredada de la Fase 7) | Todo lo seleccionado o marcado con el color primario **se lee** (antes era blanco sobre blanco) |
+| 45 | Modo oscuro, texto secundario (heredada de la Fase 7) | Leyendas y conteos más tenues que el texto normal, no igual de blancos |
+
+Al terminar, yo verifico por MCP la auditoría de cada alta, baja, edición y borrado, y te digo qué queda por limpiar en `dev`.
 
 ---
 
@@ -61,7 +113,7 @@ Dos arreglos se hicieron **después** de que el cliente probara la Fase 7, así 
 
 ### Base de datos
 
-`0008_unicidades_fase8.sql` — nombre de actividad único y disciplina única (colegio + actividad + día + hora). **Pendiente en las dos bases**, igual que `0006` y `0007`. El backend ya rechaza los dos casos por su cuenta, así que el código no depende de que estén aplicados.
+`0008_unicidades_fase8.sql` — nombre de actividad único (sin mayúsculas) y disciplina única (colegio + actividad + día + hora). Aplicada en dev y prod el 2026-09-17. Las tildes las cubre el backend.
 
 ### Frontend
 
