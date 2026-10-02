@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useColegios } from '@/hooks/useColegios';
 import { useActividades } from '@/hooks/useActividades';
-import { useActualizarDisciplina, useDias } from '@/hooks/useDisciplinas';
+import { useActualizarDisciplina, useDias, useImpactoDisciplina } from '@/hooks/useDisciplinas';
 import type { Disciplina } from '@/api/disciplinas';
 
 interface Props {
@@ -52,6 +52,16 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
 
   const tieneHistorial = disciplina.alumnos > 0 || disciplina.evaluaciones > 0;
 
+  /*
+   * Con historia —inscripciones de cualquier época, entrenadores, evaluaciones
+   * o asistencias— el colegio y la actividad no se tocan: cambiarlos movería
+   * toda esa historia a otra disciplina. El backend lo rechaza igual (409);
+   * aquí se bloquea antes para no dejar escoger algo que no se va a guardar.
+   * Mientras se consulta, también bloqueado.
+   */
+  const impacto = useImpactoDisciplina(disciplina.colacthor_id);
+  const identidadFija = impacto.data ? !impacto.data.puedeEliminar : true;
+
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -67,8 +77,7 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
       await actualizar.mutateAsync({
         id: disciplina.colacthor_id,
         datos: {
-          col_id: Number(colId),
-          act_id: Number(actId),
+          ...(identidadFija ? {} : { col_id: Number(colId), act_id: Number(actId) }),
           dia_id: Number(diaId),
           colacthor_hora_inicio: horaInicio,
           colacthor_hora_fin: horaFin,
@@ -85,7 +94,7 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="edit_col">Colegio</Label>
-          <Select value={colId} onValueChange={setColId}>
+          <Select value={colId} onValueChange={setColId} disabled={identidadFija}>
             <SelectTrigger id="edit_col" className="h-11 sm:h-10">
               <SelectValue />
             </SelectTrigger>
@@ -101,7 +110,7 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
 
         <div className="space-y-2">
           <Label htmlFor="edit_act">Actividad</Label>
-          <Select value={actId} onValueChange={setActId}>
+          <Select value={actId} onValueChange={setActId} disabled={identidadFija}>
             <SelectTrigger id="edit_act" className="h-11 sm:h-10">
               <SelectValue />
             </SelectTrigger>
@@ -154,6 +163,15 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
           </div>
         </div>
       </div>
+
+      {identidadFija && impacto.data && (
+        <p className="flex items-start gap-2 text-sm text-muted-foreground">
+          <Lock className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          El colegio y la actividad no se pueden cambiar porque esta disciplina ya tiene historia
+          (alumnos, entrenadores o asistencias). Si cambian, crea una disciplina nueva y da de baja
+          esta.
+        </p>
+      )}
 
       {cambiaHorario && tieneHistorial && (
         <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">

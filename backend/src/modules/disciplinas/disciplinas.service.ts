@@ -195,7 +195,31 @@ export async function actualizar(
   await exigirAlcance(actor, antes);
 
   const colId = input.col_id ?? antes.col_id;
-  if (input.col_id && input.col_id !== antes.col_id) {
+  const cambiaColegio = input.col_id !== undefined && input.col_id !== antes.col_id;
+  const cambiaActividad = input.act_id !== undefined && input.act_id !== antes.act_id;
+
+  /*
+   * El colegio y la actividad son la identidad de la disciplina. Si ya tiene
+   * historia —alumnos inscritos alguna vez, entrenadores, evaluaciones o
+   * asistencias— cambiarlos la reescribe entera: las asistencias de Fútbol en
+   * Quitumbe pasarían a ser de Ajedrez, o de otro colegio con alumnos que no
+   * son suyos. El día y la hora sí se pueden mover (se avisa); para lo otro se
+   * crea una disciplina nueva y se da de baja esta.
+   */
+  if (cambiaColegio || cambiaActividad) {
+    const historia = await repo.calcularImpacto(colacthorId);
+    if (!historia.puedeEliminar) {
+      throw new ApiError(
+        409,
+        `Esta disciplina ya tiene historia: no se le puede cambiar ${
+          cambiaColegio ? 'el colegio' : 'la actividad'
+        }. Crea una disciplina nueva y da de baja esta.`,
+        historia.bloqueos,
+      );
+    }
+  }
+
+  if (cambiaColegio && input.col_id) {
     const alcance = await alcanceDe(actor.usuario);
     exigirColegioEnAlcance(alcance, input.col_id);
   }

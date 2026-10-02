@@ -160,6 +160,33 @@ describe('horarios que chocan', () => {
   });
 });
 
+describe('identidad de la disciplina', () => {
+  it('con historia no se le puede cambiar la actividad', async () => {
+    await expect(service.actualizar(coordinadora, 80, { act_id: 25 })).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringContaining('la actividad'),
+    });
+  });
+
+  it('con historia no se le puede cambiar el colegio', async () => {
+    await expect(service.actualizar(coordinadora, 80, { col_id: 14, act_id: 24 })).resolves.toBeTruthy();
+    await expect(service.actualizar(coordinadora, 80, { col_id: 15 })).rejects.toMatchObject({
+      statusCode: 409,
+    });
+  });
+
+  it('con historia sí se le puede mover el día y la hora', async () => {
+    await expect(
+      service.actualizar(coordinadora, 80, { dia_id: 3, colacthor_hora_inicio: '16:00', colacthor_hora_fin: '17:00' }),
+    ).resolves.toBeTruthy();
+  });
+
+  it('sin historia se le puede cambiar todo', async () => {
+    conHistorial = false;
+    await expect(service.actualizar(coordinadora, 80, { act_id: 25 })).resolves.toBeTruthy();
+  });
+});
+
 describe('baja y borrado', () => {
   it('no se puede dar de baja dos veces', async () => {
     disciplinaActual = { ...DISCIPLINA, est_id: 2 };

@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
 import { ESTADO } from '../../lib/constants.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
-import { contieneSinTildes } from '../../lib/sql.js';
+import { contieneSinTildes, sinTildes } from '../../lib/sql.js';
 import type { ListarActividadesQuery } from './actividades.schemas.js';
 
 export interface Categoria {
@@ -130,6 +130,12 @@ export async function listarCategorias(): Promise<Categoria[]> {
   return rows;
 }
 
+/**
+ * Nombre repetido sin mirar mayúsculas **ni tildes**: "Futbol G1" y "Fútbol G1"
+ * son la misma actividad. El índice único de 0008 solo cubre mayúsculas
+ * (`translate` no se puede indexar sin una función inmutable propia), así que
+ * esta comprobación es la que manda.
+ */
 export async function existeNombre(
   nombre: string,
   excluyendo: number | null,
@@ -138,7 +144,7 @@ export async function existeNombre(
   const ejecutor = client ?? getPool();
   const { rows } = await ejecutor.query(
     `SELECT 1 FROM public.actividad
-      WHERE lower(trim(act_nombre)) = lower(trim($1))
+      WHERE ${sinTildes('trim(act_nombre)')} = ${sinTildes('trim($1::text)')}
         AND ($2::int IS NULL OR act_id <> $2)
       LIMIT 1`,
     [nombre, excluyendo],
