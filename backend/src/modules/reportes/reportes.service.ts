@@ -207,14 +207,20 @@ export async function exportar(
   const conSensibles = filtrosQuery.incluirSensibles === true;
   const columnas = columnasVisibles(definicion, conSensibles);
 
-  const hoja = libro.addWorksheet(definicion.titulo.slice(0, 31));
+  /*
+   * La fila de cabecera fija va en las opciones de `addWorksheet`: en el
+   * escritor en streaming `views` solo tiene getter, y asignarlo después lanza
+   * un TypeError con las cabeceras ya enviadas — la descarga se cortaba siempre.
+   */
+  const hoja = libro.addWorksheet(definicion.titulo.slice(0, 31), {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
   hoja.columns = columnas.map((c) => ({
     header: c.cabecera,
     key: c.clave,
     width: c.ancho,
   }));
   hoja.getRow(1).font = { bold: true };
-  hoja.views = [{ state: 'frozen', ySplit: 1 }];
 
   const { rows } = await getPool().query<Record<string, unknown>>(
     `SELECT * FROM (${sql}) r LIMIT $${params.length + 1}`,

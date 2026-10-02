@@ -348,3 +348,27 @@ describe('columnas sensibles', () => {
     }
   });
 });
+
+describe('el xlsx', () => {
+  /**
+   * Se genera de verdad y se vuelve a leer. Hasta el 2026-10-02 la exportación
+   * asignaba `hoja.views` después de crear la hoja, y en el escritor en
+   * streaming eso lanza un TypeError: la descarga se cortaba siempre. Ninguna
+   * prueba generaba el archivo, así que no se vio.
+   */
+  it('sale entero, con la cabecera fija y la hoja de filtros', async () => {
+    const { PassThrough } = await import('node:stream');
+    const ExcelJS = (await import('exceljs')).default;
+    const salida = new PassThrough();
+    const trozos: Buffer[] = [];
+    salida.on('data', (t: Buffer) => trozos.push(t));
+
+    await service.exportar(TODO, 'usuarios', {}, salida);
+
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(Buffer.concat(trozos) as never);
+    expect(libro.worksheets.map((h) => h.name)).toEqual(['Usuarios', 'Filtros']);
+    expect(libro.worksheets[0]!.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
+    expect(libro.worksheets[0]!.getRow(2).getCell(2).value).toBe('Ana');
+  });
+});
