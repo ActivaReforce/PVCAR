@@ -1418,7 +1418,6 @@ const Exito = ({ resultado, correo }: { resultado: EnvioRecibido; correo: string
     <div className="text-center">
       <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
       <h1 className="mt-3 text-xl font-semibold">¡Inscripción enviada!</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Total mensual: {dinero(resultado.total)} con IVA</p>
     </div>
     <div className="space-y-2 text-sm">
       <p>
@@ -1431,7 +1430,7 @@ const Exito = ({ resultado, correo }: { resultado: EnvioRecibido; correo: string
     </div>
     {resultado.paquetes.some((c) => c.url) && (
       <div className="space-y-2">
-        <p className="text-sm font-medium">Descarga ahora tu copia de los documentos:</p>
+        <p className="text-sm font-medium">Puedes descargar una copia de los documentos:</p>
         {resultado.paquetes.map(
           (c) =>
             c.url && (
@@ -1442,7 +1441,6 @@ const Exito = ({ resultado, correo }: { resultado: EnvioRecibido; correo: string
               </Button>
             ),
         )}
-        <p className="text-xs text-muted-foreground">Los enlaces caducan en unos minutos. Si pierdes tu copia, pídenosla.</p>
       </div>
     )}
   </div>

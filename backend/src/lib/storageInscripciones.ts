@@ -60,6 +60,21 @@ export async function firmarArchivos(rutas: string[]): Promise<Map<string, strin
   return firmadas;
 }
 
+/**
+ * URL firmada que el navegador descarga con ese nombre (Content-Disposition:
+ * attachment), en vez de abrir el PDF con su nombre interno (un uuid).
+ */
+export async function firmarDescarga(ruta: string, nombre: string): Promise<string | null> {
+  const { data, error } = await getSupabaseAdmin()
+    .storage.from(BUCKET)
+    .createSignedUrl(ruta, VIGENCIA_LECTURA_SEG, { download: nombre });
+  if (error || !data) {
+    console.error('No se pudo firmar la descarga:', error?.message);
+    return null;
+  }
+  return data.signedUrl;
+}
+
 /** Best-effort: un archivo huerfano en un bucket privado no es grave. */
 export async function borrarArchivos(rutas: string[]): Promise<void> {
   if (rutas.length === 0) return;

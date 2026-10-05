@@ -14,6 +14,7 @@ import {
   borrarArchivos,
   descargarArchivo,
   firmarArchivos,
+  firmarDescarga,
   subirArchivo,
 } from '../../lib/storageInscripciones.js';
 import * as usuariosRepo from '../usuarios/usuarios.repository.js';
@@ -452,6 +453,16 @@ export function actividadesYHorarios(disciplinas: DisciplinaConEstado[]): {
   };
 }
 
+/** "Martín Pérez" → "ActivaReforce_Martin_Perez.pdf": sin tildes ni espacios, que algunos sistemas estropean. */
+export function nombreDeDescarga(alumno: string): string {
+  const limpio = alumno
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return `ActivaReforce_${limpio || 'alumno'}.pdf`;
+}
+
 export interface EnvioRecibido {
   ins_id: number;
   total: number;
@@ -575,12 +586,15 @@ export async function enviar(
       return id;
     });
 
-    // El representante se lleva su copia en el momento.
-    const firmadas = await firmarArchivos(rutas);
+    // El representante se lleva su copia en el momento, con un nombre que
+    // reconozca en su carpeta de descargas.
+    const urls = await Promise.all(
+      guardados.map((n, i) => firmarDescarga(rutas[i]!, nombreDeDescarga(n.nombre))),
+    );
     return {
       ins_id: insId,
       total: cobro.total,
-      paquetes: guardados.map((n, i) => ({ alumno: n.nombre, url: firmadas.get(rutas[i]!) ?? null })),
+      paquetes: guardados.map((n, i) => ({ alumno: n.nombre, url: urls[i] ?? null })),
     };
   } catch (err) {
     await borrarArchivos(subidos);

@@ -6,6 +6,7 @@ process.env.FRONTEND_ORIGIN ??= 'https://dev-pvcar.vercel.app';
 const {
   bloqueosDeAprobacion,
   calcularEstado,
+  nombreDeDescarga,
   correoDeAprobacion,
   firmaDeImagenValida,
   problemasDeDisciplinas,
@@ -392,5 +393,11 @@ describe('calcularEstado', () => {
     ]);
     expect(e.colegios[0]!.motivos).toHaveLength(4);
     expect(e.motivos).toContain('Ningún colegio tiene las inscripciones abiertas.');
+  });
+});
+
+describe('nombreDeDescarga', () => {
+  it('ActivaReforce_ y el nombre sin tildes ni espacios', () => {
+    expect(nombreDeDescarga('Martín José Pérez Ñuñez')).toBe('ActivaReforce_Martin_Jose_Perez_Nunez.pdf');
   });
 });
