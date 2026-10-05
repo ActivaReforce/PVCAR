@@ -322,22 +322,10 @@ const PorColegio = ({ datos }: { datos: Documentos }) => {
   );
 };
 
-/** Las piezas que lleva cada documento, explicadas para quien edita. */
-function ayudaDePiezas(tipo: TipoDocumento): string[] {
+/** Si el documento lleva algo entre corchetes que llena el sistema. */
+function tienePiezas(tipo: TipoDocumento): boolean {
   const r = REGLAS[tipo];
-  const ayuda: string[] = [];
-  for (const c of r.casillas) ayuda.push(`[casilla ${c}] y el texto de la casilla`);
-  if (r.salud) ayuda.push('[salud] y la pregunta: debajo salen No / Sí. Especifique');
-  for (const s of r.datos) ayuda.push(`[datos ${s}]: la tabla de la sección`);
-  for (const f of r.firmas) {
-    ayuda.push(
-      f === 'activa'
-        ? '[firma activa] y debajo, en líneas, el nombre y el cargo'
-        : '[firma representante]: "Aceptado electrónicamente" con su nombre, C.C. y fecha',
-    );
-  }
-  if (r.politica) ayuda.push('[politica] y el texto del enlace a la política');
-  return ayuda;
+  return r.casillas.length + r.datos.length + r.firmas.length > 0 || r.salud || r.politica;
 }
 
 const TarjetaDocumento = ({
@@ -401,10 +389,16 @@ const TarjetaDocumento = ({
     }
     const inicio = el.selectionStart ?? contenido.length;
     const fin = el.selectionEnd ?? contenido.length;
+    // Al cambiar el valor y devolver el foco, el navegador movía el cuadro de
+    // texto y la página: se guarda dónde estaban y se deja todo quieto.
+    const scrollTexto = el.scrollTop;
+    const scrollPagina = window.scrollY;
     setContenido(contenido.slice(0, inicio) + marca + contenido.slice(fin));
     requestAnimationFrame(() => {
-      el.focus();
+      el.focus({ preventScroll: true });
       el.setSelectionRange(inicio + marca.length, inicio + marca.length);
+      el.scrollTop = scrollTexto;
+      window.scrollTo({ top: scrollPagina });
     });
   };
 
@@ -621,7 +615,6 @@ const Editor = ({
   onGuardar: () => void;
   onCancelar: () => void;
 }) => {
-  const piezas = ayudaDePiezas(tipo);
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -677,8 +670,11 @@ const Editor = ({
                 Línea en blanco entre párrafos. <code className="rounded bg-muted px-1"># </code> al principio: subtítulo.{' '}
                 <code className="rounded bg-muted px-1">## </code>: línea centrada.
               </p>
-              {piezas.length > 0 && (
-                <p>Piezas que arma el sistema (cada una al principio de su párrafo): {piezas.join(' · ')}.</p>
+              {tienePiezas(tipo) && (
+                <p>
+                  Lo que está entre corchetes, como <code className="rounded bg-muted px-1">[datos alumno]</code>,
+                  lo llena el sistema y no se edita: se puede mover o quitar.
+                </p>
               )}
             </div>
           </div>
