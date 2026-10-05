@@ -187,7 +187,10 @@ const Inscripciones = () => {
                           {dinero(i.total)}
                         </span>
                       )}
-                      <Badge variant={i.ins_estado === 'pendiente' ? 'secondary' : 'default'}>
+                      <Badge
+                        variant="secondary"
+                        className={i.ins_estado === 'aprobada' ? 'border-transparent bg-emerald-700 text-white hover:bg-emerald-700 dark:bg-emerald-400 dark:text-emerald-950 dark:hover:bg-emerald-400' : undefined}
+                      >
                         {i.ins_estado === 'pendiente' ? 'Pendiente' : 'Aprobada'}
                       </Badge>
                       <span className="text-xs text-muted-foreground">{fechaHora(i.ins_fecha)}</span>

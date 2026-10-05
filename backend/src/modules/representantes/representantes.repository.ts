@@ -34,9 +34,12 @@ export interface RepresentanteListado {
   usu_nombre: string;
   usu_correo: string;
   usu_telefono: string | null;
+  usu_cedula: string | null;
   usu_foto: string | null;
   est_id: number;
   padre_id: number | null;
+  /** Inscripciones aprobadas que le dieron de alta: tiene documentos firmados. */
+  inscripciones: number;
   padre_factura_nombre: string | null;
   padre_factura_identificacion: string | null;
   padre_factura_correo: string | null;
@@ -95,9 +98,11 @@ export async function listarRepresentantes(
             u.usu_nombre,
             u.usu_correo,
             u.usu_telefono,
+            u.usu_cedula,
             u.usu_foto,
             u.est_id,
             p.padre_id,
+            (SELECT count(*) FROM public.inscripcion i WHERE i.usu_id = u.usu_id)::int AS inscripciones,
             p.padre_factura_nombre,
             p.padre_factura_identificacion,
             p.padre_factura_correo,
@@ -153,9 +158,11 @@ export async function obtenerRepresentante(usuId: number): Promise<Representante
             u.usu_nombre,
             u.usu_correo,
             u.usu_telefono,
+            u.usu_cedula,
             u.usu_foto,
             u.est_id,
             p.padre_id,
+            (SELECT count(*) FROM public.inscripcion i WHERE i.usu_id = u.usu_id)::int AS inscripciones,
             p.padre_factura_nombre,
             p.padre_factura_identificacion,
             p.padre_factura_correo,

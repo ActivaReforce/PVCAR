@@ -91,7 +91,10 @@ const FichaInscripcion = ({ id, onClose }: Props) => {
             <DialogTitle className="flex flex-wrap items-center gap-2">
               Inscripción
               {datos && (
-                <Badge variant={datos.ins_estado === 'pendiente' ? 'secondary' : 'default'}>
+                <Badge
+                  variant="secondary"
+                  className={datos.ins_estado === 'aprobada' ? 'border-transparent bg-emerald-700 text-white hover:bg-emerald-700 dark:bg-emerald-400 dark:text-emerald-950 dark:hover:bg-emerald-400' : undefined}
+                >
                   {datos.ins_estado === 'pendiente' ? 'Pendiente' : 'Aprobada'}
                 </Badge>
               )}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, UserRoundPlus, Users } from 'lucide-react';
+import { Eye, FileText, Search, UserRoundPlus, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,9 @@ import {
 } from '@/hooks/useEncuestas';
 import { iniciales } from '@/components/evaluaciones/metodos';
 import type { DatosFactura } from '@/api/representantes';
+import { usePermissions } from '@/hooks/usePermissions';
+import FichaRepresentanteDialog from '@/components/representantes/FichaRepresentanteDialog';
+import DocumentosRepresentanteDialog from '@/components/representantes/DocumentosRepresentanteDialog';
 
 const TODOS = 'todos';
 
@@ -52,6 +55,10 @@ const Representantes = () => {
   const [busqueda, setBusqueda] = useState('');
   const [estado, setEstado] = useState('1');
   const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [viendoId, setViendoId] = useState<number | null>(null);
+  const [documentosDe, setDocumentosDe] = useState<{ usuId: number; nombre: string } | null>(null);
+  const { hasPermission } = usePermissions();
+  const veDocumentos = hasPermission('inscripciones', 'ver');
 
   const lista = useRepresentantes({
     buscar: busqueda || undefined,
@@ -173,16 +180,43 @@ const Representantes = () => {
                   </span>
                 )}
 
-                <ConditionalAction module="estudiantes" action="editar">
+                {/* Acciones, como en las demás listas de personas: solo iconos. */}
+                <div className="ml-auto flex items-center gap-1 sm:ml-0">
                   <Button
-                    variant="outline"
-                    className="h-11 flex-1 sm:h-9 sm:flex-none"
-                    onClick={() => setEditandoId(r.usu_id)}
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 md:h-9 md:w-9"
+                    onClick={() => setViendoId(r.usu_id)}
+                    title="Ver ficha"
+                    aria-label={`Ver la ficha de ${r.usu_nombre}`}
                   >
-                    <UserRoundPlus className="mr-2 h-4 w-4" />
-                    Representados
+                    <Eye className="h-4 w-4" />
                   </Button>
-                </ConditionalAction>
+                  <ConditionalAction module="estudiantes" action="editar">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-11 w-11 md:h-9 md:w-9"
+                      onClick={() => setEditandoId(r.usu_id)}
+                      title="Representados"
+                      aria-label={`Representados de ${r.usu_nombre}`}
+                    >
+                      <UserRoundPlus className="h-4 w-4" />
+                    </Button>
+                  </ConditionalAction>
+                  {veDocumentos && r.inscripciones > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-11 w-11 md:h-9 md:w-9"
+                      onClick={() => setDocumentosDe({ usuId: r.usu_id, nombre: r.usu_nombre })}
+                      title="Ver contrato y documentos"
+                      aria-label={`Ver contrato y documentos de ${r.usu_nombre}`}
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </li>
           ))}
@@ -190,6 +224,12 @@ const Representantes = () => {
       )}
 
       <DialogoRepresentados usuId={editandoId} onClose={() => setEditandoId(null)} />
+      <FichaRepresentanteDialog usuId={viendoId} onClose={() => setViendoId(null)} />
+      <DocumentosRepresentanteDialog
+        usuId={documentosDe?.usuId ?? null}
+        nombre={documentosDe?.nombre ?? ''}
+        onClose={() => setDocumentosDe(null)}
+      />
     </div>
   );
 };

@@ -329,6 +329,15 @@ export interface ConfigInscripciones {
   membrete_data_url: string | null;
 }
 
+export interface DocumentoDeRepresentante {
+  ins_id: number;
+  ins_fecha: string;
+  ins_estado: EstadoInscripcion;
+  alumno: string;
+  colegio: string | null;
+  url: string | null;
+}
+
 export const inscripcionesApi = {
   formulario: () => api.get<Formulario>('/inscripcion/formulario'),
   enviar: (envio: Envio) => api.post<EnvioRecibido>('/inscripcion', envio),
@@ -345,6 +354,8 @@ export const inscripcionesApi = {
     return api.get<ListaInscripciones>(`/inscripciones${sufijo ? `?${sufijo}` : ''}`);
   },
   detalle: (id: number) => api.get<InscripcionDetalle>(`/inscripciones/${id}`),
+  documentosDeRepresentante: (usuId: number) =>
+    api.get<DocumentoDeRepresentante[]>(`/inscripciones/representantes/${usuId}/documentos`),
   aprobar: (id: number) => api.post<ResultadoAprobacion>(`/inscripciones/${id}/aprobar`),
   rechazar: (id: number, confirmacion: string) =>
     api.delete<{ ins_id: number }>(`/inscripciones/${id}`, { confirmacion }),

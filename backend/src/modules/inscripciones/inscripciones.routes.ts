@@ -204,6 +204,20 @@ inscripcionesRouter.post(
   },
 );
 
+/** Los documentos firmados de un representante (pantalla Representantes). */
+inscripcionesRouter.get(
+  '/representantes/:colId/documentos',
+  requirePermission('inscripciones', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { colId: usuId } = colIdParamSchema.parse(req.params);
+      res.json({ data: await service.documentosDeRepresentante(usuId), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 inscripcionesRouter.get(
   '/estado',
   requirePermission('inscripciones', 'ver'),

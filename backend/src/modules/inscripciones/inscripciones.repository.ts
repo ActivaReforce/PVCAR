@@ -521,8 +521,8 @@ export async function insertarNinoDeInscripcion(
   const { rows } = await client.query<{ insnino_id: number }>(
     `INSERT INTO public.inscripcion_nino
          (ins_id, insnino_orden, insnino_datos, insnino_disciplinas,
-          insnino_pdf, insnino_pdf_sha256, insnino_precio)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+          insnino_pdf, insnino_pdf_sha256, insnino_pdf_enviado_sha256, insnino_precio)
+     VALUES ($1, $2, $3, $4, $5, $6, $6, $7)
      RETURNING insnino_id`,
     [
       datos.insId,
@@ -695,10 +695,11 @@ export interface NinoDeInscripcion {
   insnino_orden: number;
   insnino_datos: NinoGuardado;
   insnino_disciplinas: number[];
+  /** El PDF del alumno: el enviado; al aprobar, el aprobado lo sustituye (0020). */
   insnino_pdf: string;
   insnino_pdf_sha256: string;
-  insnino_pdf_aprobado: string | null;
-  insnino_pdf_aprobado_sha256: string | null;
+  /** Huella del PDF que se descargó el representante al enviar. */
+  insnino_pdf_enviado_sha256: string;
   insnino_precio: CobroAlumno | null;
   nino_id: number | null;
 }
@@ -725,8 +726,8 @@ export async function obtener(
 export async function ninosDe(insId: number, client?: PoolClient): Promise<NinoDeInscripcion[]> {
   const { rows } = await (client ?? getPool()).query<NinoDeInscripcion>(
     `SELECT insnino_id, insnino_orden, insnino_datos, insnino_disciplinas,
-            insnino_pdf, insnino_pdf_sha256, insnino_pdf_aprobado,
-            insnino_pdf_aprobado_sha256, insnino_precio, nino_id
+            insnino_pdf, insnino_pdf_sha256, insnino_pdf_enviado_sha256,
+            insnino_precio, nino_id
        FROM public.inscripcion_nino
       WHERE ins_id = $1
       ORDER BY insnino_orden`,
@@ -794,7 +795,7 @@ export async function fijarNino(
 ): Promise<void> {
   await client.query(
     `UPDATE public.inscripcion_nino
-        SET nino_id = $2, insnino_pdf_aprobado = $3, insnino_pdf_aprobado_sha256 = $4
+        SET nino_id = $2, insnino_pdf = $3, insnino_pdf_sha256 = $4
       WHERE insnino_id = $1`,
     [insninoId, ninoId, pdfAprobado.ruta, pdfAprobado.sha256],
   );
@@ -890,6 +891,32 @@ export async function borrar(client: PoolClient, insId: number): Promise<string[
   );
   await client.query('DELETE FROM public.inscripcion WHERE ins_id = $1', [insId]);
   return rows.map((r) => r.ruta);
+}
+
+export interface DocumentoDeRepresentante {
+  ins_id: number;
+  ins_fecha: string;
+  ins_estado: 'pendiente' | 'aprobada';
+  alumno: string;
+  colegio: string | null;
+  insnino_pdf: string;
+}
+
+/** Los PDF de las inscripciones aprobadas de un representante. */
+export async function documentosDeRepresentante(usuId: number): Promise<DocumentoDeRepresentante[]> {
+  const { rows } = await getPool().query<DocumentoDeRepresentante>(
+    `SELECT i.ins_id, i.ins_fecha, i.ins_estado,
+            n.insnino_datos->>'nombre' AS alumno,
+            c.col_nombre AS colegio,
+            n.insnino_pdf
+       FROM public.inscripcion i
+       JOIN public.inscripcion_nino n ON n.ins_id = i.ins_id
+       LEFT JOIN public.colegio c ON c.col_id = (n.insnino_datos->>'col_id')::int
+      WHERE i.usu_id = $1
+      ORDER BY i.ins_fecha DESC, n.insnino_orden`,
+    [usuId],
+  );
+  return rows;
 }
 
 export async function nombresDeGrados(ids: number[]): Promise<Map<number, string>> {

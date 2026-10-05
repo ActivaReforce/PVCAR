@@ -13,9 +13,12 @@ export interface Representante {
   usu_nombre: string;
   usu_correo: string;
   usu_telefono: string | null;
+  usu_cedula: string | null;
   usu_foto_url: string | null;
   est_id: number;
   padre_id: number | null;
+  /** Inscripciones aprobadas que le dieron de alta: tiene documentos firmados. */
+  inscripciones: number;
   padre_factura_nombre: string | null;
   padre_factura_identificacion: string | null;
   padre_factura_correo: string | null;

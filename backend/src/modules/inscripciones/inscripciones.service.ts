@@ -676,7 +676,7 @@ export async function detalle(insId: number): Promise<InscripcionDetalle> {
 
   const [ninos, aceptaciones] = await Promise.all([repo.ninosDe(insId), repo.aceptacionesDe(insId)]);
   const ids = [...new Set(ninos.flatMap((n) => n.insnino_disciplinas))];
-  const paquetes = ninos.map((n) => n.insnino_pdf_aprobado ?? n.insnino_pdf);
+  const paquetes = ninos.map((n) => n.insnino_pdf);
   const [disciplinas, grados, coincidencias, firmadas] = await Promise.all([
     repo.disciplinasPorId(ids),
     repo.nombresDeGrados(ninos.map((n) => n.insnino_datos.catninograd_id)),
@@ -719,7 +719,7 @@ export async function detalle(insId: number): Promise<InscripcionDetalle> {
           };
         }),
         paquete_url: firmadas.get(paquetes[i]!) ?? null,
-        paquete_sha256: n.insnino_pdf_aprobado_sha256 ?? n.insnino_pdf_sha256,
+        paquete_sha256: n.insnino_pdf_sha256,
         constancias: aceptaciones
           .filter((a) => a.insnino_id === n.insnino_id)
           .map((a) => ({
@@ -922,6 +922,10 @@ export async function aprobar(actor: AuthUser, insId: number): Promise<Resultado
     }
     throw err;
   }
+
+  // El aprobado sustituye al enviado (0020): el viejo ya no lo usa nadie.
+  // De él queda la huella en insnino_pdf_enviado_sha256.
+  await borrarArchivos(ninosPrevios.map((n) => n.insnino_pdf));
 
   const correo_enviado = await enviarCorreo({
     ...correoDeAprobacion(rep.nombre, rep.correo, resultado.cuenta_nueva),
@@ -1288,6 +1292,26 @@ export async function guardarCuentaBancaria(actor: AuthUser, texto: string | nul
       client,
     );
   });
+}
+
+export interface DocumentoListado {
+  ins_id: number;
+  ins_fecha: string;
+  ins_estado: 'pendiente' | 'aprobada';
+  alumno: string;
+  colegio: string | null;
+  url: string | null;
+}
+
+/**
+ * Los documentos firmados de un representante, para verlos desde
+ * Representantes. Solo quien ve Inscripciones (lleva datos de salud de
+ * menores).
+ */
+export async function documentosDeRepresentante(usuId: number): Promise<DocumentoListado[]> {
+  const filas = await repo.documentosDeRepresentante(usuId);
+  const firmadas = await firmarArchivos(filas.map((f) => f.insnino_pdf));
+  return filas.map(({ insnino_pdf, ...f }) => ({ ...f, url: firmadas.get(insnino_pdf) ?? null }));
 }
 
 /** Vuelve al membrete de serie. */
