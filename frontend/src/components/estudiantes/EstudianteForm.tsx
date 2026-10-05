@@ -20,7 +20,13 @@ import {
   useGrados,
   useSubirFotoEstudiante,
 } from '@/hooks/useEstudiantes';
-import type { DatosEstudiante, EstudianteDetalle } from '@/api/estudiantes';
+import type {
+  ContactoNino,
+  DatosEstudiante,
+  EstudianteDetalle,
+  ModalidadSalida,
+  PermisosImagen,
+} from '@/api/estudiantes';
 
 interface Props {
   estudiante?: EstudianteDetalle | null;
@@ -29,6 +35,57 @@ interface Props {
 }
 
 const SIN_GRADO = 'sin-grado';
+const SIN_SALIDA = 'sin-indicar';
+const CONTACTO_VACIO: ContactoNino = { nombre: '', cedula: '', relacion: '', telefono: '' };
+
+/** Todo vacío = sin contacto (null); a medias = 'incompleto'. */
+function contactoDe(c: ContactoNino, conCedula: boolean): ContactoNino | null | 'incompleto' {
+  const v = {
+    nombre: c.nombre.trim(),
+    cedula: (c.cedula ?? '').trim(),
+    relacion: c.relacion.trim(),
+    telefono: c.telefono.trim(),
+  };
+  const campos = conCedula ? [v.nombre, v.cedula, v.relacion, v.telefono] : [v.nombre, v.relacion, v.telefono];
+  if (campos.every((x) => x === '')) return null;
+  if (campos.some((x) => x === '')) return 'incompleto';
+  return { ...v, cedula: conCedula ? v.cedula : null };
+}
+
+const CamposContacto = ({
+  prefijo,
+  contacto,
+  onChange,
+  conCedula,
+}: {
+  prefijo: string;
+  contacto: ContactoNino;
+  onChange: (c: ContactoNino) => void;
+  conCedula: boolean;
+}) => {
+  const campo = (clave: keyof ContactoNino, etiqueta: string, extra?: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <div className="space-y-1">
+      <Label htmlFor={`${prefijo}-${clave}`} className="text-xs text-muted-foreground">
+        {etiqueta}
+      </Label>
+      <Input
+        id={`${prefijo}-${clave}`}
+        value={contacto[clave] ?? ''}
+        onChange={(ev) => onChange({ ...contacto, [clave]: ev.target.value })}
+        autoComplete="off"
+        {...extra}
+      />
+    </div>
+  );
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {campo('nombre', 'Nombres y apellidos')}
+      {conCedula && campo('cedula', 'Cédula / identificación', { maxLength: 20 })}
+      {campo('relacion', 'Relación con el menor')}
+      {campo('telefono', 'Teléfono', { type: 'tel' })}
+    </div>
+  );
+};
 
 /**
  * Alta y edición de un estudiante.
@@ -56,10 +113,18 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
     estudiante?.catninograd_id ? String(estudiante.catninograd_id) : SIN_GRADO,
   );
   const [nacimiento, setNacimiento] = useState(estudiante?.nino_fecha_nacimiento ?? '');
-  const [cedula, setCedula] = useState(estudiante?.nino_cedula ?? '');
-  const [transporte, setTransporte] = useState(estudiante?.nino_toma_transporte ?? false);
+  const [salida, setSalida] = useState<string>(estudiante?.nino_modalidad_salida ?? SIN_SALIDA);
+  const [detalleRetiro, setDetalleRetiro] = useState(estudiante?.nino_detalle_retiro ?? '');
   const [salud, setSalud] = useState(estudiante?.nino_info_salud ?? '');
-  const [otra, setOtra] = useState(estudiante?.nino_otra_info ?? '');
+  const [imagen, setImagen] = useState<PermisosImagen>({
+    familias: estudiante?.nino_imagen_familias ?? false,
+    redes: estudiante?.nino_imagen_redes ?? false,
+    promocional: estudiante?.nino_imagen_promocional ?? false,
+  });
+  const [emergencia, setEmergencia] = useState<ContactoNino>(
+    estudiante?.contacto_emergencia ?? { ...CONTACTO_VACIO },
+  );
+  const [retiro, setRetiro] = useState<ContactoNino>(estudiante?.contacto_retiro ?? { ...CONTACTO_VACIO });
   const [foto, setFoto] = useState<File | null>(null);
   const [fotoQuitada, setFotoQuitada] = useState(false);
 
@@ -82,6 +147,18 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
       return;
     }
 
+    const em = contactoDe(emergencia, false);
+    const re = contactoDe(retiro, true);
+    if (em === 'incompleto' || re === 'incompleto') {
+      toast({
+        title: 'Contacto incompleto',
+        description:
+          'Llena todos los datos del contacto de emergencia y de quien lo retira (con su cédula), o déjalos vacíos.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     let ruta: string | null | undefined;
     if (foto) {
       try {
@@ -98,10 +175,12 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
       col_id: Number(colId),
       catninograd_id: gradoId === SIN_GRADO ? null : Number(gradoId),
       nino_fecha_nacimiento: nacimiento || null,
-      nino_cedula: cedula.trim(),
-      nino_toma_transporte: transporte,
+      nino_modalidad_salida: salida === SIN_SALIDA ? null : (salida as ModalidadSalida),
+      nino_detalle_retiro: detalleRetiro.trim(),
       nino_info_salud: salud.trim(),
-      nino_otra_info: otra.trim(),
+      imagen,
+      contacto_emergencia: em,
+      contacto_retiro: re,
       ...(ruta !== undefined ? { nino_foto: ruta } : {}),
     };
 
@@ -185,26 +264,38 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cedula">Cédula</Label>
-            <Input
-              id="cedula"
-              value={cedula}
-              onChange={(ev) => setCedula(ev.target.value)}
-              inputMode="numeric"
-              autoComplete="off"
+            <Label htmlFor="salida">Modalidad de salida</Label>
+            <Select value={salida} onValueChange={setSalida}>
+              <SelectTrigger id="salida" className="h-11 sm:h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SIN_SALIDA}>Sin indicar</SelectItem>
+                <SelectItem value="escolar">Transporte escolar</SelectItem>
+                <SelectItem value="privado">Transporte privado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="detalle-retiro">Detalle del recorrido o instrucciones de retiro</Label>
+            <Textarea
+              id="detalle-retiro"
+              value={detalleRetiro}
+              onChange={(ev) => setDetalleRetiro(ev.target.value)}
+              rows={2}
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="transporte"
-              checked={transporte}
-              onCheckedChange={(v) => setTransporte(v === true)}
-            />
-            <Label htmlFor="transporte" className="cursor-pointer">
-              Toma transporte
-            </Label>
-          </div>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Contacto alterno de emergencia</legend>
+            <CamposContacto prefijo="em" contacto={emergencia} onChange={setEmergencia} conCedula={false} />
+          </fieldset>
+
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Persona autorizada para retirarlo</legend>
+            <CamposContacto prefijo="re" contacto={retiro} onChange={setRetiro} conCedula />
+          </fieldset>
         </div>
 
         <div className="space-y-4">
@@ -230,15 +321,27 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="otra">Otra información</Label>
-            <Textarea
-              id="otra"
-              value={otra}
-              onChange={(ev) => setOtra(ev.target.value)}
-              rows={2}
-            />
-          </div>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Uso de imagen autorizado</legend>
+            {(
+              [
+                ['familias', 'Compartir con las familias del grupo'],
+                ['redes', 'Publicar en redes sociales de ACTIVA'],
+                ['promocional', 'Material institucional o promocional'],
+              ] as const
+            ).map(([clave, texto]) => (
+              <div key={clave} className="flex min-h-11 items-center gap-2 sm:min-h-9">
+                <Checkbox
+                  id={`imagen-${clave}`}
+                  checked={imagen[clave]}
+                  onCheckedChange={(v) => setImagen((x) => ({ ...x, [clave]: v === true }))}
+                />
+                <Label htmlFor={`imagen-${clave}`} className="cursor-pointer font-normal">
+                  {texto}
+                </Label>
+              </div>
+            ))}
+          </fieldset>
         </div>
       </div>
 

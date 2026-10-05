@@ -35,8 +35,14 @@ export const hijosSchema = z.object({
     .refine((ids) => new Set(ids).size === ids.length, 'Hay un alumno repetido'),
 });
 
-export const sectorSchema = z.object({
-  padre_sector_residencia: z.string().trim().max(160).optional().or(z.literal('')),
+const campo = (max: number) => z.string().trim().max(max).optional().or(z.literal(''));
+
+/** Datos de factura (ficha de matrícula, sección A). Vacío lo borra. */
+export const facturaSchema = z.object({
+  padre_factura_nombre: campo(160),
+  padre_factura_identificacion: campo(20),
+  padre_factura_correo: z.string().trim().toLowerCase().email('Correo inválido').max(160).optional().or(z.literal('')),
+  padre_factura_direccion: campo(300),
 });
 
 export const idParamSchema = z.object({ id: z.coerce.number().int().positive() });
@@ -190,16 +196,21 @@ export async function sincronizarHijos(
   return ficha(actor, usuId);
 }
 
-export async function actualizarSector(
+export async function actualizarFactura(
   actor: AuthUser,
   usuId: number,
-  sector: string | undefined,
+  input: z.infer<typeof facturaSchema>,
 ): Promise<FichaRepresentante> {
   const { representante } = await exigirVisible(actor, usuId);
 
   await enTransaccion(async (client) => {
     const padreId = representante.padre_id ?? (await repo.asegurarFicha(client, usuId));
-    await repo.actualizarSector(client, padreId, vacioANulo(sector));
+    await repo.actualizarFactura(client, padreId, {
+      nombre: vacioANulo(input.padre_factura_nombre),
+      identificacion: vacioANulo(input.padre_factura_identificacion),
+      correo: vacioANulo(input.padre_factura_correo),
+      direccion: vacioANulo(input.padre_factura_direccion),
+    });
   });
 
   return ficha(actor, usuId);

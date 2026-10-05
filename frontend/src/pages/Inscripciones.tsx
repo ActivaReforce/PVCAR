@@ -16,7 +16,6 @@ import { useInscripciones } from '@/hooks/useInscripciones';
 import { dinero, type EstadoInscripcion } from '@/api/inscripciones';
 import FichaInscripcion from '@/components/inscripciones/FichaInscripcion';
 import DocumentosLegales from '@/components/inscripciones/DocumentosLegales';
-import PreciosColegios from '@/components/inscripciones/PreciosColegios';
 import MembreteIva from '@/components/inscripciones/MembreteIva';
 import { fechaHora } from '@/components/inscripciones/formato';
 
@@ -78,7 +77,6 @@ const Inscripciones = () => {
           <TabsList className="w-max">
             <TabsTrigger value="inscripciones">Inscripciones</TabsTrigger>
             <TabsTrigger value="documentos">Documentos</TabsTrigger>
-            <TabsTrigger value="precios">Colegios y precios</TabsTrigger>
             <TabsTrigger value="membrete">Membrete e IVA</TabsTrigger>
           </TabsList>
         </div>
@@ -208,10 +206,6 @@ const Inscripciones = () => {
 
         <TabsContent value="documentos" className="pt-2">
           <DocumentosLegales />
-        </TabsContent>
-
-        <TabsContent value="precios" className="pt-2">
-          <PreciosColegios />
         </TabsContent>
 
         <TabsContent value="membrete" className="pt-2">

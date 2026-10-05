@@ -4,7 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { DialogFooter } from '@/components/ui/dialog';
 import type { UsuarioDetalle } from '@/api/usuarios';
-import { ROL } from '@/hooks/useUserForm';
 
 interface UserDetailProps {
   user: UsuarioDetalle;
@@ -26,8 +25,6 @@ const UserDetail = ({ user, onClose }: UserDetailProps) => {
     .join('')
     .toUpperCase()
     .slice(0, 2);
-
-  const esRepresentante = user.roles.some((r) => r.rol_id === ROL.REPRESENTANTE);
 
   const fecha = (valor: string | null) =>
     valor ? new Date(valor).toLocaleDateString() : '—';
@@ -68,9 +65,6 @@ const UserDetail = ({ user, onClose }: UserDetailProps) => {
           { etiqueta: 'Fecha de creación', valor: fecha(user.usu_fecha_creacion) },
           { etiqueta: 'Última modificación', valor: fecha(user.usu_fecha_modificacion) },
           { etiqueta: 'Cédula o pasaporte', valor: user.usu_cedula || '—' },
-          ...(esRepresentante
-            ? [{ etiqueta: 'Sector de residencia', valor: user.padre_sector_residencia || '—' }]
-            : []),
         ].map(({ etiqueta, valor }) => (
           <div key={etiqueta} className="min-w-0">
             <Label className="font-semibold">{etiqueta}:</Label>

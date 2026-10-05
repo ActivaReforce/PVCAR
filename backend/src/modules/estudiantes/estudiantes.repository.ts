@@ -24,17 +24,36 @@ export interface EstudianteListado {
   representantes: number;
 }
 
+export type ModalidadSalida = 'escolar' | 'privado';
+
+export interface ContactoNino {
+  nombre: string;
+  /** Solo la persona autorizada para retirarlo; el de emergencia no la lleva. */
+  cedula: string | null;
+  relacion: string;
+  telefono: string;
+}
+
 /**
- * La ficha trae lo que la lista no: cedula, transporte y —sobre todo— la
- * informacion de salud, que es dato sensible de un menor. En el sistema viejo
- * viajaba en la consulta de la lista, junto al `usuario` anidado del padre
- * **con su contrasena dentro**.
+ * La ficha trae lo que la lista no: retiro, contactos, permisos de imagen y
+ * —sobre todo— la informacion de salud, que es dato sensible de un menor. En
+ * el sistema viejo viajaba en la consulta de la lista, junto al `usuario`
+ * anidado del padre **con su contrasena dentro**.
+ *
+ * Los campos son los de las fichas del cliente (0016). La cedula del alumno,
+ * "otra informacion" y el si/no de transporte se borraron en la 0017.
  */
 export interface EstudianteDetalle extends EstudianteListado {
-  nino_cedula: string | null;
-  nino_toma_transporte: boolean | null;
+  nino_modalidad_salida: ModalidadSalida | null;
+  nino_detalle_retiro: string | null;
   nino_info_salud: string | null;
-  nino_otra_info: string | null;
+  /** null = nunca se pregunto (alta manual o anterior a la inscripcion en linea). */
+  nino_salud_autorizada: boolean | null;
+  nino_imagen_familias: boolean | null;
+  nino_imagen_redes: boolean | null;
+  nino_imagen_promocional: boolean | null;
+  contacto_emergencia: ContactoNino | null;
+  contacto_retiro: ContactoNino | null;
   nino_fecha_modificacion: string | null;
 }
 
@@ -62,7 +81,6 @@ export interface RepresentanteListado {
   usu_nombre: string;
   usu_correo: string;
   usu_telefono: string | null;
-  padre_sector_residencia: string | null;
   usuario_activo: boolean;
 }
 
@@ -93,8 +111,7 @@ const F_ALCANCE = `(
     )
 )`;
 
-const F_BUSCAR = `($4::text IS NULL OR ${contieneSinTildes('n.nino_nombre', '$4')}
-                                    OR ${contieneSinTildes("COALESCE(n.nino_cedula, '')", '$4')})`;
+const F_BUSCAR = `($4::text IS NULL OR ${contieneSinTildes('n.nino_nombre', '$4')})`;
 
 const F_COLEGIO = `($5::int[] IS NULL OR n.col_id = ANY($5::int[]))`;
 
@@ -243,6 +260,12 @@ export async function contarEstudiantes(
   };
 }
 
+const contacto = (tipo: 'emergencia' | 'retiro') => `(
+    SELECT json_build_object('nombre', c.nincon_nombre, 'cedula', c.nincon_cedula,
+                             'relacion', c.nincon_relacion, 'telefono', c.nincon_telefono)
+      FROM public.nino_contacto c
+     WHERE c.nino_id = n.nino_id AND c.nincon_tipo = '${tipo}')`;
+
 export async function obtenerEstudiante(
   ninoId: number,
   client?: PoolClient,
@@ -251,10 +274,15 @@ export async function obtenerEstudiante(
   const { rows } = await ejecutor.query<EstudianteDetalle>(
     `
     SELECT ${COLUMNAS},
-           n.nino_cedula,
-           n.nino_toma_transporte,
+           n.nino_modalidad_salida,
+           n.nino_detalle_retiro,
            n.nino_info_salud,
-           n.nino_otra_info,
+           n.nino_salud_autorizada,
+           n.nino_imagen_familias,
+           n.nino_imagen_redes,
+           n.nino_imagen_promocional,
+           ${contacto('emergencia')} AS contacto_emergencia,
+           ${contacto('retiro')} AS contacto_retiro,
            n.nino_fecha_modificacion
     ${DESDE}
     WHERE n.nino_id = $1
@@ -460,28 +488,31 @@ export async function insertarEstudiante(
     colId: number;
     gradoId: number | null;
     fechaNacimiento: string | null;
-    cedula: string | null;
-    transporte: boolean | null;
+    modalidadSalida: ModalidadSalida | null;
+    detalleRetiro: string | null;
     salud: string | null;
-    otra: string | null;
+    imagen: { familias: boolean; redes: boolean; promocional: boolean } | null;
     foto: string | null;
   },
 ): Promise<number> {
   const { rows } = await client.query<{ nino_id: number }>(
     `INSERT INTO public.nino
-         (nino_nombre, col_id, catninograd_id, nino_fecha_nacimiento, nino_cedula,
-          nino_toma_transporte, nino_info_salud, nino_otra_info, nino_foto, est_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         (nino_nombre, col_id, catninograd_id, nino_fecha_nacimiento, nino_modalidad_salida,
+          nino_detalle_retiro, nino_info_salud, nino_imagen_familias, nino_imagen_redes,
+          nino_imagen_promocional, nino_foto, est_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING nino_id`,
     [
       datos.nombre,
       datos.colId,
       datos.gradoId,
       datos.fechaNacimiento,
-      datos.cedula,
-      datos.transporte,
+      datos.modalidadSalida,
+      datos.detalleRetiro,
       datos.salud,
-      datos.otra,
+      datos.imagen?.familias ?? null,
+      datos.imagen?.redes ?? null,
+      datos.imagen?.promocional ?? null,
       datos.foto,
       ESTADO.ACTIVO,
     ],
@@ -499,14 +530,14 @@ export async function actualizarEstudiante(
     tocarGrado: boolean;
     fechaNacimiento: string | null;
     tocarFechaNacimiento: boolean;
-    cedula: string | null;
-    tocarCedula: boolean;
-    transporte: boolean | null;
-    tocarTransporte: boolean;
+    modalidadSalida: ModalidadSalida | null;
+    tocarModalidad: boolean;
+    detalleRetiro: string | null;
+    tocarDetalleRetiro: boolean;
     salud: string | null;
     tocarSalud: boolean;
-    otra: string | null;
-    tocarOtra: boolean;
+    imagen: { familias: boolean; redes: boolean; promocional: boolean } | null;
+    tocarImagen: boolean;
     foto: string | null;
     tocarFoto: boolean;
   },
@@ -515,13 +546,15 @@ export async function actualizarEstudiante(
     `UPDATE public.nino
         SET nino_nombre           = COALESCE($2::text, nino_nombre),
             col_id                = COALESCE($3::int, col_id),
-            catninograd_id        = CASE WHEN $4::boolean  THEN $5::smallint ELSE catninograd_id       END,
+            catninograd_id        = CASE WHEN $4::boolean  THEN $5::smallint ELSE catninograd_id        END,
             nino_fecha_nacimiento = CASE WHEN $6::boolean  THEN $7::date     ELSE nino_fecha_nacimiento END,
-            nino_cedula           = CASE WHEN $8::boolean  THEN $9::text     ELSE nino_cedula          END,
-            nino_toma_transporte  = CASE WHEN $10::boolean THEN $11::boolean ELSE nino_toma_transporte END,
-            nino_info_salud       = CASE WHEN $12::boolean THEN $13::text    ELSE nino_info_salud      END,
-            nino_otra_info        = CASE WHEN $14::boolean THEN $15::text    ELSE nino_otra_info       END,
-            nino_foto             = CASE WHEN $16::boolean THEN $17::text    ELSE nino_foto            END,
+            nino_modalidad_salida = CASE WHEN $8::boolean  THEN $9::text     ELSE nino_modalidad_salida END,
+            nino_detalle_retiro   = CASE WHEN $10::boolean THEN $11::text    ELSE nino_detalle_retiro   END,
+            nino_info_salud       = CASE WHEN $12::boolean THEN $13::text    ELSE nino_info_salud       END,
+            nino_imagen_familias  = CASE WHEN $14::boolean THEN $15::boolean ELSE nino_imagen_familias  END,
+            nino_imagen_redes     = CASE WHEN $14::boolean THEN $16::boolean ELSE nino_imagen_redes     END,
+            nino_imagen_promocional = CASE WHEN $14::boolean THEN $17::boolean ELSE nino_imagen_promocional END,
+            nino_foto             = CASE WHEN $18::boolean THEN $19::text    ELSE nino_foto             END,
             nino_fecha_modificacion = now()
       WHERE nino_id = $1`,
     [
@@ -532,17 +565,47 @@ export async function actualizarEstudiante(
       campos.gradoId,
       campos.tocarFechaNacimiento,
       campos.fechaNacimiento,
-      campos.tocarCedula,
-      campos.cedula,
-      campos.tocarTransporte,
-      campos.transporte,
+      campos.tocarModalidad,
+      campos.modalidadSalida,
+      campos.tocarDetalleRetiro,
+      campos.detalleRetiro,
       campos.tocarSalud,
       campos.salud,
-      campos.tocarOtra,
-      campos.otra,
+      campos.tocarImagen,
+      campos.imagen?.familias ?? null,
+      campos.imagen?.redes ?? null,
+      campos.imagen?.promocional ?? null,
       campos.tocarFoto,
       campos.foto,
     ],
+  );
+}
+
+/**
+ * Contacto de emergencia y persona autorizada para retirarlo (0016). Uno de
+ * cada como mucho; null lo quita.
+ */
+export async function guardarContacto(
+  client: PoolClient,
+  ninoId: number,
+  tipo: 'emergencia' | 'retiro',
+  c: ContactoNino | null,
+): Promise<void> {
+  if (!c) {
+    await client.query('DELETE FROM public.nino_contacto WHERE nino_id = $1 AND nincon_tipo = $2', [
+      ninoId,
+      tipo,
+    ]);
+    return;
+  }
+  await client.query(
+    `INSERT INTO public.nino_contacto
+         (nino_id, nincon_tipo, nincon_nombre, nincon_cedula, nincon_relacion, nincon_telefono)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (nino_id, nincon_tipo) DO UPDATE
+        SET nincon_nombre = EXCLUDED.nincon_nombre, nincon_cedula = EXCLUDED.nincon_cedula,
+            nincon_relacion = EXCLUDED.nincon_relacion, nincon_telefono = EXCLUDED.nincon_telefono`,
+    [ninoId, tipo, c.nombre, tipo === 'retiro' ? c.cedula : null, c.relacion, c.telefono],
   );
 }
 
@@ -568,7 +631,6 @@ export async function listarRepresentantes(ninoId: number): Promise<Representant
             u.usu_nombre,
             u.usu_correo,
             u.usu_telefono,
-            p.padre_sector_residencia,
             (u.est_id = ${ESTADO.ACTIVO}) AS usuario_activo
        FROM public.nino_padre np
        JOIN public.padre p   ON p.padre_id = np.padre_id

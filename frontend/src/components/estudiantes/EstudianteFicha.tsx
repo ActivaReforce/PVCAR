@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
+import type { EstudianteDetalle } from '@/api/estudiantes';
 import {
   useAtarRepresentante,
   useCandidatosRepresentante,
@@ -90,9 +91,13 @@ const EstudianteFicha = ({ ninoId }: Props) => {
           {estudiante.col_nombre}
           {estudiante.catninograd_nombre && ` · ${estudiante.catninograd_nombre}`}
           {estudiante.nino_edad && ` · ${estudiante.nino_edad} años`}
-          {estudiante.nino_cedula && ` · ${estudiante.nino_cedula}`}
         </span>
-        {estudiante.nino_toma_transporte && <Badge variant="outline">Toma transporte</Badge>}
+        {estudiante.nino_modalidad_salida && (
+          <Badge variant="outline">
+            {estudiante.nino_modalidad_salida === 'escolar' ? 'Transporte escolar' : 'Transporte privado'}
+          </Badge>
+        )}
+        <PermisosDeImagen e={estudiante} />
       </div>
 
       {estudiante.nino_info_salud && (
@@ -105,8 +110,39 @@ const EstudianteFicha = ({ ninoId }: Props) => {
         </div>
       )}
 
-      {estudiante.nino_otra_info && (
-        <p className="break-words text-sm text-muted-foreground">{estudiante.nino_otra_info}</p>
+      {(estudiante.contacto_emergencia || estudiante.contacto_retiro || estudiante.nino_detalle_retiro) && (
+        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          {estudiante.contacto_emergencia && (
+            <div className="min-w-0">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Contacto de emergencia
+              </dt>
+              <dd className="break-words">
+                {estudiante.contacto_emergencia.nombre} ({estudiante.contacto_emergencia.relacion}) ·{' '}
+                {estudiante.contacto_emergencia.telefono}
+              </dd>
+            </div>
+          )}
+          {estudiante.contacto_retiro && (
+            <div className="min-w-0">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Autorizado para retirarlo
+              </dt>
+              <dd className="break-words">
+                {estudiante.contacto_retiro.nombre} ({estudiante.contacto_retiro.relacion}) · C.C.{' '}
+                {estudiante.contacto_retiro.cedula} · {estudiante.contacto_retiro.telefono}
+              </dd>
+            </div>
+          )}
+          {estudiante.nino_detalle_retiro && (
+            <div className="min-w-0 sm:col-span-2">
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Instrucciones de retiro
+              </dt>
+              <dd className="break-words">{estudiante.nino_detalle_retiro}</dd>
+            </div>
+          )}
+        </dl>
       )}
 
       {/* Inscripciones */}
@@ -327,6 +363,32 @@ const EstudianteFicha = ({ ninoId }: Props) => {
       </p>
     </div>
   );
+};
+
+
+/**
+ * Lo que el entrenador tiene que saber antes de sacar una foto. Sin
+ * respuesta (alta manual o anterior a la inscripción en línea) se dice así,
+ * no se da por permitido.
+ */
+const PermisosDeImagen = ({ e }: { e: EstudianteDetalle }) => {
+  const permisos = [
+    ['familias', e.nino_imagen_familias],
+    ['redes', e.nino_imagen_redes],
+    ['promocional', e.nino_imagen_promocional],
+  ] as const;
+  if (permisos.every(([, v]) => v === null)) {
+    return <Badge variant="outline">Fotos: sin respuesta</Badge>;
+  }
+  const si = permisos.filter(([, v]) => v === true).map(([k]) => k);
+  if (si.length === 0) {
+    return (
+      <Badge variant="outline" className="border-destructive/50 text-destructive">
+        Sin permiso de fotos
+      </Badge>
+    );
+  }
+  return <Badge variant="outline">Fotos: {si.join(', ')}</Badge>;
 };
 
 export default EstudianteFicha;

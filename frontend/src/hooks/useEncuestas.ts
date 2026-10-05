@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
 import { encuestasApi, type PreguntaInput, type RespuestaInput } from '@/api/encuestas';
-import { representantesApi } from '@/api/representantes';
+import { representantesApi, type DatosFactura } from '@/api/representantes';
 
 function mensajeDe(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -241,10 +241,10 @@ export function useGuardarHijos() {
   );
 }
 
-export function useActualizarSector() {
+export function useActualizarFactura() {
   return useMutacionRepresentante(
-    ({ usuId, sector }: { usuId: number; sector: string }) =>
-      representantesApi.actualizarSector(usuId, sector),
-    'Sector actualizado',
+    ({ usuId, factura }: { usuId: number; factura: DatosFactura }) =>
+      representantesApi.actualizarFactura(usuId, factura),
+    'Datos de factura actualizados',
   );
 }

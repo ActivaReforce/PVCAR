@@ -145,12 +145,18 @@ export async function crear(
       colId: input.col_id,
       gradoId: input.catninograd_id ?? null,
       fechaNacimiento: input.nino_fecha_nacimiento ?? null,
-      cedula: vacioANulo(input.nino_cedula),
-      transporte: input.nino_toma_transporte ?? null,
+      modalidadSalida: input.nino_modalidad_salida ?? null,
+      detalleRetiro: vacioANulo(input.nino_detalle_retiro),
       salud: vacioANulo(input.nino_info_salud),
-      otra: vacioANulo(input.nino_otra_info),
+      imagen: input.imagen ?? null,
       foto: vacioANulo(input.nino_foto ?? undefined),
     });
+    if (input.contacto_emergencia) {
+      await repo.guardarContacto(client, nuevoId, 'emergencia', input.contacto_emergencia);
+    }
+    if (input.contacto_retiro) {
+      await repo.guardarContacto(client, nuevoId, 'retiro', input.contacto_retiro);
+    }
 
     for (const colacthorId of input.disciplinas ?? []) {
       await exigirDisciplinaDelColegio(client, colacthorId, input.col_id);
@@ -236,17 +242,23 @@ export async function actualizar(
       tocarGrado: input.catninograd_id !== undefined,
       fechaNacimiento: input.nino_fecha_nacimiento ?? null,
       tocarFechaNacimiento: input.nino_fecha_nacimiento !== undefined,
-      cedula: vacioANulo(input.nino_cedula),
-      tocarCedula: input.nino_cedula !== undefined,
-      transporte: input.nino_toma_transporte ?? null,
-      tocarTransporte: input.nino_toma_transporte !== undefined,
+      modalidadSalida: input.nino_modalidad_salida ?? null,
+      tocarModalidad: input.nino_modalidad_salida !== undefined,
+      detalleRetiro: vacioANulo(input.nino_detalle_retiro),
+      tocarDetalleRetiro: input.nino_detalle_retiro !== undefined,
       salud: vacioANulo(input.nino_info_salud),
       tocarSalud: input.nino_info_salud !== undefined,
-      otra: vacioANulo(input.nino_otra_info),
-      tocarOtra: input.nino_otra_info !== undefined,
+      imagen: input.imagen ?? null,
+      tocarImagen: input.imagen !== undefined,
       foto: input.nino_foto === null ? null : vacioANulo(input.nino_foto ?? undefined),
       tocarFoto: input.nino_foto !== undefined,
     });
+    if (input.contacto_emergencia !== undefined) {
+      await repo.guardarContacto(client, ninoId, 'emergencia', input.contacto_emergencia);
+    }
+    if (input.contacto_retiro !== undefined) {
+      await repo.guardarContacto(client, ninoId, 'retiro', input.contacto_retiro);
+    }
 
     await auditar(
       {

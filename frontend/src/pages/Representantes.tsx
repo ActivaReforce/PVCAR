@@ -24,13 +24,14 @@ import {
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import {
-  useActualizarSector,
+  useActualizarFactura,
   useAlumnosDisponibles,
   useFichaRepresentante,
   useGuardarHijos,
   useRepresentantes,
 } from '@/hooks/useEncuestas';
 import { iniciales } from '@/components/evaluaciones/metodos';
+import type { DatosFactura } from '@/api/representantes';
 
 const TODOS = 'todos';
 
@@ -151,7 +152,6 @@ const Representantes = () => {
                   </div>
                   <div className="truncate text-sm text-muted-foreground">
                     {r.usu_correo}
-                    {r.padre_sector_residencia && ` · ${r.padre_sector_residencia}`}
                   </div>
                 </div>
               </div>
@@ -210,17 +210,23 @@ const DialogoRepresentados = ({
 }) => {
   const [busqueda, setBusqueda] = useState('');
   const [elegidos, setElegidos] = useState<Set<number>>(new Set());
-  const [sector, setSector] = useState('');
+  const [factura, setFactura] = useState<DatosFactura>({ padre_factura_nombre: '', padre_factura_identificacion: '', padre_factura_correo: '', padre_factura_direccion: '' });
 
   const ficha = useFichaRepresentante(usuId);
   const disponibles = useAlumnosDisponibles(usuId, busqueda);
   const guardar = useGuardarHijos();
-  const guardarSector = useActualizarSector();
+  const guardarFactura = useActualizarFactura();
 
   useEffect(() => {
     if (!ficha.data) return;
     setElegidos(new Set(ficha.data.hijos.map((h) => h.nino_id)));
-    setSector(ficha.data.representante.padre_sector_residencia ?? '');
+    const r = ficha.data.representante;
+    setFactura({
+      padre_factura_nombre: r.padre_factura_nombre ?? '',
+      padre_factura_identificacion: r.padre_factura_identificacion ?? '',
+      padre_factura_correo: r.padre_factura_correo ?? '',
+      padre_factura_direccion: r.padre_factura_direccion ?? '',
+    });
   }, [ficha.data]);
 
   /** Los ya atados salen siempre, aunque la búsqueda no los alcance. */
@@ -260,16 +266,31 @@ const DialogoRepresentados = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-1">
-          <Label htmlFor="sector">Sector de residencia</Label>
-          <Input
-            id="sector"
-            value={sector}
-            onChange={(e) => setSector(e.target.value)}
-            placeholder="Calderón, Los Chillos…"
-            className="h-11 sm:h-10"
-          />
-        </div>
+        <details className="rounded-md border p-3">
+          <summary className="cursor-pointer text-sm font-medium">Datos de factura</summary>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {(
+              [
+                ['padre_factura_nombre', 'Nombres y apellidos para factura'],
+                ['padre_factura_identificacion', 'Cédula o RUC'],
+                ['padre_factura_correo', 'Correo para factura'],
+                ['padre_factura_direccion', 'Dirección para factura'],
+              ] as const
+            ).map(([clave, etiqueta]) => (
+              <div key={clave} className="space-y-1">
+                <Label htmlFor={clave} className="text-xs text-muted-foreground">
+                  {etiqueta}
+                </Label>
+                <Input
+                  id={clave}
+                  value={factura[clave]}
+                  onChange={(e) => setFactura((f) => ({ ...f, [clave]: e.target.value }))}
+                  className="h-11 sm:h-10"
+                />
+              </div>
+            ))}
+          </div>
+        </details>
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -321,13 +342,15 @@ const DialogoRepresentados = ({
           <Button
             variant="brand"
             className="h-11 sm:h-10"
-            disabled={usuId === null || guardar.isPending || guardarSector.isPending}
+            disabled={usuId === null || guardar.isPending || guardarFactura.isPending}
             onClick={async () => {
               if (usuId === null) return;
               try {
-                if (sector.trim() !== (ficha.data?.representante.padre_sector_residencia ?? '')) {
-                  await guardarSector.mutateAsync({ usuId, sector: sector.trim() });
-                }
+                const r = ficha.data?.representante;
+                const cambio = (Object.keys(factura) as Array<keyof DatosFactura>).some(
+                  (k) => factura[k].trim() !== (r?.[k] ?? ''),
+                );
+                if (cambio) await guardarFactura.mutateAsync({ usuId, factura });
                 await guardar.mutateAsync({ usuId, ninoIds: [...elegidos] });
                 onClose();
               } catch {

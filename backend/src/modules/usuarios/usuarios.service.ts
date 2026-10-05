@@ -210,7 +210,6 @@ export async function crear(actor: AuthUser, input: CrearUsuarioInput): Promise<
 
       await repo.sincronizarRoles(client, nuevoId, input.roles);
       await aplicarFichasDeRol(client, nuevoId, [], input.roles, {
-        sector: vacioANulo(input.padre_sector_residencia),
         estadoUsuario: ESTADO.ACTIVO,
       });
 
@@ -311,14 +310,12 @@ export async function actualizar(
       agregados = diff.agregados;
       quitados = diff.quitados;
       await aplicarFichasDeRol(client, usuId, rolesAntes, input.roles, {
-        sector: vacioANulo(input.padre_sector_residencia),
         estadoUsuario: antes.est_id,
       });
     } else {
       // Sin cambio de roles, los campos de ficha siguen siendo editables.
       const rolesActuales = await repo.rolesDe(usuId, client);
       await aplicarFichasDeRol(client, usuId, rolesActuales, rolesActuales, {
-        sector: vacioANulo(input.padre_sector_residencia),
         estadoUsuario: antes.est_id,
       });
     }
@@ -408,7 +405,7 @@ async function aplicarFichasDeRol(
   usuId: number,
   rolesAntes: number[],
   rolesDespues: number[],
-  datos: { sector: string | null; estadoUsuario: number },
+  datos: { estadoUsuario: number },
 ): Promise<void> {
   const eraEntrenador = rolesAntes.includes(ROL.ENTRENADOR);
   const esEntrenador = rolesDespues.includes(ROL.ENTRENADOR);
@@ -451,7 +448,7 @@ async function aplicarFichasDeRol(
   }
 
   if (esRepresentante) {
-    await repo.upsertPadre(client, usuId, datos.sector);
+    await repo.upsertPadre(client, usuId);
   } else if (eraRepresentante) {
     const hijos = await repo.contarHijosDelPadre(client, usuId);
     if (hijos > 0) {

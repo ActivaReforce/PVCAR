@@ -26,7 +26,6 @@ const INACTIVO_SIN_CUENTA = {
   usu_cedula: null,
   ent_est_id: null,
   padre_id: null,
-  padre_sector_residencia: null,
   roles: [{ rol_id: ROL.ENTRENADOR }],
 };
 

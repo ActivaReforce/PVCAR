@@ -30,14 +30,6 @@ const fechaNacimiento = z
   .nullable()
   .optional();
 
-const cedula = z
-  .string()
-  .trim()
-  .max(20)
-  .regex(/^[0-9-]*$/, 'La cedula solo admite numeros y guiones')
-  .optional()
-  .or(z.literal(''));
-
 /** Ruta del objeto en el bucket usufoto. null borra la foto actual. */
 const foto = z.string().trim().max(255).nullable().optional();
 
@@ -74,15 +66,43 @@ export const listarEstudiantesSchema = paginacionSchema.extend({
 
 export type ListarEstudiantesQuery = z.infer<typeof listarEstudiantesSchema>;
 
+const telefono = z
+  .string()
+  .trim()
+  .min(7, 'Telefono demasiado corto')
+  .max(20)
+  .regex(/^[0-9+\s()-]+$/, 'Telefono invalido');
+
+/** Ficha de matricula, secciones C y D. null lo quita. */
+const contacto = (conCedula: boolean) =>
+  z
+    .object({
+      nombre: z.string().trim().min(3).max(160),
+      cedula: conCedula ? z.string().trim().min(6).max(20) : z.null().optional().default(null),
+      relacion: z.string().trim().min(2).max(60),
+      telefono,
+    })
+    .nullable()
+    .optional();
+
+const camposFicha = {
+  nino_modalidad_salida: z.enum(['escolar', 'privado']).nullable().optional(),
+  nino_detalle_retiro: textoOpcional(500),
+  nino_info_salud: textoOpcional(1000),
+  /** Los tres permisos de imagen van juntos: es una sola autorizacion. */
+  imagen: z
+    .object({ familias: z.boolean(), redes: z.boolean(), promocional: z.boolean() })
+    .optional(),
+  contacto_emergencia: contacto(false),
+  contacto_retiro: contacto(true),
+};
+
 export const crearEstudianteSchema = z.object({
   nino_nombre: nombre,
   col_id: z.number().int().positive(),
   catninograd_id: z.number().int().positive().nullable().optional(),
   nino_fecha_nacimiento: fechaNacimiento,
-  nino_cedula: cedula,
-  nino_toma_transporte: z.boolean().optional(),
-  nino_info_salud: textoOpcional(1000),
-  nino_otra_info: textoOpcional(1000),
+  ...camposFicha,
   nino_foto: foto,
   /** Se puede inscribir de una vez, en disciplinas de su colegio. */
   disciplinas: z.array(z.number().int().positive()).max(20).optional(),
@@ -96,10 +116,7 @@ export const actualizarEstudianteSchema = z
     col_id: z.number().int().positive().optional(),
     catninograd_id: z.number().int().positive().nullable().optional(),
     nino_fecha_nacimiento: fechaNacimiento,
-    nino_cedula: cedula,
-    nino_toma_transporte: z.boolean().optional(),
-    nino_info_salud: textoOpcional(1000),
-    nino_otra_info: textoOpcional(1000),
+    ...camposFicha,
     nino_foto: foto,
   })
   .refine((v) => Object.keys(v).length > 0, 'No hay nada que actualizar');

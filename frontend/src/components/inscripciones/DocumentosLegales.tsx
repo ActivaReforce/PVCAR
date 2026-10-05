@@ -22,6 +22,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +38,7 @@ import {
   useDocumentoLegal,
   useDocumentosLegales,
   useGuardarBorrador,
+  usePrecios,
   usePublicarDocumento,
 } from '@/hooks/useInscripciones';
 import {
@@ -37,21 +46,30 @@ import {
   NOMBRE_DOCUMENTO,
   TIPOS_DOCUMENTO,
   type Documentos,
+  type PrecioColegio,
   type TipoDocumento,
 } from '@/api/inscripciones';
 import { ApiError } from '@/lib/api';
 import DocumentoVista from './DocumentoVista';
-import { REGLAS, problemasDePlantilla, type DatosDocumento } from './documento';
+import DatosColegio from './DatosColegio';
+import { REGLAS, porcentaje, problemasDePlantilla, tarifa, type DatosDocumento } from './documento';
 import { fechaCorta } from './formato';
 
+/** Los "00" de sus Word: iguales para cualquier colegio. */
+const GENERALES: TipoDocumento[] = ['autorizacion_datos', 'datos_medicos', 'imagen', 'politica'];
+/** El "01" y el "02": un texto común, llenado con los datos de cada colegio. */
+const POR_COLEGIO: TipoDocumento[] = ['ficha_matricula', 'contrato'];
+
 /**
- * Los seis documentos de la inscripción (decisión del cliente, 2026-10-05):
- * los cuatro "00" (política, autorización de datos, salud, imagen) se leen y
- * se aceptan; la ficha ("01") se llena; el contrato ("02") se llena solo.
+ * Los seis documentos de la inscripción (decisión del cliente, 2026-10-05),
+ * en dos secciones, como sus carpetas:
  *
- * **Una plantilla por documento para todos los colegios**: lo que cambia de
- * un colegio a otro entra con marcadores ({{sede}}, {{tarifa}}…) desde
- * Colegios y precios.
+ * - **Generales**: los cuatro "00" (política, autorización de datos, salud,
+ *   imagen). Se leen y se aceptan; son iguales para todos los colegios.
+ * - **Por colegio**: la ficha ("01") y el contrato ("02"). Se elige el
+ *   colegio, se editan sus datos (sede, tarifa, mínimo…) y se ven sus dos
+ *   documentos ya llenos. El texto es **común** (decisión del 2026-10-05):
+ *   sus Word de cada colegio son el mismo texto con otros datos.
  *
  * Cada tipo tiene una versión **vigente** y como mucho un **borrador**. Al
  * publicar queda congelada para siempre —la base lo impide— y es lo que
@@ -115,8 +133,135 @@ const DocumentosLegales = () => {
         hay). Es el mismo generador que el de verdad.
       </p>
 
-      {TIPOS_DOCUMENTO.map((tipo) => (
-        <PanelDocumento key={tipo} tipo={tipo} datos={documentos.data} />
+      <Tabs defaultValue="generales">
+        <TabsList>
+          <TabsTrigger value="generales">Generales (00)</TabsTrigger>
+          <TabsTrigger value="colegio">Por colegio (01 y 02)</TabsTrigger>
+        </TabsList>
+        <TabsContent value="generales" className="space-y-6 pt-3">
+          <p className="text-sm text-muted-foreground">
+            Iguales para cualquier colegio. El representante los lee y los acepta.
+          </p>
+          {GENERALES.map((tipo) => (
+            <PanelDocumento key={tipo} tipo={tipo} datos={documentos.data} />
+          ))}
+        </TabsContent>
+        <TabsContent value="colegio" className="pt-3">
+          <PorColegio datos={documentos.data} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+/** El alumno de ejemplo, con los datos de un colegio en sus documentos. */
+function ejemploDe(fila: PrecioColegio | undefined): DatosDocumento {
+  if (!fila) return EJEMPLO;
+  return {
+    ...EJEMPLO,
+    valores: {
+      ...EJEMPLO.valores,
+      sede: fila.sede ?? fila.col_nombre,
+      sede_corta: fila.sede_corta ?? '[sede corta]',
+      institucion: fila.institucion ?? '[institución]',
+      minimo_alumnos: fila.minimo_alumnos !== null ? String(fila.minimo_alumnos) : '[mínimo]',
+      tarifa: fila.precio !== null ? tarifa(fila.precio) : '[tarifa]',
+      descuento_hermano: fila.descuento_hermano !== null ? porcentaje(fila.descuento_hermano) : '[descuento]',
+    },
+  };
+}
+
+const PorColegio = ({ datos }: { datos: Documentos }) => {
+  const precios = usePrecios();
+  const [colId, setColId] = useState<string>('');
+
+  if (precios.isLoading) return <p className="text-sm text-muted-foreground">Cargando colegios…</p>;
+  if (precios.isError || !precios.data) {
+    return (
+      <p className="text-sm text-destructive">
+        No se pudieron cargar los colegios: {(precios.error as Error | null)?.message}
+      </p>
+    );
+  }
+
+  const colegios = precios.data;
+  const fila = colegios.find((c) => String(c.col_id) === colId) ?? colegios[0];
+  const sinPrecio = colegios.filter((c) => c.precio === null && c.disciplinas_activas > 0);
+  const ejemplo = ejemploDe(fila);
+  const textoDe = (tipo: TipoDocumento) =>
+    datos.borradores.find((d) => d.doc_tipo === tipo) ??
+    datos.vigentes.find((d) => d.doc_tipo === tipo) ?? {
+      doc_titulo: datos.iniciales[tipo].titulo,
+      doc_contenido: datos.iniciales[tipo].contenido,
+    };
+
+  return (
+    <div className="space-y-6">
+      {sinPrecio.length > 0 && (
+        <div className="rounded-md border border-amber-600/50 bg-amber-500/10 p-3 text-sm">
+          <span className="font-medium">
+            {sinPrecio.length} colegio{sinPrecio.length === 1 ? '' : 's'} sin datos
+          </span>{' '}
+          <span className="text-muted-foreground">
+            ({sinPrecio.map((c) => c.col_nombre).join(', ')}): no aparecen en el formulario de inscripción.
+          </span>
+        </div>
+      )}
+
+      <div className="max-w-md space-y-1.5">
+        <Label htmlFor="docs-colegio">Colegio</Label>
+        <Select value={fila ? String(fila.col_id) : ''} onValueChange={setColId}>
+          <SelectTrigger id="docs-colegio" className="h-11 sm:h-10">
+            <SelectValue placeholder="Elige un colegio" />
+          </SelectTrigger>
+          <SelectContent>
+            {colegios.map((c) => (
+              <SelectItem key={c.col_id} value={String(c.col_id)}>
+                {c.col_nombre}
+                {c.precio === null ? ' · sin datos' : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {fila && (
+        <>
+          <DatosColegio key={fila.col_id} fila={fila} />
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {POR_COLEGIO.map((tipo) => {
+              const doc = textoDe(tipo);
+              return (
+                <section key={tipo} className="min-w-0 space-y-1.5">
+                  <p className="text-sm font-medium">
+                    {NOMBRE_DOCUMENTO[tipo]} de {fila.col_nombre} (alumno de ejemplo)
+                  </p>
+                  <div className="max-h-[560px] overflow-y-auto rounded-md border bg-background p-4">
+                    <DocumentoVista
+                      tipo={tipo}
+                      titulo={doc.doc_titulo}
+                      contenido={doc.doc_contenido}
+                      datos={ejemplo}
+                      resaltar
+                    />
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <div className="space-y-2 border-t pt-6">
+        <h3 className="text-base font-semibold">Texto común de la ficha y del contrato</h3>
+        <p className="text-sm text-muted-foreground">
+          Es el mismo para todos los colegios: lo que cambia de uno a otro son los datos de arriba, que
+          entran con los marcadores. Un cambio aquí vale para todos.
+        </p>
+      </div>
+      {POR_COLEGIO.map((tipo) => (
+        <PanelDocumento key={tipo} tipo={tipo} datos={datos} ejemplo={ejemplo} />
       ))}
     </div>
   );
@@ -184,7 +329,16 @@ function ayudaDePiezas(tipo: TipoDocumento): string[] {
   return ayuda;
 }
 
-const PanelDocumento = ({ tipo, datos }: { tipo: TipoDocumento; datos: Documentos }) => {
+const PanelDocumento = ({
+  tipo,
+  datos,
+  ejemplo = EJEMPLO,
+}: {
+  tipo: TipoDocumento;
+  datos: Documentos;
+  /** Con qué se llena la vista previa: por defecto el alumno de ejemplo. */
+  ejemplo?: DatosDocumento;
+}) => {
   const { hasPermission } = usePermissions();
   const puedeEditar = hasPermission('inscripciones', 'editar');
 
@@ -307,14 +461,14 @@ const PanelDocumento = ({ tipo, datos }: { tipo: TipoDocumento; datos: Documento
           <div className="min-w-0 space-y-1.5">
             <p className="text-sm font-medium">Así lo verá el representante (alumno de ejemplo)</p>
             <div className="max-h-[640px] overflow-y-auto rounded-md border bg-background p-4">
-              <DocumentoVista tipo={tipo} titulo={titulo} contenido={contenido} datos={EJEMPLO} resaltar />
+              <DocumentoVista tipo={tipo} titulo={titulo} contenido={contenido} datos={ejemplo} resaltar />
             </div>
           </div>
         </div>
       ) : (
         vigente && (
           <div className="max-h-96 overflow-y-auto rounded-md border bg-background p-4">
-            <DocumentoVista tipo={tipo} titulo={vigente.doc_titulo} contenido={vigente.doc_contenido} datos={EJEMPLO} />
+            <DocumentoVista tipo={tipo} titulo={vigente.doc_titulo} contenido={vigente.doc_contenido} datos={ejemplo} />
           </div>
         )
       )}

@@ -117,15 +117,15 @@ Todo lo de arriba menos **el cobro por disciplina**, que espera a definir qué e
 | `inscripcion_aceptacion` (nueva) | la constancia | |
 | `inscripcion` | **fuera** `doc_contrato_id`, `doc_terminos_id`, `doc_privacidad_id` | Los sustituye la constancia |
 
-**Ya no los pide la inscripción, pero siguen en la base** (los usa Estudiantes o Representantes; borrarlos es decisión del cliente):
+**Borrados en la `0017` (decisión del cliente, 2026-10-05: "solo usamos lo nuevo"):** `nino_toma_transporte` (lo sustituye la modalidad de salida), `nino_cedula`, `nino_otra_info`, `padre_sector_residencia` (lo sustituyen los datos de factura), más `nino_edad` y `ent_cedula`, que ya estaban pendientes. `nino_info_salud` se queda: es donde cae el detalle de salud, solo si autorizó. Estudiantes edita ahora salida, retiro, contactos y permisos de imagen; Representantes, los datos de factura; Usuarios ya no pide sector.
 
-- `nino.nino_toma_transporte` — lo sustituye `nino_modalidad_salida`; al aprobar se llena igual (escolar = sí). Candidato a borrar en la `0017`.
-- `nino.nino_cedula` y `nino.nino_otra_info` — ninguna ficha los pide.
-- `padre.padre_sector_residencia` — ninguna ficha lo pide.
-- `nino.nino_info_salud` — se queda: es donde cae el detalle de salud, solo si autorizó.
+**Parentesco:** se pide en el paso Alumnos ("Tú eres su…", obligatorio) y queda en `nino_padre.ninopadre_parentesco`. No sale en ningún documento porque los Word no lo tienen.
+
+### Pantalla de Documentos (2026-10-05)
+
+Dos secciones: **Generales (00)**, con los cuatro que se aceptan, y **Por colegio (01 y 02)**: se elige el colegio, se editan sus datos y se ven su ficha y su contrato llenos; debajo, el texto común de los dos. La pestaña "Colegios y precios" desapareció: sus datos viven en "Por colegio". El cliente eligió texto común con datos por colegio, no un texto por colegio.
 
 ### Falta
 
 1. El cobro por disciplina (ver arriba).
-2. Enseñar contactos y permisos de imagen en la ficha del alumno en Estudiantes (los datos ya se guardan al aprobar).
-3. Probar en pantalla (lista corta al cliente).
+2. Probar en pantalla (lista corta al cliente).

@@ -42,7 +42,6 @@ export interface UsuarioDetalle extends UsuarioListado {
   usu_cedula: string | null;
   ent_est_id: number | null;
   padre_id: number | null;
-  padre_sector_residencia: string | null;
 }
 
 /**
@@ -108,7 +107,6 @@ export interface DatosUsuario {
   password?: string;
   roles?: number[];
   usu_cedula?: string;
-  padre_sector_residencia?: string;
   usu_foto?: string | null;
 }
 

@@ -762,44 +762,16 @@ export async function fijarNino(
   );
 }
 
-/** Lo de las fichas que el alta de Estudiantes no cubre (0016). */
-export async function completarNino(
+/** La autorización de la ficha de salud: lo único de las fichas que el alta de Estudiantes no lleva. */
+export async function marcarSaludAutorizada(
   client: PoolClient,
   ninoId: number,
-  d: NinoGuardado,
+  autoriza: boolean,
 ): Promise<void> {
-  await client.query(
-    `UPDATE public.nino
-        SET nino_modalidad_salida = $2, nino_detalle_retiro = $3,
-            nino_salud_autorizada = $4, nino_imagen_familias = $5,
-            nino_imagen_redes = $6, nino_imagen_promocional = $7
-      WHERE nino_id = $1`,
-    [
-      ninoId,
-      d.modalidad_salida,
-      d.detalle_retiro,
-      d.salud.autoriza,
-      d.imagen.familias,
-      d.imagen.redes,
-      d.imagen.promocional,
-    ],
-  );
-  await client.query(
-    `INSERT INTO public.nino_contacto
-         (nino_id, nincon_tipo, nincon_nombre, nincon_cedula, nincon_relacion, nincon_telefono)
-     VALUES ($1, 'emergencia', $2, NULL, $3, $4),
-            ($1, 'retiro', $5, $6, $7, $8)`,
-    [
-      ninoId,
-      d.emergencia.nombre,
-      d.emergencia.relacion,
-      d.emergencia.telefono,
-      d.retiro.nombre,
-      d.retiro.cedula,
-      d.retiro.relacion,
-      d.retiro.telefono,
-    ],
-  );
+  await client.query('UPDATE public.nino SET nino_salud_autorizada = $2 WHERE nino_id = $1', [
+    ninoId,
+    autoriza,
+  ]);
 }
 
 /** Datos de factura del representante. Pisan los anteriores: son los últimos que dio. */

@@ -16,7 +16,10 @@ export interface Representante {
   usu_foto_url: string | null;
   est_id: number;
   padre_id: number | null;
-  padre_sector_residencia: string | null;
+  padre_factura_nombre: string | null;
+  padre_factura_identificacion: string | null;
+  padre_factura_correo: string | null;
+  padre_factura_direccion: string | null;
   hijos: number;
   encuestasRespondidas: number;
 }
@@ -68,6 +71,14 @@ function queryString(filtros: object): string {
   return texto ? `?${texto}` : '';
 }
 
+/** Ficha de matrícula, sección A. Vacío lo borra. */
+export interface DatosFactura {
+  padre_factura_nombre: string;
+  padre_factura_identificacion: string;
+  padre_factura_correo: string;
+  padre_factura_direccion: string;
+}
+
 export const representantesApi = {
   listar: (filtros: { buscar?: string; estado?: number }) =>
     api.get<ListaRepresentantes>(`/representantes${queryString(filtros)}`),
@@ -80,8 +91,6 @@ export const representantesApi = {
   guardarHijos: (usuId: number, ninoIds: number[]) =>
     api.put<FichaRepresentante>(`/representantes/${usuId}/hijos`, { nino_ids: ninoIds }),
 
-  actualizarSector: (usuId: number, sector: string) =>
-    api.patch<FichaRepresentante>(`/representantes/${usuId}`, {
-      padre_sector_residencia: sector,
-    }),
+  actualizarFactura: (usuId: number, factura: DatosFactura) =>
+    api.patch<FichaRepresentante>(`/representantes/${usuId}`, factura),
 };

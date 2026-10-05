@@ -729,7 +729,7 @@ export async function aprobar(actor: AuthUser, insId: number): Promise<Resultado
         });
       }
       await repo.agregarRolRepresentante(client, usuId);
-      await usuariosRepo.upsertPadre(client, usuId, null);
+      await usuariosRepo.upsertPadre(client, usuId);
       const padreId = await repo.padreIdDe(client, usuId);
       await repo.guardarFactura(client, padreId, rep.factura);
 
@@ -741,14 +741,16 @@ export async function aprobar(actor: AuthUser, insId: number): Promise<Resultado
           colId: d.col_id,
           gradoId: d.catninograd_id,
           fechaNacimiento: d.fecha_nacimiento,
-          cedula: null,
-          transporte: d.modalidad_salida === 'escolar',
+          modalidadSalida: d.modalidad_salida,
+          detalleRetiro: d.detalle_retiro,
           // Sin autorización no se guardó el detalle (schemas.ts): aquí llega null.
           salud: d.salud.detalle,
-          otra: null,
+          imagen: d.imagen,
           foto: null,
         });
-        await repo.completarNino(client, ninoId, d);
+        await repo.marcarSaludAutorizada(client, ninoId, d.salud.autoriza);
+        await estudiantesRepo.guardarContacto(client, ninoId, 'emergencia', { ...d.emergencia, cedula: null });
+        await estudiantesRepo.guardarContacto(client, ninoId, 'retiro', d.retiro);
         await repo.atarConParentesco(client, ninoId, padreId, d.parentesco);
         for (const colacthorId of n.insnino_disciplinas) {
           await repo.inscribirEnDisciplina(client, ninoId, colacthorId, n.insnino_id);

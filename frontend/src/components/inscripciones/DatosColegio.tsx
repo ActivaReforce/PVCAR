@@ -4,59 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useBorrarPrecio, useGuardarPrecio, usePrecios } from '@/hooks/useInscripciones';
+import { useBorrarPrecio, useGuardarPrecio } from '@/hooks/useInscripciones';
 import { dinero, type PrecioColegio } from '@/api/inscripciones';
-
-/**
- * Lo de cada colegio que usan la inscripción y sus documentos: la tarifa
- * mensual, el descuento por hermano, el mínimo de alumnos y cómo se nombra
- * la sede. La ficha y el contrato son una plantilla para todos; estos datos
- * entran en ella con marcadores ({{sede}}, {{tarifa}}…).
- *
- * Dentro de un colegio todas las disciplinas cuestan lo mismo. Si en una
- * misma inscripción van hermanos, lidera el que más disciplinas tiene (paga
- * completo) y cada hermano lleva el descuento de su colegio en tantas
- * disciplinas como el que lidera.
- *
- * Un colegio sin precio **no aparece** en el formulario público.
- */
-const PreciosColegios = () => {
-  const precios = usePrecios();
-
-  if (precios.isLoading) return <p className="text-sm text-muted-foreground">Cargando…</p>;
-  if (precios.isError || !precios.data) {
-    return (
-      <p className="text-sm text-destructive">
-        No se pudieron cargar los precios: {(precios.error as Error | null)?.message}
-      </p>
-    );
-  }
-
-  const sinPrecio = precios.data.filter((p) => p.precio === null && p.disciplinas_activas > 0);
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Tarifa mensual por disciplina, sin IVA (el IVA se configura en Membrete e IVA). Si se inscriben hermanos juntos, el que más disciplinas tiene
-        paga completo, y cada hermano lleva el descuento en tantas disciplinas como él: si el
-        primero va a 1, el hermano tiene descuento en 1; si va a 5, en hasta 5.
-      </p>
-      {sinPrecio.length > 0 && (
-        <div className="rounded-md border border-amber-600/50 bg-amber-500/10 p-3 text-sm">
-          <span className="font-medium">
-            {sinPrecio.length} colegio{sinPrecio.length === 1 ? '' : 's'} sin precio
-          </span>{' '}
-          <span className="text-muted-foreground">no aparecen en el formulario de inscripción.</span>
-        </div>
-      )}
-      <ul className="space-y-3">
-        {precios.data.map((p) => (
-          <FilaPrecio key={p.col_id} fila={p} />
-        ))}
-      </ul>
-    </div>
-  );
-};
 
 interface Campos {
   precio: string;
@@ -76,7 +25,20 @@ const camposDe = (f: PrecioColegio): Campos => ({
   minimo: f.minimo_alumnos !== null ? String(f.minimo_alumnos) : '',
 });
 
-const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
+/**
+ * Lo de un colegio que usan la inscripción y sus documentos: la tarifa
+ * mensual, el descuento por hermano, el mínimo de alumnos y cómo se nombra
+ * la sede. La ficha y el contrato son un texto común para todos; estos datos
+ * entran en él con marcadores ({{sede}}, {{tarifa}}…).
+ *
+ * Dentro de un colegio todas las disciplinas cuestan lo mismo. Si en una
+ * misma inscripción van hermanos, lidera el que más disciplinas tiene (paga
+ * completo) y cada hermano lleva el descuento de su colegio en tantas
+ * disciplinas como el que lidera.
+ *
+ * Un colegio sin precio **no aparece** en el formulario público.
+ */
+const DatosColegio = ({ fila }: { fila: PrecioColegio }) => {
   const { hasPermission } = usePermissions();
   const puedeEditar = hasPermission('inscripciones', 'editar');
   const guardar = useGuardarPrecio();
@@ -121,7 +83,7 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
   );
 
   return (
-    <li className="space-y-3 rounded-lg border p-4">
+    <div className="space-y-3 rounded-lg border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate font-medium" title={fila.col_nombre}>
@@ -188,8 +150,12 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
           </div>
         </>
       )}
-    </li>
+      <p className="text-xs text-muted-foreground">
+        Tarifa sin IVA (el IVA está en Membrete e IVA). Con hermanos en la misma inscripción, el que más
+        disciplinas tiene paga completo y cada hermano lleva el descuento en tantas disciplinas como él.
+      </p>
+    </div>
   );
 };
 
-export default PreciosColegios;
+export default DatosColegio;

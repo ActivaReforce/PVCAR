@@ -88,9 +88,9 @@ representantesRouter.patch(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = service.idParamSchema.parse(req.params);
-      const { padre_sector_residencia } = service.sectorSchema.parse(req.body);
+      const input = service.facturaSchema.parse(req.body);
       res.json({
-        data: await service.actualizarSector(actor(req), id, padre_sector_residencia),
+        data: await service.actualizarFactura(actor(req), id, input),
         error: null,
       });
     } catch (err) {

@@ -11,7 +11,7 @@ import { contieneSinTildes } from '../../lib/sql.js';
  * Este módulo no da de alta personas
  *
  * Un representante **es** un usuario con el rol 4 y su ficha de `padre` la crea
- * Usuarios al concederle el rol, junto con su sector de residencia. Aquí no se
+ * Usuarios al concederle el rol (los datos de factura los trae la inscripción). Aquí no se
  * duplica nada de eso: esta pantalla existe para lo que no tenía sitio en
  * ningún lado —**ver quiénes son y de qué niños responden**— y para atar y
  * soltar esos vínculos desde el lado del representante.
@@ -37,7 +37,10 @@ export interface RepresentanteListado {
   usu_foto: string | null;
   est_id: number;
   padre_id: number | null;
-  padre_sector_residencia: string | null;
+  padre_factura_nombre: string | null;
+  padre_factura_identificacion: string | null;
+  padre_factura_correo: string | null;
+  padre_factura_direccion: string | null;
   hijos: number;
   encuestasRespondidas: number;
 }
@@ -95,7 +98,10 @@ export async function listarRepresentantes(
             u.usu_foto,
             u.est_id,
             p.padre_id,
-            p.padre_sector_residencia,
+            p.padre_factura_nombre,
+            p.padre_factura_identificacion,
+            p.padre_factura_correo,
+            p.padre_factura_direccion,
             COALESCE((SELECT count(*) FROM public.nino_padre np
                        WHERE np.padre_id = p.padre_id), 0)::int AS hijos,
             COALESCE((SELECT count(*) FROM public.encuesta_respondida er
@@ -150,7 +156,10 @@ export async function obtenerRepresentante(usuId: number): Promise<Representante
             u.usu_foto,
             u.est_id,
             p.padre_id,
-            p.padre_sector_residencia,
+            p.padre_factura_nombre,
+            p.padre_factura_identificacion,
+            p.padre_factura_correo,
+            p.padre_factura_direccion,
             COALESCE((SELECT count(*) FROM public.nino_padre np
                        WHERE np.padre_id = p.padre_id), 0)::int AS hijos,
             COALESCE((SELECT count(*) FROM public.encuesta_respondida er
@@ -260,16 +269,25 @@ export async function soltar(
   ]);
 }
 
-export async function actualizarSector(
+export interface Factura {
+  nombre: string | null;
+  identificacion: string | null;
+  correo: string | null;
+  direccion: string | null;
+}
+
+export async function actualizarFactura(
   client: PoolClient,
   padreId: number,
-  sector: string | null,
+  f: Factura,
 ): Promise<void> {
   await client.query(
     `UPDATE public.padre
-        SET padre_sector_residencia = $2, padre_fecha_modificacion = now()
+        SET padre_factura_nombre = $2, padre_factura_identificacion = $3,
+            padre_factura_correo = $4, padre_factura_direccion = $5,
+            padre_fecha_modificacion = now()
       WHERE padre_id = $1`,
-    [padreId, sector],
+    [padreId, f.nombre, f.identificacion, f.correo, f.direccion],
   );
 }
 

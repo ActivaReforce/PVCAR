@@ -55,7 +55,6 @@ const cedula = z
   .regex(/^[0-9A-Z-]*$/, 'La cedula solo admite numeros, letras y guiones')
   .optional()
   .or(z.literal(''));
-const sectorResidencia = z.string().trim().max(160).optional().or(z.literal(''));
 
 /** Ruta del objeto en el bucket usufoto. null borra la foto actual. */
 const foto = z.string().trim().max(255).nullable().optional();
@@ -108,7 +107,6 @@ export const crearUsuarioSchema = z.object({
   password,
   roles,
   usu_cedula: cedula,
-  padre_sector_residencia: sectorResidencia,
   usu_foto: foto,
 });
 
@@ -126,7 +124,6 @@ export const actualizarUsuarioSchema = z
     password: password.optional(),
     roles: roles.optional(),
     usu_cedula: cedula,
-    padre_sector_residencia: sectorResidencia,
     usu_foto: foto,
   })
   .refine((v) => Object.keys(v).length > 0, 'No hay nada que actualizar');

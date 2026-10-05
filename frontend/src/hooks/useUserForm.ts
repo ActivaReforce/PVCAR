@@ -17,7 +17,6 @@ export interface DatosFormularioUsuario {
   usu_contrasena: string;
   selectedRoles: number[];
   usu_cedula: string;
-  padre_sector_residencia: string;
 }
 
 /** Ids del catalogo. Nada de comparar por nombre de rol, como hacia el viejo. */
@@ -38,7 +37,6 @@ const VACIO: DatosFormularioUsuario = {
   usu_contrasena: '',
   selectedRoles: [],
   usu_cedula: '',
-  padre_sector_residencia: '',
 };
 
 function desdeDetalle(usuario: UsuarioDetalle): DatosFormularioUsuario {
@@ -49,7 +47,6 @@ function desdeDetalle(usuario: UsuarioDetalle): DatosFormularioUsuario {
     usu_contrasena: '',
     selectedRoles: usuario.roles.map((r) => r.rol_id),
     usu_cedula: usuario.usu_cedula ?? '',
-    padre_sector_residencia: usuario.padre_sector_residencia ?? '',
   };
 }
 
@@ -65,7 +62,6 @@ export const useUserForm = (usuario?: UsuarioDetalle | null, _roles: Rol[] = [])
   }, [usuario]);
 
   const hasCoachRole = formData.selectedRoles.includes(ROL.ENTRENADOR);
-  const hasParentRole = formData.selectedRoles.includes(ROL.REPRESENTANTE);
 
   const handleInputChange = (field: string, value: string | number[]) => {
     setFormData((prev) => ({ ...prev, [field]: value }) as DatosFormularioUsuario);
@@ -77,6 +73,5 @@ export const useUserForm = (usuario?: UsuarioDetalle | null, _roles: Rol[] = [])
     handleInputChange,
     isEditMode,
     hasCoachRole,
-    hasParentRole,
   };
 };

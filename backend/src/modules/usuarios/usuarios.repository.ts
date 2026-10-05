@@ -36,7 +36,6 @@ export interface UsuarioDetalle extends UsuarioListado {
   usu_cedula: string | null;
   ent_est_id: number | null;
   padre_id: number | null;
-  padre_sector_residencia: string | null;
 }
 
 /**
@@ -299,7 +298,6 @@ export async function obtenerUsuario(
         u.usu_cedula,
         e.est_id  AS ent_est_id,
         p.padre_id,
-        p.padre_sector_residencia,
         COALESCE(r.roles, '[]'::json) AS roles
     FROM public.usuario u
     LEFT JOIN public.entrenador e ON e.ent_id = u.usu_id
@@ -533,28 +531,12 @@ export async function desactivarEntrenador(client: PoolClient, entId: number): P
   );
 }
 
-export async function upsertPadre(
-  client: PoolClient,
-  usuId: number,
-  sector: string | null,
-): Promise<void> {
-  const { rows } = await client.query<{ padre_id: number }>(
-    'SELECT padre_id FROM public.padre WHERE usu_id = $1',
-    [usuId],
-  );
-  if (rows.length > 0) {
-    await client.query(
-      `UPDATE public.padre
-          SET padre_sector_residencia = COALESCE($2, padre_sector_residencia),
-              padre_fecha_modificacion = now()
-        WHERE usu_id = $1`,
-      [usuId, sector],
-    );
-    return;
-  }
+/** La ficha de representante. Sus datos de factura los pone la inscripción. */
+export async function upsertPadre(client: PoolClient, usuId: number): Promise<void> {
   await client.query(
-    'INSERT INTO public.padre (usu_id, padre_sector_residencia) VALUES ($1, $2)',
-    [usuId, sector],
+    `INSERT INTO public.padre (usu_id)
+     SELECT $1 WHERE NOT EXISTS (SELECT 1 FROM public.padre WHERE usu_id = $1)`,
+    [usuId],
   );
 }
 

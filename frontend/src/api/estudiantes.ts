@@ -27,12 +27,34 @@ export interface Estudiante {
   representantes: number;
 }
 
-/** La ficha trae lo sensible; la lista, no. */
+export type ModalidadSalida = 'escolar' | 'privado';
+
+export interface ContactoNino {
+  nombre: string;
+  /** Solo la persona autorizada para retirarlo. */
+  cedula: string | null;
+  relacion: string;
+  telefono: string;
+}
+
+export interface PermisosImagen {
+  familias: boolean;
+  redes: boolean;
+  promocional: boolean;
+}
+
+/** La ficha trae lo sensible; la lista, no. Los campos son los de las fichas del cliente. */
 export interface EstudianteDetalle extends Estudiante {
-  nino_cedula: string | null;
-  nino_toma_transporte: boolean | null;
+  nino_modalidad_salida: ModalidadSalida | null;
+  nino_detalle_retiro: string | null;
   nino_info_salud: string | null;
-  nino_otra_info: string | null;
+  /** null = nunca se preguntó. */
+  nino_salud_autorizada: boolean | null;
+  nino_imagen_familias: boolean | null;
+  nino_imagen_redes: boolean | null;
+  nino_imagen_promocional: boolean | null;
+  contacto_emergencia: ContactoNino | null;
+  contacto_retiro: ContactoNino | null;
   nino_fecha_modificacion: string | null;
 }
 
@@ -60,7 +82,6 @@ export interface Representante {
   usu_nombre: string;
   usu_correo: string;
   usu_telefono: string | null;
-  padre_sector_residencia: string | null;
   usuario_activo: boolean;
 }
 
@@ -136,10 +157,12 @@ export interface DatosEstudiante {
   col_id?: number;
   catninograd_id?: number | null;
   nino_fecha_nacimiento?: string | null;
-  nino_cedula?: string;
-  nino_toma_transporte?: boolean;
+  nino_modalidad_salida?: ModalidadSalida | null;
+  nino_detalle_retiro?: string;
   nino_info_salud?: string;
-  nino_otra_info?: string;
+  imagen?: PermisosImagen;
+  contacto_emergencia?: ContactoNino | null;
+  contacto_retiro?: ContactoNino | null;
   nino_foto?: string | null;
   disciplinas?: number[];
 }

@@ -345,8 +345,7 @@ const estudiantes: Definicion = {
     { clave: 'nino_edad', cabecera: 'Edad', ancho: 8 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
     { clave: 'catninograd_nombre', cabecera: 'Grado', ancho: 20 },
-    { clave: 'nino_cedula', cabecera: 'Cédula', ancho: 14 },
-    { clave: 'transporte', cabecera: 'Toma transporte', ancho: 16 },
+    { clave: 'transporte', cabecera: 'Salida', ancho: 18 },
     { clave: 'estado', cabecera: 'Estado', ancho: 12 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
     { clave: 'representantes', cabecera: 'Representantes', ancho: 30 },
@@ -361,8 +360,9 @@ const estudiantes: Definicion = {
              date_part('year', age(CURRENT_DATE, n.nino_fecha_nacimiento))::int AS nino_edad,
              c.col_nombre,
              COALESCE(g.catninograd_nombre, '')                    AS catninograd_nombre,
-             COALESCE(n.nino_cedula, '')                           AS nino_cedula,
-             CASE WHEN n.nino_toma_transporte THEN 'Sí' ELSE 'No' END AS transporte,
+             CASE n.nino_modalidad_salida WHEN 'escolar' THEN 'Transporte escolar'
+                                          WHEN 'privado' THEN 'Transporte privado'
+                                          ELSE '' END              AS transporte,
              e.est_nombre                                          AS estado,
              COALESCE((SELECT string_agg(a.act_nombre || ' (' || d.dia_nombre || ')', ', '
                                          ORDER BY d.dia_id)
