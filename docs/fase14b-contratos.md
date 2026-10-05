@@ -129,3 +129,9 @@ Dos secciones: **Generales (00)**, con los cuatro que se aceptan, y **Por colegi
 
 1. El cobro por disciplina (ver arriba).
 2. Probar en pantalla (lista corta al cliente).
+
+### Ajustes del 2026-10-05 (tarde)
+
+- **IVA fijo en 15 %** (cliente): constante `IVA_PCT` en `inscripciones.precios.ts`; sin pantalla ni ruta. La columna `inscripcion_config.inscfg_iva_pct` ya no se lee; se puede borrar en una migración futura.
+- **Documentos en tarjetas**: tocar la tarjeta enseña la vista previa; desde ahí Editar (con vista previa al lado), Guardar (borrador) y Publicar. Pestañas: Generales, Por colegio, Configuración (membrete).
+- **Datos para insertar** en dos grupos, con los nombres de los campos del colegio: *De la inscripción* (fecha, nombre y cédula del representante, nombre del alumno) y *Del colegio* (nombre de la sede, nombre corto de la sede, nombre de la institución, mínimo de alumnos, tarifa mensual, descuento por hermano). Sin `{{iva}}`. Ejemplos genéricos, ningún colegio real.
