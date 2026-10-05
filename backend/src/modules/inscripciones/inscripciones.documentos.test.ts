@@ -55,7 +55,6 @@ const datos: DatosPaquete = {
     tarifa: 32.1,
     descuento_hermano: 20,
   },
-  ivaPct: 15,
   aplicaDescuento: false,
 };
 

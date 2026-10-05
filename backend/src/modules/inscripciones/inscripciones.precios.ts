@@ -21,6 +21,9 @@
  * 84,89999… y el contrato diría una cifra que no es.
  */
 
+/** El IVA de Ecuador. Decisión del cliente (2026-10-05): siempre 15 %, no se configura. */
+export const IVA_PCT = 15;
+
 export interface PrecioColegio {
   precio: number;
   descuentoHermano: number;

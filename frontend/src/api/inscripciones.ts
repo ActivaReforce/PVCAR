@@ -86,7 +86,6 @@ export interface Formulario {
   grados: Array<{ catninograd_id: number; catninograd_nombre: string }>;
   parentescos: string[];
   documentos: Partial<Record<TipoDocumento, DocumentoLegal>>;
-  iva_pct: number;
 }
 
 export interface Factura {
@@ -299,7 +298,6 @@ export interface DatosPrecio {
 }
 
 export interface ConfigInscripciones {
-  iva_pct: number;
   /** false = el membrete de serie (el de los Word del cliente). */
   membrete_propio: boolean;
   membrete_data_url: string | null;
@@ -342,8 +340,6 @@ export const inscripcionesApi = {
     api.delete<{ col_id: number }>(`/inscripciones/precios/${colId}`),
 
   config: () => api.get<ConfigInscripciones>('/inscripciones/config'),
-  guardarIva: (iva_pct: number) =>
-    api.put<{ iva_pct: number }>('/inscripciones/config/iva', { iva_pct }),
   subirMembrete: (datos: { mime: string; base64: string }) =>
     api.put<{ membrete_propio: boolean }>('/inscripciones/config/membrete', datos),
   restaurarMembrete: () =>

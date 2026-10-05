@@ -228,8 +228,6 @@ export const precioSchema = z.object({
   minimo_alumnos: z.number().int().min(1).max(200),
 });
 
-export const ivaSchema = z.object({ iva_pct: z.number().min(0).max(100) });
-
 /** El membrete viaja en base64. 700 KB caben en el límite de 1 MB del cuerpo. */
 export const BYTES_MAX_MEMBRETE = 700 * 1024;
 export const membreteSchema = z.object({

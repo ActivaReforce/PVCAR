@@ -51,18 +51,21 @@ export const NOMBRE_DOCUMENTO: Record<TipoDocumento, string> = {
   politica: 'Política de datos personales',
 };
 
+/**
+ * Los datos que se pueden poner en un texto con {{clave}}. Los del colegio
+ * tienen los mismos nombres que sus campos en Documentos → Por colegio.
+ */
 export const MARCADORES = {
   fecha: 'Fecha de la inscripción',
   representante_nombre: 'Nombre del representante',
   representante_cedula: 'Cédula del representante',
   alumno_nombre: 'Nombre del alumno',
-  sede: 'Sede, nombre completo (Colegio CRISFE Carcelén)',
-  sede_corta: 'Sede, nombre corto (Carcelén)',
-  institucion: 'Institución en las cláusulas (CRISFE)',
+  sede: 'Nombre de la sede',
+  sede_corta: 'Nombre corto de la sede',
+  institucion: 'Nombre de la institución',
   minimo_alumnos: 'Mínimo de alumnos por grupo',
-  tarifa: 'Tarifa mensual (USD 32,10)',
-  descuento_hermano: 'Descuento por hermano (20 %)',
-  iva: 'IVA (15 %)',
+  tarifa: 'Tarifa mensual',
+  descuento_hermano: 'Descuento por hermano',
 } as const;
 export type Marcador = keyof typeof MARCADORES;
 
@@ -228,7 +231,6 @@ export interface DatosPaquete {
     tarifa: number;
     descuento_hermano: number;
   };
-  ivaPct: number;
   aplicaDescuento: boolean;
   /** Al aprobar: bajo la firma de Activa sale "Aprobado por". */
   aprobacion?: { nombre: string; fecha: Date } | null;
@@ -272,7 +274,6 @@ export function valoresDe(d: DatosPaquete): Record<Marcador, string> {
     minimo_alumnos: String(d.colegio.minimo_alumnos),
     tarifa: `USD ${NUMERO.format(d.colegio.tarifa)}`,
     descuento_hermano: porcentaje(d.colegio.descuento_hermano),
-    iva: porcentaje(d.ivaPct),
   };
 }
 

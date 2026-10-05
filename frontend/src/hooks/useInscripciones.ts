@@ -137,10 +137,6 @@ export function useConfigInscripciones() {
   });
 }
 
-export function useGuardarIva() {
-  return useMutacion((iva: number) => inscripcionesApi.guardarIva(iva), 'IVA guardado');
-}
-
 export function useSubirMembrete() {
   return useMutacion(
     (datos: { mime: string; base64: string }) => inscripcionesApi.subirMembrete(datos),

@@ -271,37 +271,23 @@ export async function guardarPrecio(
 }
 
 // ---------------------------------------------------------------------------
-// Configuración: IVA y membrete (0016, una sola fila)
+// Configuración: el membrete (0016, una sola fila). El IVA es fijo: IVA_PCT.
 
 export interface ConfigInscripcion {
-  iva_pct: number;
   /** Ruta en el bucket; null = el membrete de serie. */
   membrete: string | null;
   fecha_modificacion: string;
 }
 
 export async function obtenerConfig(client?: PoolClient): Promise<ConfigInscripcion> {
-  const { rows } = await (client ?? getPool()).query<{
-    iva_pct: string;
-    membrete: string | null;
-    fecha_modificacion: string;
-  }>(
-    `SELECT inscfg_iva_pct AS iva_pct, inscfg_membrete AS membrete,
+  const { rows } = await (client ?? getPool()).query<ConfigInscripcion>(
+    `SELECT inscfg_membrete AS membrete,
             inscfg_fecha_modificacion AS fecha_modificacion
        FROM public.inscripcion_config WHERE inscfg_id = 1`,
   );
   const r = rows[0];
   if (!r) throw new Error('Falta la fila de inscripcion_config (migración 0016)');
-  return { ...r, iva_pct: Number(r.iva_pct) };
-}
-
-export async function guardarIva(client: PoolClient, ivaPct: number): Promise<void> {
-  await client.query(
-    `UPDATE public.inscripcion_config
-        SET inscfg_iva_pct = $1, inscfg_fecha_modificacion = now()
-      WHERE inscfg_id = 1`,
-    [ivaPct],
-  );
+  return r;
 }
 
 /** Cambia el membrete y devuelve la ruta anterior, para borrarla. */

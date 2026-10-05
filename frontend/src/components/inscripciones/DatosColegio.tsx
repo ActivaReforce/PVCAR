@@ -107,14 +107,14 @@ const DatosColegio = ({ fila }: { fila: PrecioColegio }) => {
       {puedeEditar && (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {campoDe({ campo: 'precio', etiqueta: 'Tarifa mensual por disciplina (USD, sin IVA)', inputMode: 'decimal', placeholder: '32,10' })}
-            {campoDe({ campo: 'descuento', etiqueta: 'Descuento por hermano (%)', inputMode: 'decimal' })}
-            {campoDe({ campo: 'minimo', etiqueta: 'Mínimo de alumnos por grupo', inputMode: 'numeric', placeholder: '14' })}
+            {campoDe({ campo: 'precio', etiqueta: 'Tarifa mensual', ayuda: 'Por disciplina, en dólares, sin IVA.', inputMode: 'decimal' })}
+            {campoDe({ campo: 'descuento', etiqueta: 'Descuento por hermano', ayuda: 'En porcentaje.', inputMode: 'decimal' })}
+            {campoDe({ campo: 'minimo', etiqueta: 'Mínimo de alumnos por grupo', ayuda: 'Para abrir un grupo.', inputMode: 'numeric' })}
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {campoDe({ campo: 'sede', etiqueta: 'Sede, nombre completo', ayuda: 'Colegio CRISFE Carcelén' })}
-            {campoDe({ campo: 'sede_corta', etiqueta: 'Sede, nombre corto', ayuda: 'Carcelén (tarifa y mínimo)' })}
-            {campoDe({ campo: 'institucion', etiqueta: 'Institución en las cláusulas', ayuda: 'CRISFE (enfermería, mora, salidas)' })}
+            {campoDe({ campo: 'sede', etiqueta: 'Nombre de la sede', ayuda: 'El nombre completo: sale en la ficha y al inicio del contrato.' })}
+            {campoDe({ campo: 'sede_corta', etiqueta: 'Nombre corto de la sede', ayuda: 'Para frases cortas del contrato: la tarifa y el mínimo de alumnos.' })}
+            {campoDe({ campo: 'institucion', etiqueta: 'Nombre de la institución', ayuda: 'Cómo se nombra al colegio en las cláusulas: enfermería, mora, salidas.' })}
           </div>
           <div className="flex gap-2">
             <Button
@@ -151,7 +151,7 @@ const DatosColegio = ({ fila }: { fila: PrecioColegio }) => {
         </>
       )}
       <p className="text-xs text-muted-foreground">
-        Tarifa sin IVA (el IVA está en Membrete e IVA). Con hermanos en la misma inscripción, el que más
+        La tarifa es sin IVA; al representante se le suma el 15 %. Con hermanos en la misma inscripción, el que más
         disciplinas tiene paga completo y cada hermano lleva el descuento en tantas disciplinas como él.
       </p>
     </div>

@@ -242,7 +242,6 @@ function datosDocumento(
       minimo_alumnos: colegio ? String(colegio.minimo_alumnos) : '[mínimo]',
       tarifa: colegio ? tarifa(colegio.precio) : '[tarifa]',
       descuento_hermano: colegio ? porcentaje(colegio.descuento_hermano) : '[descuento]',
-      iva: porcentaje(formulario.iva_pct),
     },
     representante: {
       nombre: rep.nombre.trim(),

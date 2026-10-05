@@ -10,7 +10,6 @@ import {
   cotizacionSchema,
   envioSchema,
   idParamSchema,
-  ivaSchema,
   listarSchema,
   membreteSchema,
   precioSchema,
@@ -204,20 +203,6 @@ inscripcionesRouter.get(
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({ data: await service.config(), error: null });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-inscripcionesRouter.put(
-  '/config/iva',
-  requirePermission('inscripciones', 'editar'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { iva_pct } = ivaSchema.parse(req.body);
-      await service.guardarIva(actor(req), iva_pct);
-      res.json({ data: { iva_pct }, error: null });
     } catch (err) {
       next(err);
     }

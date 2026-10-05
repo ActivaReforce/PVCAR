@@ -35,7 +35,7 @@ import {
   type TipoDocumento,
 } from './inscripciones.documentos.js';
 import { PLANTILLAS_INICIALES } from './inscripciones.plantillas.js';
-import { calcularCobro, type Cobro, type CobroAlumno } from './inscripciones.precios.js';
+import { IVA_PCT, calcularCobro, type Cobro, type CobroAlumno } from './inscripciones.precios.js';
 import {
   BYTES_MAX_MEMBRETE,
   PARENTESCOS,
@@ -187,7 +187,6 @@ export function datosDelPaquete(
       imagen: nino.imagen,
     },
     colegio: nino.documento.colegio,
-    ivaPct: cobro.iva_pct,
     aplicaDescuento: cobro.descuento_pct > 0,
     aprobacion: meta.aprobacion ?? null,
   };
@@ -261,15 +260,13 @@ export interface Formulario {
   grados: repo.GradoOfertado[];
   parentescos: readonly string[];
   documentos: Partial<Record<TipoDocumento, repo.DocumentoLegal>>;
-  iva_pct: number;
 }
 
 export async function formulario(): Promise<Formulario> {
-  const [colegios, grados, vigentes, config] = await Promise.all([
+  const [colegios, grados, vigentes] = await Promise.all([
     repo.ofertaPublica(),
     repo.grados(),
     repo.documentosVigentes(),
-    repo.obtenerConfig(),
   ]);
   const documentos: Partial<Record<TipoDocumento, repo.DocumentoLegal>> = {};
   for (const doc of vigentes) documentos[doc.doc_tipo] = doc;
@@ -280,7 +277,6 @@ export async function formulario(): Promise<Formulario> {
     grados,
     parentescos: PARENTESCOS,
     documentos,
-    iva_pct: config.iva_pct,
   };
 }
 
@@ -305,10 +301,7 @@ async function cobroDe(
     });
   }
 
-  const [precios, config] = await Promise.all([
-    repo.preciosDe([...new Set(ninos.map((n) => n.col_id))]),
-    repo.obtenerConfig(),
-  ]);
+  const precios = await repo.preciosDe([...new Set(ninos.map((n) => n.col_id))]);
   const sinPrecio = ninos.filter((n) => !precios.has(n.col_id));
   if (sinPrecio.length > 0) {
     throw new ApiError(409, 'Uno de los colegios elegidos todavía no tiene precio. Recarga la página.', {
@@ -319,7 +312,7 @@ async function cobroDe(
   const cobro = calcularCobro(
     ninos.map((n) => ({ colId: n.col_id, disciplinas: n.disciplinas.length })),
     precios,
-    config.iva_pct,
+    IVA_PCT,
   );
   return { cobro, encontradas, precios };
 }
@@ -971,42 +964,42 @@ export async function borrarBorrador(actor: AuthUser, docId: number): Promise<vo
 
 /** Datos ficticios para el PDF de ejemplo. Los mismos que la vista previa del módulo. */
 export const NINO_DE_EJEMPLO: repo.NinoGuardado = {
-  nombre: 'Martín Pérez Andrade',
-  fecha_nacimiento: '2016-05-14',
+  nombre: 'Nombre del alumno',
+  fecha_nacimiento: '2016-01-01',
   col_id: 1,
   catninograd_id: 1,
   parentesco: 'Madre',
-  emergencia: { nombre: 'Jorge Andrade Salas', relacion: 'Abuelo', telefono: '0987654321' },
-  retiro: { nombre: 'Lucía Pérez Andrade', cedula: '1723456789', relacion: 'Tía', telefono: '0998877665' },
+  emergencia: { nombre: 'Contacto de emergencia', relacion: 'Relación', telefono: '0990000000' },
+  retiro: { nombre: 'Persona autorizada', cedula: '0000000000', relacion: 'Relación', telefono: '0990000000' },
   modalidad_salida: 'privado',
-  detalle_retiro: 'Lo retira su tía en la puerta principal.',
-  salud: { tiene: true, detalle: 'Alergia leve al maní.', autoriza: true },
+  detalle_retiro: 'Instrucciones de retiro',
+  salud: { tiene: false, detalle: null, autoriza: true },
   imagen: { familias: true, redes: false, promocional: false },
   documento: {
     colegio: {
-      sede: 'Colegio CRISFE Carcelén',
-      sede_corta: 'Carcelén',
-      institucion: 'CRISFE',
-      minimo_alumnos: 14,
-      tarifa: 32.1,
-      descuento_hermano: 20,
+      sede: 'Colegio de ejemplo',
+      sede_corta: 'Sede de ejemplo',
+      institucion: 'INSTITUCIÓN',
+      minimo_alumnos: 15,
+      tarifa: 30,
+      descuento_hermano: 10,
     },
-    curso: '4to de Básica',
-    actividades: ['Fútbol'],
-    horarios: ['Fútbol: Martes 16:00 a 17:00', 'Fútbol: Jueves 16:00 a 17:00'],
+    curso: 'Curso',
+    actividades: ['Disciplina'],
+    horarios: ['Disciplina: Martes 16:00 a 17:00', 'Disciplina: Jueves 16:00 a 17:00'],
   },
 };
 
 export const REPRESENTANTE_DE_EJEMPLO: RepresentanteFormulario = {
-  nombre: 'María José Pérez Andrade',
-  cedula: '1712345678',
-  correo: 'maria.perez@ejemplo.com',
-  telefono: '0991234567',
+  nombre: 'Nombre del representante',
+  cedula: '0000000000',
+  correo: 'correo@ejemplo.com',
+  telefono: '0990000000',
   factura: {
-    nombre: 'María José Pérez Andrade',
-    identificacion: '1712345678001',
-    correo: 'facturas.perez@ejemplo.com',
-    direccion: 'Av. de los Shyris N35-17, Quito',
+    nombre: 'Nombre para la factura',
+    identificacion: '0000000000001',
+    correo: 'factura@ejemplo.com',
+    direccion: 'Dirección para la factura',
   },
 };
 
@@ -1017,10 +1010,9 @@ export const REPRESENTANTE_DE_EJEMPLO: RepresentanteFormulario = {
  * todavia se salta.
  */
 export async function ejemploPaquete(): Promise<Buffer> {
-  const [vigentes, borradores, config, membrete] = await Promise.all([
+  const [vigentes, borradores, membrete] = await Promise.all([
     repo.documentosVigentes(),
     repo.borradores(),
-    repo.obtenerConfig(),
     membreteActual(),
   ]);
   const documentos: DocumentoVigente[] = [];
@@ -1040,8 +1032,8 @@ export async function ejemploPaquete(): Promise<Buffer> {
 
   const cobro = calcularCobro(
     [{ colId: 1, disciplinas: 2 }],
-    new Map([[1, { precio: 32.1, descuentoHermano: 20 }]]),
-    config.iva_pct,
+    new Map([[1, { precio: 30, descuentoHermano: 10 }]]),
+    IVA_PCT,
   );
   const datos = datosDelPaquete(REPRESENTANTE_DE_EJEMPLO, NINO_DE_EJEMPLO, cobro.alumnos[0]!, {
     fecha: new Date(),
@@ -1099,10 +1091,9 @@ export async function borrarPrecio(actor: AuthUser, colId: number): Promise<void
 }
 
 // ---------------------------------------------------------------------------
-// Configuración: IVA y membrete (0016)
+// Configuración: el membrete (0016). El IVA no se configura: IVA_PCT.
 
 export interface ConfigVista {
-  iva_pct: number;
   /** false = el membrete de serie (el de los Word del cliente). */
   membrete_propio: boolean;
   /** La imagen vigente, para enseñarla. */
@@ -1113,20 +1104,9 @@ export async function config(): Promise<ConfigVista> {
   const [c, membrete] = await Promise.all([repo.obtenerConfig(), membreteActual()]);
   const mime = membrete?.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) ? 'image/jpeg' : 'image/png';
   return {
-    iva_pct: c.iva_pct,
     membrete_propio: c.membrete !== null,
     membrete_data_url: membrete ? `data:${mime};base64,${membrete.toString('base64')}` : null,
   };
-}
-
-export async function guardarIva(actor: AuthUser, ivaPct: number): Promise<void> {
-  await enTransaccion(async (client) => {
-    await repo.guardarIva(client, ivaPct);
-    await auditar(
-      { actor, accion: 'editar', entidad: 'inscripcion_config', entidadId: 1, detalle: { iva_pct: ivaPct } },
-      client,
-    );
-  });
 }
 
 /**
