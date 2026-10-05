@@ -481,10 +481,12 @@ const Inscripcion = () => {
           setErrores([err.message]);
           setPaso(2);
         }
+      } else if (err instanceof ApiError) {
+        // El backend dice qué falta y dónde ("Alumno 1 · Salud: …").
+        const problemas = (err.details as { problemas?: string[] } | undefined)?.problemas ?? [];
+        setErrores(problemas.length > 0 ? problemas : [err.message]);
       } else {
-        setErrores([
-          err instanceof ApiError ? err.message : 'No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.',
-        ]);
+        setErrores(['No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.']);
       }
       subir();
     } finally {

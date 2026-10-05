@@ -15,6 +15,7 @@ import {
   listarSchema,
   membreteSchema,
   precioSchema,
+  problemasDeEnvio,
   rechazarSchema,
 } from './inscripciones.schemas.js';
 
@@ -78,7 +79,11 @@ inscripcionPublicaRouter.post(
   envioLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const input = envioSchema.parse(req.body);
+      const validado = envioSchema.safeParse(req.body);
+      if (!validado.success) {
+        throw new ApiError(400, 'Hay datos que revisar', { problemas: problemasDeEnvio(validado.error) });
+      }
+      const input = validado.data;
       const navegador = req.get('user-agent')?.slice(0, 300) ?? null;
       const recibido = await service.enviar(input, { ip: req.ip ?? null, navegador });
       res.status(201).json({ data: recibido, error: null });

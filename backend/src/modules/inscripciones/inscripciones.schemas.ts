@@ -20,15 +20,16 @@ export { TIPOS_DOCUMENTO, type TipoDocumento };
 const texto = (min: number, max: number, mensaje: string) =>
   z.string().trim().min(min, mensaje).max(max);
 
+/** Vacío, ausente o null valen igual: se guarda null. */
 const textoOpcional = (max: number) =>
   z
     .string()
     .trim()
     .max(max)
-    .optional()
+    .nullish()
     .transform((v) => (v && v.length > 0 ? v : null));
 
-const correo = z.string().trim().toLowerCase().email('Correo invalido').max(160);
+const correo = z.string().trim().toLowerCase().email('Correo inválido').max(160);
 
 /**
  * Cedula ecuatoriana: exactamente 10 numeros (decision del cliente,
@@ -37,18 +38,18 @@ const correo = z.string().trim().toLowerCase().email('Correo invalido').max(160)
 const cedulaRepresentante = z
   .string()
   .trim()
-  .regex(/^\d{10}$/, 'La cedula debe tener 10 numeros');
+  .regex(/^\d{10}$/, 'La cédula debe tener 10 números');
 
 /** Solo numeros (decision del cliente, 2026-10-05). */
 const telefono = z
   .string()
   .trim()
-  .regex(/^\d{7,15}$/, 'El telefono solo lleva numeros (entre 7 y 15)');
+  .regex(/^\d{7,15}$/, 'El teléfono solo lleva números (entre 7 y 15)');
 
 /** AAAA-MM-DD, en el pasado y con una edad que tenga sentido (2 a 20 anos). */
 const fechaNacimiento = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha invalida')
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
   .refine((v) => {
     const fecha = new Date(`${v}T12:00:00Z`);
     if (Number.isNaN(fecha.getTime())) return false;
@@ -160,7 +161,7 @@ export const comprobanteSchema = z.object({
   base64: z
     .string()
     .min(100, 'Falta el comprobante')
-    .max(Math.ceil((BYTES_MAX_COMPROBANTE * 4) / 3) + 4, 'El comprobante pesa mas de 2 MB')
+    .max(Math.ceil((BYTES_MAX_COMPROBANTE * 4) / 3) + 4, 'El comprobante pesa más de 2 MB')
     .regex(/^[A-Za-z0-9+/]+=*$/, 'Comprobante ilegible'),
 });
 
@@ -193,6 +194,70 @@ export const envioSchema = z.object({
 
 export type EnvioInscripcion = z.infer<typeof envioSchema>;
 
+const SECCION: Record<string, string> = {
+  representante: 'Tus datos',
+  factura: 'Facturación',
+  emergencia: 'Contacto de emergencia',
+  retiro: 'Retiro del menor',
+  salud: 'Información de salud',
+  imagen: 'Uso de imagen',
+  comprobante: 'Pago',
+  documentos: 'Documentos',
+  acepta: 'Documentos',
+};
+
+const CAMPO: Record<string, string> = {
+  nombre: 'nombre',
+  cedula: 'cédula',
+  correo: 'correo',
+  telefono: 'teléfono',
+  direccion: 'dirección',
+  identificacion: 'cédula o RUC',
+  relacion: 'relación con el menor',
+  fecha_nacimiento: 'fecha de nacimiento',
+  catninograd_id: 'curso',
+  col_id: 'colegio',
+  parentesco: 'parentesco',
+  disciplinas: 'disciplinas',
+  modalidad_salida: 'modalidad de salida',
+  detalle_retiro: 'detalle del recorrido',
+  detalle: 'especifique',
+  autoriza: 'autorización',
+  base64: 'imagen del comprobante',
+  mime: 'tipo de imagen',
+};
+
+/**
+ * Lo que falló al validar un envío, en frases que entiende quien llena el
+ * formulario: "Alumno 1 · Información de salud: falta la autorización".
+ * Los mensajes propios ya están en castellano; los de zod por defecto (tipo
+ * equivocado, campo que falta) se cambian por uno genérico con el campo.
+ */
+export function problemasDeEnvio(err: z.ZodError): string[] {
+  const frases = err.issues.map((i) => {
+    const partes: string[] = [];
+    let campo: string | null = null;
+    for (const [n, trozo] of i.path.entries()) {
+      if (trozo === 'ninos' && typeof i.path[n + 1] === 'number') {
+        partes.push(`Alumno ${(i.path[n + 1] as number) + 1}`);
+      } else if (typeof trozo === 'string' && SECCION[trozo]) {
+        partes.push(SECCION[trozo]!);
+      } else if (typeof trozo === 'string' && CAMPO[trozo]) {
+        campo = CAMPO[trozo]!;
+      }
+    }
+    const propio = i.code === 'custom' || i.code === 'invalid_string' || i.code === 'too_small';
+    const mensaje = propio && !/^(String|Number|Array|Expected|Required|Invalid)/.test(i.message)
+      ? i.message
+      : campo
+        ? `revisa el campo "${campo}"`
+        : 'hay un dato que falta o no es válido';
+    const donde = partes.length > 0 ? `${[...new Set(partes)].join(' · ')}: ` : '';
+    return `${donde}${mensaje}`;
+  });
+  return [...new Set(frases)];
+}
+
 // ---------------------------------------------------------------------------
 // Modulo interno
 
@@ -213,7 +278,7 @@ export const rechazarSchema = z.object({
 /** Guarda el borrador del tipo (lo crea o lo actualiza). Publicar es aparte. */
 export const borradorDocumentoSchema = z.object({
   tipo: z.enum(TIPOS_DOCUMENTO),
-  titulo: texto(3, 160, 'Escribe un titulo'),
+  titulo: texto(3, 160, 'Escribe un título'),
   contenido: texto(20, 60_000, 'El texto es demasiado corto'),
 });
 

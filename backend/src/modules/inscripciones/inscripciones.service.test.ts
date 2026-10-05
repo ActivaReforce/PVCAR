@@ -11,7 +11,7 @@ const {
   problemasDeDisciplinas,
 } = await import('./inscripciones.service.js');
 const { rellenar } = await import('./inscripciones.documentos.js');
-const { envioSchema } = await import('./inscripciones.schemas.js');
+const { envioSchema, problemasDeEnvio } = await import('./inscripciones.schemas.js');
 const { calcularCobro } = await import('./inscripciones.precios.js');
 
 /**
@@ -223,6 +223,28 @@ describe('envioSchema', () => {
   it('la persona que retira no es obligatoria', () => {
     const sinRetiro = { ...valido.ninos[0]!, retiro: null };
     expect(envioSchema.parse({ ...valido, ninos: [sinRetiro] }).ninos[0]!.retiro).toBeNull();
+  });
+
+  it('acepta null en los campos opcionales (detalle de retiro, especifique)', () => {
+    const nino = {
+      ...valido.ninos[0]!,
+      detalle_retiro: null,
+      salud: { tiene: false, detalle: null, autoriza: true },
+    };
+    expect(() => envioSchema.parse({ ...valido, ninos: [nino] })).not.toThrow();
+  });
+
+  it('dice en castellano que falta y donde', () => {
+    const nino = { ...valido.ninos[0]!, salud: { tiene: false, autoriza: false } };
+    const r = envioSchema.safeParse({
+      ...valido,
+      representante: { ...valido.representante, telefono: 'abc' },
+      ninos: [nino],
+    });
+    expect(r.success).toBe(false);
+    const problemas = problemasDeEnvio(r.error!);
+    expect(problemas).toContain('Tus datos: El teléfono solo lleva números (entre 7 y 15)');
+    expect(problemas.some((p) => p.startsWith('Alumno 1 · Información de salud:'))).toBe(true);
   });
 
   it('cedula de 10 numeros, telefono solo numeros', () => {
