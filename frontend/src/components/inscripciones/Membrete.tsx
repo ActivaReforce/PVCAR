@@ -1,6 +1,5 @@
 import { useRef } from 'react';
 import { ImageUp, RotateCcw } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { useToast } from '@/hooks/use-toast';
@@ -58,10 +57,7 @@ const Membrete = () => {
   return (
     <div className="space-y-8">
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-semibold">Membrete</h2>
-          <Badge variant="outline">{config.data.membrete_propio ? 'Propio' : 'De serie (el de los Word)'}</Badge>
-        </div>
+        <h2 className="text-lg font-semibold">Membrete</h2>
         <p className="text-sm text-muted-foreground">
           Sale arriba de cada página de los documentos, de borde a borde. Usa una imagen apaisada de unos
           1240 × 280 píxeles, PNG o JPEG, de hasta 700 KB. El cambio vale para los PDF que se generen desde
@@ -85,7 +81,7 @@ const Membrete = () => {
                 onClick={() => restaurar.mutate(undefined)}
                 disabled={restaurar.isPending}
               >
-                <RotateCcw className="mr-2 h-4 w-4" /> Volver al de serie
+                <RotateCcw className="mr-2 h-4 w-4" /> Volver al original
               </Button>
             )}
           </div>
