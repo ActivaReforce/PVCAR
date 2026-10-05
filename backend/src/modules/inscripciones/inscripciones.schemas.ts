@@ -31,23 +31,19 @@ const textoOpcional = (max: number) =>
 const correo = z.string().trim().toLowerCase().email('Correo invalido').max(160);
 
 /**
- * Cedula o pasaporte. Es la contrasena inicial del representante, y Supabase
- * Auth pide al menos 6 caracteres: por eso el minimo es 6 y no 10.
+ * Cedula ecuatoriana: exactamente 10 numeros (decision del cliente,
+ * 2026-10-05). Es la contrasena inicial del representante.
  */
 const cedulaRepresentante = z
   .string()
   .trim()
-  .toUpperCase()
-  .min(6, 'La cedula o pasaporte debe tener al menos 6 caracteres')
-  .max(20)
-  .regex(/^[0-9A-Z-]+$/, 'Solo numeros, letras y guiones');
+  .regex(/^\d{10}$/, 'La cedula debe tener 10 numeros');
 
+/** Solo numeros (decision del cliente, 2026-10-05). */
 const telefono = z
   .string()
   .trim()
-  .min(7, 'Telefono demasiado corto')
-  .max(20)
-  .regex(/^[0-9+\s()-]+$/, 'Telefono invalido');
+  .regex(/^\d{7,15}$/, 'El telefono solo lleva numeros (entre 7 y 15)');
 
 /** AAAA-MM-DD, en el pasado y con una edad que tenga sentido (2 a 20 anos). */
 const fechaNacimiento = z
@@ -112,15 +108,26 @@ export const ninoSchema = z
       .refine((ids) => new Set(ids).size === ids.length, 'Disciplina repetida'),
     /** Ficha, sección C. */
     emergencia: z.object(persona),
-    /** Ficha, sección D: una sola persona autorizada. */
-    retiro: z.object({ ...persona, cedula: identificacionFactura }),
+    /**
+     * Ficha, sección D: una sola persona autorizada. Puede ser el propio
+     * representante (el formulario la llena con sus datos) o nadie: no es
+     * obligatoria (decisión del cliente, 2026-10-05).
+     */
+    retiro: z
+      .object({ ...persona, cedula: identificacionFactura })
+      .nullable()
+      .optional()
+      .transform((v) => v ?? null),
     modalidad_salida: z.enum(['escolar', 'privado']),
     detalle_retiro: textoOpcional(500),
     /** Ficha de datos médicos. */
     salud: z.object({
       tiene: z.boolean(),
       detalle: textoOpcional(1000),
-      autoriza: z.boolean(),
+      /** Obligatoria, conteste Sí o No (decisión del cliente, 2026-10-05). */
+      autoriza: z.literal(true, {
+        errorMap: () => ({ message: 'Hay que autorizar el tratamiento de la información de salud' }),
+      }),
     }),
     /** Ficha de uso de imagen: tres permisos opcionales e independientes. */
     imagen: z.object({
@@ -133,10 +140,10 @@ export const ninoSchema = z
     message: 'Si hay alguna condición de salud, especifícala',
     path: ['salud', 'detalle'],
   })
-  // Sin autorización no se guarda la información de salud (su propia política).
+  // Si contestó No, lo que hubiera escrito en "Especifique" no se guarda.
   .transform((n) => ({
     ...n,
-    salud: { ...n.salud, detalle: n.salud.tiene && n.salud.autoriza ? n.salud.detalle : null },
+    salud: { ...n.salud, detalle: n.salud.tiene ? n.salud.detalle : null },
   }));
 
 export type NinoFormulario = z.infer<typeof ninoSchema>;

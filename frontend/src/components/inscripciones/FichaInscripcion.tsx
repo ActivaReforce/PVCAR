@@ -371,7 +371,9 @@ const FichaNino = ({ n, pendiente }: { n: NinoDetalle; pendiente: boolean }) => 
           {d.emergencia.nombre} ({d.emergencia.relacion}) · {d.emergencia.telefono}
         </Fila>
         <Fila etiqueta="Autorizado para retirarlo">
-          {d.retiro.nombre} ({d.retiro.relacion}) · C.C. {d.retiro.cedula} · {d.retiro.telefono}
+          {d.retiro
+            ? `${d.retiro.nombre} (${d.retiro.relacion}) · C.C. ${d.retiro.cedula} · ${d.retiro.telefono}`
+            : 'No indicó a nadie'}
         </Fila>
         <Fila etiqueta="Salud">
           {d.salud.tiene

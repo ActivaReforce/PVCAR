@@ -96,6 +96,8 @@ interface Alumno {
   disciplinas: number[];
   emergencia: { nombre: string; relacion: string; telefono: string };
   retiro: { nombre: string; cedula: string; relacion: string; telefono: string };
+  /** "Yo retiraré al menor": la persona autorizada es el representante. */
+  yo_retiro: boolean;
   modalidad_salida: ModalidadSalida | '';
   detalle_retiro: string;
   salud_tiene: '' | 'no' | 'si';
@@ -115,6 +117,7 @@ const alumnoVacio = (): Alumno => ({
   disciplinas: [],
   emergencia: { nombre: '', relacion: '', telefono: '' },
   retiro: { nombre: '', cedula: '', relacion: '', telefono: '' },
+  yo_retiro: false,
   modalidad_salida: '',
   detalle_retiro: '',
   salud_tiene: '',
@@ -124,7 +127,11 @@ const alumnoVacio = (): Alumno => ({
 });
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TELEFONO = /^[0-9+\s()-]{7,20}$/;
+/** Solo números (decisión del cliente, 2026-10-05). */
+const TELEFONO = /^\d{7,15}$/;
+/** Cédula ecuatoriana: exactamente 10 números. */
+const CEDULA = /^\d{10}$/;
+const soloNumeros = (v: string) => v.replace(/\D/g, '');
 const IDENTIFICACION = /^[0-9A-Za-z-]{6,20}$/;
 
 /** La factura que se manda: la propia o la que escribió. */
@@ -147,10 +154,9 @@ function facturaDe(r: Representante) {
 function erroresRepresentante(r: Representante): string[] {
   const e: string[] = [];
   if (r.nombre.trim().length < 3) e.push('Escribe tu nombre completo.');
-  if (!IDENTIFICACION.test(r.cedula.trim()))
-    e.push('La cédula o pasaporte debe tener entre 6 y 20 caracteres, sin espacios.');
+  if (!CEDULA.test(r.cedula.trim())) e.push('La cédula debe tener 10 números.');
   if (!CORREO.test(r.correo.trim())) e.push('El correo no es válido.');
-  if (!TELEFONO.test(r.telefono.trim())) e.push('El teléfono no es válido.');
+  if (!TELEFONO.test(r.telefono.trim())) e.push('El teléfono debe tener entre 7 y 15 números.');
   const f = facturaDe(r);
   if (!r.facturaPropia) {
     if (f.nombre.length < 3) e.push('Escribe el nombre para la factura.');
@@ -185,17 +191,42 @@ function erroresAlumnos(alumnos: Alumno[]): string[] {
     const em = a.emergencia;
     if (em.nombre.trim().length < 3 || em.relacion.trim().length < 2 || !TELEFONO.test(em.telefono.trim()))
       e.push(`${quien}completa el contacto de emergencia (nombre, relación y teléfono).`);
-    const re = a.retiro;
-    if (
-      re.nombre.trim().length < 3 ||
-      re.relacion.trim().length < 2 ||
-      !TELEFONO.test(re.telefono.trim()) ||
-      !IDENTIFICACION.test(re.cedula.trim())
-    )
-      e.push(`${quien}completa quién puede retirarlo (nombre, cédula, relación y teléfono).`);
+    if (!a.yo_retiro && retiroDe(a) === 'incompleto')
+      e.push(`${quien}completa los datos de quien lo retira (nombre, cédula, relación y teléfono) o déjalos vacíos.`);
     if (!a.modalidad_salida) e.push(`${quien}elige transporte escolar o privado.`);
   });
   return e;
+}
+
+/**
+ * La persona autorizada para retirarlo: el representante si marcó "Yo
+ * retiraré al menor"; si no, la que escribió, o nadie si dejó todo vacío.
+ */
+function retiroDe(a: Alumno, rep?: Representante) {
+  if (a.yo_retiro && rep) {
+    return {
+      nombre: rep.nombre.trim(),
+      cedula: rep.cedula.trim(),
+      relacion: a.parentesco,
+      telefono: rep.telefono.trim(),
+    };
+  }
+  const r = {
+    nombre: a.retiro.nombre.trim(),
+    cedula: a.retiro.cedula.trim(),
+    relacion: a.retiro.relacion.trim(),
+    telefono: a.retiro.telefono.trim(),
+  };
+  const campos = Object.values(r);
+  if (campos.every((c) => c === '')) return null;
+  if (
+    r.nombre.length < 3 ||
+    r.relacion.length < 2 ||
+    !TELEFONO.test(r.telefono) ||
+    !IDENTIFICACION.test(r.cedula)
+  )
+    return 'incompleto' as const;
+  return r;
 }
 
 function erroresSalud(alumnos: Alumno[]): string[] {
@@ -205,6 +236,8 @@ function erroresSalud(alumnos: Alumno[]): string[] {
     if (!a.salud_tiene) e.push(`${quien}responde la pregunta de salud.`);
     if (a.salud_tiene === 'si' && !a.salud_detalle.trim())
       e.push(`${quien}especifica la condición de salud.`);
+    if (a.salud_tiene && !a.salud_autoriza)
+      e.push(`${quien}marca la autorización del tratamiento de la información de salud.`);
   });
   return e;
 }
@@ -257,13 +290,16 @@ function datosDocumento(
       actividades: [...new Set(elegidas.map((d) => d.actividad))].join(', '),
       horarios: elegidas.map((d) => `${d.actividad}: ${d.dia} ${d.hora_inicio} a ${d.hora_fin}`).join('; '),
       emergencia: alumno.emergencia,
-      retiro: alumno.retiro,
+      retiro: (() => {
+        const r = retiroDe(alumno, rep);
+        return r && r !== 'incompleto' ? r : { nombre: '', cedula: '', relacion: '', telefono: '' };
+      })(),
       modalidad_salida: alumno.modalidad_salida || null,
       detalle_retiro: alumno.detalle_retiro.trim(),
       salud: {
         tiene: alumno.salud_tiene === '' ? null : alumno.salud_tiene === 'si',
         // Sin autorización, el detalle no se guarda: tampoco sale en el documento.
-        detalle: alumno.salud_tiene === 'si' && alumno.salud_autoriza ? alumno.salud_detalle.trim() : '',
+        detalle: alumno.salud_tiene === 'si' ? alumno.salud_detalle.trim() : '',
         autoriza: alumno.salud_autoriza,
       },
       imagen: alumno.imagen,
@@ -400,12 +436,10 @@ const Inscripcion = () => {
             relacion: a.emergencia.relacion.trim(),
             telefono: a.emergencia.telefono.trim(),
           },
-          retiro: {
-            nombre: a.retiro.nombre.trim(),
-            cedula: a.retiro.cedula.trim(),
-            relacion: a.retiro.relacion.trim(),
-            telefono: a.retiro.telefono.trim(),
-          },
+          retiro: (() => {
+            const r = retiroDe(a, rep);
+            return r === 'incompleto' ? null : r;
+          })(),
           modalidad_salida: a.modalidad_salida as ModalidadSalida,
           detalle_retiro: a.detalle_retiro.trim() || null,
           salud: {
@@ -502,7 +536,9 @@ const Inscripcion = () => {
 
             <section className="space-y-5 rounded-lg border bg-background p-4 sm:p-6">
               {paso === 0 && <PasoRepresentante rep={rep} onChange={setRep} />}
-              {paso === 1 && <PasoAlumnos alumnos={alumnos} onChange={setAlumnos} formulario={formulario.data} />}
+              {paso === 1 && (
+                <PasoAlumnos alumnos={alumnos} onChange={setAlumnos} formulario={formulario.data} rep={rep} />
+              )}
               {paso === 2 && <PasoSalud alumnos={alumnos} onChange={setAlumnos} formulario={formulario.data} />}
               {paso === 3 && (
                 <PasoDocumentos
@@ -613,12 +649,13 @@ const PasoRepresentante = ({ rep, onChange }: { rep: Representante; onChange: (r
       <Texto id="rep-nombre" etiqueta="Nombres y apellidos" valor={rep.nombre} onChange={poner('nombre')} autoComplete="name" />
       <Texto
         id="rep-cedula"
-        etiqueta="Cédula o pasaporte"
-        ayuda="Será tu contraseña para entrar a la plataforma. Podrás cambiarla después."
+        etiqueta="Cédula"
+        ayuda="Su cédula será su contraseña para entrar a la plataforma. Podrás cambiarla después."
         valor={rep.cedula}
-        onChange={poner('cedula')}
+        onChange={(v) => poner('cedula')(soloNumeros(v))}
         autoComplete="off"
-        maxLength={20}
+        inputMode="numeric"
+        maxLength={10}
       />
       <Texto
         id="rep-correo"
@@ -629,7 +666,16 @@ const PasoRepresentante = ({ rep, onChange }: { rep: Representante; onChange: (r
         type="email"
         autoComplete="email"
       />
-      <Texto id="rep-telefono" etiqueta="Teléfono" valor={rep.telefono} onChange={poner('telefono')} type="tel" autoComplete="tel" />
+      <Texto
+        id="rep-telefono"
+        etiqueta="Teléfono"
+        valor={rep.telefono}
+        onChange={(v) => poner('telefono')(soloNumeros(v))}
+        type="tel"
+        inputMode="numeric"
+        maxLength={15}
+        autoComplete="tel"
+      />
 
       <div className="space-y-4 border-t pt-5">
         <h2 className="font-semibold">Facturación</h2>
@@ -670,10 +716,12 @@ const PasoAlumnos = ({
   alumnos,
   onChange,
   formulario,
+  rep,
 }: {
   alumnos: Alumno[];
   onChange: (a: Alumno[]) => void;
   formulario: Formulario;
+  rep: Representante;
 }) => {
   const cambiar = (clave: number, cambios: Partial<Alumno>) =>
     onChange(alumnos.map((a) => (a.clave === clave ? { ...a, ...cambios } : a)));
@@ -693,6 +741,7 @@ const PasoAlumnos = ({
           alumno={a}
           numero={alumnos.length > 1 ? i + 1 : null}
           formulario={formulario}
+          rep={rep}
           onChange={(c) => cambiar(a.clave, c)}
           onQuitar={alumnos.length > 1 ? () => onChange(alumnos.filter((x) => x.clave !== a.clave)) : null}
         />
@@ -711,12 +760,14 @@ const FichaAlumno = ({
   alumno,
   numero,
   formulario,
+  rep,
   onChange,
   onQuitar,
 }: {
   alumno: Alumno;
   numero: number | null;
   formulario: Formulario;
+  rep: Representante;
   onChange: (c: Partial<Alumno>) => void;
   onQuitar: (() => void) | null;
 }) => {
@@ -813,13 +864,13 @@ const FichaAlumno = ({
       </div>
 
       {colegio && (
-        <fieldset className="space-y-3">
-          <legend className="text-sm font-medium">
+        <section className="space-y-3 border-t pt-5">
+          <h2 className="font-semibold">
             Disciplina contratada{' '}
-            <span className="font-normal text-muted-foreground">
+            <span className="text-sm font-normal text-muted-foreground">
               · {dinero(colegio.precio)} al mes más IVA, cada una
             </span>
-          </legend>
+          </h2>
           {porActividad.map(([actividad, horarios]) => (
             <div key={actividad} className="rounded-md bg-muted/40 p-3">
               <p className="mb-2 text-sm font-medium">{actividad}</p>
@@ -842,26 +893,63 @@ const FichaAlumno = ({
               </div>
             </div>
           ))}
-        </fieldset>
+        </section>
       )}
 
-      <fieldset className="space-y-3 border-t pt-4">
-        <legend className="pt-4 text-sm font-semibold">Contacto alterno de emergencia</legend>
+      <section className="space-y-3 border-t pt-5">
+        <h2 className="font-semibold">Contacto alterno de emergencia</h2>
         <Texto id={id('em-nombre')} etiqueta="Nombres y apellidos" valor={alumno.emergencia.nombre} onChange={(v) => onChange({ emergencia: { ...alumno.emergencia, nombre: v } })} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Texto id={id('em-relacion')} etiqueta="Relación con el menor" valor={alumno.emergencia.relacion} onChange={(v) => onChange({ emergencia: { ...alumno.emergencia, relacion: v } })} />
-          <Texto id={id('em-telefono')} etiqueta="Teléfono" type="tel" valor={alumno.emergencia.telefono} onChange={(v) => onChange({ emergencia: { ...alumno.emergencia, telefono: v } })} />
+          <Texto
+            id={id('em-telefono')}
+            etiqueta="Teléfono"
+            type="tel"
+            inputMode="numeric"
+            maxLength={15}
+            valor={alumno.emergencia.telefono}
+            onChange={(v) => onChange({ emergencia: { ...alumno.emergencia, telefono: soloNumeros(v) } })}
+          />
         </div>
-      </fieldset>
+      </section>
 
-      <fieldset className="space-y-3 border-t pt-4">
-        <legend className="pt-4 text-sm font-semibold">Retiro del menor y transporte</legend>
-        <Texto id={id('re-nombre')} etiqueta="Persona autorizada para retirar al menor" valor={alumno.retiro.nombre} onChange={(v) => onChange({ retiro: { ...alumno.retiro, nombre: v } })} />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Texto id={id('re-cedula')} etiqueta="Cédula / identificación" maxLength={20} valor={alumno.retiro.cedula} onChange={(v) => onChange({ retiro: { ...alumno.retiro, cedula: v } })} />
-          <Texto id={id('re-relacion')} etiqueta="Relación con el menor" valor={alumno.retiro.relacion} onChange={(v) => onChange({ retiro: { ...alumno.retiro, relacion: v } })} />
-          <Texto id={id('re-telefono')} etiqueta="Teléfono" type="tel" valor={alumno.retiro.telefono} onChange={(v) => onChange({ retiro: { ...alumno.retiro, telefono: v } })} />
+      <section className="space-y-3 border-t pt-5">
+        <h2 className="font-semibold">Retiro del menor y transporte</h2>
+        <div className="flex min-h-11 items-center justify-between gap-3">
+          <Label htmlFor={id('yo-retiro')}>Yo retiraré al menor</Label>
+          <Switch
+            id={id('yo-retiro')}
+            checked={alumno.yo_retiro}
+            onCheckedChange={(v) => onChange({ yo_retiro: v })}
+          />
         </div>
+        {(() => {
+          // Con "Yo retiraré al menor" salen sus datos, sin poder cambiarlos.
+          const r = alumno.yo_retiro
+            ? { nombre: rep.nombre, cedula: rep.cedula, relacion: alumno.parentesco, telefono: rep.telefono }
+            : alumno.retiro;
+          const poner = (campo: keyof Alumno['retiro']) => (v: string) =>
+            onChange({ retiro: { ...alumno.retiro, [campo]: campo === 'telefono' ? soloNumeros(v) : v } });
+          return (
+            <>
+              <Texto id={id('re-nombre')} etiqueta="Persona autorizada para retirar al menor" valor={r.nombre} onChange={poner('nombre')} disabled={alumno.yo_retiro} />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Texto id={id('re-cedula')} etiqueta="Cédula / identificación" maxLength={20} valor={r.cedula} onChange={poner('cedula')} disabled={alumno.yo_retiro} />
+                <Texto id={id('re-relacion')} etiqueta="Relación con el menor" valor={r.relacion} onChange={poner('relacion')} disabled={alumno.yo_retiro} />
+                <Texto
+                  id={id('re-telefono')}
+                  etiqueta="Teléfono"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={15}
+                  valor={r.telefono}
+                  onChange={poner('telefono')}
+                  disabled={alumno.yo_retiro}
+                />
+              </div>
+            </>
+          );
+        })()}
         <Campo id={id('modalidad')} etiqueta="Modalidad de salida / recorrido">
           <RadioGroup
             id={id('modalidad')}
@@ -890,7 +978,7 @@ const FichaAlumno = ({
             maxLength={500}
           />
         </Campo>
-      </fieldset>
+      </section>
     </div>
   );
 };
@@ -957,15 +1045,17 @@ const PasoSalud = ({
                 ))}
               </RadioGroup>
               {a.salud_tiene === 'si' && (
+                <Campo id={id('detalle')} etiqueta="Especifique">
+                  <Textarea
+                    id={id('detalle')}
+                    value={a.salud_detalle}
+                    onChange={(e) => cambiar(a.clave, { salud_detalle: e.target.value })}
+                    maxLength={1000}
+                  />
+                </Campo>
+              )}
+              {a.salud_tiene && (
                 <>
-                  <Campo id={id('detalle')} etiqueta="Especifique">
-                    <Textarea
-                      id={id('detalle')}
-                      value={a.salud_detalle}
-                      onChange={(e) => cambiar(a.clave, { salud_detalle: e.target.value })}
-                      maxLength={1000}
-                    />
-                  </Campo>
                   <label htmlFor={id('autoriza')} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3">
                     <Checkbox
                       id={id('autoriza')}
@@ -975,11 +1065,11 @@ const PasoSalud = ({
                     />
                     <span className="text-sm">{autoriza}</span>
                   </label>
-                  {!a.salud_autoriza && (
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      Sin esta autorización no guardaremos la información de salud que escribas.
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Esta información será de acceso restringido y solo se compartirá con la institución
+                    educativa, personal médico o servicios de emergencia cuando sea necesario para proteger al
+                    menor.
+                  </p>
                 </>
               )}
             </section>

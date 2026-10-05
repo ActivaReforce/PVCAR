@@ -132,7 +132,8 @@ export interface NinoEnvio {
   parentesco: string;
   disciplinas: number[];
   emergencia: Persona;
-  retiro: Persona & { cedula: string };
+  /** Quien puede retirarlo; null si no indicó a nadie. */
+  retiro: (Persona & { cedula: string }) | null;
   modalidad_salida: ModalidadSalida;
   detalle_retiro: string | null;
   salud: Salud;

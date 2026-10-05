@@ -219,7 +219,8 @@ export interface DatosPaquete {
     modalidad_salida: 'escolar' | 'privado';
     detalle_retiro: string | null;
     emergencia: { nombre: string; relacion: string; telefono: string };
-    retiro: { nombre: string; cedula: string; relacion: string; telefono: string };
+    /** null: no indicó a nadie más. */
+    retiro: { nombre: string; cedula: string; relacion: string; telefono: string } | null;
     salud: { tiene: boolean; detalle: string | null; autoriza: boolean };
     imagen: { familias: boolean; redes: boolean; promocional: boolean };
   };
@@ -326,10 +327,10 @@ export function filasDe(seccion: Seccion, d: DatosPaquete): Array<[string, Celda
       ];
     case 'retiro':
       return [
-        ['Persona autorizada para retirar al menor', a.retiro.nombre],
-        ['Cédula / identificación', a.retiro.cedula],
-        ['Relación con el menor', a.retiro.relacion],
-        ['Teléfono', a.retiro.telefono],
+        ['Persona autorizada para retirar al menor', a.retiro?.nombre ?? ''],
+        ['Cédula / identificación', a.retiro?.cedula ?? ''],
+        ['Relación con el menor', a.retiro?.relacion ?? ''],
+        ['Teléfono', a.retiro?.telefono ?? ''],
         [
           'Modalidad de salida / recorrido',
           {

@@ -160,7 +160,7 @@ describe('envioSchema', () => {
         emergencia: persona,
         retiro: { ...persona, cedula: '1700000000' },
         modalidad_salida: 'escolar',
-        salud: { tiene: false, autoriza: false },
+        salud: { tiene: false, autoriza: true },
         imagen: { familias: true, redes: false, promocional: false },
       },
     ],
@@ -210,10 +210,26 @@ describe('envioSchema', () => {
     expect(() => envioSchema.parse({ ...valido, ninos: [nino] })).toThrow();
   });
 
-  it('sin autorizacion no guarda el detalle de salud', () => {
-    const nino = { ...valido.ninos[0]!, salud: { tiene: true, detalle: 'Asma', autoriza: false } };
-    const r = envioSchema.parse({ ...valido, ninos: [nino] });
-    expect(r.ninos[0]!.salud).toEqual({ tiene: true, detalle: null, autoriza: false });
+  it('la autorizacion de salud es obligatoria, conteste si o no', () => {
+    const nino = { ...valido.ninos[0]!, salud: { tiene: false, autoriza: false } };
+    expect(() => envioSchema.parse({ ...valido, ninos: [nino] })).toThrow();
+  });
+
+  it('si contesta No, no guarda lo escrito en especifique', () => {
+    const nino = { ...valido.ninos[0]!, salud: { tiene: false, detalle: 'Asma', autoriza: true } };
+    expect(envioSchema.parse({ ...valido, ninos: [nino] }).ninos[0]!.salud.detalle).toBeNull();
+  });
+
+  it('la persona que retira no es obligatoria', () => {
+    const sinRetiro = { ...valido.ninos[0]!, retiro: null };
+    expect(envioSchema.parse({ ...valido, ninos: [sinRetiro] }).ninos[0]!.retiro).toBeNull();
+  });
+
+  it('cedula de 10 numeros, telefono solo numeros', () => {
+    const conRep = (r: object) => ({ ...valido, representante: { ...valido.representante, ...r } });
+    expect(() => envioSchema.parse(conRep({ cedula: '171234567' }))).toThrow();
+    expect(() => envioSchema.parse(conRep({ cedula: '17123456AB' }))).toThrow();
+    expect(() => envioSchema.parse(conRep({ telefono: '099-123-4567' }))).toThrow();
   });
 
   it('con autorizacion guarda el detalle', () => {
