@@ -189,6 +189,8 @@ export interface InscripcionListada {
   representante_cedula: string;
   representante_telefono: string;
   ninos: string[];
+  /** Los colegios de sus alumnos, sin repetir. */
+  colegios: string[];
   total: number | null;
   usuario_existente: boolean;
 }
@@ -333,9 +335,10 @@ export const inscripcionesApi = {
   cotizar: (ninos: Array<{ col_id: number; disciplinas: number[] }>) =>
     api.post<Cobro>('/inscripcion/cotizacion', { ninos }),
 
-  listar: (filtros: { estado?: EstadoInscripcion; buscar?: string; page?: number }) => {
+  listar: (filtros: { estado?: EstadoInscripcion; buscar?: string; colegio?: number; page?: number }) => {
     const qs = new URLSearchParams();
     if (filtros.estado) qs.set('estado', filtros.estado);
+    if (filtros.colegio) qs.set('colegio', String(filtros.colegio));
     if (filtros.buscar) qs.set('buscar', filtros.buscar);
     if (filtros.page) qs.set('page', String(filtros.page));
     const sufijo = qs.toString();

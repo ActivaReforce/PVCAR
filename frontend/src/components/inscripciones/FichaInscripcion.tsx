@@ -174,26 +174,36 @@ const FichaInscripcion = ({ id, onClose }: Props) => {
 
 const ResumenAprobacion = ({ datos }: { datos: InscripcionDetalle }) => {
   const existente = datos.coincidencias.find((c) => c.por_correo);
-  const n = datos.ninos.length;
+  const rep = datos.ins_representante;
   return (
     <>
-      <p>
-        {existente ? (
-          <>
-            <strong>{existente.usu_nombre}</strong> ya tiene cuenta: los alumnos se le añaden y entra
-            con su contraseña de siempre.
-          </>
-        ) : (
-          <>
-            Se crea la cuenta de <strong>{datos.ins_representante.nombre}</strong>. Entra con{' '}
-            <strong>{datos.ins_representante.correo}</strong> y su cédula como contraseña.
-          </>
-        )}
-      </p>
-      <p>
-        Se {n === 1 ? 'crea 1 alumno' : `crean ${n} alumnos`} inscritos en sus disciplinas, y se le
-        manda un correo avisándole.
-      </p>
+      <p>Al aprobar pasa esto:</p>
+      <ul className="list-disc space-y-1 pl-5">
+        <li>
+          {existente ? (
+            <>
+              <strong>{existente.usu_nombre}</strong> ya tiene cuenta: no se crea otra. Se le añaden los
+              alumnos y entra con su contraseña de siempre.
+            </>
+          ) : (
+            <>
+              Se crea la cuenta de <strong>{rep.nombre}</strong>: entra con <strong>{rep.correo}</strong> y su
+              cédula como contraseña.
+            </>
+          )}
+        </li>
+        {datos.ninos.map((n) => (
+          <li key={n.insnino_id}>
+            <strong>{n.datos.nombre}</strong> pasa a Estudiantes en {n.colegio ?? n.datos.documento.colegio.sede},
+            inscrito en {n.disciplinas.length} {n.disciplinas.length === 1 ? 'disciplina' : 'disciplinas'}.
+          </li>
+        ))}
+        <li>Los documentos quedan firmados por Activa ("Aprobado por" con tu nombre).</li>
+        <li>
+          Le llega un correo a <strong>{rep.correo}</strong> con su acceso y los documentos en PDF.
+        </li>
+      </ul>
+      <p>No se puede deshacer desde aquí: para quitar a un alumno habrá que darlo de baja en Estudiantes.</p>
     </>
   );
 };

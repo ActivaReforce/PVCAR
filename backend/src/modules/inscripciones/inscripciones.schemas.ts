@@ -264,6 +264,8 @@ export function problemasDeEnvio(err: z.ZodError): string[] {
 export const listarSchema = paginacionSchema.extend({
   estado: z.enum(['pendiente', 'aprobada']).optional(),
   buscar: z.string().trim().max(160).optional(),
+  /** Solo las que traen algún alumno de este colegio. */
+  colegio: z.coerce.number().int().positive().optional(),
 });
 
 export type ListarInscripcionesQuery = z.infer<typeof listarSchema>;

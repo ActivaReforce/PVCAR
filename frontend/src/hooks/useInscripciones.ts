@@ -17,6 +17,7 @@ function mensajeDe(error: unknown): string {
 export function useInscripciones(filtros: {
   estado?: EstadoInscripcion;
   buscar?: string;
+  colegio?: number;
   page?: number;
 }) {
   return useQuery({

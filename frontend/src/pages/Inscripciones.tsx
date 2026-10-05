@@ -12,7 +12,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
 import { useToast } from '@/hooks/use-toast';
-import { useInscripciones } from '@/hooks/useInscripciones';
+import { useInscripciones, usePrecios } from '@/hooks/useInscripciones';
 import { dinero, type EstadoInscripcion } from '@/api/inscripciones';
 import FichaInscripcion from '@/components/inscripciones/FichaInscripcion';
 import DocumentosLegales from '@/components/inscripciones/DocumentosLegales';
@@ -32,12 +32,15 @@ const Inscripciones = () => {
   const { toast } = useToast();
   const [estado, setEstado] = useState<string>('pendiente');
   const [busqueda, setBusqueda] = useState('');
+  const [colegio, setColegio] = useState<string>(TODAS);
+  const colegios = usePrecios();
   const [pagina, setPagina] = useState(1);
   const [abierta, setAbierta] = useState<number | null>(null);
 
   const lista = useInscripciones({
     estado: estado === TODAS ? undefined : (estado as EstadoInscripcion),
     buscar: busqueda || undefined,
+    colegio: colegio === TODAS ? undefined : Number(colegio),
     page: pagina,
   });
 
@@ -82,7 +85,7 @@ const Inscripciones = () => {
 
         <TabsContent value="inscripciones" className="space-y-4 pt-2">
           <EstadoGeneral />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <DebouncedSearchInput
               placeholder="Buscar por representante, cédula, correo o alumno..."
               value={busqueda}
@@ -93,13 +96,32 @@ const Inscripciones = () => {
               className="w-full sm:col-span-2"
             />
             <Select
+              value={colegio}
+              onValueChange={(v) => {
+                setColegio(v);
+                setPagina(1);
+              }}
+            >
+              <SelectTrigger className="h-11 sm:h-10" aria-label="Colegio">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODAS}>Todos los colegios</SelectItem>
+                {(colegios.data ?? []).map((c) => (
+                  <SelectItem key={c.col_id} value={String(c.col_id)}>
+                    {c.col_nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
               value={estado}
               onValueChange={(v) => {
                 setEstado(v);
                 setPagina(1);
               }}
             >
-              <SelectTrigger className="h-11 sm:h-10">
+              <SelectTrigger className="h-11 sm:h-10" aria-label="Estado">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -123,7 +145,7 @@ const Inscripciones = () => {
             <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
               <ClipboardList className="mx-auto mb-3 h-10 w-10 opacity-50" />
               <p className="text-lg">
-                {estado === 'pendiente' && !busqueda
+                {estado === 'pendiente' && !busqueda && colegio === TODAS
                   ? 'No hay inscripciones por revisar'
                   : 'No hay inscripciones con ese filtro'}
               </p>
@@ -147,7 +169,8 @@ const Inscripciones = () => {
                         {i.representante_nombre}
                       </div>
                       <div className="truncate text-sm text-muted-foreground">
-                        {i.ninos.join(', ')}
+                        {i.ninos.length} {i.ninos.length === 1 ? 'alumno' : 'alumnos'}: {i.ninos.join(', ')}
+                        {i.colegios.length > 0 && ` · ${i.colegios.join(', ')}`}
                       </div>
                       <div className="truncate text-xs text-muted-foreground">
                         {i.representante_correo} · {i.representante_telefono}

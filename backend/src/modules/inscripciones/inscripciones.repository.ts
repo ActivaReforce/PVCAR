@@ -603,6 +603,8 @@ export interface InscripcionListada {
   representante_cedula: string;
   representante_telefono: string;
   ninos: string[];
+  /** Los colegios de sus alumnos, sin repetir. */
+  colegios: string[];
   total: number | null;
   /** Ya hay un usuario con ese correo o con esa cedula. */
   usuario_existente: boolean;
@@ -617,6 +619,10 @@ const F_LISTA = `
          OR EXISTS (SELECT 1 FROM public.inscripcion_nino n
                      WHERE n.ins_id = i.ins_id
                        AND ${contieneSinTildes("n.insnino_datos->>'nombre'", '$2')}))
+    AND ($5::int IS NULL
+         OR EXISTS (SELECT 1 FROM public.inscripcion_nino n
+                     WHERE n.ins_id = i.ins_id
+                       AND (n.insnino_datos->>'col_id')::int = $5))
 `;
 
 /** Coincidencia con un usuario ya existente, por correo o por cedula. */
@@ -640,6 +646,10 @@ export async function listar(
             i.ins_representante->>'telefono' AS representante_telefono,
             COALESCE((SELECT json_agg(n.insnino_datos->>'nombre' ORDER BY n.insnino_orden)
                         FROM public.inscripcion_nino n WHERE n.ins_id = i.ins_id), '[]'::json) AS ninos,
+            COALESCE((SELECT json_agg(DISTINCT c.col_nombre)
+                        FROM public.inscripcion_nino n
+                        JOIN public.colegio c ON c.col_id = (n.insnino_datos->>'col_id')::int
+                       WHERE n.ins_id = i.ins_id), '[]'::json) AS colegios,
             i.ins_total::float8 AS total_cobro,
             (i.ins_estado = 'pendiente' AND ${USUARIO_EXISTENTE}) AS usuario_existente,
             count(*) OVER() AS total
@@ -647,7 +657,7 @@ export async function listar(
       WHERE ${F_LISTA}
       ORDER BY (i.ins_estado = 'pendiente') DESC, i.ins_fecha DESC, i.ins_id DESC
       LIMIT $3 OFFSET $4`,
-    [query.estado ?? null, buscar, query.limit, offsetDe(query)],
+    [query.estado ?? null, buscar, query.limit, offsetDe(query), query.colegio ?? null],
   );
   const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
   return {

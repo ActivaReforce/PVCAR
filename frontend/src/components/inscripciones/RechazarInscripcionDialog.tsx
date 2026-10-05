@@ -71,16 +71,21 @@ const RechazarInscripcionDialog = ({ inscripcion, onClose, onRechazada }: Props)
 
         <div className="space-y-3">
           <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
-            <p className="mb-1 font-medium">Se eliminan:</p>
-            <ul className="list-disc pl-5">
+            <p className="mb-1 font-medium">Al rechazar pasa esto:</p>
+            <ul className="list-disc space-y-1 pl-5">
               <li>
-                Los datos de <strong>{ninos}</strong> {ninos === 1 ? 'alumno' : 'alumnos'} y del
-                representante
+                Se borran los datos del representante y de{' '}
+                {ninos === 1 ? 'su alumno' : `sus ${ninos} alumnos`}.
               </li>
               <li>
-                {ninos === 1 ? 'El contrato firmado' : `Los ${ninos} contratos firmados`}
+                Se borran {ninos === 1 ? 'sus documentos firmados' : `los documentos firmados de los ${ninos}`}{' '}
+                y el comprobante de pago.
               </li>
-              <li>El comprobante de pago</li>
+              <li>No se crea ninguna cuenta ni ningún alumno.</li>
+              <li>
+                <strong>No se le avisa</strong> al representante: si hace falta, avísale tú (y devuélvele el
+                pago).
+              </li>
             </ul>
             <p className="mt-2 text-muted-foreground">
               Si solo falta corregir algo, déjala pendiente y contacta al representante.
