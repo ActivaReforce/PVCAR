@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Download,
+  FileText,
   ImageUp,
   Plus,
   Trash2,
@@ -74,7 +75,13 @@ import { fechaNacimiento } from '@/components/inscripciones/formato';
  * acceso, y su contraseña es su cédula.
  */
 
-const PASOS = ['Tus datos', 'Alumnos', 'Salud e imagen', 'Documentos', 'Pago'] as const;
+const PASOS = ['Tus datos', 'Alumnos', 'Salud, imagen y datos', 'Documentos', 'Pago'] as const;
+/** Lo que se acepta en el paso Documentos; los otros tres se contestan en el paso anterior. */
+const A_ACEPTAR: Array<[TipoDocumento, string]> = [
+  ['ficha_matricula', 'He leído y acepto la ficha de matrícula.'],
+  ['contrato', 'He leído y acepto el contrato.'],
+  ['politica', 'He leído y acepto la Política de Tratamiento y Protección de Datos Personales.'],
+];
 
 interface Representante {
   nombre: string;
@@ -363,9 +370,12 @@ const Inscripcion = () => {
         : paso === 1
           ? erroresAlumnos(alumnos)
           : paso === 2
-            ? erroresSalud(alumnos)
+            ? [
+                ...erroresSalud(alumnos),
+                ...(acepta.autorizacion_datos ? [] : ['Falta autorizar el tratamiento de datos personales.']),
+              ]
             : paso === 3
-              ? TIPOS_DOCUMENTO.filter((t) => !acepta[t]).map((t) => `Falta aceptar: ${NOMBRE_DOCUMENTO[t]}.`)
+              ? A_ACEPTAR.filter(([t]) => !acepta[t]).map(([t]) => `Falta aceptar: ${NOMBRE_DOCUMENTO[t]}.`)
               : [];
     if (e.length > 0) {
       setErrores(e);
@@ -469,7 +479,7 @@ const Inscripcion = () => {
         } else {
           setAcepta(Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, false])) as Record<TipoDocumento, boolean>);
           setErrores([err.message]);
-          setPaso(3);
+          setPaso(2);
         }
       } else {
         setErrores([
@@ -539,7 +549,16 @@ const Inscripcion = () => {
               {paso === 1 && (
                 <PasoAlumnos alumnos={alumnos} onChange={setAlumnos} formulario={formulario.data} rep={rep} />
               )}
-              {paso === 2 && <PasoSalud alumnos={alumnos} onChange={setAlumnos} formulario={formulario.data} />}
+              {paso === 2 && (
+                <PasoSalud
+                  alumnos={alumnos}
+                  onChange={setAlumnos}
+                  formulario={formulario.data}
+                  rep={rep}
+                  aceptaDatos={acepta.autorizacion_datos}
+                  onAceptaDatos={(v) => setAcepta((a) => ({ ...a, autorizacion_datos: v }))}
+                />
+              )}
               {paso === 3 && (
                 <PasoDocumentos
                   formulario={formulario.data}
@@ -571,7 +590,11 @@ const Inscripcion = () => {
                 <span />
               )}
               {paso < PASOS.length - 1 ? (
-                <Button className="h-12 sm:h-10" onClick={siguiente}>
+                <Button
+                  className="h-12 sm:h-10"
+                  onClick={siguiente}
+                  disabled={paso === 3 && A_ACEPTAR.some(([t]) => !acepta[t])}
+                >
                   Continuar <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
@@ -992,11 +1015,27 @@ const PasoSalud = ({
   alumnos,
   onChange,
   formulario,
+  rep,
+  aceptaDatos,
+  onAceptaDatos,
 }: {
   alumnos: Alumno[];
   onChange: (a: Alumno[]) => void;
   formulario: Formulario;
+  rep: Representante;
+  aceptaDatos: boolean;
+  onAceptaDatos: (v: boolean) => void;
 }) => {
+  const [politica, setPolitica] = useState(false);
+  const autorizacion = formulario.documentos.autorizacion_datos?.doc_contenido;
+  const bloquesDatos = autorizacion ? analizar(autorizacion) : [];
+  const introDatos = bloquesDatos.flatMap((b) => (b.t === 'parrafo' ? [b.texto] : []));
+  const enlacePolitica =
+    bloquesDatos.flatMap((b) => (b.t === 'politica' ? [b.texto] : []))[0] ??
+    'Ver Política de Tratamiento y Protección de Datos Personales';
+  const casillaDatos =
+    textoDeCasilla(autorizacion, 'acepta') ?? 'Autorizo el tratamiento de mis datos personales y los del menor.';
+  const docPolitica = formulario.documentos.politica!;
   const cambiar = (clave: number, cambios: Partial<Alumno>) =>
     onChange(alumnos.map((a) => (a.clave === clave ? { ...a, ...cambios } : a)));
   const medicos = formulario.documentos.datos_medicos?.doc_contenido;
@@ -1015,8 +1054,8 @@ const PasoSalud = ({
   return (
     <>
       <div>
-        <h1 className="text-xl font-semibold">Salud e imagen</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Por cada alumno.</p>
+        <h1 className="text-xl font-semibold">Salud, imagen y tratamiento de datos</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Salud e imagen, por cada alumno.</p>
       </div>
       {alumnos.map((a, i) => {
         const id = (c: string) => `salud-${a.clave}-${c}`;
@@ -1096,30 +1135,61 @@ const PasoSalud = ({
           </div>
         );
       })}
+
+      <section className="space-y-3 rounded-md border p-3 sm:p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Tratamiento de datos personales
+        </h2>
+        {introDatos.map((t) => (
+          <p key={t} className="text-sm text-muted-foreground">
+            {t}
+          </p>
+        ))}
+        <label htmlFor="acepta-datos" className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3">
+          <Checkbox
+            id="acepta-datos"
+            checked={aceptaDatos}
+            onCheckedChange={(v) => onAceptaDatos(v === true)}
+            className="mt-0.5"
+          />
+          <span className="text-sm">
+            {casillaDatos}
+            {alumnos.length > 1 ? ` (para los ${alumnos.length} alumnos)` : ''}
+          </span>
+        </label>
+        <button
+          type="button"
+          onClick={() => setPolitica(true)}
+          className="text-left text-sm text-primary underline underline-offset-2"
+        >
+          {enlacePolitica}
+        </button>
+      </section>
+
+      <Dialog open={politica} onOpenChange={setPolitica}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{NOMBRE_DOCUMENTO.politica}</DialogTitle>
+            <DialogDescription>Versión {docPolitica.doc_version}</DialogDescription>
+          </DialogHeader>
+          <DocumentoVista
+            tipo="politica"
+            titulo={docPolitica.doc_titulo}
+            contenido={docPolitica.doc_contenido}
+            datos={datosDocumento(rep, alumnos[0]!, formulario, undefined)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
 
-/** Lo que dice la casilla de aceptar de cada documento. */
-function textoAceptar(tipo: TipoDocumento, formulario: Formulario, alumnos: number): string {
-  const varios = alumnos > 1 ? ` (para los ${alumnos} alumnos)` : '';
-  if (tipo === 'autorizacion_datos') {
-    return (
-      textoDeCasilla(formulario.documentos.autorizacion_datos?.doc_contenido, 'acepta') ??
-      'Autorizo el tratamiento de datos personales.'
-    ) + varios;
-  }
-  if (tipo === 'datos_medicos' || tipo === 'imagen') {
-    return `Confirmo mis respuestas en ${NOMBRE_DOCUMENTO[tipo].toLowerCase()}${varios}.`;
-  }
-  const nombre: Record<string, string> = {
-    ficha_matricula: 'la ficha de matrícula',
-    contrato: 'el contrato',
-    politica: 'la Política de Tratamiento y Protección de Datos Personales',
-  };
-  return `He leído y acepto ${nombre[tipo]}${varios}.`;
-}
-
+/**
+ * Para leer y confirmar: una tarjeta por documento, ya lleno, que se abre en
+ * una ventana. Salud, imagen y tratamiento de datos ya se contestaron en el
+ * paso anterior; aquí solo se aceptan la ficha, el contrato y la política
+ * (decisión del cliente, 2026-10-05).
+ */
 const PasoDocumentos = ({
   formulario,
   rep,
@@ -1136,18 +1206,19 @@ const PasoDocumentos = ({
   cobro: Cobro | undefined;
 }) => {
   const [claveAlumno, setClaveAlumno] = useState(alumnos[0]?.clave ?? 0);
-  const [politica, setPolitica] = useState(false);
+  const [abierto, setAbierto] = useState<TipoDocumento | null>(null);
   const indice = Math.max(0, alumnos.findIndex((a) => a.clave === claveAlumno));
   const alumno = alumnos[indice]!;
   const datos = datosDocumento(rep, alumno, formulario, cobro?.alumnos[indice]);
-  const docPolitica = formulario.documentos.politica!;
+  const doc = abierto ? formulario.documentos[abierto] : undefined;
+  const varios = alumnos.length > 1 ? ` (para los ${alumnos.length} alumnos)` : '';
 
   return (
     <>
       <div>
         <h1 className="text-xl font-semibold">Documentos</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Están llenos con lo que escribiste. Léelos y marca cada casilla: aceptar es tu firma.
+          Están llenos con lo que escribiste. Toca cada uno para leerlo y acepta al final.
         </p>
       </div>
 
@@ -1168,40 +1239,61 @@ const PasoDocumentos = ({
         </Campo>
       )}
 
-      {TIPOS_DOCUMENTO.map((tipo) => {
-        const doc = formulario.documentos[tipo]!;
-        return (
-          <div key={tipo} className="space-y-3">
-            <h2 className="font-semibold">{NOMBRE_DOCUMENTO[tipo]}</h2>
-            <div className="max-h-96 overflow-y-auto rounded-md border bg-background p-3 sm:p-4" tabIndex={0} aria-label={doc.doc_titulo}>
-              <DocumentoVista
-                tipo={tipo}
-                titulo={doc.doc_titulo}
-                contenido={doc.doc_contenido}
-                datos={datos}
-                onVerPolitica={() => setPolitica(true)}
-              />
-            </div>
-            <label htmlFor={`acepta-${tipo}`} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3">
-              <Checkbox
-                id={`acepta-${tipo}`}
-                checked={acepta[tipo]}
-                onCheckedChange={(v) => onAcepta(tipo, v === true)}
-                className="mt-0.5"
-              />
-              <span className="text-sm">{textoAceptar(tipo, formulario, alumnos.length)}</span>
-            </label>
-          </div>
-        );
-      })}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {TIPOS_DOCUMENTO.map((tipo) => (
+          <button
+            key={tipo}
+            type="button"
+            onClick={() => setAbierto(tipo)}
+            className="flex min-h-14 items-center gap-3 rounded-md border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <FileText className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">{NOMBRE_DOCUMENTO[tipo]}</span>
+              <span className="block text-xs text-muted-foreground">Toca para leerlo</span>
+            </span>
+          </button>
+        ))}
+      </div>
 
-      <Dialog open={politica} onOpenChange={setPolitica}>
+      <div className="space-y-2 border-t pt-5">
+        {A_ACEPTAR.map(([tipo, texto]) => (
+          <label
+            key={tipo}
+            htmlFor={`acepta-${tipo}`}
+            className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3"
+          >
+            <Checkbox
+              id={`acepta-${tipo}`}
+              checked={acepta[tipo]}
+              onCheckedChange={(v) => onAcepta(tipo, v === true)}
+              className="mt-0.5"
+            />
+            <span className="text-sm">
+              {texto.replace(/\.$/, '')}
+              {varios}.
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <Dialog open={abierto !== null} onOpenChange={(v) => !v && setAbierto(null)}>
         <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{NOMBRE_DOCUMENTO.politica}</DialogTitle>
-            <DialogDescription>Versión {docPolitica.doc_version}</DialogDescription>
+            <DialogTitle>{abierto ? NOMBRE_DOCUMENTO[abierto] : ''}</DialogTitle>
+            <DialogDescription>
+              {alumnos.length > 1 ? `De ${alumno.nombre.trim() || 'este alumno'}` : 'Lleno con tus datos'}
+            </DialogDescription>
           </DialogHeader>
-          <DocumentoVista tipo="politica" titulo={docPolitica.doc_titulo} contenido={docPolitica.doc_contenido} datos={datos} />
+          {abierto && doc && (
+            <DocumentoVista
+              tipo={abierto}
+              titulo={doc.doc_titulo}
+              contenido={doc.doc_contenido}
+              datos={datos}
+              onVerPolitica={() => setAbierto('politica')}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -1226,10 +1318,6 @@ const PasoPago = ({
   <>
     <div>
       <h1 className="text-xl font-semibold">Pago</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Transfiere el primer mes y sube una foto o captura del comprobante
-        {alumnos.length > 1 ? `, uno solo por los ${alumnos.length} alumnos` : ''}.
-      </p>
     </div>
 
     <div className="rounded-md border">
@@ -1265,7 +1353,7 @@ const PasoPago = ({
             </div>
           </dl>
           <div className="flex items-center justify-between border-t bg-muted/40 p-3">
-            <span className="font-semibold">Total mensual</span>
+            <span className="font-semibold">Pago Inscripción</span>
             <span className="text-lg font-bold">{dinero(cobro.total)}</span>
           </div>
         </>
@@ -1276,6 +1364,10 @@ const PasoPago = ({
       )}
     </div>
 
+    <p className="text-sm">
+      Sube el comprobante de la transferencia del pago, por favor
+      {alumnos.length > 1 ? ` (uno solo por los ${alumnos.length} alumnos)` : ''}.
+    </p>
     <label
       htmlFor="comprobante"
       className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-4 text-center hover:bg-muted/40"
