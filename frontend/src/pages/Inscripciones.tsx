@@ -16,6 +16,7 @@ import { useInscripciones } from '@/hooks/useInscripciones';
 import { dinero, type EstadoInscripcion } from '@/api/inscripciones';
 import FichaInscripcion from '@/components/inscripciones/FichaInscripcion';
 import DocumentosLegales from '@/components/inscripciones/DocumentosLegales';
+import { EstadoGeneral } from '@/components/inscripciones/EstadoInscripciones';
 import { fechaHora } from '@/components/inscripciones/formato';
 
 const TODAS = 'todas';
@@ -80,6 +81,7 @@ const Inscripciones = () => {
         </div>
 
         <TabsContent value="inscripciones" className="space-y-4 pt-2">
+          <EstadoGeneral />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <DebouncedSearchInput
               placeholder="Buscar por representante, cédula, correo o alumno..."

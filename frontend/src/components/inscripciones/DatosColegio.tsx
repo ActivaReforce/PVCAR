@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { usePermissions } from '@/hooks/usePermissions';
-import { useBorrarPrecio, useGuardarPrecio } from '@/hooks/useInscripciones';
-import { dinero, type PrecioColegio } from '@/api/inscripciones';
+import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useBorrarPrecio, useGuardarPrecio } from "@/hooks/useInscripciones";
+import { dinero, type PrecioColegio } from "@/api/inscripciones";
 
 interface Campos {
   precio: string;
@@ -17,12 +18,12 @@ interface Campos {
 }
 
 const camposDe = (f: PrecioColegio): Campos => ({
-  precio: f.precio !== null ? String(f.precio) : '',
-  descuento: f.descuento_hermano !== null ? String(f.descuento_hermano) : '0',
+  precio: f.precio !== null ? String(f.precio) : "",
+  descuento: f.descuento_hermano !== null ? String(f.descuento_hermano) : "0",
   sede: f.sede ?? f.col_nombre,
-  sede_corta: f.sede_corta ?? '',
-  institucion: f.institucion ?? '',
-  minimo: f.minimo_alumnos !== null ? String(f.minimo_alumnos) : '',
+  sede_corta: f.sede_corta ?? "",
+  institucion: f.institucion ?? "",
+  minimo: f.minimo_alumnos !== null ? String(f.minimo_alumnos) : "",
 });
 
 /**
@@ -40,22 +41,25 @@ const camposDe = (f: PrecioColegio): Campos => ({
  */
 const DatosColegio = ({ fila }: { fila: PrecioColegio }) => {
   const { hasPermission } = usePermissions();
-  const puedeEditar = hasPermission('inscripciones', 'editar');
+  const puedeEditar = hasPermission("inscripciones", "editar");
   const guardar = useGuardarPrecio();
   const quitar = useBorrarPrecio();
 
   const [c, setC] = useState<Campos>(() => camposDe(fila));
+  // Abierta de entrada si el colegio todavía no tiene valores: es lo primero que falta.
+  const [abierta, setAbierta] = useState(fila.precio === null);
   useEffect(() => {
     setC(camposDe(fila));
   }, [fila]);
-  const poner = (campo: keyof Campos) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setC((x) => ({ ...x, [campo]: e.target.value }));
+  const poner =
+    (campo: keyof Campos) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setC((x) => ({ ...x, [campo]: e.target.value }));
 
-  const nPrecio = Number(c.precio.replace(',', '.'));
-  const nDescuento = Number(c.descuento.replace(',', '.') || '0');
+  const nPrecio = Number(c.precio.replace(",", "."));
+  const nDescuento = Number(c.descuento.replace(",", ".") || "0");
   const nMinimo = Number(c.minimo);
   const valido =
-    c.precio.trim() !== '' &&
+    c.precio.trim() !== "" &&
     Number.isFinite(nPrecio) &&
     nPrecio > 0 &&
     Number.isFinite(nDescuento) &&
@@ -67,94 +71,157 @@ const DatosColegio = ({ fila }: { fila: PrecioColegio }) => {
     Number.isInteger(nMinimo) &&
     nMinimo >= 1;
   const original = camposDe(fila);
-  const cambiado = (Object.keys(c) as Array<keyof Campos>).some((k) => c[k] !== original[k]);
+  const cambiado = (Object.keys(c) as Array<keyof Campos>).some(
+    (k) => c[k] !== original[k],
+  );
 
   const id = (x: string) => `precio-${fila.col_id}-${x}`;
-  const campoDe = ({ campo, etiqueta, ayuda, ...resto }: {
+  const campoDe = ({
+    campo,
+    etiqueta,
+    ayuda,
+    ...resto
+  }: {
     campo: keyof Campos;
     etiqueta: string;
     ayuda?: string;
   } & React.InputHTMLAttributes<HTMLInputElement>) => (
     <div className="space-y-1.5">
       <Label htmlFor={id(campo)}>{etiqueta}</Label>
-      <Input id={id(campo)} value={c[campo]} onChange={poner(campo)} className="h-11 sm:h-10" {...resto} />
+      <Input
+        id={id(campo)}
+        value={c[campo]}
+        onChange={poner(campo)}
+        className="h-11 sm:h-10"
+        {...resto}
+      />
       {ayuda && <p className="text-xs text-muted-foreground">{ayuda}</p>}
     </div>
   );
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate font-medium" title={fila.col_nombre}>
-            {fila.col_nombre}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {fila.disciplinas_activas} disciplina{fila.disciplinas_activas === 1 ? '' : 's'} activa
-            {fila.disciplinas_activas === 1 ? '' : 's'}
+    <section className="overflow-hidden rounded-lg border">
+      <button
+        type="button"
+        onClick={() => setAbierta((v) => !v)}
+        aria-expanded={abierta}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Valores del colegio</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {fila.disciplinas_activas} disciplina
+            {fila.disciplinas_activas === 1 ? "" : "s"} activa
+            {fila.disciplinas_activas === 1 ? "" : "s"}
           </p>
         </div>
         {fila.precio === null ? (
-          <Badge variant="secondary">Sin precio</Badge>
+          <Badge variant="secondary" className="flex-shrink-0">
+            Sin valores
+          </Badge>
         ) : (
-          <Badge variant="outline">
+          <Badge
+            variant="outline"
+            className="hidden flex-shrink-0 sm:inline-flex"
+          >
             {dinero(fila.precio)} al mes
-            {fila.descuento_hermano ? ` · ${fila.descuento_hermano} % hermanos` : ''}
+            {fila.descuento_hermano
+              ? ` · ${fila.descuento_hermano} % hermanos`
+              : ""}
           </Badge>
         )}
-      </div>
+        <ChevronDown
+          className={`h-4 w-4 flex-shrink-0 transition-transform ${abierta ? "rotate-180" : ""}`}
+        />
+      </button>
 
-      {puedeEditar && (
-        <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {campoDe({ campo: 'precio', etiqueta: 'Tarifa mensual', ayuda: 'Por disciplina, en dólares, sin IVA.', inputMode: 'decimal' })}
-            {campoDe({ campo: 'descuento', etiqueta: 'Descuento por hermano', ayuda: 'En porcentaje.', inputMode: 'decimal' })}
-            {campoDe({ campo: 'minimo', etiqueta: 'Mínimo de alumnos por grupo', ayuda: 'Para abrir un grupo.', inputMode: 'numeric' })}
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {campoDe({ campo: 'sede', etiqueta: 'Nombre de la sede', ayuda: 'El nombre completo: sale en la ficha y al inicio del contrato.' })}
-            {campoDe({ campo: 'sede_corta', etiqueta: 'Nombre corto de la sede', ayuda: 'Para frases cortas del contrato: la tarifa y el mínimo de alumnos.' })}
-            {campoDe({ campo: 'institucion', etiqueta: 'Nombre de la institución', ayuda: 'Cómo se nombra al colegio en las cláusulas: enfermería, mora, salidas.' })}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              className="h-11 sm:h-10"
-              disabled={!valido || !cambiado || guardar.isPending}
-              onClick={() =>
-                guardar.mutate({
-                  colId: fila.col_id,
-                  datos: {
-                    precio: Math.round(nPrecio * 100) / 100,
-                    descuento_hermano: nDescuento,
-                    sede: c.sede.trim(),
-                    sede_corta: c.sede_corta.trim(),
-                    institucion: c.institucion.trim(),
-                    minimo_alumnos: nMinimo,
-                  },
-                })
-              }
-            >
-              Guardar
-            </Button>
-            {fila.precio !== null && (
-              <Button
-                variant="ghost"
-                className="h-11 text-destructive sm:h-10"
-                disabled={quitar.isPending}
-                onClick={() => quitar.mutate(fila.col_id)}
-                title="El colegio deja de aparecer en el formulario"
-              >
-                Quitar
-              </Button>
-            )}
-          </div>
-        </>
+      {abierta && (
+        <div className="space-y-3 border-t p-4">
+          {puedeEditar && (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {campoDe({
+                  campo: "precio",
+                  etiqueta: "Tarifa mensual",
+                  ayuda: "Por disciplina, en dólares, sin IVA.",
+                  inputMode: "decimal",
+                })}
+                {campoDe({
+                  campo: "descuento",
+                  etiqueta: "Descuento por hermano",
+                  ayuda: "En porcentaje.",
+                  inputMode: "decimal",
+                })}
+                {campoDe({
+                  campo: "minimo",
+                  etiqueta: "Mínimo de alumnos por grupo",
+                  ayuda: "Para abrir un grupo.",
+                  inputMode: "numeric",
+                })}
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {campoDe({
+                  campo: "sede",
+                  etiqueta: "Nombre de la sede",
+                  ayuda:
+                    "El nombre completo: sale en la ficha y al inicio del contrato.",
+                })}
+                {campoDe({
+                  campo: "sede_corta",
+                  etiqueta: "Nombre corto de la sede",
+                  ayuda:
+                    "Para frases cortas del contrato: la tarifa y el mínimo de alumnos.",
+                })}
+                {campoDe({
+                  campo: "institucion",
+                  etiqueta: "Nombre de la institución",
+                  ayuda:
+                    "Cómo se nombra al colegio en las cláusulas: enfermería, mora, salidas.",
+                })}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="h-11 sm:h-10"
+                  disabled={!valido || !cambiado || guardar.isPending}
+                  onClick={() =>
+                    guardar.mutate({
+                      colId: fila.col_id,
+                      datos: {
+                        precio: Math.round(nPrecio * 100) / 100,
+                        descuento_hermano: nDescuento,
+                        sede: c.sede.trim(),
+                        sede_corta: c.sede_corta.trim(),
+                        institucion: c.institucion.trim(),
+                        minimo_alumnos: nMinimo,
+                      },
+                    })
+                  }
+                >
+                  Guardar
+                </Button>
+                {fila.precio !== null && (
+                  <Button
+                    variant="ghost"
+                    className="h-11 text-destructive sm:h-10"
+                    disabled={quitar.isPending}
+                    onClick={() => quitar.mutate(fila.col_id)}
+                    title="El colegio deja de aparecer en el formulario"
+                  >
+                    Quitar
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+          <p className="text-xs text-muted-foreground">
+            La tarifa es sin IVA; al representante se le suma el 15 %. Con
+            hermanos en la misma inscripción, el que más disciplinas tiene paga
+            completo y cada hermano lleva el descuento en tantas disciplinas
+            como él.
+          </p>
+        </div>
       )}
-      <p className="text-xs text-muted-foreground">
-        La tarifa es sin IVA; al representante se le suma el 15 %. Con hermanos en la misma inscripción, el que más
-        disciplinas tiene paga completo y cada hermano lleva el descuento en tantas disciplinas como él.
-      </p>
-    </div>
+    </section>
   );
 };
 

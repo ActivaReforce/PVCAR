@@ -210,6 +210,8 @@ export const borradorDocumentoSchema = z.object({
   contenido: texto(20, 60_000, 'El texto es demasiado corto'),
 });
 
+export const abrirSchema = z.object({ abiertas: z.boolean() });
+
 export const colIdParamSchema = z.object({ colId: z.coerce.number().int().positive() });
 
 /** Dolares con dos decimales como mucho; descuento en porcentaje. */

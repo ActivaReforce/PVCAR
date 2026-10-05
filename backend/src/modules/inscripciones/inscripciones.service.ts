@@ -262,17 +262,130 @@ export interface Formulario {
   documentos: Partial<Record<TipoDocumento, repo.DocumentoLegal>>;
 }
 
+// ---------------------------------------------------------------------------
+// Abiertas o cerradas (0018)
+
+/** Iguales para cualquier colegio. */
+export const TIPOS_GENERALES: TipoDocumento[] = ['autorizacion_datos', 'datos_medicos', 'imagen', 'politica'];
+/** Texto común, llenado con los datos de cada colegio. */
+export const TIPOS_POR_COLEGIO: TipoDocumento[] = ['ficha_matricula', 'contrato'];
+
+export interface EstadoColegio {
+  col_id: number;
+  col_nombre: string;
+  /** Abierto de verdad: interruptor encendido y todo lo necesario listo. */
+  abierto: boolean;
+  /** Lo que eligió el admin. */
+  interruptor: boolean;
+  /** Por qué está cerrado, en frases. Vacío si está abierto. */
+  motivos: string[];
+}
+
+export interface EstadoInscripciones {
+  abiertas: boolean;
+  interruptor: boolean;
+  motivos: string[];
+  colegios: EstadoColegio[];
+}
+
+/**
+ * Reglas del cliente (2026-10-05). Un colegio está abierto si su interruptor
+ * está encendido, la ficha y el contrato están publicados, tiene sus valores
+ * y al menos una disciplina activa. Las inscripciones están abiertas si el
+ * interruptor general está encendido, los cuatro generales están publicados
+ * y hay al menos un colegio abierto.
+ */
+export function calcularEstado(
+  publicados: Set<TipoDocumento>,
+  interruptor: boolean,
+  colegios: Array<{
+    col_id: number;
+    col_nombre: string;
+    precio: number | null;
+    abierta: boolean | null;
+    disciplinas_activas: number;
+  }>,
+): EstadoInscripciones {
+  const faltan = (tipos: TipoDocumento[]) => tipos.filter((t) => !publicados.has(t));
+  const faltanColegio = faltan(TIPOS_POR_COLEGIO);
+  const estados = colegios.map((c): EstadoColegio => {
+    const motivos: string[] = [];
+    if (c.precio === null) motivos.push('Faltan los valores del colegio.');
+    if (c.disciplinas_activas === 0) motivos.push('No tiene disciplinas activas.');
+    if (faltanColegio.length > 0) {
+      motivos.push(`Falta publicar: ${faltanColegio.map((t) => NOMBRE_DOCUMENTO[t]).join(', ')}.`);
+    }
+    if (!c.abierta) motivos.push('Las inscripciones de este colegio están cerradas.');
+    return {
+      col_id: c.col_id,
+      col_nombre: c.col_nombre,
+      abierto: motivos.length === 0,
+      interruptor: c.abierta === true,
+      motivos,
+    };
+  });
+
+  const motivos: string[] = [];
+  if (!interruptor) motivos.push('Están cerradas a mano.');
+  const faltanGenerales = faltan(TIPOS_GENERALES);
+  if (faltanGenerales.length > 0) {
+    motivos.push(`Falta publicar: ${faltanGenerales.map((t) => NOMBRE_DOCUMENTO[t]).join(', ')}.`);
+  }
+  if (!estados.some((e) => e.abierto)) motivos.push('Ningún colegio tiene las inscripciones abiertas.');
+  return { abiertas: motivos.length === 0, interruptor, motivos, colegios: estados };
+}
+
+export async function estado(): Promise<EstadoInscripciones> {
+  const [vigentes, config, colegios] = await Promise.all([
+    repo.documentosVigentes(),
+    repo.obtenerConfig(),
+    repo.listarPrecios(),
+  ]);
+  return calcularEstado(new Set(vigentes.map((v) => v.doc_tipo)), config.abiertas, colegios);
+}
+
+export async function abrirInscripciones(actor: AuthUser, abiertas: boolean): Promise<EstadoInscripciones> {
+  await enTransaccion(async (client) => {
+    await repo.guardarAbiertas(client, abiertas);
+    await auditar(
+      { actor, accion: 'editar', entidad: 'inscripcion_config', entidadId: 1, detalle: { abiertas } },
+      client,
+    );
+  });
+  return estado();
+}
+
+export async function abrirColegio(
+  actor: AuthUser,
+  colId: number,
+  abierta: boolean,
+): Promise<EstadoInscripciones> {
+  await enTransaccion(async (client) => {
+    if (!(await repo.guardarAbiertaColegio(client, colId, abierta))) {
+      throw new ApiError(409, 'Primero guarda los valores del colegio.');
+    }
+    await auditar(
+      { actor, accion: 'editar', entidad: 'colegio_precio', entidadId: colId, detalle: { abierta } },
+      client,
+    );
+  });
+  return estado();
+}
+
 export async function formulario(): Promise<Formulario> {
-  const [colegios, grados, vigentes] = await Promise.all([
+  const [oferta, grados, vigentes, situacion] = await Promise.all([
     repo.ofertaPublica(),
     repo.grados(),
     repo.documentosVigentes(),
+    estado(),
   ]);
   const documentos: Partial<Record<TipoDocumento, repo.DocumentoLegal>> = {};
   for (const doc of vigentes) documentos[doc.doc_tipo] = doc;
+  const abiertos = new Set(situacion.colegios.filter((c) => c.abierto).map((c) => c.col_id));
+  const colegios = situacion.abiertas ? oferta.filter((c) => abiertos.has(c.col_id)) : [];
 
   return {
-    disponible: TIPOS_DOCUMENTO.every((t) => documentos[t]) && colegios.length > 0,
+    disponible: situacion.abiertas && colegios.length > 0,
     colegios,
     grados,
     parentescos: PARENTESCOS,
@@ -345,6 +458,13 @@ export async function enviar(
   input: EnvioInscripcion,
   meta: { ip: string | null; navegador: string | null },
 ): Promise<EnvioRecibido> {
+  const situacion = await estado();
+  if (!situacion.abiertas) throw new ApiError(503, 'Las inscripciones están cerradas.');
+  const abiertos = new Set(situacion.colegios.filter((c) => c.abierto).map((c) => c.col_id));
+  if (input.ninos.some((n) => !abiertos.has(n.col_id))) {
+    throw new ApiError(409, 'Las inscripciones de uno de los colegios elegidos se cerraron. Recarga la página.');
+  }
+
   const vigentes = await repo.documentosVigentes();
   const documentos: DocumentoVigente[] = [];
   for (const tipo of TIPOS_DOCUMENTO) {

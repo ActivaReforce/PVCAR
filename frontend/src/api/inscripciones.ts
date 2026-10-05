@@ -285,7 +285,26 @@ export interface PrecioColegio {
   sede_corta: string | null;
   institucion: string | null;
   minimo_alumnos: number | null;
+  /** Interruptor del colegio; null si todavía no tiene valores. */
+  abierta: boolean | null;
   fecha_modificacion: string | null;
+}
+
+export interface EstadoColegio {
+  col_id: number;
+  col_nombre: string;
+  /** Abierto de verdad: interruptor encendido y todo lo necesario listo. */
+  abierto: boolean;
+  interruptor: boolean;
+  /** Por qué está cerrado. Vacío si está abierto. */
+  motivos: string[];
+}
+
+export interface EstadoInscripciones {
+  abiertas: boolean;
+  interruptor: boolean;
+  motivos: string[];
+  colegios: EstadoColegio[];
 }
 
 export interface DatosPrecio {
@@ -338,6 +357,11 @@ export const inscripcionesApi = {
     api.put<{ col_id: number }>(`/inscripciones/precios/${colId}`, datos),
   borrarPrecio: (colId: number) =>
     api.delete<{ col_id: number }>(`/inscripciones/precios/${colId}`),
+
+  estado: () => api.get<EstadoInscripciones>('/inscripciones/estado'),
+  abrir: (abiertas: boolean) => api.put<EstadoInscripciones>('/inscripciones/estado', { abiertas }),
+  abrirColegio: (colId: number, abiertas: boolean) =>
+    api.put<EstadoInscripciones>(`/inscripciones/estado/colegios/${colId}`, { abiertas }),
 
   config: () => api.get<ConfigInscripciones>('/inscripciones/config'),
   subirMembrete: (datos: { mime: string; base64: string }) =>

@@ -63,6 +63,7 @@ import { ApiError } from '@/lib/api';
 import DocumentoVista from './DocumentoVista';
 import DatosColegio from './DatosColegio';
 import Membrete from './Membrete';
+import { EstadoDelColegio } from './EstadoInscripciones';
 import { REGLAS, porcentaje, problemasDePlantilla, tarifa, type DatosDocumento } from './documento';
 import { fechaCorta } from './formato';
 
@@ -305,6 +306,8 @@ const PorColegio = ({ datos }: { datos: Documentos }) => {
           </SelectContent>
         </Select>
       </div>
+
+      <EstadoDelColegio colId={fila.col_id} />
 
       <DatosColegio key={fila.col_id} fila={fila} />
 

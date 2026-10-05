@@ -9,6 +9,7 @@ import {
   colIdParamSchema,
   cotizacionSchema,
   envioSchema,
+  abrirSchema,
   idParamSchema,
   listarSchema,
   membreteSchema,
@@ -191,6 +192,47 @@ inscripcionesRouter.post(
         .type('application/pdf')
         .set('Content-Disposition', 'inline; filename="inscripcion-ejemplo.pdf"')
         .send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+inscripcionesRouter.get(
+  '/estado',
+  requirePermission('inscripciones', 'ver'),
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.estado(), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Interruptor general. Abiertas de verdad solo si además se cumplen las reglas (service.calcularEstado). */
+inscripcionesRouter.put(
+  '/estado',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { abiertas } = abrirSchema.parse(req.body);
+      res.json({ data: await service.abrirInscripciones(actor(req), abiertas), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Interruptor de un colegio. */
+inscripcionesRouter.put(
+  '/estado/colegios/:colId',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { colId } = colIdParamSchema.parse(req.params);
+      const { abiertas } = abrirSchema.parse(req.body);
+      res.json({ data: await service.abrirColegio(actor(req), colId, abiertas), error: null });
     } catch (err) {
       next(err);
     }

@@ -153,6 +153,8 @@ export interface PrecioListado {
   sede_corta: string | null;
   institucion: string | null;
   minimo_alumnos: number | null;
+  /** Interruptor del colegio (0018); null si todavía no tiene valores. */
+  abierta: boolean | null;
   fecha_modificacion: string | null;
 }
 
@@ -180,6 +182,7 @@ export async function listarPrecios(): Promise<PrecioListado[]> {
             p.colpre_sede_corta             AS sede_corta,
             p.colpre_institucion            AS institucion,
             p.colpre_minimo_alumnos         AS minimo_alumnos,
+            p.colpre_inscripciones_abiertas AS abierta,
             p.colpre_fecha_modificacion     AS fecha_modificacion
        FROM public.colegio c
        LEFT JOIN public.colegio_precio p ON p.col_id = c.col_id
@@ -274,6 +277,8 @@ export async function guardarPrecio(
 // Configuración: el membrete (0016, una sola fila). El IVA es fijo: IVA_PCT.
 
 export interface ConfigInscripcion {
+  /** Interruptor general de las inscripciones (0018). */
+  abiertas: boolean;
   /** Ruta en el bucket; null = el membrete de serie. */
   membrete: string | null;
   fecha_modificacion: string;
@@ -281,13 +286,37 @@ export interface ConfigInscripcion {
 
 export async function obtenerConfig(client?: PoolClient): Promise<ConfigInscripcion> {
   const { rows } = await (client ?? getPool()).query<ConfigInscripcion>(
-    `SELECT inscfg_membrete AS membrete,
+    `SELECT inscfg_abiertas AS abiertas, inscfg_membrete AS membrete,
             inscfg_fecha_modificacion AS fecha_modificacion
        FROM public.inscripcion_config WHERE inscfg_id = 1`,
   );
   const r = rows[0];
   if (!r) throw new Error('Falta la fila de inscripcion_config (migración 0016)');
   return r;
+}
+
+export async function guardarAbiertas(client: PoolClient, abiertas: boolean): Promise<void> {
+  await client.query(
+    `UPDATE public.inscripcion_config
+        SET inscfg_abiertas = $1, inscfg_fecha_modificacion = now()
+      WHERE inscfg_id = 1`,
+    [abiertas],
+  );
+}
+
+/** Interruptor de un colegio. false si el colegio todavía no tiene valores. */
+export async function guardarAbiertaColegio(
+  client: PoolClient,
+  colId: number,
+  abierta: boolean,
+): Promise<boolean> {
+  const { rowCount } = await client.query(
+    `UPDATE public.colegio_precio
+        SET colpre_inscripciones_abiertas = $2, colpre_fecha_modificacion = now()
+      WHERE col_id = $1`,
+    [colId, abierta],
+  );
+  return (rowCount ?? 0) > 0;
 }
 
 /** Cambia el membrete y devuelve la ruta anterior, para borrarla. */
@@ -368,6 +397,7 @@ export async function ofertaPublica(): Promise<ColegioOfertado[]> {
        JOIN public.dia       dia ON dia.dia_id = d.dia_id
        LEFT JOIN public.categoria cat ON cat.cat_id = act.cat_id
       WHERE d.est_id = $1
+        AND pre.colpre_inscripciones_abiertas
       GROUP BY col.col_id, col.col_nombre, pre.colpre_precio_disciplina,
                pre.colpre_descuento_hermano, pre.colpre_sede, pre.colpre_sede_corta,
                pre.colpre_institucion, pre.colpre_minimo_alumnos

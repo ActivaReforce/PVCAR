@@ -130,6 +130,25 @@ export function useBorrarPrecio() {
   );
 }
 
+export function useEstadoInscripciones() {
+  return useQuery({
+    queryKey: ['inscripciones', 'estado'],
+    queryFn: () => inscripcionesApi.estado(),
+  });
+}
+
+export function useAbrirInscripciones() {
+  return useMutacion((abiertas: boolean) => inscripcionesApi.abrir(abiertas), null);
+}
+
+export function useAbrirColegio() {
+  return useMutacion(
+    ({ colId, abiertas }: { colId: number; abiertas: boolean }) =>
+      inscripcionesApi.abrirColegio(colId, abiertas),
+    null,
+  );
+}
+
 export function useConfigInscripciones() {
   return useQuery({
     queryKey: ['inscripciones', 'config'],

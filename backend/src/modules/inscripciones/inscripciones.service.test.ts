@@ -3,8 +3,13 @@ import { describe, expect, it } from 'vitest';
 process.env.SUPABASE_URL ??= 'https://test.supabase.co';
 process.env.FRONTEND_ORIGIN ??= 'https://dev-pvcar.vercel.app';
 
-const { bloqueosDeAprobacion, correoDeAprobacion, firmaDeImagenValida, problemasDeDisciplinas } =
-  await import('./inscripciones.service.js');
+const {
+  bloqueosDeAprobacion,
+  calcularEstado,
+  correoDeAprobacion,
+  firmaDeImagenValida,
+  problemasDeDisciplinas,
+} = await import('./inscripciones.service.js');
 const { rellenar } = await import('./inscripciones.documentos.js');
 const { envioSchema } = await import('./inscripciones.schemas.js');
 const { calcularCobro } = await import('./inscripciones.precios.js');
@@ -308,5 +313,46 @@ describe('calcularCobro', () => {
     expect(c.subtotal).toBe(60);
     expect(c.iva).toBe(9);
     expect(c.total).toBe(69);
+  });
+});
+
+describe('calcularEstado', () => {
+  type Tipo = Parameters<typeof calcularEstado>[0] extends Set<infer T> ? T : never;
+  const todos = new Set<Tipo>([
+    'ficha_matricula',
+    'contrato',
+    'autorizacion_datos',
+    'datos_medicos',
+    'imagen',
+    'politica',
+  ]);
+  const listo = { col_id: 1, col_nombre: 'A', precio: 30, abierta: true, disciplinas_activas: 2 };
+
+  it('abiertas con todo publicado, interruptor encendido y un colegio listo', () => {
+    const e = calcularEstado(todos, true, [listo, { ...listo, col_id: 2, abierta: false }]);
+    expect(e.abiertas).toBe(true);
+    expect(e.colegios.map((c) => c.abierto)).toEqual([true, false]);
+  });
+
+  it('cerradas a mano aunque todo este listo', () => {
+    const e = calcularEstado(todos, false, [listo]);
+    expect(e.abiertas).toBe(false);
+    expect(e.motivos).toEqual(['Están cerradas a mano.']);
+  });
+
+  it('sin la politica publicada no se abren', () => {
+    const sinPolitica = new Set([...todos].filter((t) => t !== 'politica'));
+    const e = calcularEstado(sinPolitica, true, [listo]);
+    expect(e.abiertas).toBe(false);
+    expect(e.motivos[0]).toContain('Política');
+  });
+
+  it('un colegio sin contrato publicado, sin valores ni disciplinas dice por que', () => {
+    const sinContrato = new Set([...todos].filter((t) => t !== 'contrato'));
+    const e = calcularEstado(sinContrato, true, [
+      { col_id: 1, col_nombre: 'A', precio: null, abierta: null, disciplinas_activas: 0 },
+    ]);
+    expect(e.colegios[0]!.motivos).toHaveLength(4);
+    expect(e.motivos).toContain('Ningún colegio tiene las inscripciones abiertas.');
   });
 });
