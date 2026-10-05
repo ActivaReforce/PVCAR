@@ -10,7 +10,9 @@ import {
   cotizacionSchema,
   envioSchema,
   idParamSchema,
+  ivaSchema,
   listarSchema,
+  membreteSchema,
   precioSchema,
   rechazarSchema,
 } from './inscripciones.schemas.js';
@@ -178,19 +180,73 @@ inscripcionesRouter.delete(
   },
 );
 
-/** El contrato con datos ficticios, en PDF, para revisarlo antes de publicar. */
+/** Un paquete de ejemplo con lo guardado de los seis documentos, en PDF. */
 inscripcionesRouter.post(
-  '/documentos/:id/ejemplo',
+  '/documentos/ejemplo',
   requirePermission('inscripciones', 'ver'),
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id } = idParamSchema.parse(req.params);
-      const pdf = await service.ejemploContrato(id);
+      const pdf = await service.ejemploPaquete();
       res
         .status(200)
         .type('application/pdf')
-        .set('Content-Disposition', `inline; filename="contrato-ejemplo-${id}.pdf"`)
+        .set('Content-Disposition', 'inline; filename="inscripcion-ejemplo.pdf"')
         .send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+inscripcionesRouter.get(
+  '/config',
+  requirePermission('inscripciones', 'ver'),
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.config(), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+inscripcionesRouter.put(
+  '/config/iva',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { iva_pct } = ivaSchema.parse(req.body);
+      await service.guardarIva(actor(req), iva_pct);
+      res.json({ data: { iva_pct }, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Membrete propio: PNG o JPEG en base64, hasta 700 KB. */
+inscripcionesRouter.put(
+  '/config/membrete',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = membreteSchema.parse(req.body);
+      await service.subirMembrete(actor(req), input);
+      res.json({ data: { membrete_propio: true }, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Vuelve al membrete de serie. */
+inscripcionesRouter.delete(
+  '/config/membrete',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await service.restaurarMembrete(actor(req));
+      res.json({ data: { membrete_propio: false }, error: null });
     } catch (err) {
       next(err);
     }

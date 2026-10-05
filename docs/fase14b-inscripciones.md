@@ -1,5 +1,7 @@
 # Fase 14B — Inscripciones
 
+> **2026-10-05:** los documentos, la constancia, el IVA y el membrete se rehicieron con la `0016`. Lo de documentos de este archivo (contrato/términos/privacidad, casillas, PDF de solo texto) queda superado por `docs/fase14b-contratos.md`.
+
 Estado al **2026-10-02, noche**. **Construida y en `dev`**, sin probar en pantalla. `0014` aplicada y verificada en dev y prod; **`0015` escrita, sin correr**. **Abierto: contratos por colegio y firma (§7)** — puede cambiar cómo se genera el contrato. Falta del cliente: campos definitivos y los textos legales.
 
 ---
@@ -59,7 +61,7 @@ Los datos van en `jsonb` a propósito: los campos todavía no están cerrados y 
 
 **`0015` (escrita, sin correr):** `colegio_precio`, borradores de documentos (`doc_publicado`; una publicada no se edita ni se borra, trigger sobre UPDATE y DELETE), `ins_total` e `insnino_precio`.
 
-**Pendiente — `0016`, cuando el código esté desplegado:** borrar `entrenador.ent_cedula` y `nino.nino_edad`, que el código nuevo ya no usa. En dev después del deploy de `dev`; en prod **solo después del PR a `main`**, porque el código de `main` todavía las lee. No está escrita.
+**Pendiente — `0017`, cuando el código esté desplegado:** borrar `entrenador.ent_cedula` y `nino.nino_edad`, que el código nuevo ya no usa. En dev después del deploy de `dev`; en prod **solo después del PR a `main`**, porque el código de `main` todavía las lee. No está escrita.
 
 ## 4. ¿Cuándo nacen la cuenta y el niño? — B, decidido el 2026-10-02
 

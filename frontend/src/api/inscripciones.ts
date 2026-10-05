@@ -6,9 +6,21 @@ import { api } from '@/lib/api';
  * Dos lados: el formulario público, que no tiene sesión, y el módulo interno
  * del Propietario. Mientras una inscripción está pendiente no existe ni el
  * usuario ni el alumno: nacen al aprobar.
+ *
+ * Cada alumno acepta seis documentos (ficha, contrato y los cuatro "00" del
+ * cliente); de cada uno queda una constancia y todos van en un PDF.
  */
 
-export type TipoDocumento = 'contrato' | 'terminos' | 'privacidad';
+/** En el orden en que van en el paquete de cada alumno. */
+export const TIPOS_DOCUMENTO = [
+  'ficha_matricula',
+  'contrato',
+  'autorizacion_datos',
+  'datos_medicos',
+  'imagen',
+  'politica',
+] as const;
+export type TipoDocumento = (typeof TIPOS_DOCUMENTO)[number];
 
 export interface DocumentoLegal {
   doc_id: number;
@@ -37,6 +49,10 @@ export interface ColegioOfertado {
   col_nombre: string;
   precio: number;
   descuento_hermano: number;
+  sede: string;
+  sede_corta: string;
+  institucion: string;
+  minimo_alumnos: number;
   disciplinas: DisciplinaOfertada[];
 }
 
@@ -47,12 +63,20 @@ export interface CobroAlumno {
   descuento_pct: number;
   disciplinas_con_descuento: number;
   descuento: number;
+  /** Sin IVA. */
   total: number;
   paga_completo: boolean;
+  iva_pct: number;
+  iva: number;
+  total_con_iva: number;
 }
 
 export interface Cobro {
   alumnos: CobroAlumno[];
+  /** Sin IVA, con descuentos. */
+  subtotal: number;
+  iva: number;
+  /** Con IVA: lo que se paga al mes. */
   total: number;
 }
 
@@ -62,6 +86,14 @@ export interface Formulario {
   grados: Array<{ catninograd_id: number; catninograd_nombre: string }>;
   parentescos: string[];
   documentos: Partial<Record<TipoDocumento, DocumentoLegal>>;
+  iva_pct: number;
+}
+
+export interface Factura {
+  nombre: string;
+  identificacion: string;
+  correo: string;
+  direccion: string;
 }
 
 export interface RepresentanteEnvio {
@@ -69,20 +101,62 @@ export interface RepresentanteEnvio {
   cedula: string;
   correo: string;
   telefono: string;
-  sector_residencia?: string;
+  factura: Factura;
+}
+
+export interface Persona {
+  nombre: string;
+  relacion: string;
+  telefono: string;
+}
+
+export type ModalidadSalida = 'escolar' | 'privado';
+
+export interface Salud {
+  tiene: boolean;
+  detalle: string | null;
+  autoriza: boolean;
+}
+
+export interface PermisosImagen {
+  familias: boolean;
+  redes: boolean;
+  promocional: boolean;
 }
 
 export interface NinoEnvio {
   nombre: string;
   fecha_nacimiento: string;
-  cedula?: string;
   col_id: number;
-  catninograd_id: number | null;
+  /** "Curso" en la ficha. */
+  catninograd_id: number;
   parentesco: string;
-  toma_transporte: boolean;
-  info_salud?: string;
-  otra_info?: string;
   disciplinas: number[];
+  emergencia: Persona;
+  retiro: Persona & { cedula: string };
+  modalidad_salida: ModalidadSalida;
+  detalle_retiro: string | null;
+  salud: Salud;
+  imagen: PermisosImagen;
+}
+
+export interface ColegioDocumento {
+  sede: string;
+  sede_corta: string;
+  institucion: string;
+  minimo_alumnos: number;
+  tarifa: number;
+  descuento_hermano: number;
+}
+
+/** Lo que se guarda de cada alumno: lo enviado y lo que el sistema puso en sus documentos. */
+export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas'> {
+  documento: {
+    colegio: ColegioDocumento;
+    curso: string | null;
+    actividades: string[];
+    horarios: string[];
+  };
 }
 
 export interface Envio {
@@ -96,7 +170,7 @@ export interface Envio {
 export interface EnvioRecibido {
   ins_id: number;
   total: number;
-  contratos: Array<{ alumno: string; url: string | null }>;
+  paquetes: Array<{ alumno: string; url: string | null }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,14 +211,24 @@ export interface UsuarioCoincidente {
   por_cedula: boolean;
 }
 
+export interface ConstanciaDetalle {
+  tipo: TipoDocumento;
+  nombre: string;
+  version: number;
+  sha256: string;
+  opciones: Record<string, unknown>;
+}
+
 export interface NinoDetalle {
   insnino_id: number;
-  datos: Omit<NinoEnvio, 'disciplinas'>;
+  datos: NinoGuardado;
   colegio: string | null;
   grado: string | null;
   disciplinas: Array<{ colacthor_id: number; descripcion: string; disponible: boolean }>;
-  contrato_url: string | null;
-  contrato_sha256: string;
+  /** El aprobado si existe; si no, el que se descargó al enviar. */
+  paquete_url: string | null;
+  paquete_sha256: string;
+  constancias: ConstanciaDetalle[];
   cobro: CobroAlumno | null;
   nino_id: number | null;
 }
@@ -160,7 +244,6 @@ export interface InscripcionDetalle {
   aprobada_por_nombre: string | null;
   ins_fecha_aprobacion: string | null;
   ins_total: number | null;
-  versiones: Record<TipoDocumento, number>;
   comprobante_url: string | null;
   ninos: NinoDetalle[];
   coincidencias: UsuarioCoincidente[];
@@ -189,6 +272,8 @@ export interface Documentos {
   borradores: DocumentoLegal[];
   historial: VersionDocumento[];
   marcadores: Record<string, string>;
+  /** Los textos de los Word del cliente, para un tipo que todavía no tiene texto. */
+  iniciales: Record<TipoDocumento, { titulo: string; contenido: string }>;
 }
 
 export interface PrecioColegio {
@@ -197,12 +282,27 @@ export interface PrecioColegio {
   disciplinas_activas: number;
   precio: number | null;
   descuento_hermano: number | null;
+  sede: string | null;
+  sede_corta: string | null;
+  institucion: string | null;
+  minimo_alumnos: number | null;
   fecha_modificacion: string | null;
 }
 
 export interface DatosPrecio {
   precio: number;
   descuento_hermano: number;
+  sede: string;
+  sede_corta: string;
+  institucion: string;
+  minimo_alumnos: number;
+}
+
+export interface ConfigInscripciones {
+  iva_pct: number;
+  /** false = el membrete de serie (el de los Word del cliente). */
+  membrete_propio: boolean;
+  membrete_data_url: string | null;
 }
 
 export const inscripcionesApi = {
@@ -232,21 +332,32 @@ export const inscripcionesApi = {
     api.post<DocumentoLegal>(`/inscripciones/documentos/${id}/publicar`),
   borrarBorrador: (id: number) => api.delete<{ doc_id: number }>(`/inscripciones/documentos/${id}`),
   /** El PDF de ejemplo se baja como archivo: no es { data, error }. */
-  ejemploContrato: (id: number) =>
-    api.descargar(`/inscripciones/documentos/${id}/ejemplo`, {}, `contrato-ejemplo-${id}.pdf`),
+  ejemploPaquete: () =>
+    api.descargar('/inscripciones/documentos/ejemplo', {}, 'inscripcion-ejemplo.pdf'),
 
   precios: () => api.get<PrecioColegio[]>('/inscripciones/precios'),
   guardarPrecio: (colId: number, datos: DatosPrecio) =>
     api.put<{ col_id: number }>(`/inscripciones/precios/${colId}`, datos),
   borrarPrecio: (colId: number) =>
     api.delete<{ col_id: number }>(`/inscripciones/precios/${colId}`),
+
+  config: () => api.get<ConfigInscripciones>('/inscripciones/config'),
+  guardarIva: (iva_pct: number) =>
+    api.put<{ iva_pct: number }>('/inscripciones/config/iva', { iva_pct }),
+  subirMembrete: (datos: { mime: string; base64: string }) =>
+    api.put<{ membrete_propio: boolean }>('/inscripciones/config/membrete', datos),
+  restaurarMembrete: () =>
+    api.delete<{ membrete_propio: boolean }>('/inscripciones/config/membrete'),
 };
 
 const MONEDA = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
 export const dinero = (dolares: number) => MONEDA.format(dolares);
 
 export const NOMBRE_DOCUMENTO: Record<TipoDocumento, string> = {
+  ficha_matricula: 'Ficha de matrícula',
   contrato: 'Contrato',
-  terminos: 'Términos y condiciones',
-  privacidad: 'Política de privacidad',
+  autorizacion_datos: 'Autorización de datos personales',
+  datos_medicos: 'Información de salud',
+  imagen: 'Uso de imagen',
+  politica: 'Política de datos personales',
 };

@@ -32,7 +32,12 @@ import {
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useAprobarInscripcion, useFichaInscripcion } from '@/hooks/useInscripciones';
-import { dinero, type InscripcionDetalle } from '@/api/inscripciones';
+import {
+  dinero,
+  type ConstanciaDetalle,
+  type InscripcionDetalle,
+  type NinoDetalle,
+} from '@/api/inscripciones';
 import RechazarInscripcionDialog from './RechazarInscripcionDialog';
 import { fechaCorta, fechaHora, fechaNacimiento, enlaceWhatsApp } from './formato';
 
@@ -241,7 +246,12 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
           <Fila etiqueta="Cédula o pasaporte">{rep.cedula}</Fila>
           <Fila etiqueta="Correo">{rep.correo}</Fila>
           <Fila etiqueta="Teléfono">{rep.telefono}</Fila>
-          {rep.sector_residencia && <Fila etiqueta="Sector">{rep.sector_residencia}</Fila>}
+        </dl>
+        <dl className="grid grid-cols-1 gap-3 rounded-md bg-muted/40 p-3 sm:grid-cols-2">
+          <Fila etiqueta="Factura a nombre de">{rep.factura.nombre}</Fila>
+          <Fila etiqueta="Cédula o RUC">{rep.factura.identificacion}</Fila>
+          <Fila etiqueta="Correo para factura">{rep.factura.correo}</Fila>
+          <Fila etiqueta="Dirección para factura">{rep.factura.direccion}</Fila>
         </dl>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild className="h-10 sm:h-9">
@@ -269,7 +279,7 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
           Comprobante de pago
           {datos.ins_total !== null && (
             <span className="ml-2 font-normal text-muted-foreground">
-              · debe cubrir {dinero(datos.ins_total)} al mes
+              · debe cubrir {dinero(datos.ins_total)} al mes con IVA
             </span>
           )}
         </h3>
@@ -297,63 +307,16 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
           {datos.ninos.length === 1 ? 'Alumno' : `Alumnos (${datos.ninos.length})`}
         </h3>
         {datos.ninos.map((n) => (
-          <div key={n.insnino_id} className="space-y-3 rounded-md border p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium">{n.datos.nombre}</p>
-              {n.contrato_url && (
-                <Button variant="outline" size="sm" asChild className="h-10 sm:h-9">
-                  <a href={n.contrato_url} target="_blank" rel="noreferrer">
-                    <FileText className="mr-2 h-4 w-4" /> Contrato
-                    <ExternalLink className="ml-1 h-3 w-3" />
-                  </a>
-                </Button>
-              )}
-            </div>
-            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Fila etiqueta="Nacimiento">{fechaNacimiento(n.datos.fecha_nacimiento)}</Fila>
-              <Fila etiqueta="Cédula">{n.datos.cedula || '—'}</Fila>
-              <Fila etiqueta="Parentesco">{n.datos.parentesco}</Fila>
-              <Fila etiqueta="Colegio">{n.colegio ?? '—'}</Fila>
-              <Fila etiqueta="Grado">{n.grado ?? '—'}</Fila>
-              <Fila etiqueta="Transporte">{n.datos.toma_transporte ? 'Sí' : 'No'}</Fila>
-            </dl>
-            {n.datos.info_salud && (
-              <Fila etiqueta="Información de salud">{n.datos.info_salud}</Fila>
-            )}
-            {n.datos.otra_info && <Fila etiqueta="Otra información">{n.datos.otra_info}</Fila>}
-            {n.cobro && (
-              <p className="text-sm">
-                {n.cobro.disciplinas} × {dinero(n.cobro.precio_disciplina)} ={' '}
-                {dinero(n.cobro.subtotal)}
-                {n.cobro.descuento > 0 &&
-                  ` − ${n.cobro.descuento_pct} % hermano en ${n.cobro.disciplinas_con_descuento} (${dinero(n.cobro.descuento)})`}{' '}
-                → <strong>{dinero(n.cobro.total)}</strong>
-              </p>
-            )}
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Disciplinas
-              </p>
-              <ul className="mt-1 space-y-1 text-sm">
-                {n.disciplinas.map((d) => (
-                  <li key={d.colacthor_id} className={d.disponible ? '' : 'text-destructive'}>
-                    {d.descripcion}
-                    {!d.disponible && datos.ins_estado === 'pendiente' && ' — ya no disponible'}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          <FichaNino key={n.insnino_id} n={n} pendiente={datos.ins_estado === 'pendiente'} />
         ))}
       </section>
 
       <section className="space-y-1 text-xs text-muted-foreground">
         <h3 className="text-sm font-semibold text-foreground">Aceptación</h3>
         <p>
-          Aceptó el contrato (v{datos.versiones.contrato}), los términos (v
-          {datos.versiones.terminos}) y la privacidad (v{datos.versiones.privacidad}) el{' '}
-          {fechaHora(datos.ins_fecha)}
-          {datos.ins_ip && ` desde ${datos.ins_ip}`}.
+          Aceptó los seis documentos de cada alumno el {fechaHora(datos.ins_fecha)}
+          {datos.ins_ip && ` desde ${datos.ins_ip}`}. El detalle está en cada alumno y en la última hoja
+          de su PDF.
         </p>
         {datos.ins_estado === 'aprobada' && datos.ins_fecha_aprobacion && (
           <p>
@@ -362,6 +325,99 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
           </p>
         )}
       </section>
+    </div>
+  );
+};
+
+const siNo = (v: unknown) => (v ? 'Sí' : 'No');
+
+/** Lo que marcó en cada documento, en corto. */
+function resumenConstancia(c: ConstanciaDetalle): string {
+  const o = c.opciones;
+  if (c.tipo === 'datos_medicos') return `Condición: ${siNo(o.tiene)} · Autoriza: ${siNo(o.autoriza)}`;
+  if (c.tipo === 'imagen') {
+    return `Familias: ${siNo(o.familias)} · Redes: ${siNo(o.redes)} · Promocional: ${siNo(o.promocional)}`;
+  }
+  return 'Aceptado';
+}
+
+const FichaNino = ({ n, pendiente }: { n: NinoDetalle; pendiente: boolean }) => {
+  const d = n.datos;
+  return (
+    <div className="space-y-3 rounded-md border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium">{d.nombre}</p>
+        {n.paquete_url && (
+          <Button variant="outline" size="sm" asChild className="h-10 sm:h-9">
+            <a href={n.paquete_url} target="_blank" rel="noreferrer">
+              <FileText className="mr-2 h-4 w-4" /> Documentos (PDF)
+              <ExternalLink className="ml-1 h-3 w-3" />
+            </a>
+          </Button>
+        )}
+      </div>
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Fila etiqueta="Nacimiento">{fechaNacimiento(d.fecha_nacimiento)}</Fila>
+        <Fila etiqueta="Parentesco">{d.parentesco}</Fila>
+        <Fila etiqueta="Curso">{n.grado ?? d.documento.curso ?? '—'}</Fila>
+        <Fila etiqueta="Colegio">{n.colegio ?? d.documento.colegio.sede}</Fila>
+        <Fila etiqueta="Salida">
+          {d.modalidad_salida === 'escolar' ? 'Transporte escolar' : 'Transporte privado'}
+        </Fila>
+        {d.detalle_retiro && <Fila etiqueta="Detalle del retiro">{d.detalle_retiro}</Fila>}
+      </dl>
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Fila etiqueta="Contacto de emergencia">
+          {d.emergencia.nombre} ({d.emergencia.relacion}) · {d.emergencia.telefono}
+        </Fila>
+        <Fila etiqueta="Autorizado para retirarlo">
+          {d.retiro.nombre} ({d.retiro.relacion}) · C.C. {d.retiro.cedula} · {d.retiro.telefono}
+        </Fila>
+        <Fila etiqueta="Salud">
+          {d.salud.tiene
+            ? d.salud.autoriza
+              ? d.salud.detalle
+              : 'Indicó que sí, pero no autorizó guardarla'
+            : 'Sin condiciones'}
+        </Fila>
+        <Fila etiqueta="Uso de imagen">
+          Familias {siNo(d.imagen.familias)} · Redes {siNo(d.imagen.redes)} · Promocional{' '}
+          {siNo(d.imagen.promocional)}
+        </Fila>
+      </dl>
+      {n.cobro && (
+        <p className="text-sm">
+          {n.cobro.disciplinas} × {dinero(n.cobro.precio_disciplina)} = {dinero(n.cobro.subtotal)}
+          {n.cobro.descuento > 0 &&
+            ` − ${n.cobro.descuento_pct} % hermano en ${n.cobro.disciplinas_con_descuento} (${dinero(n.cobro.descuento)})`}{' '}
+          + IVA {n.cobro.iva_pct} % ({dinero(n.cobro.iva)}) → <strong>{dinero(n.cobro.total_con_iva)}</strong>
+        </p>
+      )}
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Disciplinas</p>
+        <ul className="mt-1 space-y-1 text-sm">
+          {n.disciplinas.map((x) => (
+            <li key={x.colacthor_id} className={x.disponible ? '' : 'text-destructive'}>
+              {x.descripcion}
+              {!x.disponible && pendiente && ' — ya no disponible'}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <details className="rounded-md bg-muted/40 p-2 text-xs">
+        <summary className="cursor-pointer font-medium">Constancia de los seis documentos</summary>
+        <ul className="mt-2 space-y-1.5">
+          {n.constancias.map((c) => (
+            <li key={c.tipo} className="min-w-0">
+              <span className="font-medium">
+                {c.nombre} v{c.version}
+              </span>{' '}
+              · {resumenConstancia(c)}
+              <span className="block break-all font-mono text-[11px] text-muted-foreground">{c.sha256}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 };

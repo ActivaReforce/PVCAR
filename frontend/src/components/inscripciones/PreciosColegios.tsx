@@ -8,7 +8,10 @@ import { useBorrarPrecio, useGuardarPrecio, usePrecios } from '@/hooks/useInscri
 import { dinero, type PrecioColegio } from '@/api/inscripciones';
 
 /**
- * Precio mensual de inscripción por colegio.
+ * Lo de cada colegio que usan la inscripción y sus documentos: la tarifa
+ * mensual, el descuento por hermano, el mínimo de alumnos y cómo se nombra
+ * la sede. La ficha y el contrato son una plantilla para todos; estos datos
+ * entran en ella con marcadores ({{sede}}, {{tarifa}}…).
  *
  * Dentro de un colegio todas las disciplinas cuestan lo mismo. Si en una
  * misma inscripción van hermanos, lidera el que más disciplinas tiene (paga
@@ -34,7 +37,7 @@ const PreciosColegios = () => {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Precio mensual por disciplina. Si se inscriben hermanos juntos, el que más disciplinas tiene
+        Tarifa mensual por disciplina, sin IVA (el IVA se configura en Membrete e IVA). Si se inscriben hermanos juntos, el que más disciplinas tiene
         paga completo, y cada hermano lleva el descuento en tantas disciplinas como él: si el
         primero va a 1, el hermano tiene descuento en 1; si va a 5, en hasta 5.
       </p>
@@ -55,34 +58,67 @@ const PreciosColegios = () => {
   );
 };
 
+interface Campos {
+  precio: string;
+  descuento: string;
+  sede: string;
+  sede_corta: string;
+  institucion: string;
+  minimo: string;
+}
+
+const camposDe = (f: PrecioColegio): Campos => ({
+  precio: f.precio !== null ? String(f.precio) : '',
+  descuento: f.descuento_hermano !== null ? String(f.descuento_hermano) : '0',
+  sede: f.sede ?? f.col_nombre,
+  sede_corta: f.sede_corta ?? '',
+  institucion: f.institucion ?? '',
+  minimo: f.minimo_alumnos !== null ? String(f.minimo_alumnos) : '',
+});
+
 const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
   const { hasPermission } = usePermissions();
   const puedeEditar = hasPermission('inscripciones', 'editar');
   const guardar = useGuardarPrecio();
   const quitar = useBorrarPrecio();
 
-  const [precio, setPrecio] = useState('');
-  const [descuento, setDescuento] = useState('');
-
+  const [c, setC] = useState<Campos>(() => camposDe(fila));
   useEffect(() => {
-    setPrecio(fila.precio !== null ? String(fila.precio) : '');
-    setDescuento(fila.descuento_hermano !== null ? String(fila.descuento_hermano) : '0');
-  }, [fila.precio, fila.descuento_hermano]);
+    setC(camposDe(fila));
+  }, [fila]);
+  const poner = (campo: keyof Campos) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setC((x) => ({ ...x, [campo]: e.target.value }));
 
-  const nPrecio = Number(precio.replace(',', '.'));
-  const nDescuento = Number(descuento.replace(',', '.') || '0');
+  const nPrecio = Number(c.precio.replace(',', '.'));
+  const nDescuento = Number(c.descuento.replace(',', '.') || '0');
+  const nMinimo = Number(c.minimo);
   const valido =
-    precio.trim() !== '' &&
+    c.precio.trim() !== '' &&
     Number.isFinite(nPrecio) &&
     nPrecio > 0 &&
     Number.isFinite(nDescuento) &&
     nDescuento >= 0 &&
-    nDescuento <= 100;
-  const cambiado =
-    nPrecio !== fila.precio ||
-    nDescuento !== (fila.descuento_hermano ?? 0);
+    nDescuento <= 100 &&
+    c.sede.trim().length >= 3 &&
+    c.sede_corta.trim().length >= 2 &&
+    c.institucion.trim().length >= 2 &&
+    Number.isInteger(nMinimo) &&
+    nMinimo >= 1;
+  const original = camposDe(fila);
+  const cambiado = (Object.keys(c) as Array<keyof Campos>).some((k) => c[k] !== original[k]);
 
-  const id = (c: string) => `precio-${fila.col_id}-${c}`;
+  const id = (x: string) => `precio-${fila.col_id}-${x}`;
+  const campoDe = ({ campo, etiqueta, ayuda, ...resto }: {
+    campo: keyof Campos;
+    etiqueta: string;
+    ayuda?: string;
+  } & React.InputHTMLAttributes<HTMLInputElement>) => (
+    <div className="space-y-1.5">
+      <Label htmlFor={id(campo)}>{etiqueta}</Label>
+      <Input id={id(campo)} value={c[campo]} onChange={poner(campo)} className="h-11 sm:h-10" {...resto} />
+      {ayuda && <p className="text-xs text-muted-foreground">{ayuda}</p>}
+    </div>
+  );
 
   return (
     <li className="space-y-3 rounded-lg border p-4">
@@ -107,31 +143,20 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
       </div>
 
       {puedeEditar && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-          <div className="space-y-1.5">
-            <Label htmlFor={id('precio')}>Precio mensual por disciplina (USD)</Label>
-            <Input
-              id={id('precio')}
-              inputMode="decimal"
-              value={precio}
-              onChange={(e) => setPrecio(e.target.value)}
-              placeholder="45,00"
-              className="h-11 sm:h-10"
-            />
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {campoDe({ campo: 'precio', etiqueta: 'Tarifa mensual por disciplina (USD, sin IVA)', inputMode: 'decimal', placeholder: '32,10' })}
+            {campoDe({ campo: 'descuento', etiqueta: 'Descuento por hermano (%)', inputMode: 'decimal' })}
+            {campoDe({ campo: 'minimo', etiqueta: 'Mínimo de alumnos por grupo', inputMode: 'numeric', placeholder: '14' })}
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor={id('descuento')}>Descuento por hermano (%)</Label>
-            <Input
-              id={id('descuento')}
-              inputMode="decimal"
-              value={descuento}
-              onChange={(e) => setDescuento(e.target.value)}
-              className="h-11 sm:h-10"
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {campoDe({ campo: 'sede', etiqueta: 'Sede, nombre completo', ayuda: 'Colegio CRISFE Carcelén' })}
+            {campoDe({ campo: 'sede_corta', etiqueta: 'Sede, nombre corto', ayuda: 'Carcelén (tarifa y mínimo)' })}
+            {campoDe({ campo: 'institucion', etiqueta: 'Institución en las cláusulas', ayuda: 'CRISFE (enfermería, mora, salidas)' })}
           </div>
           <div className="flex gap-2">
             <Button
-              className="h-11 flex-1 sm:h-10"
+              className="h-11 sm:h-10"
               disabled={!valido || !cambiado || guardar.isPending}
               onClick={() =>
                 guardar.mutate({
@@ -139,6 +164,10 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
                   datos: {
                     precio: Math.round(nPrecio * 100) / 100,
                     descuento_hermano: nDescuento,
+                    sede: c.sede.trim(),
+                    sede_corta: c.sede_corta.trim(),
+                    institucion: c.institucion.trim(),
+                    minimo_alumnos: nMinimo,
                   },
                 })
               }
@@ -157,7 +186,7 @@ const FilaPrecio = ({ fila }: { fila: PrecioColegio }) => {
               </Button>
             )}
           </div>
-        </div>
+        </>
       )}
     </li>
   );

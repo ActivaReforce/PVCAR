@@ -24,7 +24,7 @@ export const MIME_COMPROBANTE: Record<string, string> = {
 };
 
 export async function subirArchivo(
-  carpeta: 'comprobantes' | 'contratos',
+  carpeta: 'comprobantes' | 'contratos' | 'membretes',
   contenido: Buffer,
   mimeType: string,
   extension: string,
@@ -67,4 +67,14 @@ export async function borrarArchivos(rutas: string[]): Promise<void> {
   if (error) {
     console.error(`No se pudieron borrar ${rutas.length} archivo(s) de inscripcion:`, error.message);
   }
+}
+
+/** Descarga un archivo del bucket. null si no se pudo. */
+export async function descargarArchivo(ruta: string): Promise<Buffer | null> {
+  const { data, error } = await getSupabaseAdmin().storage.from(BUCKET).download(ruta);
+  if (error || !data) {
+    console.error(`No se pudo descargar ${ruta}:`, error?.message);
+    return null;
+  }
+  return Buffer.from(await data.arrayBuffer());
 }

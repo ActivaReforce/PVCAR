@@ -129,3 +129,25 @@ export function useBorrarPrecio() {
     'Precio quitado: el colegio ya no aparece en el formulario',
   );
 }
+
+export function useConfigInscripciones() {
+  return useQuery({
+    queryKey: ['inscripciones', 'config'],
+    queryFn: () => inscripcionesApi.config(),
+  });
+}
+
+export function useGuardarIva() {
+  return useMutacion((iva: number) => inscripcionesApi.guardarIva(iva), 'IVA guardado');
+}
+
+export function useSubirMembrete() {
+  return useMutacion(
+    (datos: { mime: string; base64: string }) => inscripcionesApi.subirMembrete(datos),
+    'Membrete cambiado: sale en los PDF que se generen desde ahora',
+  );
+}
+
+export function useRestaurarMembrete() {
+  return useMutacion((_: void) => inscripcionesApi.restaurarMembrete(), 'Se volvió al membrete de serie');
+}

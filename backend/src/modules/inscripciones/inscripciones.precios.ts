@@ -14,6 +14,9 @@
  * empate, el primero. Así el orden en que se escriben los hijos no cambia
  * el total salvo cuando de verdad da igual.
  *
+ * IVA (decisión del 2026-10-05): se suma y se muestra. Se calcula sobre lo
+ * que paga cada alumno, ya con su descuento, y el total es la suma.
+ *
  * Todo en centavos enteros: con decimales de coma flotante, 3 × 28,30 da
  * 84,89999… y el contrato diría una cifra que no es.
  */
@@ -35,10 +38,18 @@ export interface CobroAlumno {
   total: number;
   /** Es el que lidera (paga completo) cuando hay hermanos. */
   paga_completo: boolean;
+  iva_pct: number;
+  iva: number;
+  /** Lo que paga al mes con IVA. `total` es sin IVA. */
+  total_con_iva: number;
 }
 
 export interface Cobro {
   alumnos: CobroAlumno[];
+  /** Sin IVA, con los descuentos. */
+  subtotal: number;
+  iva: number;
+  /** Lo que se paga al mes, con IVA. */
   total: number;
 }
 
@@ -48,6 +59,7 @@ const aDolares = (centavos: number) => centavos / 100;
 export function calcularCobro(
   alumnos: Array<{ colId: number; disciplinas: number }>,
   precios: Map<number, PrecioColegio>,
+  ivaPct: number,
 ): Cobro {
   const base = alumnos.map((a) => {
     const p = precios.get(a.colId);
@@ -68,6 +80,8 @@ export function calcularCobro(
     const conDescuento = hayHermanos && i !== lider && b.p.descuentoHermano > 0;
     const cubiertas = conDescuento ? Math.min(b.n, cupo) : 0;
     const descuento = Math.round((b.precio * cubiertas * b.p.descuentoHermano) / 100);
+    const neto = b.subtotal - descuento;
+    const iva = Math.round((neto * ivaPct) / 100);
     return {
       precio_disciplina: aDolares(b.precio),
       disciplinas: b.n,
@@ -75,15 +89,23 @@ export function calcularCobro(
       descuento_pct: conDescuento ? b.p.descuentoHermano : 0,
       disciplinas_con_descuento: cubiertas,
       descuento: aDolares(descuento),
-      total: aDolares(b.subtotal - descuento),
+      total: aDolares(neto),
       paga_completo: !hayHermanos || i === lider,
-      _centavos: b.subtotal - descuento,
+      iva_pct: ivaPct,
+      iva: aDolares(iva),
+      total_con_iva: aDolares(neto + iva),
+      _neto: neto,
+      _iva: iva,
     };
   });
 
+  const neto = resultado.reduce((s, r) => s + r._neto, 0);
+  const iva = resultado.reduce((s, r) => s + r._iva, 0);
   return {
-    alumnos: resultado.map(({ _centavos, ...resto }) => resto),
-    total: aDolares(resultado.reduce((s, r) => s + r._centavos, 0)),
+    alumnos: resultado.map(({ _neto, _iva, ...resto }) => resto),
+    subtotal: aDolares(neto),
+    iva: aDolares(iva),
+    total: aDolares(neto + iva),
   };
 }
 

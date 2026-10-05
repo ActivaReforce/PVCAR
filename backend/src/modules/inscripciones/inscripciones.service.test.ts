@@ -5,7 +5,7 @@ process.env.FRONTEND_ORIGIN ??= 'https://dev-pvcar.vercel.app';
 
 const { bloqueosDeAprobacion, correoDeAprobacion, firmaDeImagenValida, problemasDeDisciplinas } =
   await import('./inscripciones.service.js');
-const { rellenar } = await import('./inscripciones.contrato.js');
+const { rellenar } = await import('./inscripciones.documentos.js');
 const { envioSchema } = await import('./inscripciones.schemas.js');
 const { calcularCobro } = await import('./inscripciones.precios.js');
 
@@ -117,15 +117,7 @@ describe('correoDeAprobacion', () => {
 
 describe('rellenar', () => {
   it('sustituye los marcadores y deja a la vista uno desconocido', () => {
-    const valores = {
-      representante_nombre: 'Ana',
-      representante_cedula: '1',
-      alumno_nombre: 'Leo',
-      alumno_fecha_nacimiento: '1 de enero de 2016',
-      colegio: 'C',
-      disciplinas: 'D',
-      fecha: 'hoy',
-    };
+    const valores = { representante_nombre: 'Ana', alumno_nombre: 'Leo', fecha: 'hoy' };
     expect(
       rellenar(
         '{{ representante_nombre }} y {{alumno_nombre}} {{otro}}',
@@ -138,26 +130,51 @@ describe('rellenar', () => {
 });
 
 describe('envioSchema', () => {
+  const persona = { nombre: 'Jorge Andrade', relacion: 'Abuelo', telefono: '0987654321' };
   const valido = {
     representante: {
       nombre: 'Ana Pérez',
       cedula: '1712345678',
       correo: ' Ana@X.co ',
       telefono: '0991234567',
+      factura: {
+        nombre: 'Ana Pérez',
+        identificacion: '1712345678001',
+        correo: 'f@x.co',
+        direccion: 'Av. Siempre Viva 123',
+      },
     },
     ninos: [
       {
         nombre: 'Leo Pérez',
         fecha_nacimiento: '2016-05-01',
         col_id: 1,
-        catninograd_id: null,
+        catninograd_id: 3,
         parentesco: 'Madre',
-        toma_transporte: false,
         disciplinas: [1],
+        emergencia: persona,
+        retiro: { ...persona, cedula: '1700000000' },
+        modalidad_salida: 'escolar',
+        salud: { tiene: false, autoriza: false },
+        imagen: { familias: true, redes: false, promocional: false },
       },
     ],
-    documentos: { contrato: 1, terminos: 2, privacidad: 3 },
-    acepta: { contrato: true, terminos: true, privacidad: true },
+    documentos: {
+      ficha_matricula: 1,
+      contrato: 2,
+      autorizacion_datos: 3,
+      datos_medicos: 4,
+      imagen: 5,
+      politica: 6,
+    },
+    acepta: {
+      ficha_matricula: true,
+      contrato: true,
+      autorizacion_datos: true,
+      datos_medicos: true,
+      imagen: true,
+      politica: true,
+    },
     comprobante: { mime: 'image/jpeg', base64: 'A'.repeat(200) },
   };
 
@@ -166,9 +183,9 @@ describe('envioSchema', () => {
     expect(r.representante.correo).toBe('ana@x.co');
   });
 
-  it('exige las tres casillas', () => {
+  it('exige aceptar los seis documentos', () => {
     expect(() =>
-      envioSchema.parse({ ...valido, acepta: { ...valido.acepta, privacidad: false } }),
+      envioSchema.parse({ ...valido, acepta: { ...valido.acepta, politica: false } }),
     ).toThrow();
   });
 
@@ -182,6 +199,22 @@ describe('envioSchema', () => {
     const nino = { ...valido.ninos[0]!, fecha_nacimiento: '1990-01-01' };
     expect(() => envioSchema.parse({ ...valido, ninos: [nino] })).toThrow();
   });
+
+  it('si hay condicion de salud, exige especificarla', () => {
+    const nino = { ...valido.ninos[0]!, salud: { tiene: true, autoriza: true } };
+    expect(() => envioSchema.parse({ ...valido, ninos: [nino] })).toThrow();
+  });
+
+  it('sin autorizacion no guarda el detalle de salud', () => {
+    const nino = { ...valido.ninos[0]!, salud: { tiene: true, detalle: 'Asma', autoriza: false } };
+    const r = envioSchema.parse({ ...valido, ninos: [nino] });
+    expect(r.ninos[0]!.salud).toEqual({ tiene: true, detalle: null, autoriza: false });
+  });
+
+  it('con autorizacion guarda el detalle', () => {
+    const nino = { ...valido.ninos[0]!, salud: { tiene: true, detalle: 'Asma', autoriza: true } };
+    expect(envioSchema.parse({ ...valido, ninos: [nino] }).ninos[0]!.salud.detalle).toBe('Asma');
+  });
 });
 
 describe('calcularCobro', () => {
@@ -191,7 +224,7 @@ describe('calcularCobro', () => {
   ]);
 
   it('un alumno solo paga completo, sin coma flotante', () => {
-    const c = calcularCobro([{ colId: 1, disciplinas: 3 }], precios);
+    const c = calcularCobro([{ colId: 1, disciplinas: 3 }], precios, 0);
     expect(c.total).toBe(84.9);
     expect(c.alumnos[0]!.paga_completo).toBe(true);
     expect(c.alumnos[0]!.descuento).toBe(0);
@@ -204,6 +237,7 @@ describe('calcularCobro', () => {
         { colId: 1, disciplinas: 2 },
       ],
       precios,
+      0,
     );
     expect(c.alumnos[1]!.paga_completo).toBe(true);
     // El hermano: 1 disciplina, 1 con descuento. 28,30 - 10 % = 25,47.
@@ -219,6 +253,7 @@ describe('calcularCobro', () => {
         { colId: 1, disciplinas: 3 }, // 84,90
       ],
       precios,
+      0,
     );
     expect(c.alumnos[1]!.paga_completo).toBe(true);
     // El hermano: sus 2 disciplinas con 50 %.
@@ -233,6 +268,7 @@ describe('calcularCobro', () => {
         { colId: 2, disciplinas: 2 }, // 80,00
       ],
       precios,
+      0,
     );
     expect(c.alumnos[1]!.paga_completo).toBe(true);
     expect(c.alumnos[0]!.descuento).toBe(5.66);
@@ -246,6 +282,7 @@ describe('calcularCobro', () => {
         { colId: 2, disciplinas: 3 },
       ],
       precios,
+      0,
     );
     expect(c.alumnos[0]!.paga_completo).toBe(true);
     expect(c.alumnos[1]!.disciplinas_con_descuento).toBe(1);
@@ -254,6 +291,22 @@ describe('calcularCobro', () => {
   });
 
   it('sin precio configurado no calcula', () => {
-    expect(() => calcularCobro([{ colId: 9, disciplinas: 1 }], precios)).toThrow();
+    expect(() => calcularCobro([{ colId: 9, disciplinas: 1 }], precios, 0)).toThrow();
+  });
+
+  it('suma el IVA sobre lo que paga cada alumno, ya con descuento', () => {
+    const c = calcularCobro(
+      [
+        { colId: 2, disciplinas: 1 }, // 40,00 lidera
+        { colId: 2, disciplinas: 1 }, // 40,00 - 50 % = 20,00
+      ],
+      precios,
+      15,
+    );
+    expect(c.alumnos[0]!.iva).toBe(6);
+    expect(c.alumnos[1]!.total_con_iva).toBe(23);
+    expect(c.subtotal).toBe(60);
+    expect(c.iva).toBe(9);
+    expect(c.total).toBe(69);
   });
 });

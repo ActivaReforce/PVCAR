@@ -16,6 +16,8 @@ export interface Correo {
   asunto: string;
   html: string;
   texto: string;
+  /** Resend acepta adjuntos en base64; el total no debe pasar de 40 MB. */
+  adjuntos?: Array<{ nombre: string; contenido: Buffer }>;
 }
 
 export async function enviarCorreo(correo: Correo): Promise<boolean> {
@@ -37,6 +39,14 @@ export async function enviarCorreo(correo: Correo): Promise<boolean> {
         subject: correo.asunto,
         html: correo.html,
         text: correo.texto,
+        ...(correo.adjuntos?.length
+          ? {
+              attachments: correo.adjuntos.map((a) => ({
+                filename: a.nombre,
+                content: a.contenido.toString('base64'),
+              })),
+            }
+          : {}),
       }),
       signal: AbortSignal.timeout(10_000),
     });

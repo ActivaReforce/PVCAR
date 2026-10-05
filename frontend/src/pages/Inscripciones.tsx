@@ -17,6 +17,7 @@ import { dinero, type EstadoInscripcion } from '@/api/inscripciones';
 import FichaInscripcion from '@/components/inscripciones/FichaInscripcion';
 import DocumentosLegales from '@/components/inscripciones/DocumentosLegales';
 import PreciosColegios from '@/components/inscripciones/PreciosColegios';
+import MembreteIva from '@/components/inscripciones/MembreteIva';
 import { fechaHora } from '@/components/inscripciones/formato';
 
 const TODAS = 'todas';
@@ -76,9 +77,9 @@ const Inscripciones = () => {
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TabsList className="w-max">
             <TabsTrigger value="inscripciones">Inscripciones</TabsTrigger>
-            <TabsTrigger value="contrato">Contrato</TabsTrigger>
-            <TabsTrigger value="legales">Términos y privacidad</TabsTrigger>
-            <TabsTrigger value="precios">Precios</TabsTrigger>
+            <TabsTrigger value="documentos">Documentos</TabsTrigger>
+            <TabsTrigger value="precios">Colegios y precios</TabsTrigger>
+            <TabsTrigger value="membrete">Membrete e IVA</TabsTrigger>
           </TabsList>
         </div>
 
@@ -161,7 +162,9 @@ const Inscripciones = () => {
                         </Badge>
                       )}
                       {i.total !== null && (
-                        <span className="text-sm font-medium">{dinero(i.total)}</span>
+                        <span className="text-sm font-medium" title="Al mes, con IVA">
+                          {dinero(i.total)}
+                        </span>
                       )}
                       <Badge variant={i.ins_estado === 'pendiente' ? 'secondary' : 'default'}>
                         {i.ins_estado === 'pendiente' ? 'Pendiente' : 'Aprobada'}
@@ -203,16 +206,16 @@ const Inscripciones = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="contrato" className="pt-2">
-          <DocumentosLegales tipos={['contrato']} />
-        </TabsContent>
-
-        <TabsContent value="legales" className="pt-2">
-          <DocumentosLegales tipos={['terminos', 'privacidad']} />
+        <TabsContent value="documentos" className="pt-2">
+          <DocumentosLegales />
         </TabsContent>
 
         <TabsContent value="precios" className="pt-2">
           <PreciosColegios />
+        </TabsContent>
+
+        <TabsContent value="membrete" className="pt-2">
+          <MembreteIva />
         </TabsContent>
       </Tabs>
 
