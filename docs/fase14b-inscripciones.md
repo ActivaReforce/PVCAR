@@ -1,6 +1,6 @@
 # Fase 14B — Inscripciones
 
-> **2026-10-05:** los documentos, la constancia, el IVA y el membrete se rehicieron con la `0016`. Lo de documentos de este archivo (contrato/términos/privacidad, casillas, PDF de solo texto) queda superado por `docs/fase14b-contratos.md`.
+> **2026-10-05:** documentos, formulario, constancia, IVA, membrete, apertura y cuenta bancaria se rehicieron (`0016`–`0019`). **El estado vigente está en `docs/fase14b-contratos.md` y manda sobre este archivo.** Aquí sigue valiendo el flujo de aprobar y rechazar, la cuenta con contraseña = cédula y la regla de precios por hermano.
 
 Estado al **2026-10-02, noche**. **Construida y en `dev`**, sin probar en pantalla. `0014` aplicada y verificada en dev y prod; **`0015` escrita, sin correr**. **Abierto: contratos por colegio y firma (§7)** — puede cambiar cómo se genera el contrato. Falta del cliente: campos definitivos y los textos legales.
 
