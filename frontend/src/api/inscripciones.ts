@@ -86,6 +86,8 @@ export interface Formulario {
   grados: Array<{ catninograd_id: number; catninograd_nombre: string }>;
   parentescos: string[];
   documentos: Partial<Record<TipoDocumento, DocumentoLegal>>;
+  /** A dónde transferir el pago. */
+  cuenta_bancaria: string | null;
 }
 
 export interface Factura {
@@ -318,6 +320,8 @@ export interface DatosPrecio {
 }
 
 export interface ConfigInscripciones {
+  /** A dónde se transfiere el pago. Texto libre, con saltos de línea. */
+  cuenta_bancaria: string | null;
   /** false = el membrete de serie (el de los Word del cliente). */
   membrete_propio: boolean;
   membrete_data_url: string | null;
@@ -367,6 +371,8 @@ export const inscripcionesApi = {
   config: () => api.get<ConfigInscripciones>('/inscripciones/config'),
   subirMembrete: (datos: { mime: string; base64: string }) =>
     api.put<{ membrete_propio: boolean }>('/inscripciones/config/membrete', datos),
+  guardarCuentaBancaria: (texto: string) =>
+    api.put<{ cuenta_bancaria: string | null }>('/inscripciones/config/cuenta-bancaria', { texto }),
   restaurarMembrete: () =>
     api.delete<{ membrete_propio: boolean }>('/inscripciones/config/membrete'),
 };

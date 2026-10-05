@@ -260,6 +260,8 @@ export interface Formulario {
   grados: repo.GradoOfertado[];
   parentescos: readonly string[];
   documentos: Partial<Record<TipoDocumento, repo.DocumentoLegal>>;
+  /** A dónde transferir el pago: lo escribe Activa en Configuración. */
+  cuenta_bancaria: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,11 +375,12 @@ export async function abrirColegio(
 }
 
 export async function formulario(): Promise<Formulario> {
-  const [oferta, grados, vigentes, situacion] = await Promise.all([
+  const [oferta, grados, vigentes, situacion, config] = await Promise.all([
     repo.ofertaPublica(),
     repo.grados(),
     repo.documentosVigentes(),
     estado(),
+    repo.obtenerConfig(),
   ]);
   const documentos: Partial<Record<TipoDocumento, repo.DocumentoLegal>> = {};
   for (const doc of vigentes) documentos[doc.doc_tipo] = doc;
@@ -390,6 +393,7 @@ export async function formulario(): Promise<Formulario> {
     grados,
     parentescos: PARENTESCOS,
     documentos,
+    cuenta_bancaria: config.cuenta_bancaria,
   };
 }
 
@@ -1214,6 +1218,7 @@ export async function borrarPrecio(actor: AuthUser, colId: number): Promise<void
 // Configuración: el membrete (0016). El IVA no se configura: IVA_PCT.
 
 export interface ConfigVista {
+  cuenta_bancaria: string | null;
   /** false = el membrete de serie (el de los Word del cliente). */
   membrete_propio: boolean;
   /** La imagen vigente, para enseñarla. */
@@ -1224,6 +1229,7 @@ export async function config(): Promise<ConfigVista> {
   const [c, membrete] = await Promise.all([repo.obtenerConfig(), membreteActual()]);
   const mime = membrete?.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) ? 'image/jpeg' : 'image/png';
   return {
+    cuenta_bancaria: c.cuenta_bancaria,
     membrete_propio: c.membrete !== null,
     membrete_data_url: membrete ? `data:${mime};base64,${membrete.toString('base64')}` : null,
   };
@@ -1258,6 +1264,16 @@ export async function subirMembrete(
     throw err;
   }
   if (anterior) await borrarArchivos([anterior]);
+}
+
+export async function guardarCuentaBancaria(actor: AuthUser, texto: string | null): Promise<void> {
+  await enTransaccion(async (client) => {
+    await repo.guardarCuentaBancaria(client, texto);
+    await auditar(
+      { actor, accion: 'editar', entidad: 'inscripcion_config', entidadId: 1, detalle: { cuenta_bancaria: true } },
+      client,
+    );
+  });
 }
 
 /** Vuelve al membrete de serie. */

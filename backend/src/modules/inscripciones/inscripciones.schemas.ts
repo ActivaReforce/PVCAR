@@ -219,6 +219,15 @@ export const borradorDocumentoSchema = z.object({
 
 export const abrirSchema = z.object({ abiertas: z.boolean() });
 
+/** Texto libre con saltos de línea. Vacío lo borra. */
+export const cuentaBancariaSchema = z.object({
+  texto: z
+    .string()
+    .max(2000, 'Como mucho 2000 caracteres')
+    .transform((v) => v.replace(/\r\n/g, '\n').trim())
+    .transform((v) => (v.length > 0 ? v : null)),
+});
+
 export const colIdParamSchema = z.object({ colId: z.coerce.number().int().positive() });
 
 /** Dolares con dos decimales como mucho; descuento en porcentaje. */

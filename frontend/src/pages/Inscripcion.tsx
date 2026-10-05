@@ -571,6 +571,7 @@ const Inscripcion = () => {
               )}
               {paso === 4 && (
                 <PasoPago
+                  cuentaBancaria={formulario.data.cuenta_bancaria}
                   vista={vista}
                   preparando={preparando}
                   onArchivo={elegirComprobante}
@@ -1301,6 +1302,7 @@ const PasoDocumentos = ({
 };
 
 const PasoPago = ({
+  cuentaBancaria,
   vista,
   preparando,
   onArchivo,
@@ -1308,6 +1310,7 @@ const PasoPago = ({
   cobro,
   cargandoCobro,
 }: {
+  cuentaBancaria: string | null;
   vista: string | null;
   preparando: boolean;
   onArchivo: (f: File | undefined) => void;
@@ -1363,6 +1366,13 @@ const PasoPago = ({
         </p>
       )}
     </div>
+
+    {cuentaBancaria && (
+      <div className="rounded-md border bg-muted/40 p-3">
+        <p className="mb-1 text-sm font-semibold">Transfiere a esta cuenta</p>
+        <p className="whitespace-pre-line break-words text-sm">{cuentaBancaria}</p>
+      </div>
+    )}
 
     <p className="text-sm">
       Sube el comprobante de la transferencia del pago, por favor

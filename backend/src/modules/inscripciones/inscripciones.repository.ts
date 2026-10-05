@@ -279,6 +279,8 @@ export async function guardarPrecio(
 export interface ConfigInscripcion {
   /** Interruptor general de las inscripciones (0018). */
   abiertas: boolean;
+  /** A dónde se transfiere el pago (0019). Texto libre, con saltos de línea. */
+  cuenta_bancaria: string | null;
   /** Ruta en el bucket; null = el membrete de serie. */
   membrete: string | null;
   fecha_modificacion: string;
@@ -286,13 +288,23 @@ export interface ConfigInscripcion {
 
 export async function obtenerConfig(client?: PoolClient): Promise<ConfigInscripcion> {
   const { rows } = await (client ?? getPool()).query<ConfigInscripcion>(
-    `SELECT inscfg_abiertas AS abiertas, inscfg_membrete AS membrete,
+    `SELECT inscfg_abiertas AS abiertas, inscfg_cuenta_bancaria AS cuenta_bancaria,
+            inscfg_membrete AS membrete,
             inscfg_fecha_modificacion AS fecha_modificacion
        FROM public.inscripcion_config WHERE inscfg_id = 1`,
   );
   const r = rows[0];
   if (!r) throw new Error('Falta la fila de inscripcion_config (migración 0016)');
   return r;
+}
+
+export async function guardarCuentaBancaria(client: PoolClient, texto: string | null): Promise<void> {
+  await client.query(
+    `UPDATE public.inscripcion_config
+        SET inscfg_cuenta_bancaria = $1, inscfg_fecha_modificacion = now()
+      WHERE inscfg_id = 1`,
+    [texto],
+  );
 }
 
 export async function guardarAbiertas(client: PoolClient, abiertas: boolean): Promise<void> {

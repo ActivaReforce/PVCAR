@@ -10,6 +10,7 @@ import {
   cotizacionSchema,
   envioSchema,
   abrirSchema,
+  cuentaBancariaSchema,
   idParamSchema,
   listarSchema,
   membreteSchema,
@@ -245,6 +246,21 @@ inscripcionesRouter.get(
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({ data: await service.config(), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Los datos de la cuenta a la que se transfiere el pago. */
+inscripcionesRouter.put(
+  '/config/cuenta-bancaria',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { texto } = cuentaBancariaSchema.parse(req.body);
+      await service.guardarCuentaBancaria(actor(req), texto);
+      res.json({ data: { cuenta_bancaria: texto }, error: null });
     } catch (err) {
       next(err);
     }
