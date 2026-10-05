@@ -38,7 +38,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <SidebarInset className="bg-background text-foreground">
+        {/* min-w-0: sin esto, un contenido ancho (el calendario de Disciplinas)
+            estiraba toda la página y el botón y los filtros se salían de la
+            pantalla. Así lo ancho se desplaza dentro de su propia caja. */}
+        <SidebarInset className="min-w-0 bg-background text-foreground">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4">
             <SidebarTrigger />
             <div className="flex-1" />

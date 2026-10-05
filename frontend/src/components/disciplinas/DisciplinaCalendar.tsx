@@ -1,6 +1,6 @@
-import DisciplinaCard from './DisciplinaCard';
-import { GrupoDesplegable } from '@/components/comun/TarjetaDesplegable';
-import type { Dia, Disciplina } from '@/api/disciplinas';
+import DisciplinaCard from "./DisciplinaCard";
+import { GrupoDesplegable } from "@/components/comun/TarjetaDesplegable";
+import type { Dia, Disciplina } from "@/api/disciplinas";
 
 interface Props {
   disciplinas: Disciplina[];
@@ -40,7 +40,7 @@ const DisciplinaCalendar = ({
     colegios.set(d.col_id, grupo);
   }
   const orden = [...colegios.entries()].sort(([, a], [, b]) =>
-    a.nombre.localeCompare(b.nombre, 'es'),
+    a.nombre.localeCompare(b.nombre, "es"),
   );
 
   return (
@@ -55,44 +55,48 @@ const DisciplinaCalendar = ({
               <header className="flex flex-wrap items-baseline justify-between gap-x-3 border-b pb-1">
                 <h2 className="text-lg font-semibold">{nombre}</h2>
                 <span className="text-xs text-muted-foreground">
-                  {lista.length} {lista.length === 1 ? 'disciplina' : 'disciplinas'}
+                  {lista.length}{" "}
+                  {lista.length === 1 ? "disciplina" : "disciplinas"}
                   {sinEntrenador > 0 && (
                     <span className="text-amber-700 dark:text-amber-400">
-                      {' '}
+                      {" "}
                       · {sinEntrenador} sin entrenador
                     </span>
                   )}
                 </span>
               </header>
 
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[repeat(7,minmax(8.5rem,1fr))] lg:gap-2 lg:overflow-x-auto lg:pb-1">
-                {dias.map((dia) => {
-                  const delDia = lista.filter((d) => d.dia_id === dia.dia_id);
-                  return (
-                    <div
-                      key={dia.dia_id}
-                      className={`min-w-0 space-y-1.5 ${delDia.length === 0 ? 'hidden lg:block' : ''}`}
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {dia.dia_nombre}
-                      </p>
-                      {delDia.length === 0 ? (
-                        <p className="text-xs text-muted-foreground/60">—</p>
-                      ) : (
-                        delDia.map((d) => (
-                          <DisciplinaCard
-                            key={d.colacthor_id}
-                            disciplina={d}
-                            onEdit={onEdit}
-                            onBaja={onBaja}
-                            onReactivar={onReactivar}
-                            onEliminar={onEliminar}
-                          />
-                        ))
-                      )}
-                    </div>
-                  );
-                })}
+              {/* Lo único que se desplaza a lo ancho es el calendario de cada colegio. */}
+              <div className="max-w-full lg:overflow-x-auto lg:pb-1">
+                <div className="grid grid-cols-1 gap-3 lg:min-w-[61rem] lg:grid-cols-[repeat(7,minmax(8.5rem,1fr))] lg:gap-2">
+                  {dias.map((dia) => {
+                    const delDia = lista.filter((d) => d.dia_id === dia.dia_id);
+                    return (
+                      <div
+                        key={dia.dia_id}
+                        className={`min-w-0 space-y-1.5 ${delDia.length === 0 ? "hidden lg:block" : ""}`}
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {dia.dia_nombre}
+                        </p>
+                        {delDia.length === 0 ? (
+                          <p className="text-xs text-muted-foreground/60">—</p>
+                        ) : (
+                          delDia.map((d) => (
+                            <DisciplinaCard
+                              key={d.colacthor_id}
+                              disciplina={d}
+                              onEdit={onEdit}
+                              onBaja={onBaja}
+                              onReactivar={onReactivar}
+                              onEliminar={onEliminar}
+                            />
+                          ))
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </section>
           );
