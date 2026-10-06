@@ -1,73 +1,79 @@
 import { describe, expect, it } from 'vitest';
 import {
   actualizarDisciplinaSchema,
-  crearDisciplinasSchema,
+  crearDisciplinaSchema,
   listarDisciplinasSchema,
 } from './disciplinas.schemas.js';
 
 const base = { col_id: 11, act_id: 24 };
-const franja = { dia_id: 1, colacthor_hora_inicio: '15:00', colacthor_hora_fin: '16:00' };
+const franja = { dia_id: 1, inicio: '15:00', fin: '16:00' };
 
-describe('crearDisciplinasSchema', () => {
-  it('acepta un lote de varios dias con el mismo horario', () => {
-    const r = crearDisciplinasSchema.parse({
+describe('crearDisciplinaSchema', () => {
+  it('acepta varios dias, cada uno con su hora', () => {
+    const r = crearDisciplinaSchema.parse({
       ...base,
-      horarios: [franja, { ...franja, dia_id: 3 }],
+      horarios: [franja, { dia_id: 3, inicio: '16:00', fin: '17:00' }],
     });
     expect(r.horarios).toHaveLength(2);
   });
 
+  it('rechaza el mismo dia dos veces', () => {
+    const r = crearDisciplinaSchema.safeParse({ ...base, horarios: [franja, franja] });
+    expect(r.success).toBe(false);
+  });
+
   it('exige al menos un horario', () => {
-    expect(crearDisciplinasSchema.safeParse({ ...base, horarios: [] }).success).toBe(false);
+    expect(crearDisciplinaSchema.safeParse({ ...base, horarios: [] }).success).toBe(false);
   });
 
   it('rechaza la hora de fin anterior a la de inicio', () => {
-    const r = crearDisciplinasSchema.safeParse({
+    const r = crearDisciplinaSchema.safeParse({
       ...base,
-      horarios: [{ dia_id: 1, colacthor_hora_inicio: '16:00', colacthor_hora_fin: '15:00' }],
+      horarios: [{ dia_id: 1, inicio: '16:00', fin: '15:00' }],
     });
     expect(r.success).toBe(false);
   });
 
   it('rechaza la hora de fin igual a la de inicio', () => {
-    const r = crearDisciplinasSchema.safeParse({
+    const r = crearDisciplinaSchema.safeParse({
       ...base,
-      horarios: [{ dia_id: 1, colacthor_hora_inicio: '15:00', colacthor_hora_fin: '15:00' }],
+      horarios: [{ dia_id: 1, inicio: '15:00', fin: '15:00' }],
     });
     expect(r.success).toBe(false);
   });
 
   it('admite el formato con segundos que devuelve Postgres', () => {
-    const r = crearDisciplinasSchema.safeParse({
+    const r = crearDisciplinaSchema.safeParse({
       ...base,
-      horarios: [{ dia_id: 1, colacthor_hora_inicio: '15:00:00', colacthor_hora_fin: '16:30:00' }],
+      horarios: [{ dia_id: 1, inicio: '15:00:00', fin: '16:30:00' }],
     });
     expect(r.success).toBe(true);
+    if (r.success) expect(r.data.horarios[0]).toMatchObject({ inicio: '15:00', fin: '16:30' });
   });
 
   it('rechaza una hora imposible', () => {
-    const r = crearDisciplinasSchema.safeParse({
+    const r = crearDisciplinaSchema.safeParse({
       ...base,
-      horarios: [{ dia_id: 1, colacthor_hora_inicio: '25:00', colacthor_hora_fin: '26:00' }],
+      horarios: [{ dia_id: 1, inicio: '25:00', fin: '26:00' }],
     });
     expect(r.success).toBe(false);
   });
 
   it('rechaza un dia fuera de 1..7', () => {
     expect(
-      crearDisciplinasSchema.safeParse({ ...base, horarios: [{ ...franja, dia_id: 8 }] }).success,
+      crearDisciplinaSchema.safeParse({ ...base, horarios: [{ ...franja, dia_id: 8 }] }).success,
     ).toBe(false);
   });
 
-  it('no deja crear mas de dos semanas de golpe', () => {
-    const muchos = Array.from({ length: 15 }, () => franja);
-    expect(crearDisciplinasSchema.safeParse({ ...base, horarios: muchos }).success).toBe(false);
+  it('no admite mas de siete dias', () => {
+    const muchos = Array.from({ length: 8 }, (_, i) => ({ ...franja, dia_id: (i % 7) + 1 }));
+    expect(crearDisciplinaSchema.safeParse({ ...base, horarios: muchos }).success).toBe(false);
   });
 });
 
 describe('actualizarDisciplinaSchema', () => {
-  it('admite cambiar solo el dia', () => {
-    expect(actualizarDisciplinaSchema.safeParse({ dia_id: 5 }).success).toBe(true);
+  it('admite cambiar solo los horarios', () => {
+    expect(actualizarDisciplinaSchema.safeParse({ horarios: [{ ...franja, dia_id: 5 }] }).success).toBe(true);
   });
 
   it('rechaza un cuerpo vacio', () => {

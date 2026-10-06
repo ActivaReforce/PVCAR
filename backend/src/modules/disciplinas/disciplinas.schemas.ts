@@ -4,9 +4,10 @@ import { paginacionSchema } from '../../lib/paginacion.js';
 /**
  * Validacion de entrada de Disciplinas.
  *
- * Una disciplina es colegio + actividad + dia + franja horaria: el eje del
- * modelo. De ella cuelgan las inscripciones, las asignaciones de entrenador,
- * las evaluaciones y las asistencias.
+ * Una disciplina es colegio + actividad + sus horarios (uno o varios dias,
+ * cada uno con su hora; Disciplinas v2). Es el eje del modelo: de ella
+ * cuelgan las inscripciones, las asignaciones de entrenador, las evaluaciones
+ * y las asistencias.
  */
 
 /**
@@ -20,16 +21,30 @@ const hora = z
 
 const idPositivo = z.coerce.number().int().positive();
 
+/** HH:MM:SS -> HH:MM, para comparar y guardar siempre igual. */
+const corta = (h: string) => h.slice(0, 5);
+
 const franja = z
   .object({
     dia_id: z.number().int().min(1).max(7),
-    colacthor_hora_inicio: hora,
-    colacthor_hora_fin: hora,
+    inicio: hora.transform(corta),
+    fin: hora.transform(corta),
   })
-  .refine((f) => f.colacthor_hora_fin > f.colacthor_hora_inicio, {
+  .refine((f) => f.fin > f.inicio, {
     message: 'La hora de fin tiene que ser posterior a la de inicio',
-    path: ['colacthor_hora_fin'],
+    path: ['fin'],
   });
+
+/** Los dias de una disciplina: al menos uno y sin repetir dia. */
+const horarios = z
+  .array(franja)
+  .min(1, 'Hay que indicar al menos un día')
+  .max(7)
+  .refine((lista) => new Set(lista.map((f) => f.dia_id)).size === lista.length, {
+    message: 'Un día no puede repetirse en la misma disciplina',
+  });
+
+export type Franja = z.infer<typeof franja>;
 
 /**
  * Varios ids separados por coma (?colegio=11,14). La pantalla vieja dejaba
@@ -66,27 +81,23 @@ export const listarDisciplinasSchema = paginacionSchema.extend({
 export type ListarDisciplinasQuery = z.infer<typeof listarDisciplinasSchema>;
 
 /**
- * Alta por lote: un colegio, una actividad y varias franjas de una vez.
- *
- * Es como se crea de verdad —"karate en Quitumbe, lunes y miercoles de 15:00
- * a 16:00"— y era lo unico que el formulario viejo hacia bien. Lo que no hacia
- * era comprobar que no existieran ya, ni meterlo todo en una transaccion.
+ * Alta: un colegio, una actividad y sus dias ("Fútbol en Quitumbe, lunes
+ * 15:00-16:00 y miércoles 16:00-17:00"). Es UNA disciplina, no una por dia.
  */
-export const crearDisciplinasSchema = z.object({
+export const crearDisciplinaSchema = z.object({
   col_id: z.number().int().positive(),
   act_id: z.number().int().positive(),
-  horarios: z.array(franja).min(1, 'Hay que indicar al menos un horario').max(14),
+  horarios,
 });
 
-export type CrearDisciplinasInput = z.infer<typeof crearDisciplinasSchema>;
+export type CrearDisciplinaInput = z.infer<typeof crearDisciplinaSchema>;
 
+/** Edicion. `horarios` reemplaza la lista entera. */
 export const actualizarDisciplinaSchema = z
   .object({
     col_id: z.number().int().positive().optional(),
     act_id: z.number().int().positive().optional(),
-    dia_id: z.number().int().min(1).max(7).optional(),
-    colacthor_hora_inicio: hora.optional(),
-    colacthor_hora_fin: hora.optional(),
+    horarios: horarios.optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'No hay nada que actualizar');
 

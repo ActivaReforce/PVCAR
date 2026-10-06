@@ -295,6 +295,9 @@ export const cuentaBancariaSchema = z.object({
     .transform((v) => (v.length > 0 ? v : null)),
 });
 
+/** Tope de disciplinas por alumno en el formulario público (1 a 10). */
+export const maxDisciplinasSchema = z.object({ maximo: z.number().int().min(1).max(10) });
+
 export const colIdParamSchema = z.object({ colId: z.coerce.number().int().positive() });
 
 /** Dolares con dos decimales como mucho; descuento en porcentaje. */

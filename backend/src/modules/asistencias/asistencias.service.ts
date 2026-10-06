@@ -89,11 +89,12 @@ async function exigirSesion(
     throw new ApiError(403, 'Esa disciplina esta fuera de tu alcance');
   }
 
-  if (diaIsoDe(fecha) !== sesion.dia_id) {
-    throw new ApiError(
-      400,
-      `La disciplina es de los ${sesion.dia_nombre.toLowerCase()} y ${fecha} no cae en ${sesion.dia_nombre.toLowerCase()}`,
-    );
+  // Una disciplina tiene varios dias: la fecha tiene que caer en uno de ellos.
+  const dia = diaIsoDe(fecha);
+  if (!sesion.horarios.some((h) => h.dia_id === dia)) {
+    const dias = sesion.horarios.map((h) => h.dia_nombre.toLowerCase());
+    const lista = dias.length > 1 ? `${dias.slice(0, -1).join(', ')} y ${dias.at(-1)}` : (dias[0] ?? 'ningún día');
+    throw new ApiError(400, `La disciplina es de los ${lista} y ${fecha} no cae en ninguno`);
   }
 
   return sesion;

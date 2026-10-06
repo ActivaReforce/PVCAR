@@ -4,7 +4,7 @@ import { requirePermission } from '../../middleware/requirePermission.js';
 import { ApiError } from '../../middleware/error.js';
 import {
   actualizarDisciplinaSchema,
-  crearDisciplinasSchema,
+  crearDisciplinaSchema,
   eliminarDisciplinaSchema,
   idParamSchema,
   listarDisciplinasSchema,
@@ -88,17 +88,17 @@ disciplinasRouter.get(
 );
 
 /**
- * POST /api/v1/disciplinas — alta por lote.
+ * POST /api/v1/disciplinas — alta de una disciplina con sus dias.
  *
- * Un colegio, una actividad y varias franjas: asi se crea de verdad ("karate
- * en Quitumbe, lunes y miercoles de 15:00 a 16:00"). Todo en una transaccion.
+ * Un colegio, una actividad y sus horarios ("karate en Quitumbe, lunes
+ * 15:00-16:00 y miercoles 16:00-17:00"). Todo en una transaccion.
  */
 disciplinasRouter.post(
   '/',
   requirePermission('disciplinas', 'crear'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const input = crearDisciplinasSchema.parse(req.body);
+      const input = crearDisciplinaSchema.parse(req.body);
       res.status(201).json({ data: await service.crear(actor(req), input), error: null });
     } catch (err) {
       next(err);

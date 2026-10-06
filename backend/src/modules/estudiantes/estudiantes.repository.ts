@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
+import { horarioTexto, horariosJson, primerHorario, type HorarioDisciplina } from '../../lib/horarios.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import type { ListarEstudiantesQuery } from './estudiantes.schemas.js';
@@ -63,10 +64,9 @@ export interface InscripcionListada {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  /** Sus dias con su hora (Disciplinas v2). */
+  horarios: HorarioDisciplina[];
+  horario_texto: string | null;
   ninoasig_fecha_inscripcion: string;
   ninoasig_fecha_baja: string | null;
   est_id: number;
@@ -303,10 +303,8 @@ export async function listarInscripciones(
            cah.col_id,
            col.col_nombre,
            act.act_nombre,
-           cah.dia_id,
-           dia.dia_nombre,
-           cah.colacthor_hora_inicio,
-           cah.colacthor_hora_fin,
+           ${horariosJson('cah')} AS horarios,
+           ${horarioTexto('cah')} AS horario_texto,
            na.ninoasig_fecha_inscripcion,
            na.ninoasig_fecha_baja,
            na.est_id,
@@ -316,7 +314,6 @@ export async function listarInscripciones(
       JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = na.colacthor_id
       JOIN public.colegio   col ON col.col_id = cah.col_id
       JOIN public.actividad act ON act.act_id = cah.act_id
-      JOIN public.dia       dia ON dia.dia_id = cah.dia_id
       LEFT JOIN LATERAL (
           SELECT u.usu_nombre
           FROM public.entrenador_asignacion ea
@@ -328,7 +325,7 @@ export async function listarInscripciones(
       ) ent ON TRUE
      WHERE na.nino_id = $1
        AND ($2::boolean OR na.est_id = ${ESTADO.ACTIVO})
-     ORDER BY (na.est_id <> ${ESTADO.ACTIVO}), cah.dia_id, cah.colacthor_hora_inicio
+     ORDER BY (na.est_id <> ${ESTADO.ACTIVO}), ${primerHorario('cah')}
     `,
     [ninoId, historial],
   );
@@ -339,10 +336,9 @@ export async function listarInscripciones(
 export interface DisciplinaDisponible {
   colacthor_id: number;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  /** Sus dias con su hora (Disciplinas v2). */
+  horarios: HorarioDisciplina[];
+  horario_texto: string | null;
   alumnos: number;
   entrenador: string | null;
   /** true si existe una inscripcion cerrada: reinscribir la reabre. */
@@ -354,10 +350,8 @@ export async function listarDisponibles(ninoId: number): Promise<DisciplinaDispo
     `
     SELECT cah.colacthor_id,
            act.act_nombre,
-           cah.dia_id,
-           dia.dia_nombre,
-           cah.colacthor_hora_inicio,
-           cah.colacthor_hora_fin,
+           ${horariosJson('cah')} AS horarios,
+           ${horarioTexto('cah')} AS horario_texto,
            COALESCE(al.n, 0)::int AS alumnos,
            ent.usu_nombre AS entrenador,
            EXISTS (
@@ -367,7 +361,6 @@ export async function listarDisponibles(ninoId: number): Promise<DisciplinaDispo
       FROM public.nino n
       JOIN public.colegio_actividad_horario cah ON cah.col_id = n.col_id
       JOIN public.actividad act ON act.act_id = cah.act_id
-      JOIN public.dia       dia ON dia.dia_id = cah.dia_id
       LEFT JOIN LATERAL (
           SELECT count(*) AS n FROM public.nino_asignacion na2
           WHERE na2.colacthor_id = cah.colacthor_id AND na2.est_id = ${ESTADO.ACTIVO}
@@ -389,7 +382,7 @@ export async function listarDisponibles(ninoId: number): Promise<DisciplinaDispo
              AND activa.colacthor_id = cah.colacthor_id
              AND activa.est_id = ${ESTADO.ACTIVO}
        )
-     ORDER BY cah.dia_id, cah.colacthor_hora_inicio, act.act_nombre
+     ORDER BY ${primerHorario('cah')}, act.act_nombre
     `,
     [ninoId],
   );

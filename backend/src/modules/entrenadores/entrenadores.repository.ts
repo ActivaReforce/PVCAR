@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO, ROL, ROLES_AUXILIARES } from '../../lib/constants.js';
+import { horarioTexto, horariosJson, primerHorario, type HorarioDisciplina } from '../../lib/horarios.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
 import { contieneSinTildes, paramsUsados } from '../../lib/sql.js';
 import type { ListarEntrenadoresQuery } from './entrenadores.schemas.js';
@@ -37,10 +38,9 @@ export interface AsignacionListada {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  /** Sus dias con su hora (Disciplinas v2). */
+  horarios: HorarioDisciplina[];
+  horario_texto: string | null;
   entasig_fecha_inicio: string;
   entasig_fecha_fin: string | null;
   est_id: number;
@@ -270,10 +270,8 @@ export async function listarAsignaciones(
            cah.col_id,
            col.col_nombre,
            act.act_nombre,
-           cah.dia_id,
-           dia.dia_nombre,
-           cah.colacthor_hora_inicio,
-           cah.colacthor_hora_fin,
+           ${horariosJson('cah')} AS horarios,
+           ${horarioTexto('cah')} AS horario_texto,
            ea.entasig_fecha_inicio,
            ea.entasig_fecha_fin,
            ea.est_id,
@@ -283,14 +281,13 @@ export async function listarAsignaciones(
       JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
       JOIN public.colegio   col ON col.col_id = cah.col_id
       JOIN public.actividad act ON act.act_id = cah.act_id
-      JOIN public.dia       dia ON dia.dia_id = cah.dia_id
       LEFT JOIN LATERAL (
           SELECT count(*) AS n FROM public.nino_asignacion na
           WHERE na.colacthor_id = cah.colacthor_id AND na.est_id = ${ESTADO.ACTIVO}
       ) al ON TRUE
      WHERE ea.ent_id = $1
        AND ($2::boolean OR (ea.entasig_fecha_fin IS NULL AND ea.est_id = ${ESTADO.ACTIVO}))
-     ORDER BY (ea.entasig_fecha_fin IS NOT NULL), cah.dia_id, cah.colacthor_hora_inicio,
+     ORDER BY (ea.entasig_fecha_fin IS NOT NULL), ${primerHorario('cah')},
               ea.entasig_fecha_inicio DESC
     `,
     [entId, historial],
@@ -392,10 +389,9 @@ export interface DisciplinaDisponible {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  /** Sus dias con su hora (Disciplinas v2). */
+  horarios: HorarioDisciplina[];
+  horario_texto: string | null;
   alumnos: number;
   entrenador_actual: string | null;
 }
@@ -411,16 +407,13 @@ export async function listarDisponibles(
            cah.col_id,
            col.col_nombre,
            act.act_nombre,
-           cah.dia_id,
-           dia.dia_nombre,
-           cah.colacthor_hora_inicio,
-           cah.colacthor_hora_fin,
+           ${horariosJson('cah')} AS horarios,
+           ${horarioTexto('cah')} AS horario_texto,
            COALESCE(al.n, 0)::int AS alumnos,
            ocupada.usu_nombre AS entrenador_actual
       FROM public.colegio_actividad_horario cah
       JOIN public.colegio   col ON col.col_id = cah.col_id
       JOIN public.actividad act ON act.act_id = cah.act_id
-      JOIN public.dia       dia ON dia.dia_id = cah.dia_id
       LEFT JOIN LATERAL (
           SELECT count(*) AS n FROM public.nino_asignacion na
           WHERE na.colacthor_id = cah.colacthor_id AND na.est_id = ${ESTADO.ACTIVO}
@@ -444,7 +437,7 @@ export async function listarDisponibles(
              AND mia.est_id = ${ESTADO.ACTIVO}
              AND mia.entasig_fecha_fin IS NULL
        )
-     ORDER BY col.col_nombre, cah.dia_id, cah.colacthor_hora_inicio
+     ORDER BY col.col_nombre, ${primerHorario('cah')}
     `,
     [alcance.global, alcance.colegios, colegios, entId],
   );
@@ -482,18 +475,19 @@ export async function listarAuxiliares(
   return rows;
 }
 
-/** Con quien esta atado ya este usuario, si lo esta. */
+/** Si este usuario ya esta atado (activo) a este titular. */
 export async function auxiliarDe(
   client: PoolClient,
   usuId: number,
+  entId: number,
 ): Promise<{ entaux_id: number; ent_id: number; usu_nombre: string } | null> {
   const { rows } = await client.query<{ entaux_id: number; ent_id: number; usu_nombre: string }>(
     `SELECT aux.entaux_id, aux.ent_id, u.usu_nombre
        FROM public.entrenador_auxiliar aux
        JOIN public.usuario u ON u.usu_id = aux.ent_id
-      WHERE aux.usu_id = $1 AND aux.est_id = $2
+      WHERE aux.usu_id = $1 AND aux.ent_id = $3 AND aux.est_id = $2
       LIMIT 1`,
-    [usuId, ESTADO.ACTIVO],
+    [usuId, ESTADO.ACTIVO, entId],
   );
   return rows[0] ?? null;
 }
@@ -553,25 +547,30 @@ export async function obtenerAuxiliar(
   return rows[0] ?? null;
 }
 
-/** Candidatos: activos con rol 6 o 7 que no respalden ya a nadie. */
-export async function listarCandidatosAAuxiliar(): Promise<
-  Array<{ usu_id: number; usu_nombre: string; usu_correo: string; rol_id: number }>
-> {
-  const { rows } = await getPool().query<{
-    usu_id: number;
-    usu_nombre: string;
-    usu_correo: string;
-    rol_id: number;
-  }>(
-    `SELECT DISTINCT ON (u.usu_id) u.usu_id, u.usu_nombre, u.usu_correo, ur.rol_id
+export interface CandidatoAuxiliar {
+  usu_id: number;
+  usu_nombre: string;
+  usu_correo: string;
+  rol_id: number;
+  /** ent_id de los titulares a los que ya respalda. Puede respaldar a varios (2026-10-01). */
+  titulares: number[];
+}
+
+/**
+ * Candidatos: activos con rol 6 o 7, **aunque ya respalden a otro**: un
+ * auxiliar puede estar con varios titulares. Se dice a quienes respalda para
+ * que la pantalla no ofrezca atarlo dos veces al mismo.
+ */
+export async function listarCandidatosAAuxiliar(): Promise<CandidatoAuxiliar[]> {
+  const { rows } = await getPool().query<CandidatoAuxiliar>(
+    `SELECT DISTINCT ON (u.usu_id) u.usu_id, u.usu_nombre, u.usu_correo, ur.rol_id,
+            COALESCE((SELECT array_agg(aux.ent_id ORDER BY aux.ent_id)
+                        FROM public.entrenador_auxiliar aux
+                       WHERE aux.usu_id = u.usu_id AND aux.est_id = $2), '{}') AS titulares
        FROM public.usuario u
        JOIN public.usuario_rol ur ON ur.usu_id = u.usu_id
       WHERE ur.rol_id = ANY($1::int[])
         AND u.est_id = $2
-        AND NOT EXISTS (
-            SELECT 1 FROM public.entrenador_auxiliar aux
-            WHERE aux.usu_id = u.usu_id AND aux.est_id = $2
-        )
       ORDER BY u.usu_id, ur.rol_id`,
     [ROLES_AUXILIARES, ESTADO.ACTIVO],
   );

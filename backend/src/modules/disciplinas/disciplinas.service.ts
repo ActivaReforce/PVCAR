@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import { alcanceDe, alcanzaColegio, alcanzaDisciplina, type Alcance } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
+import { afectadosPorCruce } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { enTransaccion } from '../../lib/tx.js';
@@ -9,7 +10,7 @@ import { ApiError } from '../../middleware/error.js';
 import * as repo from './disciplinas.repository.js';
 import type {
   ActualizarDisciplinaInput,
-  CrearDisciplinasInput,
+  CrearDisciplinaInput,
   ListarDisciplinasQuery,
 } from './disciplinas.schemas.js';
 
@@ -74,27 +75,22 @@ function exigirColegioEnAlcance(alcance: Alcance, colId: number): void {
   }
 }
 
-/** Nombre legible para mensajes y auditoria: "Karate — Quitumbe, lunes 15:00". */
+/** Nombre legible para mensajes y auditoria: "Karate — Quitumbe, Lun y Mié 15:00–16:00". */
 function nombreDe(d: repo.DisciplinaListada): string {
-  const hora = d.colacthor_hora_inicio?.slice(0, 5) ?? '';
-  return `${d.act_nombre} — ${d.col_nombre}, ${d.dia_nombre.toLowerCase()} ${hora}`.trim();
+  return `${d.act_nombre} — ${d.col_nombre}, ${d.horario_texto ?? 'sin horario'}`;
 }
 
 /**
- * Alta por lote: un colegio, una actividad, varias franjas.
- *
- * Todo en una transaccion: o entran las cuatro franjas o no entra ninguna. El
- * formulario viejo las insertaba una a una y si la tercera fallaba dejaba dos
- * creadas sin decir cuales.
+ * Alta de una disciplina con sus dias. Todo en una transaccion.
  */
 export async function crear(
   actor: AuthUser,
-  input: CrearDisciplinasInput,
-): Promise<repo.DisciplinaListada[]> {
+  input: CrearDisciplinaInput,
+): Promise<repo.DisciplinaListada> {
   const alcance = await alcanceDe(actor.usuario);
   exigirColegioEnAlcance(alcance, input.col_id);
 
-  const ids = await enTransaccion(async (client) => {
+  const id = await enTransaccion(async (client) => {
     if (!(await repo.existeColegio(client, input.col_id))) {
       throw new ApiError(400, 'El colegio no existe');
     }
@@ -102,87 +98,68 @@ export async function crear(
       throw new ApiError(400, 'La actividad no existe');
     }
 
-    const creados: number[] = [];
-    for (const franja of input.horarios) {
-      await exigirHorarioLibre(client, {
-        colId: input.col_id,
-        actId: input.act_id,
-        diaId: franja.dia_id,
-        horaInicio: franja.colacthor_hora_inicio,
-        horaFin: franja.colacthor_hora_fin,
-        excluyendo: null,
-      });
-
-      creados.push(
-        await repo.insertarDisciplina(client, {
-          colId: input.col_id,
-          actId: input.act_id,
-          diaId: franja.dia_id,
-          horaInicio: franja.colacthor_hora_inicio,
-          horaFin: franja.colacthor_hora_fin,
-        }),
-      );
-    }
+    const nuevo = await repo.insertarDisciplina(client, {
+      colId: input.col_id,
+      actId: input.act_id,
+    });
+    await repo.reemplazarHorarios(client, nuevo, input.horarios);
+    await exigirSinSolape(client, nuevo);
 
     await auditar(
       {
         actor,
         accion: 'crear',
         entidad: 'disciplina',
-        entidadId: creados.join(','),
-        detalle: { col_id: input.col_id, act_id: input.act_id, creadas: creados.length },
+        entidadId: nuevo,
+        detalle: { col_id: input.col_id, act_id: input.act_id, horarios: input.horarios },
       },
       client,
     );
-
-    return creados;
+    return nuevo;
   });
 
-  const disciplinas = await Promise.all(ids.map((id) => repo.obtenerDisciplina(id)));
-  return disciplinas.filter((d): d is repo.DisciplinaListada => d !== null);
+  return (await repo.obtenerDisciplina(id))!;
 }
 
 /**
- * Dos comprobaciones distintas, con dos mensajes distintos:
- *
- *  - **Duplicado exacto**: misma actividad, colegio, dia y hora de inicio. La
- *    base no lo impide y en el sistema viejo se podian crear copias que
- *    aparecian dos veces en el calendario y en todos los selectores.
- *  - **Solape**: la misma actividad en el mismo colegio y dia pisando horario.
- *    No es la misma fila, pero es el mismo grupo partido en dos, y las
- *    asistencias de esa tarde acabarian en una u otra al azar.
+ * La misma actividad en el mismo colegio no puede tener dos grupos que se
+ * pisen ningun dia. Se comprueba con los horarios ya escritos en la
+ * transaccion: si falla, el rollback los deshace.
  */
-async function exigirHorarioLibre(
-  client: PoolClient,
-  datos: {
-    colId: number;
-    actId: number;
-    diaId: number;
-    horaInicio: string;
-    horaFin: string;
-    excluyendo: number | null;
-  },
-): Promise<void> {
-  if (await repo.existeIgual(client, datos, datos.excluyendo)) {
-    throw new ApiError(409, 'Ya existe esa disciplina: mismo colegio, actividad, día y hora');
-  }
-
-  const solape = await repo.haySolape(client, datos, datos.excluyendo);
+async function exigirSinSolape(client: PoolClient, colacthorId: number): Promise<void> {
+  const solape = await repo.haySolape(client, colacthorId);
   if (solape) {
     throw new ApiError(
       409,
-      `Se pisa con otra disciplina de la misma actividad ese día (${solape.inicio.slice(0, 5)}–${solape.fin.slice(0, 5)}). Ajusta el horario o edita la existente.`,
+      `Se pisa con otro grupo de la misma actividad en este colegio el ${solape.dia_nombre.toLowerCase()} (${solape.inicio}–${solape.fin}). Ajusta el horario o edita el existente.`,
     );
   }
+}
+
+/**
+ * Nadie inscrito ni asignado puede quedar con dos disciplinas a la vez por
+ * culpa del cambio de horario. Se dice a quien afecta, con nombres.
+ */
+async function exigirSinCrucesDeGente(client: PoolClient, colacthorId: number): Promise<void> {
+  const { alumnos, entrenadores } = await afectadosPorCruce(client, colacthorId);
+  if (alumnos.length === 0 && entrenadores.length === 0) return;
+  const partes: string[] = [];
+  if (alumnos.length > 0) partes.push(`alumnos: ${alumnos.join(', ')}`);
+  if (entrenadores.length > 0) partes.push(`entrenadores: ${entrenadores.join(', ')}`);
+  throw new ApiError(
+    409,
+    `Con ese horario se cruzaría con otra disciplina de ${partes.join('; ')}. Cambia el horario o mueve primero a esas personas.`,
+    { alumnos, entrenadores },
+  );
 }
 
 /**
  * Edicion.
  *
- * Cambiar el dia o la hora de una disciplina con asistencias ya registradas
- * reescribe la historia: las asistencias guardan la fecha, pero la sesion a la
- * que pertenecen pasa a ser otra. No se bloquea —a veces el horario cambia de
- * verdad— pero la respuesta lo dice para que la pantalla avise.
+ * Los horarios se pueden cambiar aunque la disciplina tenga historia (a veces
+ * el horario cambia de verdad): las asistencias guardan su fecha. Lo que no se
+ * deja es que el cambio cruce a un alumno o a un entrenador con su otra
+ * disciplina.
  */
 export async function actualizar(
   actor: AuthUser,
@@ -194,7 +171,6 @@ export async function actualizar(
 
   await exigirAlcance(actor, antes);
 
-  const colId = input.col_id ?? antes.col_id;
   const cambiaColegio = input.col_id !== undefined && input.col_id !== antes.col_id;
   const cambiaActividad = input.act_id !== undefined && input.act_id !== antes.act_id;
 
@@ -203,8 +179,8 @@ export async function actualizar(
    * historia —alumnos inscritos alguna vez, entrenadores, evaluaciones o
    * asistencias— cambiarlos la reescribe entera: las asistencias de Fútbol en
    * Quitumbe pasarían a ser de Ajedrez, o de otro colegio con alumnos que no
-   * son suyos. El día y la hora sí se pueden mover (se avisa); para lo otro se
-   * crea una disciplina nueva y se da de baja esta.
+   * son suyos. Los horarios sí se pueden mover; para lo otro se crea una
+   * disciplina nueva y se da de baja esta.
    */
   if (cambiaColegio || cambiaActividad) {
     const historia = await repo.calcularImpacto(colacthorId);
@@ -232,28 +208,15 @@ export async function actualizar(
       throw new ApiError(400, 'La actividad no existe');
     }
 
-    const horaInicio = input.colacthor_hora_inicio ?? antes.colacthor_hora_inicio ?? '00:00';
-    const horaFin = input.colacthor_hora_fin ?? antes.colacthor_hora_fin ?? '00:00';
-    if (horaFin <= horaInicio) {
-      throw new ApiError(400, 'La hora de fin tiene que ser posterior a la de inicio');
-    }
-
-    await exigirHorarioLibre(client, {
-      colId,
-      actId: input.act_id ?? antes.act_id,
-      diaId: input.dia_id ?? antes.dia_id,
-      horaInicio,
-      horaFin,
-      excluyendo: colacthorId,
-    });
-
     await repo.actualizarDisciplina(client, colacthorId, {
       colId: input.col_id,
       actId: input.act_id,
-      diaId: input.dia_id,
-      horaInicio: input.colacthor_hora_inicio,
-      horaFin: input.colacthor_hora_fin,
     });
+    if (input.horarios) {
+      await repo.reemplazarHorarios(client, colacthorId, input.horarios);
+      await exigirSinCrucesDeGente(client, colacthorId);
+    }
+    if (antes.est_id === ESTADO.ACTIVO) await exigirSinSolape(client, colacthorId);
 
     await auditar(
       {
@@ -344,14 +307,7 @@ export async function reactivar(
   }
 
   await enTransaccion(async (client) => {
-    await exigirHorarioLibre(client, {
-      colId: antes.col_id,
-      actId: antes.act_id,
-      diaId: antes.dia_id,
-      horaInicio: antes.colacthor_hora_inicio ?? '00:00',
-      horaFin: antes.colacthor_hora_fin ?? '00:00',
-      excluyendo: colacthorId,
-    });
+    await exigirSinSolape(client, colacthorId);
     await repo.cambiarEstado(client, colacthorId, ESTADO.ACTIVO);
     await auditar(
       {
@@ -392,7 +348,7 @@ export async function eliminar(
   await exigirAlcance(actor, disciplina);
 
   // Se confirma escribiendo la actividad, que es lo que la pantalla ensena
-  // grande. Pedir "Karate — Quitumbe, lunes 15:00" seria pedir un dictado.
+  // grande. Pedir "Karate — Quitumbe, Lun y Mié 15:00–16:00" seria pedir un dictado.
   if (confirmacion.trim().toLowerCase() !== disciplina.act_nombre.trim().toLowerCase()) {
     throw new ApiError(400, 'El nombre escrito no coincide con el de la actividad');
   }

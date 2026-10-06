@@ -17,10 +17,8 @@ const DISCIPLINA = {
   act_id: 24,
   act_nombre: 'Futbol G2',
   cat_nombre: 'Deportiva',
-  dia_id: 1,
-  dia_nombre: 'Lunes',
-  colacthor_hora_inicio: '15:00:00',
-  colacthor_hora_fin: '16:00:00',
+  horarios: [{ dia_id: 1, dia_nombre: 'Lunes', inicio: '15:00', fin: '16:00' }],
+  horario_texto: 'Lun 15:00–16:00',
   est_id: 1,
   colacthor_fecha_creacion: null,
   entrenadores: [],
@@ -30,9 +28,9 @@ const DISCIPLINA = {
 
 /** La disciplina que devuelve obtenerDisciplina. */
 let disciplinaActual: typeof DISCIPLINA | null = DISCIPLINA;
-/** Respuesta de existeIgual / haySolape. */
-let duplicada = false;
+/** Respuesta de haySolape y de afectadosPorCruce. */
 let solapada = false;
+let alumnoCruzado = false;
 /** Respuesta de calcularImpacto. */
 let conHistorial = true;
 
@@ -44,11 +42,14 @@ const query = vi.fn(async (sql: string) => {
   if (sql.includes('FROM public.colegio_actividad_horario d')) {
     return { rows: disciplinaActual ? [disciplinaActual] : [] };
   }
-  if (sql.includes('OVERLAPS')) {
-    return { rows: solapada ? [{ colacthor_id: 99, inicio: '15:30:00', fin: '16:30:00' }] : [] };
+  if (sql.includes('OVERLAPS') && sql.includes('otra.act_id = yo.act_id')) {
+    return { rows: solapada ? [{ dia_nombre: 'Lunes', inicio: '15:30', fin: '16:30' }] : [] };
   }
-  if (sql.includes('colacthor_hora_inicio = $4::time')) {
-    return { rows: duplicada ? [{ '?column?': 1 }] : [] };
+  if (sql.includes('OVERLAPS') && sql.includes('nino_asignacion yo')) {
+    return { rows: alumnoCruzado ? [{ nombre: 'Martina' }] : [] };
+  }
+  if (sql.includes('INSERT INTO public.colegio_actividad_horario')) {
+    return { rows: [{ colacthor_id: 80 }] };
   }
   if (sql.includes('AS asistencias')) {
     return {
@@ -90,8 +91,8 @@ const coordinadora = {
 
 beforeEach(() => {
   disciplinaActual = DISCIPLINA;
-  duplicada = false;
   solapada = false;
+  alumnoCruzado = false;
   conHistorial = true;
   query.mockClear();
 });
@@ -105,7 +106,7 @@ describe('alcance', () => {
   it('no deja editarla', async () => {
     disciplinaActual = { ...DISCIPLINA, colacthor_id: 999, col_id: 12 };
     await expect(
-      service.actualizar(coordinadora, 999, { dia_id: 2 }),
+      service.actualizar(coordinadora, 999, { act_id: 2 }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
@@ -119,7 +120,7 @@ describe('alcance', () => {
       service.crear(coordinadora, {
         col_id: 12,
         act_id: 24,
-        horarios: [{ dia_id: 1, colacthor_hora_inicio: '15:00', colacthor_hora_fin: '16:00' }],
+        horarios: [{ dia_id: 1, inicio: '15:00', fin: '16:00' }],
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
@@ -131,32 +132,34 @@ describe('alcance', () => {
 });
 
 describe('horarios que chocan', () => {
-  it('rechaza el duplicado exacto', async () => {
-    duplicada = true;
-    await expect(
-      service.crear(coordinadora, {
-        col_id: 14,
-        act_id: 24,
-        horarios: [{ dia_id: 1, colacthor_hora_inicio: '15:00', colacthor_hora_fin: '16:00' }],
-      }),
-    ).rejects.toMatchObject({ statusCode: 409 });
-  });
-
   it('rechaza el solape y dice con que horario choca', async () => {
     solapada = true;
     await expect(
       service.crear(coordinadora, {
         col_id: 14,
         act_id: 24,
-        horarios: [{ dia_id: 1, colacthor_hora_inicio: '15:30', colacthor_hora_fin: '16:30' }],
+        horarios: [{ dia_id: 1, inicio: '15:30', fin: '16:30' }],
       }),
     ).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('15:30') });
   });
 
-  it('al editar, la hora de fin no puede quedar antes de la de inicio', async () => {
+  it('crea una sola disciplina con todos sus dias', async () => {
+    const d = await service.crear(coordinadora, {
+      col_id: 14,
+      act_id: 24,
+      horarios: [
+        { dia_id: 1, inicio: '15:00', fin: '16:00' },
+        { dia_id: 3, inicio: '16:00', fin: '17:00' },
+      ],
+    });
+    expect(d.colacthor_id).toBe(80);
+  });
+
+  it('al cambiar el horario no deja cruzado a un alumno, y dice quien', async () => {
+    alumnoCruzado = true;
     await expect(
-      service.actualizar(coordinadora, 80, { colacthor_hora_fin: '14:00' }),
-    ).rejects.toMatchObject({ statusCode: 400 });
+      service.actualizar(coordinadora, 80, { horarios: [{ dia_id: 2, inicio: '15:00', fin: '16:00' }] }),
+    ).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('Martina') });
   });
 });
 
@@ -177,7 +180,7 @@ describe('identidad de la disciplina', () => {
 
   it('con historia sí se le puede mover el día y la hora', async () => {
     await expect(
-      service.actualizar(coordinadora, 80, { dia_id: 3, colacthor_hora_inicio: '16:00', colacthor_hora_fin: '17:00' }),
+      service.actualizar(coordinadora, 80, { horarios: [{ dia_id: 3, inicio: '16:00', fin: '17:00' }] }),
     ).resolves.toBeTruthy();
   });
 

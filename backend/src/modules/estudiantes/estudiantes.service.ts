@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { alcanceDe, alcanzaColegio, alcanzaDisciplina, type Alcance } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
 import { ESTADO } from '../../lib/constants.js';
+import { crucesEntre, describirCruce } from '../../lib/horarios.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { borrarFoto, firmarFoto, firmarFotos, rutaValida } from '../../lib/storage.js';
 import { enTransaccion } from '../../lib/tx.js';
@@ -162,6 +163,7 @@ export async function crear(
       await exigirDisciplinaDelColegio(client, colacthorId, input.col_id);
       await repo.inscribir(client, nuevoId, colacthorId);
     }
+    await exigirSinCruces(client, input.disciplinas ?? []);
 
     await auditar(
       {
@@ -204,6 +206,18 @@ async function exigirDisciplinaDelColegio(
   }
   if (disciplina.est_id !== ESTADO.ACTIVO) {
     throw new ApiError(409, 'Esa disciplina esta dada de baja');
+  }
+}
+
+/**
+ * Un alumno no puede estar en dos disciplinas que se pisen (mismo dia, horas
+ * que se solapan). Desde aqui no hay tope de cuantas: el maximo de 2 es solo
+ * del formulario publico (cliente, 2026-10-06).
+ */
+async function exigirSinCruces(client: PoolClient, disciplinas: number[]): Promise<void> {
+  const cruces = await crucesEntre(disciplinas, client);
+  if (cruces.length > 0) {
+    throw new ApiError(409, `No puede estar en las dos: ${describirCruce(cruces[0]!)}.`, { cruces });
   }
 }
 
@@ -322,6 +336,7 @@ export async function sincronizarInscripciones(
     for (const inscripcion of aDarDeBaja) {
       await repo.darDeBajaInscripcion(client, inscripcion.ninoasig_id);
     }
+    if (aInscribir.length > 0) await exigirSinCruces(client, deseadas);
 
     if (aInscribir.length > 0 || aDarDeBaja.length > 0) {
       await auditar(

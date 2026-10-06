@@ -197,13 +197,15 @@ const disciplinasPorDia: DefinicionGrafica = {
   construir: (f, ctx) => ({
     sql: `
       SELECT d.dia_nombre AS dia,
-             count(cah.colacthor_id)::int AS disciplinas
+             count(DISTINCT cah.colacthor_id)::int AS disciplinas
         FROM public.dia d
-        LEFT JOIN public.colegio_actividad_horario cah
-               ON cah.dia_id = d.dia_id
-              AND cah.est_id = ${ESTADO.ACTIVO}
-              AND ($1::boolean OR cah.colacthor_id = ANY($2::int[]) OR cah.col_id = ANY($3::int[]))
-              AND ($4::int[] IS NULL OR cah.col_id = ANY($4::int[]))
+        LEFT JOIN (public.disciplina_horario h
+                   JOIN public.colegio_actividad_horario cah
+                     ON cah.colacthor_id = h.colacthor_id
+                    AND cah.est_id = ${ESTADO.ACTIVO}
+                    AND ($1::boolean OR cah.colacthor_id = ANY($2::int[]) OR cah.col_id = ANY($3::int[]))
+                    AND ($4::int[] IS NULL OR cah.col_id = ANY($4::int[])))
+               ON h.dia_id = d.dia_id
        GROUP BY d.dia_id, d.dia_nombre
        ORDER BY d.dia_id`,
     params: [ctx.global, ctx.disciplinas, ctx.colegios, oNulo(f.colegio)],
@@ -387,7 +389,8 @@ const asistenciaPorDiaSemana: DefinicionGrafica = {
              count(*)::int                  AS registros
         FROM public.asistencia_nino an
         JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = an.colacthor_id
-        JOIN public.dia d ON d.dia_id = cah.dia_id
+        -- El dia de la clase sale de la fecha: una disciplina tiene varios.
+        JOIN public.dia d ON d.dia_id = EXTRACT(ISODOW FROM an.asisnino_fecha)::smallint
        WHERE an.asisnino_fecha BETWEEN $4::date AND $5::date
          AND ($1::boolean OR an.colacthor_id = ANY($2::int[]) OR cah.col_id = ANY($3::int[]))
          AND ($6::int[] IS NULL OR cah.col_id = ANY($6::int[]))

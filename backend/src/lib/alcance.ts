@@ -29,7 +29,9 @@ import type { UsuarioConRoles } from '../modules/auth/auth.repository.js';
  *   Propietario / Admin  -> todo (global = true, no se consulta nada)
  *   Coordinador          -> colegio_coordinador, y con ellos sus disciplinas
  *   Entrenador           -> entrenador_asignacion activa -> disciplina
- *   Asistente / Respaldo -> entrenador_auxiliar -> el titular -> sus disciplinas
+ *   Asistente / Respaldo -> entrenador_auxiliar -> sus titulares -> sus disciplinas
+ *                           (todos, o solo el elegido arriba en la pantalla:
+ *                           `titularElegido`, que solo estrecha)
  *   Representante        -> SOLO sus ninos (ver abajo)
  *
  * ---------------------------------------------------------------------------
@@ -108,6 +110,7 @@ const SQL_ALCANCE = `
       JOIN public.entrenador_asignacion ea ON ea.ent_id = aux.ent_id
       WHERE aux.usu_id = $1
         AND $5::boolean
+        AND ($7::int IS NULL OR aux.ent_id = $7)
         AND aux.est_id = $2
         AND ea.est_id = $2
         AND ea.entasig_fecha_fin IS NULL
@@ -163,6 +166,7 @@ export async function alcanceDe(usuario: UsuarioConRoles): Promise<Alcance> {
       tiene(ROL.ENTRENADOR),
       ROLES_AUXILIARES.some((r) => tiene(r)),
       tiene(ROL.REPRESENTANTE),
+      usuario.titularElegido ?? null,
     ],
   );
 
@@ -183,4 +187,23 @@ export function alcanzaColegio(alcance: Alcance, colId: number): boolean {
 /** Atajo legible para los servicios: ¿esta disciplina cae dentro del alcance? */
 export function alcanzaDisciplina(alcance: Alcance, colacthorId: number): boolean {
   return alcance.global || alcance.disciplinas.includes(colacthorId);
+}
+
+export interface TitularDeAuxiliar {
+  ent_id: number;
+  usu_nombre: string;
+}
+
+/** A quienes respalda el usuario ahora mismo. Vacio si no es auxiliar de nadie. */
+export async function titularesDe(usuario: UsuarioConRoles): Promise<TitularDeAuxiliar[]> {
+  if (!usuario.roles.some((r) => ROLES_AUXILIARES.includes(r.rol_id))) return [];
+  const { rows } = await getPool().query<TitularDeAuxiliar>(
+    `SELECT aux.ent_id, u.usu_nombre
+       FROM public.entrenador_auxiliar aux
+       JOIN public.usuario u ON u.usu_id = aux.ent_id
+      WHERE aux.usu_id = $1 AND aux.est_id = $2
+      ORDER BY u.usu_nombre`,
+    [usuario.usu_id, ESTADO.ACTIVO],
+  );
+  return rows;
 }

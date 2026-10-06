@@ -6,6 +6,7 @@ import { ApiError } from '../../middleware/error.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { auditar } from '../../lib/auditoria.js';
 import { ESTADO, ROLES_GLOBALES } from '../../lib/constants.js';
+import { diaDeCruce } from '../../lib/horarios.js';
 import { enTransaccion } from '../../lib/tx.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { enviarCorreo, escaparHtml } from '../../lib/correo.js';
@@ -64,13 +65,8 @@ import {
 
 type DisciplinaConEstado = Awaited<ReturnType<typeof repo.disciplinasPorId>>[number];
 
-export function describirDisciplina(d: {
-  actividad: string;
-  dia: string;
-  hora_inicio: string;
-  hora_fin: string;
-}): string {
-  return `${d.actividad} — ${d.dia} ${d.hora_inicio} a ${d.hora_fin}`;
+export function describirDisciplina(d: { actividad: string; horario: string | null }): string {
+  return `${d.actividad} — ${d.horario ?? 'sin horario'}`;
 }
 
 /**
@@ -92,6 +88,20 @@ export function problemasDeDisciplinas(
         problemas.push(`${nino.nombre}: ${describirDisciplina(d)} ya no está abierta`);
       } else if (d.col_id !== nino.col_id) {
         problemas.push(`${nino.nombre}: ${describirDisciplina(d)} no es de su colegio`);
+      }
+    }
+    // Un alumno no puede estar en dos disciplinas que se pisen (Disciplinas v2).
+    const elegidas = nino.disciplinas
+      .map((id) => encontradas.get(id))
+      .filter((d): d is DisciplinaConEstado => d !== undefined);
+    for (let i = 0; i < elegidas.length; i++) {
+      for (let j = i + 1; j < elegidas.length; j++) {
+        const dia = diaDeCruce(elegidas[i]!.horarios, elegidas[j]!.horarios);
+        if (dia) {
+          problemas.push(
+            `${nino.nombre}: ${elegidas[i]!.actividad} y ${elegidas[j]!.actividad} se cruzan el ${dia.toLowerCase()}`,
+          );
+        }
       }
     }
   }
@@ -263,6 +273,8 @@ export interface Formulario {
   documentos: Partial<Record<TipoDocumento, repo.DocumentoLegal>>;
   /** A dónde transferir el pago: lo escribe Activa en Configuración. */
   cuenta_bancaria: string | null;
+  /** Cuántas disciplinas puede elegir cada alumno. */
+  max_disciplinas: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -395,6 +407,7 @@ export async function formulario(): Promise<Formulario> {
     parentescos: PARENTESCOS,
     documentos,
     cuenta_bancaria: config.cuenta_bancaria,
+    max_disciplinas: config.max_disciplinas,
   };
 }
 
@@ -411,12 +424,28 @@ async function cobroDe(
   precios: Map<number, repo.PrecioConDocumento>;
 }> {
   const ids = [...new Set(ninos.flatMap((n) => n.disciplinas))];
-  const encontradas = new Map((await repo.disciplinasPorId(ids)).map((d) => [d.colacthor_id, d]));
+  const [lista, config] = await Promise.all([repo.disciplinasPorId(ids), repo.obtenerConfig()]);
+  const encontradas = new Map(lista.map((d) => [d.colacthor_id, d]));
+
+  // El tope por alumno es solo del formulario público: desde la plataforma
+  // el personal puede inscribir en más (cliente, 2026-10-06).
+  const pasados = ninos.filter((n) => n.disciplinas.length > config.max_disciplinas);
+  if (pasados.length > 0) {
+    throw new ApiError(409, `Cada alumno puede elegir como mucho ${config.max_disciplinas} disciplinas.`, {
+      problemas: pasados.map((n) => `${n.nombre}: eligió ${n.disciplinas.length}`),
+    });
+  }
+
   const problemas = problemasDeDisciplinas(ninos, encontradas);
   if (problemas.length > 0) {
-    throw new ApiError(409, 'Alguna disciplina elegida ya no está disponible. Recarga la página.', {
-      problemas,
-    });
+    const cruce = problemas.some((p) => p.includes(' se cruzan el '));
+    throw new ApiError(
+      409,
+      cruce
+        ? 'Dos de las disciplinas elegidas se dan a la misma hora: elige otra.'
+        : 'Alguna disciplina elegida ya no está disponible. Recarga la página.',
+      { problemas },
+    );
   }
 
   const precios = await repo.preciosDe([...new Set(ninos.map((n) => n.col_id))]);
@@ -449,7 +478,7 @@ export function actividadesYHorarios(disciplinas: DisciplinaConEstado[]): {
 } {
   return {
     actividades: [...new Set(disciplinas.map((d) => d.actividad))],
-    horarios: disciplinas.map((d) => `${d.actividad}: ${d.dia} ${d.hora_inicio} a ${d.hora_fin}`),
+    horarios: disciplinas.map((d) => `${d.actividad}: ${d.horario}`),
   };
 }
 
@@ -1256,6 +1285,7 @@ export async function borrarPrecio(actor: AuthUser, colId: number): Promise<void
 
 export interface ConfigVista {
   cuenta_bancaria: string | null;
+  max_disciplinas: number;
   /** false = el membrete de serie (el de los Word del cliente). */
   membrete_propio: boolean;
   /** La imagen vigente, para enseñarla. */
@@ -1267,6 +1297,7 @@ export async function config(): Promise<ConfigVista> {
   const mime = membrete?.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) ? 'image/jpeg' : 'image/png';
   return {
     cuenta_bancaria: c.cuenta_bancaria,
+    max_disciplinas: c.max_disciplinas,
     membrete_propio: c.membrete !== null,
     membrete_data_url: membrete ? `data:${mime};base64,${membrete.toString('base64')}` : null,
   };
@@ -1308,6 +1339,16 @@ export async function guardarCuentaBancaria(actor: AuthUser, texto: string | nul
     await repo.guardarCuentaBancaria(client, texto);
     await auditar(
       { actor, accion: 'editar', entidad: 'inscripcion_config', entidadId: 1, detalle: { cuenta_bancaria: true } },
+      client,
+    );
+  });
+}
+
+export async function guardarMaxDisciplinas(actor: AuthUser, maximo: number): Promise<void> {
+  await enTransaccion(async (client) => {
+    await repo.guardarMaxDisciplinas(client, maximo);
+    await auditar(
+      { actor, accion: 'editar', entidad: 'inscripcion_config', entidadId: 1, detalle: { max_disciplinas: maximo } },
       client,
     );
   });

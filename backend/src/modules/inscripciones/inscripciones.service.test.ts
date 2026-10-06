@@ -21,17 +21,17 @@ const { calcularCobro } = await import('./inscripciones.precios.js');
  * que el correo de aprobacion no lleve la contrasena.
  */
 
-const disciplina = (id: number, col: number, est = 1) => ({
+const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+const disciplina = (id: number, col: number, est = 1, dias: number[] = [id], inicio = '16:00', fin = '17:00') => ({
   colacthor_id: id,
   col_id: col,
   est_id: est,
   col_nombre: 'Colegio',
-  actividad: 'Futbol',
+  actividad: `Act${id}`,
   categoria: null,
-  dia: 'Lunes',
-  dia_id: 1,
-  hora_inicio: '16:00',
-  hora_fin: '17:00',
+  horarios: dias.map((d) => ({ dia_id: d, dia_nombre: DIAS[d]!, inicio, fin })),
+  horario: 'x',
 });
 
 describe('problemasDeDisciplinas', () => {
@@ -53,6 +53,23 @@ describe('problemasDeDisciplinas', () => {
       encontradas,
     );
     expect(problemas).toHaveLength(3);
+  });
+
+  it('rechaza dos disciplinas que se pisan algun dia, y dice cual', () => {
+    const conCruce = new Map([
+      [1, disciplina(1, 10, 1, [1, 3])],
+      [4, disciplina(4, 10, 1, [3, 5], '16:30', '17:30')],
+    ]);
+    const problemas = problemasDeDisciplinas([{ nombre: 'A', col_id: 10, disciplinas: [1, 4] }], conCruce);
+    expect(problemas).toEqual(['A: Act1 y Act4 se cruzan el miércoles']);
+  });
+
+  it('una que acaba cuando empieza la otra no se cruza', () => {
+    const seguidas = new Map([
+      [1, disciplina(1, 10, 1, [1, 3])],
+      [4, disciplina(4, 10, 1, [1], '17:00', '18:00')],
+    ]);
+    expect(problemasDeDisciplinas([{ nombre: 'A', col_id: 10, disciplinas: [1, 4] }], seguidas)).toEqual([]);
   });
 });
 

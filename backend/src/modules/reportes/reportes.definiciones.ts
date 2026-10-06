@@ -1,4 +1,5 @@
 import { ESTADO } from '../../lib/constants.js';
+import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 
 /**
@@ -228,15 +229,13 @@ const actividades: Definicion = {
 const disciplinas: Definicion = {
   id: 'disciplinas',
   titulo: 'Disciplinas',
-  descripcion: 'Colegio, actividad, día y hora, con su entrenador y sus alumnos.',
+  descripcion: 'Colegio, actividad, días y horas, con su entrenador y sus alumnos.',
   modulo: 'disciplinas',
   exigeRango: false,
   columnas: [
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
     { clave: 'act_nombre', cabecera: 'Actividad', ancho: 24 },
-    { clave: 'dia_nombre', cabecera: 'Día', ancho: 12 },
-    { clave: 'hora_inicio', cabecera: 'Hora inicio', ancho: 12 },
-    { clave: 'hora_fin', cabecera: 'Hora fin', ancho: 12 },
+    { clave: 'horario', cabecera: 'Horario', ancho: 36 },
     { clave: 'estado', cabecera: 'Estado', ancho: 12 },
     { clave: 'entrenadores', cabecera: 'Entrenadores', ancho: 34 },
     { clave: 'alumnos', cabecera: 'Alumnos activos', ancho: 16 },
@@ -245,9 +244,7 @@ const disciplinas: Definicion = {
     sql: `
       SELECT c.col_nombre,
              a.act_nombre,
-             d.dia_nombre,
-             to_char(cah.colacthor_hora_inicio, 'HH24:MI') AS hora_inicio,
-             to_char(cah.colacthor_hora_fin, 'HH24:MI')    AS hora_fin,
+             COALESCE(${horarioTexto('cah')}, '')          AS horario,
              e.est_nombre                                  AS estado,
              COALESCE((SELECT string_agg(u.usu_nombre, ', ' ORDER BY u.usu_nombre)
                          FROM public.entrenador_asignacion ea
@@ -260,14 +257,13 @@ const disciplinas: Definicion = {
         FROM public.colegio_actividad_horario cah
         JOIN public.colegio c   ON c.col_id = cah.col_id
         JOIN public.actividad a ON a.act_id = cah.act_id
-        JOIN public.dia d       ON d.dia_id = cah.dia_id
         JOIN public.estado e    ON e.est_id = cah.est_id
        WHERE ($1::boolean OR cah.colacthor_id = ANY($2::int[]) OR cah.col_id = ANY($3::int[]))
          AND ($4::text IS NULL OR ${contieneSinTildes('a.act_nombre', '$4')}
                                OR ${contieneSinTildes('c.col_nombre', '$4')})
          AND ($5::int[] IS NULL OR cah.col_id = ANY($5::int[]))
          AND ($6::int IS NULL OR cah.est_id = $6)
-       ORDER BY c.col_nombre, a.act_nombre, d.dia_id, cah.colacthor_hora_inicio`,
+       ORDER BY c.col_nombre, a.act_nombre, ${primerHorario('cah')}`,
     params: [
       ctx.global,
       ctx.disciplinas,
@@ -364,12 +360,11 @@ const estudiantes: Definicion = {
                                           WHEN 'privado' THEN 'Transporte privado'
                                           ELSE '' END              AS transporte,
              e.est_nombre                                          AS estado,
-             COALESCE((SELECT string_agg(a.act_nombre || ' (' || d.dia_nombre || ')', ', '
-                                         ORDER BY d.dia_id)
+             COALESCE((SELECT string_agg(a.act_nombre || ' (' || COALESCE(${horarioTexto('cah')}, '') || ')', ', '
+                                         ORDER BY ${primerHorario('cah')})
                          FROM public.nino_asignacion na
                          JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = na.colacthor_id
                          JOIN public.actividad a ON a.act_id = cah.act_id
-                         JOIN public.dia d ON d.dia_id = cah.dia_id
                         WHERE na.nino_id = n.nino_id AND na.est_id = ${ESTADO.ACTIVO}), '') AS disciplinas,
              COALESCE((SELECT string_agg(u.usu_nombre, ', ' ORDER BY u.usu_nombre)
                          FROM public.nino_padre np
@@ -432,8 +427,8 @@ const asistenciasAlumnos: Definicion = {
              c.col_nombre,
              a.act_nombre,
              d.dia_nombre,
-             to_char(cah.colacthor_hora_inicio, 'HH24:MI') || '–' ||
-               COALESCE(to_char(cah.colacthor_hora_fin, 'HH24:MI'), '')  AS horario,
+             COALESCE(to_char(h.dishor_hora_inicio, 'HH24:MI') || '–' ||
+                      to_char(h.dishor_hora_fin, 'HH24:MI'), '')  AS horario,
              n.nino_nombre,
              ae.asisest_nombre                                   AS estado,
              COALESCE(to_char(an.asisnino_hora_tarde, 'HH24:MI'), '')    AS hora_tarde,
@@ -444,7 +439,10 @@ const asistenciasAlumnos: Definicion = {
         JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = an.colacthor_id
         JOIN public.colegio c   ON c.col_id = cah.col_id
         JOIN public.actividad a ON a.act_id = cah.act_id
-        JOIN public.dia d       ON d.dia_id = cah.dia_id
+        -- El dia y la hora de esa clase: los de la fecha, entre los de la disciplina.
+        JOIN public.dia d       ON d.dia_id = EXTRACT(ISODOW FROM an.asisnino_fecha)::smallint
+        LEFT JOIN public.disciplina_horario h
+               ON h.colacthor_id = cah.colacthor_id AND h.dia_id = d.dia_id
         JOIN public.asistencia_estado ae ON ae.asisest_id = an.asisest_id
         LEFT JOIN public.usuario u ON u.usu_id = an.usu_registrador
        WHERE an.asisnino_fecha BETWEEN $4::date AND $5::date

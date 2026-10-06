@@ -65,6 +65,12 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       throw new ApiError(403, 'Usuario inactivo o no autorizado');
     }
 
+    // El auxiliar con varios titulares elige de quien ver; solo estrecha su
+    // alcance (lib/alcance.ts), nunca lo amplia: un id ajeno deja vacio el
+    // camino del auxiliar.
+    const titular = Number(req.headers['x-titular']);
+    usuario.titularElegido = Number.isInteger(titular) && titular > 0 ? titular : null;
+
     req.user = {
       authUserId: data.user.id,
       email: data.user.email,

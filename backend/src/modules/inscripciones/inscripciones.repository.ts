@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
+import { horarioTexto, horariosJson, primerHorario, type HorarioDisciplina } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import { offsetDe } from '../../lib/paginacion.js';
 import type { CobroAlumno, PrecioColegio } from './inscripciones.precios.js';
@@ -281,6 +282,8 @@ export interface ConfigInscripcion {
   abiertas: boolean;
   /** A dónde se transfiere el pago (0019). Texto libre, con saltos de línea. */
   cuenta_bancaria: string | null;
+  /** Tope de disciplinas por alumno en el formulario público (0021). */
+  max_disciplinas: number;
   /** Ruta en el bucket; null = el membrete de serie. */
   membrete: string | null;
   fecha_modificacion: string;
@@ -289,6 +292,7 @@ export interface ConfigInscripcion {
 export async function obtenerConfig(client?: PoolClient): Promise<ConfigInscripcion> {
   const { rows } = await (client ?? getPool()).query<ConfigInscripcion>(
     `SELECT inscfg_abiertas AS abiertas, inscfg_cuenta_bancaria AS cuenta_bancaria,
+            inscfg_max_disciplinas AS max_disciplinas,
             inscfg_membrete AS membrete,
             inscfg_fecha_modificacion AS fecha_modificacion
        FROM public.inscripcion_config WHERE inscfg_id = 1`,
@@ -304,6 +308,15 @@ export async function guardarCuentaBancaria(client: PoolClient, texto: string | 
         SET inscfg_cuenta_bancaria = $1, inscfg_fecha_modificacion = now()
       WHERE inscfg_id = 1`,
     [texto],
+  );
+}
+
+export async function guardarMaxDisciplinas(client: PoolClient, maximo: number): Promise<void> {
+  await client.query(
+    `UPDATE public.inscripcion_config
+        SET inscfg_max_disciplinas = $1, inscfg_fecha_modificacion = now()
+      WHERE inscfg_id = 1`,
+    [maximo],
   );
 }
 
@@ -360,10 +373,10 @@ export interface DisciplinaOfertada {
   col_id: number;
   actividad: string;
   categoria: string | null;
-  dia: string;
-  dia_id: number;
-  hora_inicio: string;
-  hora_fin: string;
+  /** Sus dias con su hora (Disciplinas v2): una disciplina se paga una vez. */
+  horarios: HorarioDisciplina[];
+  /** "Lun y Mié 15:00–16:00". */
+  horario: string;
 }
 
 export interface ColegioOfertado {
@@ -397,16 +410,13 @@ export async function ofertaPublica(): Promise<ColegioOfertado[]> {
                 'col_id',       d.col_id,
                 'actividad',    act.act_nombre,
                 'categoria',    cat.cat_nombre,
-                'dia',          dia.dia_nombre,
-                'dia_id',       d.dia_id,
-                'hora_inicio',  to_char(d.colacthor_hora_inicio, 'HH24:MI'),
-                'hora_fin',     to_char(d.colacthor_hora_fin, 'HH24:MI')
-            ) ORDER BY act.act_nombre, d.dia_id, d.colacthor_hora_inicio) AS disciplinas
+                'horarios',     ${horariosJson('d')},
+                'horario',      ${horarioTexto('d')}
+            ) ORDER BY act.act_nombre, ${primerHorario('d')}) AS disciplinas
        FROM public.colegio_actividad_horario d
        JOIN public.colegio   col ON col.col_id = d.col_id
        JOIN public.colegio_precio pre ON pre.col_id = d.col_id
        JOIN public.actividad act ON act.act_id = d.act_id
-       JOIN public.dia       dia ON dia.dia_id = d.dia_id
        LEFT JOIN public.categoria cat ON cat.cat_id = act.cat_id
       WHERE d.est_id = $1
         AND pre.colpre_inscripciones_abiertas
@@ -446,13 +456,11 @@ export async function disciplinasPorId(
   >(
     `SELECT d.colacthor_id, d.col_id, d.est_id, col.col_nombre,
             act.act_nombre AS actividad, cat.cat_nombre AS categoria,
-            dia.dia_nombre AS dia, d.dia_id,
-            to_char(d.colacthor_hora_inicio, 'HH24:MI') AS hora_inicio,
-            to_char(d.colacthor_hora_fin, 'HH24:MI')    AS hora_fin
+            ${horariosJson('d')} AS horarios,
+            ${horarioTexto('d')} AS horario
        FROM public.colegio_actividad_horario d
        JOIN public.colegio   col ON col.col_id = d.col_id
        JOIN public.actividad act ON act.act_id = d.act_id
-       JOIN public.dia       dia ON dia.dia_id = d.dia_id
        LEFT JOIN public.categoria cat ON cat.cat_id = act.cat_id
       WHERE d.colacthor_id = ANY($1::int[])`,
     [ids],

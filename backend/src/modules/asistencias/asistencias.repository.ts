@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
 import { ESTADO } from '../../lib/constants.js';
+import { horarioTexto, horariosJson, tieneDia, type HorarioDisciplina } from '../../lib/horarios.js';
 
 /**
  * Consultas de Asistencias.
@@ -32,10 +33,9 @@ export interface Sesion {
   col_nombre: string;
   act_id: number;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  /** Sus dias con su hora (Disciplinas v2). */
+  horarios: HorarioDisciplina[];
+  horario_texto: string | null;
   est_id: number;
   entrenadores: string[];
 }
@@ -120,10 +120,8 @@ export async function obtenerSesion(colacthorId: number): Promise<Sesion | null>
             c.col_nombre,
             cah.act_id,
             a.act_nombre,
-            cah.dia_id,
-            d.dia_nombre,
-            to_char(cah.colacthor_hora_inicio, 'HH24:MI') AS colacthor_hora_inicio,
-            to_char(cah.colacthor_hora_fin, 'HH24:MI')    AS colacthor_hora_fin,
+            ${horariosJson('cah')} AS horarios,
+            ${horarioTexto('cah')} AS horario_texto,
             cah.est_id,
             COALESCE((
                 SELECT array_agg(u.usu_nombre ORDER BY u.usu_nombre)
@@ -136,7 +134,6 @@ export async function obtenerSesion(colacthorId: number): Promise<Sesion | null>
        FROM public.colegio_actividad_horario cah
        JOIN public.colegio c   ON c.col_id = cah.col_id
        JOIN public.actividad a ON a.act_id = cah.act_id
-       JOIN public.dia d       ON d.dia_id = cah.dia_id
       WHERE cah.colacthor_id = $1`,
     [colacthorId],
   );
@@ -325,7 +322,7 @@ const SQL_PERSONAL = `
           FROM public.entrenador_asignacion ea
           JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
          WHERE cah.col_id = $1
-           AND cah.dia_id = EXTRACT(ISODOW FROM $2::date)::smallint
+           AND ${tieneDia('EXTRACT(ISODOW FROM $2::date)::smallint', 'cah')}
            AND cah.est_id = ${ESTADO.ACTIVO}
            AND ea.entasig_fecha_inicio <= $2::date
            AND (ea.entasig_fecha_fin IS NULL OR ea.entasig_fecha_fin >= $2::date)
@@ -362,13 +359,15 @@ const SQL_PERSONAL = `
            u.usu_foto,
            NULL::text         AS titular,
            COALESCE((
-               SELECT array_agg(a.act_nombre ORDER BY cah.colacthor_hora_inicio)
+               SELECT array_agg(a.act_nombre ORDER BY h.dishor_hora_inicio)
                  FROM public.entrenador_asignacion ea2
                  JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea2.colacthor_id
                  JOIN public.actividad a ON a.act_id = cah.act_id
+                 JOIN public.disciplina_horario h
+                   ON h.colacthor_id = cah.colacthor_id
+                  AND h.dia_id = EXTRACT(ISODOW FROM $2::date)::smallint
                 WHERE ea2.ent_id = t.ent_id
                   AND cah.col_id = $1
-                  AND cah.dia_id = EXTRACT(ISODOW FROM $2::date)::smallint
                   AND ea2.entasig_fecha_inicio <= $2::date
                   AND (ea2.entasig_fecha_fin IS NULL OR ea2.entasig_fecha_fin >= $2::date)
            ), '{}') AS imparte,

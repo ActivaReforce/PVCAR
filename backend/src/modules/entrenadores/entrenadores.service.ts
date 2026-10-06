@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { alcanceDe, alcanzaColegio } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
+import { crucesEntre, describirCruce, disciplinasAbiertasDeEntrenador } from '../../lib/horarios.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { firmarFoto, firmarFotos } from '../../lib/storage.js';
 import { enTransaccion } from '../../lib/tx.js';
@@ -125,7 +126,9 @@ export async function disponibles(
  *   4. si la tiene otro entrenador, se rechaza diciendo quien — salvo que
  *      llegue `reemplazar`, y entonces se cierra la del otro y se abre la
  *      nueva en la misma transaccion;
- *   5. la fecha de inicio no puede ser futura.
+ *   5. la fecha de inicio no puede ser futura;
+ *   6. no se le cruza con otra disciplina que ya da (mismo dia, horas que se
+ *      pisan), aunque sea de otro colegio.
  *
  * El sistema viejo no hacia ninguna: insertaba y ya.
  */
@@ -184,6 +187,14 @@ export async function asignar(
       input.colacthor_id,
       input.desde ?? null,
     );
+
+    const cruces = await crucesEntre(await disciplinasAbiertasDeEntrenador(entId, client), client);
+    const cruce = cruces.find((c) => c.a === input.colacthor_id || c.b === input.colacthor_id);
+    if (cruce) {
+      throw new ApiError(409, `Se le cruza con otra disciplina que ya da: ${describirCruce(cruce)}.`, {
+        cruce,
+      });
+    }
 
     await auditar(
       {
@@ -247,9 +258,7 @@ export async function cerrar(
 // ---------------------------------------------------------------------------
 // Auxiliares
 
-export async function candidatosAAuxiliar(): Promise<
-  Array<{ usu_id: number; usu_nombre: string; usu_correo: string; rol_id: number }>
-> {
+export async function candidatosAAuxiliar(): Promise<repo.CandidatoAuxiliar[]> {
   return repo.listarCandidatosAAuxiliar();
 }
 
@@ -260,8 +269,9 @@ export async function candidatosAAuxiliar(): Promise<
  * una decision de permisos disfrazada de dato, y por eso se valida:
  *   - el titular tiene rol 3 y ficha activa;
  *   - el auxiliar esta activo y tiene rol 6 o 7;
- *   - no respalda ya a otro (uno cada vez: si no, heredaria dos alcances y
- *     nadie sabria de quien es asistente);
+ *   - no esta ya atado a este mismo titular. Si puede respaldar a varios
+ *     (pedido del 2026-10-01): su alcance es la union de los de todos, y en
+ *     pantalla elige de quien ver (o "Todos");
  *   - nadie se respalda a si mismo.
  *
  * En los datos reales hay tres filas que no pasarian estas comprobaciones —dos
@@ -293,14 +303,8 @@ export async function atarAuxiliar(
       );
     }
 
-    const yaAtado = await repo.auxiliarDe(client, usuId);
-    if (yaAtado) {
-      throw new ApiError(
-        409,
-        yaAtado.ent_id === entId
-          ? 'Ese auxiliar ya está atado a este entrenador'
-          : `Ese auxiliar ya respalda a ${yaAtado.usu_nombre}. Suéltalo primero.`,
-      );
+    if (await repo.auxiliarDe(client, usuId, entId)) {
+      throw new ApiError(409, 'Ese auxiliar ya está atado a este entrenador');
     }
 
     const entauxId = await repo.atarAuxiliar(client, entId, usuId, rolId);

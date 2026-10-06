@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
+import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
 import { armarPagina, offsetDe, ordenSeguro, type Pagina, type Paginacion } from '../../lib/paginacion.js';
 import { contieneSinTildes } from '../../lib/sql.js';
@@ -62,8 +63,8 @@ export interface DisciplinaVinculada {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
+  /** "Lun y Mié 15:00–16:00" (Disciplinas v2). */
+  horario_texto: string | null;
   est_id: number;
   alumnos: number;
   pendientes: number;
@@ -75,8 +76,8 @@ export interface DisciplinaDisponible {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
+  /** "Lun y Mié 15:00–16:00" (Disciplinas v2). */
+  horario_texto: string | null;
   alumnos: number;
   /** True si estuvo vinculada y se desvinculo: volver a vincularla la reactiva. */
   estuvo: boolean;
@@ -539,8 +540,7 @@ export async function listarVinculadas(evaId: number): Promise<DisciplinaVincula
             cah.col_id,
             c.col_nombre,
             act.act_nombre,
-            d.dia_nombre,
-            to_char(cah.colacthor_hora_inicio, 'HH24:MI') AS colacthor_hora_inicio,
+            ${horarioTexto('cah')} AS horario_texto,
             a.est_id,
             COALESCE(al.n, 0)::int  AS alumnos,
             COALESCE(p.pendientes, 0)::int AS pendientes,
@@ -549,7 +549,6 @@ export async function listarVinculadas(evaId: number): Promise<DisciplinaVincula
        JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = a.colacthor_id
        JOIN public.colegio c   ON c.col_id = cah.col_id
        JOIN public.actividad act ON act.act_id = cah.act_id
-       JOIN public.dia d       ON d.dia_id = cah.dia_id
        LEFT JOIN LATERAL (
            SELECT count(*) AS n FROM public.nino_asignacion na
            WHERE na.colacthor_id = a.colacthor_id AND na.est_id = ${ESTADO.ACTIVO}
@@ -584,14 +583,12 @@ export async function listarDisponibles(
             cah.col_id,
             c.col_nombre,
             act.act_nombre,
-            d.dia_nombre,
-            to_char(cah.colacthor_hora_inicio, 'HH24:MI') AS colacthor_hora_inicio,
+            ${horarioTexto('cah')} AS horario_texto,
             COALESCE(al.n, 0)::int AS alumnos,
             (a.evaasig_id IS NOT NULL) AS estuvo
        FROM public.colegio_actividad_horario cah
        JOIN public.colegio c   ON c.col_id = cah.col_id
        JOIN public.actividad act ON act.act_id = cah.act_id
-       JOIN public.dia d       ON d.dia_id = cah.dia_id
        LEFT JOIN public.evaluacion_asignacion a
               ON a.eva_id = $1 AND a.colacthor_id = cah.colacthor_id
        LEFT JOIN LATERAL (
@@ -601,7 +598,7 @@ export async function listarDisponibles(
       WHERE cah.est_id = ${ESTADO.ACTIVO}
         AND ($2::boolean OR cah.colacthor_id = ANY($3::int[]))
         AND (a.evaasig_id IS NULL OR a.est_id <> ${ESTADO.ACTIVO})
-      ORDER BY c.col_nombre, act.act_nombre, d.dia_id`,
+      ORDER BY c.col_nombre, act.act_nombre, ${primerHorario('cah')}`,
     [evaId, alcance.global, alcance.disciplinas],
   );
   return rows;

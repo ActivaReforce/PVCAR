@@ -1,4 +1,5 @@
 import { getPool } from '../../config/db.js';
+import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
 
 /**
@@ -141,8 +142,8 @@ export interface DisciplinaDelEntrenador {
   colacthor_id: number;
   act_nombre: string;
   col_nombre: string;
-  dia_nombre: string;
-  hora: string | null;
+  /** "Lun y Mié 15:00–16:00". */
+  horario: string | null;
   alumnos: number;
   pendientes: number;
 }
@@ -183,18 +184,16 @@ export async function tableroEntrenador(
                 'colacthor_id', cah.colacthor_id,
                 'act_nombre',   act.act_nombre,
                 'col_nombre',   c.col_nombre,
-                'dia_nombre',   d.dia_nombre,
-                'hora',         to_char(cah.colacthor_hora_inicio, 'HH24:MI'),
+                'horario',      ${horarioTexto('cah')},
                 'alumnos',      (SELECT count(*) FROM public.nino_asignacion na
                                   WHERE na.colacthor_id = cah.colacthor_id AND na.est_id = ${ESTADO.ACTIVO}),
                 'pendientes',   (SELECT count(*) FROM public.evaluacion_nino_pendiente np
                                    JOIN public.nino_asignacion na2 ON na2.ninoasig_id = np.ninoasig_id
                                   WHERE na2.colacthor_id = cah.colacthor_id AND np.est_id = ${ESTADO.PENDIENTE})
-            ) ORDER BY d.dia_id, cah.colacthor_hora_inicio)
+            ) ORDER BY ${primerHorario('cah')})
             FROM public.colegio_actividad_horario cah
             JOIN public.actividad act ON act.act_id = cah.act_id
             JOIN public.colegio c     ON c.col_id = cah.col_id
-            JOIN public.dia d         ON d.dia_id = cah.dia_id
             WHERE cah.colacthor_id = ANY($3::int[])
         ), '[]'::json) AS disciplinas,
 
@@ -220,7 +219,7 @@ export interface HijoDelRepresentante {
   nino_nombre: string;
   col_nombre: string | null;
   catninograd_nombre: string | null;
-  disciplinas: Array<{ act_nombre: string; dia_nombre: string; hora: string | null }>;
+  disciplinas: Array<{ act_nombre: string; horario: string | null }>;
   asistencia: Asistencia;
   evaluacionesPendientes: number;
   evaluacionesHechas: number;
@@ -246,13 +245,11 @@ export async function tableroRepresentante(
             'disciplinas', COALESCE((
                 SELECT json_agg(json_build_object(
                     'act_nombre', act.act_nombre,
-                    'dia_nombre', d.dia_nombre,
-                    'hora',       to_char(cah.colacthor_hora_inicio, 'HH24:MI')
-                ) ORDER BY d.dia_id)
+                    'horario',    ${horarioTexto('cah')}
+                ) ORDER BY ${primerHorario('cah')})
                 FROM public.nino_asignacion na
                 JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = na.colacthor_id
                 JOIN public.actividad act ON act.act_id = cah.act_id
-                JOIN public.dia d ON d.dia_id = cah.dia_id
                 WHERE na.nino_id = n.nino_id AND na.est_id = ${ESTADO.ACTIVO}
             ), '[]'::json),
             'asistencia', (

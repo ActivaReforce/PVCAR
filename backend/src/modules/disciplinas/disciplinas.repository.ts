@@ -3,8 +3,9 @@ import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO } from '../../lib/constants.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
+import { horarioTexto, horariosJson, primerHorario, tieneDia, type HorarioDisciplina } from '../../lib/horarios.js';
 import { contieneSinTildes, paramsUsados } from '../../lib/sql.js';
-import type { ListarDisciplinasQuery } from './disciplinas.schemas.js';
+import type { Franja, ListarDisciplinasQuery } from './disciplinas.schemas.js';
 
 export interface EntrenadorDeDisciplina {
   usu_id: number;
@@ -18,10 +19,10 @@ export interface DisciplinaListada {
   act_id: number;
   act_nombre: string;
   cat_nombre: string | null;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  /** Sus dias, cada uno con su hora, ordenados de lunes a domingo. */
+  horarios: HorarioDisciplina[];
+  /** "Lun y Mié 15:00–16:00". */
+  horario_texto: string | null;
   est_id: number;
   colacthor_fecha_creacion: string | null;
   /** Entrenadores con asignacion activa. Normalmente uno; el modelo admite varios. */
@@ -47,16 +48,19 @@ const F_ALCANCE = `($1::boolean OR d.colacthor_id = ANY($2::int[]))`;
 
 const F_BUSCAR = `($3::text IS NULL OR ${contieneSinTildes('col.col_nombre', '$3')}
                                      OR ${contieneSinTildes('act.act_nombre', '$3')}
-                                     OR ${contieneSinTildes('dia.dia_nombre', '$3')})`;
+                                     OR EXISTS (SELECT 1 FROM public.disciplina_horario hb
+                                                  JOIN public.dia db ON db.dia_id = hb.dia_id
+                                                 WHERE hb.colacthor_id = d.colacthor_id
+                                                   AND ${contieneSinTildes('db.dia_nombre', '$3')}))`;
 
 const F_COLEGIO = `($4::int[] IS NULL OR d.col_id = ANY($4::int[]))`;
 const F_ACTIVIDAD = `($5::int[] IS NULL OR d.act_id = ANY($5::int[]))`;
-const F_DIA = `($6::int IS NULL OR d.dia_id = $6)`;
+const F_DIA = `($6::int IS NULL OR ${tieneDia('$6')})`;
 const F_ESTADO = `($7::int IS NULL OR d.est_id = $7)`;
 const F_SIN_ENTRENADOR = `(NOT $8::boolean OR COALESCE(ent.n, 0) = 0)`;
 
 const COLUMNAS_ORDEN: Record<string, string> = {
-  horario: 'd.dia_id',
+  horario: 'primer_horario',
   colegio: 'col.col_nombre',
   actividad: 'act.act_nombre',
   creacion: 'd.colacthor_fecha_creacion',
@@ -95,10 +99,8 @@ const COLUMNAS = `
         d.act_id,
         act.act_nombre,
         cat.cat_nombre,
-        d.dia_id,
-        dia.dia_nombre,
-        d.colacthor_hora_inicio,
-        d.colacthor_hora_fin,
+        ${horariosJson('d')} AS horarios,
+        ${horarioTexto('d')} AS horario_texto,
         d.est_id,
         d.colacthor_fecha_creacion,
         COALESCE(ent.lista, '[]'::json) AS entrenadores,
@@ -110,7 +112,6 @@ const DESDE = `
     FROM public.colegio_actividad_horario d
     JOIN public.colegio   col ON col.col_id = d.col_id
     JOIN public.actividad act ON act.act_id = d.act_id
-    JOIN public.dia       dia ON dia.dia_id = d.dia_id
     LEFT JOIN public.categoria cat ON cat.cat_id = act.cat_id
     ${LATERALES}
 `;
@@ -133,24 +134,24 @@ export async function listarDisciplinas(
   query: ListarDisciplinasQuery,
   alcance: Alcance,
 ): Promise<{ items: DisciplinaListada[]; total: number }> {
-  const columna = ordenSeguro(query.orden, COLUMNAS_ORDEN, 'd.dia_id');
+  const columna = ordenSeguro(query.orden, COLUMNAS_ORDEN, 'primer_horario');
   const direccion = query.dir === 'desc' ? 'DESC' : 'ASC';
   const paginacion: Paginacion = { page: query.page, limit: query.limit };
 
-  const { rows } = await getPool().query<DisciplinaListada & { total: string }>(
+  const { rows } = await getPool().query<DisciplinaListada & { total: string; primer_horario: unknown }>(
     `
-    SELECT ${COLUMNAS}, count(*) OVER() AS total
+    SELECT ${COLUMNAS}, ${primerHorario('d')} AS primer_horario, count(*) OVER() AS total
     ${DESDE}
     WHERE ${F_ALCANCE} AND ${F_BUSCAR} AND ${F_COLEGIO} AND ${F_ACTIVIDAD}
       AND ${F_DIA} AND ${F_ESTADO} AND ${F_SIN_ENTRENADOR}
-    ORDER BY ${columna} ${direccion}, d.colacthor_hora_inicio ASC, col.col_nombre ASC, d.colacthor_id ASC
+    ORDER BY ${columna} ${direccion}, primer_horario ASC, col.col_nombre ASC, d.colacthor_id ASC
     LIMIT $9 OFFSET $10
     `,
     [...params(query, alcance), paginacion.limit, offsetDe(paginacion)],
   );
 
   const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
-  return { items: rows.map(({ total: _t, ...resto }) => resto), total };
+  return { items: rows.map(({ total: _t, primer_horario: _p, ...resto }) => resto), total };
 }
 
 /**
@@ -215,121 +216,78 @@ export async function obtenerDisciplina(
 }
 
 /**
- * Dos disciplinas iguales: mismo colegio, misma actividad, mismo dia y misma
- * hora de inicio. La base no lo impide y la pantalla vieja tampoco, asi que se
- * podian crear copias exactas que despues aparecian dos veces en el calendario
- * y en todos los selectores.
- */
-export async function existeIgual(
-  client: PoolClient,
-  datos: { colId: number; actId: number; diaId: number; horaInicio: string },
-  excluyendo: number | null,
-): Promise<boolean> {
-  const { rows } = await client.query(
-    `SELECT 1 FROM public.colegio_actividad_horario
-      WHERE col_id = $1 AND act_id = $2 AND dia_id = $3
-        AND colacthor_hora_inicio = $4::time
-        AND ($5::int IS NULL OR colacthor_id <> $5)
-      LIMIT 1`,
-    [datos.colId, datos.actId, datos.diaId, datos.horaInicio, excluyendo],
-  );
-  return rows.length > 0;
-}
-
-/**
- * Misma actividad, mismo colegio, mismo dia y horarios que se pisan.
+ * La misma actividad en el mismo colegio pisando horario algún día.
  *
- * No es lo mismo que el duplicado exacto: "karate 15:00-16:00" y "karate
- * 15:30-16:30" en el mismo colegio y dia no son la misma fila, pero no pueden
- * existir las dos — es el mismo grupo partido en dos, y las asistencias de esa
- * tarde acabarian en una u otra al azar.
- *
- * Dos actividades distintas a la misma hora si son legitimas: son dos grupos
- * en espacios distintos.
+ * Se llama con los horarios ya escritos, dentro de la transaccion. No es lo
+ * mismo que dos actividades distintas a la misma hora (eso es legitimo: son
+ * dos grupos en espacios distintos): dos grupos de la misma actividad que se
+ * pisan no se distinguen —no tienen nombre de grupo— y las asistencias de esa
+ * tarde acabarian en uno u otro al azar. El duplicado exacto es un caso de
+ * esto.
  */
 export async function haySolape(
   client: PoolClient,
-  datos: {
-    colId: number;
-    actId: number;
-    diaId: number;
-    horaInicio: string;
-    horaFin: string;
-  },
-  excluyendo: number | null,
-): Promise<{ colacthor_id: number; inicio: string; fin: string } | null> {
-  const { rows } = await client.query<{ colacthor_id: number; inicio: string; fin: string }>(
-    `SELECT colacthor_id,
-            colacthor_hora_inicio::text AS inicio,
-            colacthor_hora_fin::text    AS fin
-       FROM public.colegio_actividad_horario
-      WHERE col_id = $1 AND act_id = $2 AND dia_id = $3
-        AND est_id = $6
-        AND ($7::int IS NULL OR colacthor_id <> $7)
-        AND colacthor_hora_inicio IS NOT NULL
-        AND colacthor_hora_fin IS NOT NULL
-        AND (colacthor_hora_inicio, colacthor_hora_fin) OVERLAPS ($4::time, $5::time)
+  colacthorId: number,
+): Promise<{ dia_nombre: string; inicio: string; fin: string } | null> {
+  const { rows } = await client.query<{ dia_nombre: string; inicio: string; fin: string }>(
+    `SELECT dd.dia_nombre,
+            to_char(b.dishor_hora_inicio, 'HH24:MI') AS inicio,
+            to_char(b.dishor_hora_fin, 'HH24:MI')    AS fin
+       FROM public.colegio_actividad_horario yo
+       JOIN public.colegio_actividad_horario otra
+         ON otra.col_id = yo.col_id AND otra.act_id = yo.act_id
+        AND otra.colacthor_id <> yo.colacthor_id AND otra.est_id = $2
+       JOIN public.disciplina_horario a ON a.colacthor_id = yo.colacthor_id
+       JOIN public.disciplina_horario b ON b.colacthor_id = otra.colacthor_id AND b.dia_id = a.dia_id
+        AND (a.dishor_hora_inicio, a.dishor_hora_fin) OVERLAPS (b.dishor_hora_inicio, b.dishor_hora_fin)
+       JOIN public.dia dd ON dd.dia_id = a.dia_id
+      WHERE yo.colacthor_id = $1
+      ORDER BY a.dia_id
       LIMIT 1`,
-    [
-      datos.colId,
-      datos.actId,
-      datos.diaId,
-      datos.horaInicio,
-      datos.horaFin,
-      ESTADO.ACTIVO,
-      excluyendo,
-    ],
+    [colacthorId, ESTADO.ACTIVO],
   );
   return rows[0] ?? null;
 }
 
 export async function insertarDisciplina(
   client: PoolClient,
-  datos: {
-    colId: number;
-    actId: number;
-    diaId: number;
-    horaInicio: string;
-    horaFin: string;
-  },
+  datos: { colId: number; actId: number },
 ): Promise<number> {
   const { rows } = await client.query<{ colacthor_id: number }>(
-    `INSERT INTO public.colegio_actividad_horario
-         (col_id, act_id, dia_id, colacthor_hora_inicio, colacthor_hora_fin, est_id)
-     VALUES ($1, $2, $3, $4::time, $5::time, $6)
+    `INSERT INTO public.colegio_actividad_horario (col_id, act_id, est_id)
+     VALUES ($1, $2, $3)
      RETURNING colacthor_id`,
-    [datos.colId, datos.actId, datos.diaId, datos.horaInicio, datos.horaFin, ESTADO.ACTIVO],
+    [datos.colId, datos.actId, ESTADO.ACTIVO],
   );
   return rows[0]!.colacthor_id;
+}
+
+/** Sustituye los dias de la disciplina por `horarios`. */
+export async function reemplazarHorarios(
+  client: PoolClient,
+  colacthorId: number,
+  horarios: Franja[],
+): Promise<void> {
+  await client.query('DELETE FROM public.disciplina_horario WHERE colacthor_id = $1', [colacthorId]);
+  await client.query(
+    `INSERT INTO public.disciplina_horario (colacthor_id, dia_id, dishor_hora_inicio, dishor_hora_fin)
+     SELECT $1, f.dia_id, f.inicio::time, f.fin::time
+       FROM json_to_recordset($2::json) AS f(dia_id smallint, inicio text, fin text)`,
+    [colacthorId, JSON.stringify(horarios)],
+  );
 }
 
 export async function actualizarDisciplina(
   client: PoolClient,
   colacthorId: number,
-  campos: {
-    colId?: number;
-    actId?: number;
-    diaId?: number;
-    horaInicio?: string;
-    horaFin?: string;
-  },
+  campos: { colId?: number; actId?: number },
 ): Promise<void> {
   await client.query(
     `UPDATE public.colegio_actividad_horario
-        SET col_id                = COALESCE($2::int, col_id),
-            act_id                = COALESCE($3::int, act_id),
-            dia_id                = COALESCE($4::smallint, dia_id),
-            colacthor_hora_inicio = COALESCE($5::time, colacthor_hora_inicio),
-            colacthor_hora_fin    = COALESCE($6::time, colacthor_hora_fin)
+        SET col_id = COALESCE($2::int, col_id),
+            act_id = COALESCE($3::int, act_id)
       WHERE colacthor_id = $1`,
-    [
-      colacthorId,
-      campos.colId ?? null,
-      campos.actId ?? null,
-      campos.diaId ?? null,
-      campos.horaInicio ?? null,
-      campos.horaFin ?? null,
-    ],
+    [colacthorId, campos.colId ?? null, campos.actId ?? null],
   );
 }
 

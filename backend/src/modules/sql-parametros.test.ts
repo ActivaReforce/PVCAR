@@ -42,7 +42,7 @@ const query = vi.fn(async (sql: string, params: unknown[] = []) => {
 vi.mock('../config/db.js', () => ({ getPool: () => ({ query }) }));
 
 const cliente = { query };
-const ALCANCE = { global: false, colegios: [1], disciplinas: [1] };
+const ALCANCE = { global: false, colegios: [1], disciplinas: [1], disciplinasDeHijos: [1], ninos: [1] };
 
 function valorDe(tipo: string, booleano: boolean): unknown {
   const t = tipo.trim();
@@ -145,6 +145,21 @@ it('cada consulta manda tantos valores como marcadores, y sin huecos', async () 
     );
   } catch (err) {
     errores.push(`lib.auditar: ${(err as Error).message}`);
+  }
+
+  const horarios = await import('../lib/horarios.js');
+  for (const [nombre, llamada] of [
+    ['crucesEntre', () => horarios.crucesEntre([1, 2], cliente as never)],
+    ['disciplinasActivasDeNino', () => horarios.disciplinasActivasDeNino(1, cliente as never)],
+    ['disciplinasAbiertasDeEntrenador', () => horarios.disciplinasAbiertasDeEntrenador(1, cliente as never)],
+    ['afectadosPorCruce', () => horarios.afectadosPorCruce(cliente as never, 1)],
+  ] as const) {
+    actual = { modulo: 'lib', fn: nombre, variante: 0 };
+    try {
+      await llamada();
+    } catch (err) {
+      errores.push(`lib.${nombre}: ${(err as Error).message}`);
+    }
   }
 
   const { DEFINICIONES } = await import('./reportes/reportes.definiciones.js');

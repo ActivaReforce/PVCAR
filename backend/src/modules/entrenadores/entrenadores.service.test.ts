@@ -38,7 +38,9 @@ let ocupadaPor: { entasig_id: number; ent_id: number; usu_nombre: string } | nul
 let rolAuxiliar: number | null = ROL.ASISTENTE;
 let auxiliarYaAtado: { entaux_id: number; ent_id: number; usu_nombre: string } | null = null;
 
-const query = vi.fn(async (sql: string) => {
+let cruzada = false;
+
+const query = vi.fn(async (sql: string, params: unknown[] = []) => {
   if (sql.includes('WITH col_coordinador')) {
     return { rows: [{ colegios: [14], disciplinas: [60] }] };
   }
@@ -58,7 +60,18 @@ const query = vi.fn(async (sql: string) => {
     return { rows: rolAuxiliar === null ? [] : [{ rol_id: rolAuxiliar }] };
   }
   if (sql.includes('FROM public.entrenador_auxiliar aux') && sql.includes('LIMIT 1')) {
-    return { rows: auxiliarYaAtado ? [auxiliarYaAtado] : [] };
+    // Solo cuenta si ya esta atado a ESTE titular ($3).
+    return { rows: auxiliarYaAtado && auxiliarYaAtado.ent_id === params[2] ? [auxiliarYaAtado] : [] };
+  }
+  if (sql.includes('entasig_fecha_fin IS NULL') && sql.includes('ea.ent_id = $1')) {
+    return { rows: [{ colacthor_id: 135 }, { colacthor_id: 136 }] };
+  }
+  if (sql.includes('OVERLAPS')) {
+    return {
+      rows: cruzada
+        ? [{ a: 135, b: 136, a_nombre: 'Karate — X (Lun 15:00–16:00)', b_nombre: 'Danza — Y (Lun 15:30–16:30)', dia_nombre: 'Lunes' }]
+        : [],
+    };
   }
   if (sql.includes('RETURNING entasig_id')) return { rows: [{ entasig_id: 500 }] };
   if (sql.includes('RETURNING entaux_id')) return { rows: [{ entaux_id: 600 }] };
@@ -91,6 +104,7 @@ const coordinadora = {
 } as never;
 
 beforeEach(() => {
+  cruzada = false;
   entrenadorActual = ENTRENADOR;
   disciplina = { colacthor_id: 60, col_id: 14, est_id: 1 };
   yaLaTiene = false;
@@ -177,6 +191,14 @@ describe('asignar', () => {
     expect(sqls.some((s) => s.includes('SET entasig_fecha_fin = CURRENT_DATE'))).toBe(true);
     expect(sqls.some((s) => s.includes('RETURNING entasig_id'))).toBe(true);
   });
+
+  it('no deja darle una disciplina que se le cruza con otra suya, y dice cual', async () => {
+    cruzada = true;
+    await expect(service.asignar(coordinadora, 76, { colacthor_id: 135 })).rejects.toMatchObject({
+      statusCode: 409,
+      message: expect.stringContaining('se cruzan el lunes'),
+    });
+  });
 });
 
 describe('auxiliares', () => {
@@ -194,11 +216,15 @@ describe('auxiliares', () => {
     });
   });
 
-  it('no puede respaldar a dos titulares a la vez', async () => {
+  it('puede respaldar a otro titular aunque ya respalde a uno', async () => {
     auxiliarYaAtado = { entaux_id: 15, ent_id: 60, usu_nombre: 'Alex Lopez' };
+    await expect(service.atarAuxiliar(coordinadora, 76, 85)).resolves.toBeDefined();
+  });
+
+  it('no se ata dos veces al mismo titular', async () => {
+    auxiliarYaAtado = { entaux_id: 15, ent_id: 76, usu_nombre: 'Titular' };
     await expect(service.atarAuxiliar(coordinadora, 76, 85)).rejects.toMatchObject({
       statusCode: 409,
-      message: expect.stringContaining('Alex Lopez'),
     });
   });
 

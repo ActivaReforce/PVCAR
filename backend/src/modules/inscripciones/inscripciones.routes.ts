@@ -11,6 +11,7 @@ import {
   envioSchema,
   abrirSchema,
   cuentaBancariaSchema,
+  maxDisciplinasSchema,
   idParamSchema,
   listarSchema,
   membreteSchema,
@@ -297,6 +298,21 @@ inscripcionesRouter.put(
       const { texto } = cuentaBancariaSchema.parse(req.body);
       await service.guardarCuentaBancaria(actor(req), texto);
       res.json({ data: { cuenta_bancaria: texto }, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Cuántas disciplinas puede elegir cada alumno en el formulario público. */
+inscripcionesRouter.put(
+  '/config/max-disciplinas',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { maximo } = maxDisciplinasSchema.parse(req.body);
+      await service.guardarMaxDisciplinas(actor(req), maximo);
+      res.json({ data: { max_disciplinas: maximo }, error: null });
     } catch (err) {
       next(err);
     }
