@@ -25,11 +25,11 @@ const materiales = z
   .optional();
 
 /**
- * Colores de la actividad (0022). Se guarda el nombre; los tonos pastel los
+ * Colores de la actividad (0022, paleta sobria desde la 0023). Se guarda el nombre; los tonos pastel los
  * pone el frontend (lib/colores.ts). Tiene que coincidir con el CHECK.
  */
 export const COLORES_ACTIVIDAD = [
-  'rosa', 'coral', 'menta', 'verde', 'turquesa', 'cielo', 'azul', 'lavanda', 'violeta', 'gris',
+  'marino', 'acero', 'cielo', 'petroleo', 'bosque', 'oliva', 'piedra', 'grafito', 'indigo', 'vino',
 ] as const;
 
 /** null = sin color. */
