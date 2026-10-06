@@ -632,8 +632,13 @@ const USUARIO_EXISTENTE = `
                 OR upper(trim(u.usu_cedula)) = upper(trim(i.ins_representante->>'cedula')))
 `;
 
+/**
+ * `usuId`: solo las de ese representante (quien no es Propietario ni Admin
+ * solo ve las suyas). null = todas.
+ */
 export async function listar(
   query: ListarInscripcionesQuery,
+  usuId: number | null,
 ): Promise<{ items: InscripcionListada[]; total: number }> {
   const buscar = query.buscar && query.buscar.length > 0 ? query.buscar : null;
   const { rows } = await getPool().query<
@@ -655,9 +660,10 @@ export async function listar(
             count(*) OVER() AS total
        FROM public.inscripcion i
       WHERE ${F_LISTA}
+        AND ($6::int IS NULL OR i.usu_id = $6)
       ORDER BY (i.ins_estado = 'pendiente') DESC, i.ins_fecha DESC, i.ins_id DESC
       LIMIT $3 OFFSET $4`,
-    [query.estado ?? null, buscar, query.limit, offsetDe(query), query.colegio ?? null],
+    [query.estado ?? null, buscar, query.limit, offsetDe(query), query.colegio ?? null, usuId],
   );
   const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
   return {
@@ -666,11 +672,15 @@ export async function listar(
   };
 }
 
-export async function contarPorEstado(): Promise<{ pendientes: number; aprobadas: number }> {
+export async function contarPorEstado(
+  usuId: number | null,
+): Promise<{ pendientes: number; aprobadas: number }> {
   const { rows } = await getPool().query<{ pendientes: number; aprobadas: number }>(
     `SELECT count(*) FILTER (WHERE ins_estado = 'pendiente')::int AS pendientes,
             count(*) FILTER (WHERE ins_estado = 'aprobada')::int  AS aprobadas
-       FROM public.inscripcion`,
+       FROM public.inscripcion
+      WHERE ($1::int IS NULL OR usu_id = $1)`,
+    [usuId],
   );
   return rows[0] ?? { pendientes: 0, aprobadas: 0 };
 }

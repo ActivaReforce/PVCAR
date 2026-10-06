@@ -105,13 +105,30 @@ function actor(req: Request) {
   return req.user;
 }
 
+/**
+ * Quien no es Propietario ni Admin (un representante con permiso de ver)
+ * solo puede pedir su lista y la ficha de las suyas. Todo lo demás
+ * (documentos, valores de los colegios, configuración, abrir y cerrar,
+ * aprobar, rechazar) es del personal, tenga el permiso que tenga.
+ */
+inscripcionesRouter.use((req: Request, _res: Response, next: NextFunction) => {
+  try {
+    if (service.esPersonal(actor(req))) return next();
+    const lectura = req.method === 'GET' && (req.path === '/' || /^\/\d+$/.test(req.path));
+    if (!lectura) throw new ApiError(403, 'Solo el personal de Activa Reforce puede hacer esto');
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 inscripcionesRouter.get(
   '/',
   requirePermission('inscripciones', 'ver'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const query = listarSchema.parse(req.query);
-      res.json({ data: await service.listar(query), error: null });
+      res.json({ data: await service.listar(actor(req), query), error: null });
     } catch (err) {
       next(err);
     }
@@ -363,7 +380,7 @@ inscripcionesRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
-      res.json({ data: await service.detalle(id), error: null });
+      res.json({ data: await service.detalle(actor(req), id), error: null });
     } catch (err) {
       next(err);
     }

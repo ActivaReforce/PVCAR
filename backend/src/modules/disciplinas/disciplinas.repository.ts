@@ -118,7 +118,8 @@ const DESDE = `
 function params(query: ListarDisciplinasQuery, alcance: Alcance): unknown[] {
   return [
     alcance.global,
-    alcance.disciplinas,
+    // El representante ve en la lista las disciplinas de sus hijos (y nada más).
+    [...new Set([...alcance.disciplinas, ...alcance.disciplinasDeHijos])],
     query.buscar && query.buscar.length > 0 ? query.buscar : null,
     query.colegio ?? null,
     query.actividad ?? null,

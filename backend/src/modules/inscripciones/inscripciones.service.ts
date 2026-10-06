@@ -5,7 +5,7 @@ import { frontendBaseUrl } from '../../config/env.js';
 import { ApiError } from '../../middleware/error.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { auditar } from '../../lib/auditoria.js';
-import { ESTADO } from '../../lib/constants.js';
+import { ESTADO, ROLES_GLOBALES } from '../../lib/constants.js';
 import { enTransaccion } from '../../lib/tx.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { enviarCorreo, escaparHtml } from '../../lib/correo.js';
@@ -609,8 +609,21 @@ export interface ListaInscripciones extends Pagina<repo.InscripcionListada> {
   conteos: { pendientes: number; aprobadas: number };
 }
 
-export async function listar(query: ListarInscripcionesQuery): Promise<ListaInscripciones> {
-  const [{ items, total }, conteos] = await Promise.all([repo.listar(query), repo.contarPorEstado()]);
+/**
+ * Propietario y Admin ven todas las inscripciones. Cualquier otro con el
+ * permiso de verlas (un representante) solo ve las suyas: las que le dieron
+ * de alta, con sus hijos (decisión del cliente, 2026-10-05).
+ */
+export function esPersonal(actor: AuthUser): boolean {
+  return actor.usuario.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id));
+}
+
+export async function listar(actor: AuthUser, query: ListarInscripcionesQuery): Promise<ListaInscripciones> {
+  const usuId = esPersonal(actor) ? null : actor.usuario.usu_id;
+  const [{ items, total }, conteos] = await Promise.all([
+    repo.listar(query, usuId),
+    repo.contarPorEstado(usuId),
+  ]);
   return { ...armarPagina(items, total, query), conteos };
 }
 
@@ -670,9 +683,13 @@ export function bloqueosDeAprobacion(
   return [...bloqueos, ...problemasDisciplinas];
 }
 
-export async function detalle(insId: number): Promise<InscripcionDetalle> {
+export async function detalle(actor: AuthUser, insId: number): Promise<InscripcionDetalle> {
   const fila = await repo.obtener(insId);
-  if (!fila) throw new ApiError(404, 'Inscripción no encontrada');
+  // A un representante, una que no es suya es como si no existiera.
+  const personal = esPersonal(actor);
+  if (!fila || (!personal && fila.usu_id !== actor.usuario.usu_id)) {
+    throw new ApiError(404, 'Inscripción no encontrada');
+  }
 
   const [ninos, aceptaciones] = await Promise.all([repo.ninosDe(insId), repo.aceptacionesDe(insId)]);
   const ids = [...new Set(ninos.flatMap((n) => n.insnino_disciplinas))];
@@ -701,8 +718,10 @@ export async function detalle(insId: number): Promise<InscripcionDetalle> {
   return {
     ...resto,
     comprobante_url: firmadas.get(ins_comprobante) ?? null,
-    coincidencias,
-    bloqueos: pendiente ? bloqueosDeAprobacion(coincidencias, problemas) : [],
+    // Lo que sirve para decidir (otros usuarios con su correo o cédula) es
+    // solo del personal.
+    coincidencias: personal ? coincidencias : [],
+    bloqueos: personal && pendiente ? bloqueosDeAprobacion(coincidencias, problemas) : [],
     ninos: ninos.map((n, i) => {
       const propias = n.insnino_disciplinas.map((id) => porId.get(id));
       return {

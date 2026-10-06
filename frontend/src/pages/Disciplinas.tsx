@@ -34,7 +34,11 @@ const POR_PAGINA = 200;
  * de permitidos salía vacía devolvía **todas** las del sistema.
  */
 const Disciplinas = () => {
-  const { canCreate } = usePermissions();
+  const { canCreate, hasPermission } = usePermissions();
+  // Quien no administra (un representante) ve sus disciplinas: sin filtro de
+  // colegio ni de estado, que no le dicen nada.
+  const administra = hasPermission('disciplinas', 'editar');
+  const veColegios = hasPermission('colegios', 'ver');
 
   const [busqueda, setBusqueda] = useState('');
   const [colegio, setColegio] = useState<string>(TODOS);
@@ -47,7 +51,7 @@ const Disciplinas = () => {
   const [aEliminar, setAEliminar] = useState<Disciplina | null>(null);
 
   const dias = useDias();
-  const colegios = useColegios({ limit: 200, orden: 'nombre' });
+  const colegios = useColegios({ limit: 200, orden: 'nombre' }, veColegios);
   const reactivar = useReactivarDisciplina();
 
   const filtros: FiltrosDisciplinas = {
@@ -86,11 +90,11 @@ const Disciplinas = () => {
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-            Gestión de Disciplinas
+            {administra ? 'Gestión de Disciplinas' : 'Disciplinas'}
           </h1>
           {/* Los conteos salen de SQL sobre el filtro actual, no de contar la
               página cargada, que es lo que hacía la pantalla vieja. */}
-          {conteos && (
+          {conteos && administra && (
             <p className="mt-1 text-sm text-muted-foreground">
               {conteos.total} disciplinas · {conteos.alumnos} inscripciones ·{' '}
               <span className={conteos.sinEntrenador > 0 ? 'text-amber-700 dark:text-amber-400' : ''}>
@@ -118,21 +122,23 @@ const Disciplinas = () => {
           className="w-full xl:col-span-2"
         />
 
-        <Select value={colegio} onValueChange={setColegio}>
-          <SelectTrigger className="h-11 sm:h-10">
-            <SelectValue placeholder="Todos los colegios" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TODOS}>Todos los colegios</SelectItem>
-            {(colegios.data?.items ?? []).map((c) => (
-              <SelectItem key={c.col_id} value={String(c.col_id)}>
-                {c.col_nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {veColegios && (
+          <Select value={colegio} onValueChange={setColegio}>
+            <SelectTrigger className="h-11 sm:h-10">
+              <SelectValue placeholder="Todos los colegios" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todos los colegios</SelectItem>
+              {(colegios.data?.items ?? []).map((c) => (
+                <SelectItem key={c.col_id} value={String(c.col_id)}>
+                  {c.col_nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className={administra ? 'grid grid-cols-2 gap-3' : ''}>
           <Select value={dia} onValueChange={setDia}>
             <SelectTrigger className="h-11 sm:h-10">
               <SelectValue placeholder="Todos los días" />
@@ -147,16 +153,18 @@ const Disciplinas = () => {
             </SelectContent>
           </Select>
 
-          <Select value={estado} onValueChange={setEstado}>
-            <SelectTrigger className="h-11 sm:h-10">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">Activas</SelectItem>
-              <SelectItem value="2">De baja</SelectItem>
-              <SelectItem value={TODOS}>Todas</SelectItem>
-            </SelectContent>
-          </Select>
+          {administra && (
+            <Select value={estado} onValueChange={setEstado}>
+              <SelectTrigger className="h-11 sm:h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Activas</SelectItem>
+                <SelectItem value="2">De baja</SelectItem>
+                <SelectItem value={TODOS}>Todas</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 

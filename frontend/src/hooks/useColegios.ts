@@ -23,11 +23,12 @@ const CLAVE = {
   impacto: (id: number) => ['colegios', 'impacto', id] as const,
 };
 
-export function useColegios(filtros: FiltrosColegios) {
+export function useColegios(filtros: FiltrosColegios, enabled = true) {
   return useQuery({
     queryKey: CLAVE.lista(filtros),
     queryFn: () => colegiosApi.listar(filtros),
     placeholderData: (anterior) => anterior,
+    enabled,
   });
 }
 

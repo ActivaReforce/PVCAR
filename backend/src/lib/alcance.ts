@@ -30,15 +30,31 @@ import type { UsuarioConRoles } from '../modules/auth/auth.repository.js';
  *   Coordinador          -> colegio_coordinador, y con ellos sus disciplinas
  *   Entrenador           -> entrenador_asignacion activa -> disciplina
  *   Asistente / Respaldo -> entrenador_auxiliar -> el titular -> sus disciplinas
- *   Representante        -> sus ninos -> nino_asignacion activa -> disciplina
+ *   Representante        -> SOLO sus ninos (ver abajo)
+ *
+ * ---------------------------------------------------------------------------
+ * El representante no suma colegios ni disciplinas (2026-10-05)
+ *
+ * Antes su camino aportaba las disciplinas de sus hijos, y con ellas sus
+ * colegios, al mismo alcance que usa el personal. Eso le abria, con solo
+ * concederle el permiso de ver, a TODOS los alumnos del colegio de su hijo
+ * (Estudiantes filtra por colegio), a la asistencia y las evaluaciones de
+ * los companeros de clase (filtran por disciplina) y a los demas padres.
+ * Ahora un representante solo trae `ninos` (sus hijos) y `disciplinasDeHijos`
+ * (para que Disciplinas le ensene las de sus hijos). Los modulos que no
+ * miran esas dos listas no le ensenan nada: es el valor seguro por defecto.
  */
 export interface Alcance {
   /** True para Propietario y Admin: ven todo y no se les filtra nada. */
   global: boolean;
   /** col_id visibles. Vacio y global=false significa "no ve ningun colegio". */
   colegios: number[];
-  /** colacthor_id visibles (disciplinas). */
+  /** colacthor_id visibles (disciplinas) para el personal. */
   disciplinas: number[];
+  /** nino_id de los hijos, si es representante. */
+  ninos: number[];
+  /** Las disciplinas activas de esos hijos. Solo para listarlas, no da acceso a nada mas. */
+  disciplinasDeHijos: number[];
 }
 
 /**
@@ -84,20 +100,23 @@ const SQL_ALCANCE = `
         AND ea.est_id = $2
         AND ea.entasig_fecha_fin IS NULL
   ),
-  disc_representante AS (
-      SELECT na.colacthor_id
+  hijos AS (
+      SELECT np.nino_id
       FROM public.padre p
       JOIN public.nino_padre np ON np.padre_id = p.padre_id
-      JOIN public.nino_asignacion na ON na.nino_id = np.nino_id
       WHERE p.usu_id = $1
         AND $6::boolean
-        AND na.est_id = $2
+  ),
+  disc_hijos AS (
+      SELECT DISTINCT na.colacthor_id
+      FROM public.nino_asignacion na
+      JOIN hijos h ON h.nino_id = na.nino_id
+      WHERE na.est_id = $2
   ),
   disciplinas AS (
       SELECT colacthor_id FROM disc_coordinador
       UNION SELECT colacthor_id FROM disc_entrenador
       UNION SELECT colacthor_id FROM disc_auxiliar
-      UNION SELECT colacthor_id FROM disc_representante
   ),
   colegios AS (
       SELECT col_id FROM col_coordinador
@@ -108,19 +127,26 @@ const SQL_ALCANCE = `
   )
   SELECT
       COALESCE((SELECT array_agg(col_id ORDER BY col_id) FROM colegios), '{}')                AS colegios,
-      COALESCE((SELECT array_agg(colacthor_id ORDER BY colacthor_id) FROM disciplinas), '{}') AS disciplinas
+      COALESCE((SELECT array_agg(colacthor_id ORDER BY colacthor_id) FROM disciplinas), '{}') AS disciplinas,
+      COALESCE((SELECT array_agg(nino_id ORDER BY nino_id) FROM hijos), '{}')                  AS ninos,
+      COALESCE((SELECT array_agg(colacthor_id ORDER BY colacthor_id) FROM disc_hijos), '{}')  AS disciplinas_hijos
 `;
 
 export async function alcanceDe(usuario: UsuarioConRoles): Promise<Alcance> {
   const esGlobal = usuario.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id));
 
   if (esGlobal) {
-    return { global: true, colegios: [], disciplinas: [] };
+    return { global: true, colegios: [], disciplinas: [], ninos: [], disciplinasDeHijos: [] };
   }
 
   const tiene = (rolId: number): boolean => usuario.roles.some((r) => r.rol_id === rolId);
 
-  const { rows } = await getPool().query<{ colegios: number[]; disciplinas: number[] }>(
+  const { rows } = await getPool().query<{
+    colegios: number[];
+    disciplinas: number[];
+    ninos?: number[];
+    disciplinas_hijos?: number[];
+  }>(
     SQL_ALCANCE,
     [
       usuario.usu_id,
@@ -136,6 +162,8 @@ export async function alcanceDe(usuario: UsuarioConRoles): Promise<Alcance> {
     global: false,
     colegios: rows[0]?.colegios ?? [],
     disciplinas: rows[0]?.disciplinas ?? [],
+    ninos: rows[0]?.ninos ?? [],
+    disciplinasDeHijos: rows[0]?.disciplinas_hijos ?? [],
   };
 }
 

@@ -18,6 +18,21 @@ import FichaInscripcion from '@/components/inscripciones/FichaInscripcion';
 import DocumentosLegales from '@/components/inscripciones/DocumentosLegales';
 import { EstadoGeneral } from '@/components/inscripciones/EstadoInscripciones';
 import { fechaHora } from '@/components/inscripciones/formato';
+import MisInscripciones from '@/components/inscripciones/MisInscripciones';
+import { useAuth } from '@/contexts/AuthContext';
+import { ROL } from '@/hooks/useUserForm';
+
+const GLOBALES: number[] = [ROL.PROPIETARIO, ROL.ADMIN];
+
+/**
+ * El personal (Propietario y Admin) administra; cualquier otro con permiso de
+ * ver (un representante) solo ve las suyas. El backend aplica lo mismo.
+ */
+const Inscripciones = () => {
+  const { user } = useAuth();
+  const esPersonal = user?.roles.some((r) => GLOBALES.includes(r.rol_id)) ?? false;
+  return esPersonal ? <InscripcionesPersonal /> : <MisInscripciones />;
+};
 
 const TODAS = 'todas';
 
@@ -28,7 +43,7 @@ const TODAS = 'todas';
  * llega por correo. Aquí se revisa cada envío —datos, contrato y comprobante—
  * y se aprueba (nacen la cuenta y los alumnos) o se rechaza (se borra).
  */
-const Inscripciones = () => {
+const InscripcionesPersonal = () => {
   const { toast } = useToast();
   const [estado, setEstado] = useState<string>('pendiente');
   const [busqueda, setBusqueda] = useState('');
