@@ -4,7 +4,7 @@ import { ApiError } from '@/lib/api';
 import {
   disciplinasApi,
   type DatosDisciplina,
-  type DatosLote,
+  type DatosNuevaDisciplina,
   type FiltrosDisciplinas,
 } from '@/api/disciplinas';
 
@@ -83,8 +83,8 @@ function useMutacion<TVars, TData>(fn: (vars: TVars) => Promise<TData>, exito: s
   });
 }
 
-export function useCrearDisciplinas() {
-  return useMutacion((datos: DatosLote) => disciplinasApi.crear(datos), 'Disciplinas creadas');
+export function useCrearDisciplina() {
+  return useMutacion((datos: DatosNuevaDisciplina) => disciplinasApi.crear(datos), 'Disciplina creada');
 }
 
 export function useActualizarDisciplina() {

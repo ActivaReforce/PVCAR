@@ -75,7 +75,7 @@ const EliminarDisciplinaDialog = ({ disciplina, onClose, onEliminado }: Props) =
           </DialogTitle>
           <DialogDescription className="break-words">
             <strong>{disciplina?.act_nombre}</strong> en {disciplina?.col_nombre},{' '}
-            {disciplina?.dia_nombre.toLowerCase()}.
+            {disciplina?.horario_texto}.
             <strong> Esta acción no se puede deshacer.</strong>
           </DialogDescription>
         </DialogHeader>

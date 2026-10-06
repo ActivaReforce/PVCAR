@@ -53,8 +53,7 @@ const BajaDisciplinaDialog = ({ disciplina, onClose, onHecho }: Props) => {
           </DialogTitle>
           <DialogDescription className="break-words">
             <strong>{disciplina?.act_nombre}</strong> en {disciplina?.col_nombre},{' '}
-            {disciplina?.dia_nombre.toLowerCase()} a las{' '}
-            {disciplina?.colacthor_hora_inicio?.slice(0, 5)}. Dejará de aparecer en el calendario y
+            {disciplina?.horario_texto}. Dejará de aparecer en el calendario y
             en las pantallas de asistencia.
           </DialogDescription>
         </DialogHeader>

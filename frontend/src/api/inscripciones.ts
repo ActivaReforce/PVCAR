@@ -1,3 +1,4 @@
+import type { HorarioDisciplina } from '@/api/disciplinas';
 import { api } from '@/lib/api';
 
 /**
@@ -38,10 +39,10 @@ export interface DisciplinaOfertada {
   col_id: number;
   actividad: string;
   categoria: string | null;
-  dia: string;
-  dia_id: number;
-  hora_inicio: string;
-  hora_fin: string;
+  /** Sus días con su hora: una disciplina se paga una vez. */
+  horarios: HorarioDisciplina[];
+  /** "Lun y Mié 15:00–16:00". */
+  horario: string;
 }
 
 export interface ColegioOfertado {
@@ -88,6 +89,8 @@ export interface Formulario {
   documentos: Partial<Record<TipoDocumento, DocumentoLegal>>;
   /** A dónde transferir el pago. */
   cuenta_bancaria: string | null;
+  /** Cuántas disciplinas puede elegir cada alumno. */
+  max_disciplinas: number;
 }
 
 export interface Factura {
@@ -324,6 +327,8 @@ export interface DatosPrecio {
 export interface ConfigInscripciones {
   /** A dónde se transfiere el pago. Texto libre, con saltos de línea. */
   cuenta_bancaria: string | null;
+  /** Tope de disciplinas por alumno en el formulario público. */
+  max_disciplinas: number;
   /** false = el membrete de serie (el de los Word del cliente). */
   membrete_propio: boolean;
   membrete_data_url: string | null;
@@ -387,6 +392,8 @@ export const inscripcionesApi = {
     api.put<{ membrete_propio: boolean }>('/inscripciones/config/membrete', datos),
   guardarCuentaBancaria: (texto: string) =>
     api.put<{ cuenta_bancaria: string | null }>('/inscripciones/config/cuenta-bancaria', { texto }),
+  guardarMaxDisciplinas: (maximo: number) =>
+    api.put<{ max_disciplinas: number }>('/inscripciones/config/max-disciplinas', { maximo }),
   restaurarMembrete: () =>
     api.delete<{ membrete_propio: boolean }>('/inscripciones/config/membrete'),
 };

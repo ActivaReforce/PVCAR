@@ -1,3 +1,4 @@
+import type { HorarioDisciplina } from '@/api/disciplinas';
 import { api } from '@/lib/api';
 
 /**
@@ -39,10 +40,9 @@ export interface Asignacion {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  horarios: HorarioDisciplina[];
+  /** "Lun y Mié 15:00–16:00". */
+  horario_texto: string | null;
   entasig_fecha_inicio: string;
   entasig_fecha_fin: string | null;
   est_id: number;
@@ -99,10 +99,9 @@ export interface DisciplinaDisponible {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  horarios: HorarioDisciplina[];
+  /** "Lun y Mié 15:00–16:00". */
+  horario_texto: string | null;
   alumnos: number;
   /** Quién la da ahora, si la da alguien. Asignarla exige `reemplazar`. */
   entrenador_actual: string | null;

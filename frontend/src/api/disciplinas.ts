@@ -3,7 +3,8 @@ import { api } from '@/lib/api';
 /**
  * Cliente de Disciplinas: el eje del modelo.
  *
- * Una disciplina es colegio + actividad + día + franja horaria. De ella
+ * Una disciplina es colegio + actividad + sus días, cada uno con su hora
+ * (Disciplinas v2: "Fútbol lunes 15:00 y miércoles 16:00" es UNA). De ella
  * cuelgan inscripciones, asignaciones de entrenador, evaluaciones y
  * asistencias — las cuatro sin cascada, así que una disciplina usada no se
  * borra: se da de baja.
@@ -14,6 +15,14 @@ export interface EntrenadorDeDisciplina {
   usu_nombre: string;
 }
 
+/** Un día de la disciplina con su hora ("15:00"). */
+export interface HorarioDisciplina {
+  dia_id: number;
+  dia_nombre: string;
+  inicio: string;
+  fin: string;
+}
+
 export interface Disciplina {
   colacthor_id: number;
   col_id: number;
@@ -21,10 +30,10 @@ export interface Disciplina {
   act_id: number;
   act_nombre: string;
   cat_nombre: string | null;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  /** Ordenados de lunes a domingo. */
+  horarios: HorarioDisciplina[];
+  /** "Lun y Mié 15:00–16:00". */
+  horario_texto: string | null;
   est_id: number;
   colacthor_fecha_creacion: string | null;
   entrenadores: EntrenadorDeDisciplina[];
@@ -65,22 +74,21 @@ export interface FiltrosDisciplinas {
 
 export interface Franja {
   dia_id: number;
-  colacthor_hora_inicio: string;
-  colacthor_hora_fin: string;
+  inicio: string;
+  fin: string;
 }
 
-export interface DatosLote {
+export interface DatosNuevaDisciplina {
   col_id: number;
   act_id: number;
   horarios: Franja[];
 }
 
+/** `horarios` reemplaza la lista entera. */
 export interface DatosDisciplina {
   col_id?: number;
   act_id?: number;
-  dia_id?: number;
-  colacthor_hora_inicio?: string;
-  colacthor_hora_fin?: string;
+  horarios?: Franja[];
 }
 
 export interface PrevioBaja {
@@ -121,8 +129,8 @@ export const disciplinasApi = {
 
   obtener: (id: number) => api.get<Disciplina>(`/disciplinas/${id}`),
 
-  /** Alta por lote: un colegio, una actividad y varias franjas de una vez. */
-  crear: (datos: DatosLote) => api.post<Disciplina[]>('/disciplinas', datos),
+  /** Una disciplina con todos sus días. */
+  crear: (datos: DatosNuevaDisciplina) => api.post<Disciplina>('/disciplinas', datos),
 
   actualizar: (id: number, datos: DatosDisciplina) =>
     api.patch<Disciplina>(`/disciplinas/${id}`, datos),

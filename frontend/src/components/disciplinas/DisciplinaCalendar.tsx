@@ -16,7 +16,8 @@ interface Props {
  *
  * Pedido del cliente al probar la Fase 8: una sección por colegio y, dentro,
  * su semana de lunes a domingo. Cada disciplina es una tarjeta compacta
- * (actividad y hora) que despliega el detalle.
+ * (actividad y hora) que despliega el detalle, y sale en **cada uno de sus
+ * días** con la hora de ese día (Disciplinas v2: una disciplina tiene varios).
  *
  * Un solo markup para todos los anchos: desde `lg` la semana son siete
  * columnas de un ancho mínimo legible (si no caben, se desliza en horizontal
@@ -70,7 +71,11 @@ const DisciplinaCalendar = ({
               <div className="max-w-full lg:overflow-x-auto lg:pb-1">
                 <div className="grid grid-cols-1 gap-3 lg:min-w-[61rem] lg:grid-cols-[repeat(7,minmax(8.5rem,1fr))] lg:gap-2">
                   {dias.map((dia) => {
-                    const delDia = lista.filter((d) => d.dia_id === dia.dia_id);
+                    const horaDe = (d: Disciplina) =>
+                      d.horarios.find((h) => h.dia_id === dia.dia_id)?.inicio ?? "";
+                    const delDia = lista
+                      .filter((d) => d.horarios.some((h) => h.dia_id === dia.dia_id))
+                      .sort((a, b) => horaDe(a).localeCompare(horaDe(b)));
                     return (
                       <div
                         key={dia.dia_id}
@@ -86,6 +91,7 @@ const DisciplinaCalendar = ({
                             <DisciplinaCard
                               key={d.colacthor_id}
                               disciplina={d}
+                              diaId={dia.dia_id}
                               onEdit={onEdit}
                               onBaja={onBaja}
                               onReactivar={onReactivar}

@@ -17,32 +17,32 @@ import type { Disciplina } from '@/api/disciplinas';
 
 interface Props {
   disciplina: Disciplina;
+  /** El día de la columna donde se pinta: la hora del subtítulo es la de ese día. */
+  diaId: number;
   onEdit: (d: Disciplina) => void;
   onBaja: (d: Disciplina) => void;
   onReactivar: (d: Disciplina) => void;
   onEliminar: (d: Disciplina) => void;
 }
 
-/** 15:00:00 → 15:00. La hora viene de Postgres con segundos. */
-const hhmm = (hora: string | null) => hora?.slice(0, 5) ?? '--:--';
-
 /**
- * Una disciplina dentro de su colegio y su día.
+ * Una disciplina dentro de su colegio y uno de sus días.
  *
  * A la vista, solo la actividad y la hora con su menú; el resto se despliega.
  * **Sin entrenador** lleva borde ámbar fuerte —es lo primero que hay que
  * resolver cada periodo— y, para quien puede asignar, el selector para
  * resolverlo ahí mismo.
  */
-const DisciplinaCard = ({ disciplina, onEdit, onBaja, onReactivar, onEliminar }: Props) => {
+const DisciplinaCard = ({ disciplina, diaId, onEdit, onBaja, onReactivar, onEliminar }: Props) => {
   const { canEdit } = usePermissions();
   const activa = disciplina.est_id === 1;
   const sinEntrenador = activa && disciplina.entrenadores.length === 0;
-  const horario = `${hhmm(disciplina.colacthor_hora_inicio)} – ${hhmm(disciplina.colacthor_hora_fin)}`;
+  const hoy = disciplina.horarios.find((h) => h.dia_id === diaId);
+  const horario = hoy ? `${hoy.inicio} – ${hoy.fin}` : '--:--';
 
   return (
     <TarjetaDesplegable
-      id={`disc-${disciplina.colacthor_id}`}
+      id={`disc-${disciplina.colacthor_id}-${diaId}`}
       titulo={disciplina.act_nombre}
       subtitulo={horario}
       aviso={sinEntrenador}
@@ -101,7 +101,7 @@ const DisciplinaCard = ({ disciplina, onEdit, onBaja, onReactivar, onEliminar }:
       </p>
       <p className="flex items-center gap-1.5">
         <CalendarDays className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-        {disciplina.dia_nombre} · {horario}
+        <span className="break-words">{disciplina.horario_texto ?? 'Sin horario'}</span>
       </p>
       <p className="flex items-start gap-1.5">
         <UserCog className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />

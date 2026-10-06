@@ -25,7 +25,6 @@ interface Props {
   onClose: () => void;
 }
 
-const hhmm = (hora: string | null) => hora?.slice(0, 5) ?? '--:--';
 
 /**
  * Asignar disciplinas a un entrenador.
@@ -58,18 +57,19 @@ const AsignarDisciplinaModal = ({ entrenador, onClose }: Props) => {
   const colegios = [...new Map(todas.map((d) => [d.col_id, d.col_nombre])).entries()].sort(
     ([, a], [, b]) => a.localeCompare(b, 'es'),
   );
-  const dias = [...new Map(todas.map((d) => [d.dia_id, d.dia_nombre])).entries()].sort(
-    ([a], [b]) => a - b,
-  );
+  const dias = [
+    ...new Map(todas.flatMap((d) => d.horarios.map((h) => [h.dia_id, h.dia_nombre] as const))).entries(),
+  ].sort(([a], [b]) => a - b);
   const libres = todas.filter((d) => !d.entrenador_actual).length;
 
   const sinTildes = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const lista = todas.filter((d) => {
     if (soloLibres && d.entrenador_actual) return false;
     if (colegio !== TODOS && d.col_id !== Number(colegio)) return false;
-    if (dia !== TODOS && d.dia_id !== Number(dia)) return false;
+    if (dia !== TODOS && !d.horarios.some((h) => h.dia_id === Number(dia))) return false;
     if (!busqueda.trim()) return true;
-    return sinTildes(`${d.act_nombre} ${d.col_nombre} ${d.dia_nombre}`).includes(
+    const diasTexto = d.horarios.map((h) => h.dia_nombre).join(' ');
+    return sinTildes(`${d.act_nombre} ${d.col_nombre} ${diasTexto}`).includes(
       sinTildes(busqueda.trim()),
     );
   });
@@ -189,11 +189,10 @@ const AsignarDisciplinaModal = ({ entrenador, onClose }: Props) => {
                   >
                     <div className="min-w-0">
                       <p className="break-words font-medium">{d.act_nombre}</p>
-                      <p className="text-sm text-muted-foreground">{d.dia_nombre}</p>
                       <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {hhmm(d.colacthor_hora_inicio)}–{hhmm(d.colacthor_hora_fin)}
+                          {d.horario_texto}
                         </span>
                         <span className="flex items-center gap-1">
                           <GraduationCap className="h-3 w-3" />
@@ -234,7 +233,7 @@ const AsignarDisciplinaModal = ({ entrenador, onClose }: Props) => {
               </DialogTitle>
               <DialogDescription className="break-words">
                 <strong>{aReemplazar?.act_nombre}</strong> ({aReemplazar?.col_nombre},{' '}
-                {aReemplazar?.dia_nombre.toLowerCase()}) la da{' '}
+                {aReemplazar?.horario_texto}) la da{' '}
                 <strong>{aReemplazar?.entrenador_actual}</strong>. Se cerrará su asignación con la
                 fecha de hoy y se abrirá la de {entrenador?.usu_nombre}. El historial de asistencias
                 no se toca.

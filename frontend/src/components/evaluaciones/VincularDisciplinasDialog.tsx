@@ -62,8 +62,7 @@ const VincularDisciplinasDialog = ({ evaluacion, onClose }: Props) => {
       colacthor_id: v.colacthor_id,
       col_nombre: v.col_nombre,
       act_nombre: v.act_nombre,
-      dia_nombre: v.dia_nombre,
-      hora: v.colacthor_hora_inicio,
+      horario: v.horario_texto,
       alumnos: v.alumnos,
       evaluados: v.evaluados,
       estuvo: false,
@@ -72,8 +71,7 @@ const VincularDisciplinasDialog = ({ evaluacion, onClose }: Props) => {
       colacthor_id: d.colacthor_id,
       col_nombre: d.col_nombre,
       act_nombre: d.act_nombre,
-      dia_nombre: d.dia_nombre,
-      hora: d.colacthor_hora_inicio,
+      horario: d.horario_texto,
       alumnos: d.alumnos,
       evaluados: 0,
       estuvo: d.estuvo,
@@ -172,7 +170,7 @@ const VincularDisciplinasDialog = ({ evaluacion, onClose }: Props) => {
                 <label htmlFor={`disc-${d.colacthor_id}`} className="min-w-0 flex-1 cursor-pointer">
                   <div className="truncate font-medium">{d.act_nombre}</div>
                   <div className="truncate text-sm text-muted-foreground">
-                    {d.col_nombre} · {d.dia_nombre} {d.hora ?? ''} · {d.alumnos} alumno
+                    {d.col_nombre} · {d.horario ?? ''} · {d.alumnos} alumno
                     {d.alumnos === 1 ? '' : 's'}
                   </div>
                   {d.evaluados > 0 && (

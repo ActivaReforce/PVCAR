@@ -1,3 +1,4 @@
+import type { HorarioDisciplina } from '@/api/disciplinas';
 import { api } from '@/lib/api';
 
 /**
@@ -35,10 +36,9 @@ export interface Sesion {
   col_nombre: string;
   act_id: number;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  horarios: HorarioDisciplina[];
+  /** "Lun y Mié 15:00–16:00". */
+  horario_texto: string | null;
   est_id: number;
   entrenadores: string[];
 }

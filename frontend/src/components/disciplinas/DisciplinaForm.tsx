@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { AlertTriangle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -13,8 +12,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useColegios } from '@/hooks/useColegios';
 import { useActividades } from '@/hooks/useActividades';
-import { useActualizarDisciplina, useDias, useImpactoDisciplina } from '@/hooks/useDisciplinas';
-import type { Disciplina } from '@/api/disciplinas';
+import { useActualizarDisciplina, useImpactoDisciplina } from '@/hooks/useDisciplinas';
+import type { Disciplina, Franja } from '@/api/disciplinas';
+import { problemaDeHorarios } from '@/lib/horarios';
+import HorariosEditor from './HorariosEditor';
 
 interface Props {
   disciplina: Disciplina;
@@ -22,33 +23,28 @@ interface Props {
   onCancel: () => void;
 }
 
-const hhmm = (hora: string | null) => hora?.slice(0, 5) ?? '';
+const aFranjas = (d: Disciplina): Franja[] =>
+  d.horarios.map((h) => ({ dia_id: h.dia_id, inicio: h.inicio, fin: h.fin }));
 
 /**
- * Edición de una disciplina.
+ * Edición de una disciplina: colegio, actividad y sus días con su hora.
  *
- * Si ya tiene alumnos o evaluaciones, cambiarle el día o la hora reescribe la
- * historia: las asistencias guardan su fecha, pero la sesión a la que
- * pertenecen pasa a ser otra. No se bloquea —los horarios cambian de verdad—
- * pero se avisa antes, que es lo que no hacía el sistema viejo.
+ * Los horarios se pueden cambiar aunque tenga historia —los horarios cambian
+ * de verdad— y se avisa antes. Lo que el backend no deja es que el cambio
+ * cruce a un alumno o a un entrenador con su otra disciplina: entonces
+ * responde 409 con los nombres, y el aviso los enseña.
  */
 const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
   const { toast } = useToast();
-  const dias = useDias();
   const colegios = useColegios({ limit: 200, orden: 'nombre' });
   const actividades = useActividades({ limit: 200, orden: 'nombre' });
   const actualizar = useActualizarDisciplina();
 
   const [colId, setColId] = useState(String(disciplina.col_id));
   const [actId, setActId] = useState(String(disciplina.act_id));
-  const [diaId, setDiaId] = useState(String(disciplina.dia_id));
-  const [horaInicio, setHoraInicio] = useState(hhmm(disciplina.colacthor_hora_inicio));
-  const [horaFin, setHoraFin] = useState(hhmm(disciplina.colacthor_hora_fin));
+  const [horarios, setHorarios] = useState<Franja[]>(() => aFranjas(disciplina));
 
-  const cambiaHorario =
-    diaId !== String(disciplina.dia_id) ||
-    horaInicio !== hhmm(disciplina.colacthor_hora_inicio) ||
-    horaFin !== hhmm(disciplina.colacthor_hora_fin);
+  const cambiaHorario = JSON.stringify(horarios) !== JSON.stringify(aFranjas(disciplina));
 
   const tieneHistorial = disciplina.alumnos > 0 || disciplina.evaluaciones > 0;
 
@@ -65,11 +61,9 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (horaFin <= horaInicio) {
-      toast({
-        title: 'La hora de fin tiene que ser posterior a la de inicio',
-        variant: 'destructive',
-      });
+    const problema = problemaDeHorarios(horarios);
+    if (problema) {
+      toast({ title: problema, variant: 'destructive' });
       return;
     }
 
@@ -78,9 +72,7 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
         id: disciplina.colacthor_id,
         datos: {
           ...(identidadFija ? {} : { col_id: Number(colId), act_id: Number(actId) }),
-          dia_id: Number(diaId),
-          colacthor_hora_inicio: horaInicio,
-          colacthor_hora_fin: horaFin,
+          ...(cambiaHorario ? { horarios } : {}),
         },
       });
       onSuccess();
@@ -123,46 +115,9 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
             </SelectContent>
           </Select>
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="edit_dia">Día</Label>
-          <Select value={diaId} onValueChange={setDiaId}>
-            <SelectTrigger id="edit_dia" className="h-11 sm:h-10">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(dias.data ?? []).map((d) => (
-                <SelectItem key={d.dia_id} value={String(d.dia_id)}>
-                  {d.dia_nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label htmlFor="edit_inicio">Inicio</Label>
-            <Input
-              id="edit_inicio"
-              type="time"
-              value={horaInicio}
-              onChange={(e) => setHoraInicio(e.target.value)}
-              className="h-11 sm:h-10"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit_fin">Fin</Label>
-            <Input
-              id="edit_fin"
-              type="time"
-              value={horaFin}
-              onChange={(e) => setHoraFin(e.target.value)}
-              className="h-11 sm:h-10"
-            />
-          </div>
-        </div>
       </div>
+
+      <HorariosEditor value={horarios} onChange={setHorarios} />
 
       {identidadFija && impacto.data && (
         <p className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -179,8 +134,9 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
           <p>
             Esta disciplina tiene {disciplina.alumnos} alumnos
             {disciplina.evaluaciones > 0 && ` y ${disciplina.evaluaciones} evaluaciones`}. Cambiar
-            el día o la hora no mueve las asistencias ya registradas: quedarán con su fecha
-            original pero bajo el horario nuevo.
+            los días o las horas no mueve las asistencias ya registradas: quedan con su fecha. Si
+            el cambio cruza a algún alumno o entrenador con su otra disciplina, no se guardará y
+            te dirá a quién.
           </p>
         </div>
       )}

@@ -109,12 +109,28 @@ const AsistenciasAlumnos = () => {
     (d) => String(d.colacthor_id) === disciplina,
   );
 
-  /** Al cambiar de disciplina se propone su última sesión pasada. */
+  /**
+   * Al cambiar de disciplina se propone su última sesión pasada. Una
+   * disciplina tiene varios días: si el filtro de día es uno de ellos, la de
+   * ese día; si no, la más reciente de cualquiera de sus días.
+   */
   useEffect(() => {
-    if (elegida && hoy) setFecha(ultimaFechaDe(elegida.dia_id, hoy));
+    if (!elegida || !hoy) return;
+    const suyos = elegida.horarios.map((h) => h.dia_id);
+    const candidatos = dia !== TODOS && suyos.includes(Number(dia)) ? [Number(dia)] : suyos;
+    const fechas = candidatos.map((d) => ultimaFechaDe(d, hoy)).sort();
+    if (fechas.length > 0) setFecha(fechas[fechas.length - 1]!);
+    // El filtro de día solo cuenta al elegir la disciplina.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elegida, hoy]);
 
-  const fechaCuadra = elegida !== undefined && fecha !== '' && diaDe(fecha) === elegida.dia_id;
+  /** El horario de la clase de esa fecha, si cae en uno de sus días. */
+  const deEseDia =
+    elegida && fecha !== '' ? elegida.horarios.find((h) => h.dia_id === diaDe(fecha)) : undefined;
+  const fechaCuadra = deEseDia !== undefined;
+  const susDias = (elegida?.horarios ?? []).map((h) => h.dia_nombre.toLowerCase());
+  const susDiasTexto =
+    susDias.length > 1 ? `${susDias.slice(0, -1).join(', ')} y ${susDias.at(-1)}` : (susDias[0] ?? '');
 
   const lista = useAsistenciaAlumnos(
     elegida && fechaCuadra ? elegida.colacthor_id : null,
@@ -222,7 +238,7 @@ const AsistenciasAlumnos = () => {
             <SelectContent>
               {(disciplinas.data?.items ?? []).map((d) => (
                 <SelectItem key={d.colacthor_id} value={String(d.colacthor_id)}>
-                  {d.act_nombre} · {d.dia_nombre} {d.colacthor_hora_inicio ?? ''}
+                  {d.act_nombre} · {d.horario_texto ?? ''}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -245,9 +261,8 @@ const AsistenciasAlumnos = () => {
 
       {elegida && fecha !== '' && !fechaCuadra && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-          {elegida.act_nombre} es de los {elegida.dia_nombre.toLowerCase()} y el{' '}
-          {enLetras(fecha)} no lo es. Elige una fecha que caiga en{' '}
-          {elegida.dia_nombre.toLowerCase()}.
+          {elegida.act_nombre} es de los {susDiasTexto} y el {enLetras(fecha)} no lo es. Elige
+          una fecha que caiga en uno de esos días.
         </p>
       )}
 
@@ -272,8 +287,7 @@ const AsistenciasAlumnos = () => {
               </h2>
               <p className="text-sm text-muted-foreground">
                 {enLetras(fecha)}
-                {elegida.colacthor_hora_inicio &&
-                  ` · ${elegida.colacthor_hora_inicio}–${elegida.colacthor_hora_fin ?? ''}`}
+                {deEseDia && ` · ${deEseDia.inicio}–${deEseDia.fin}`}
               </p>
             </div>
 

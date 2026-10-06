@@ -183,7 +183,7 @@ export const PanelEntrenador = ({ datos }: { datos: TableroEntrenador }) => (
                 <div className="min-w-0">
                   <div className="truncate font-medium">{d.act_nombre}</div>
                   <div className="truncate text-sm text-muted-foreground">
-                    {d.col_nombre} · {d.dia_nombre} {d.hora ?? ''}
+                    {d.col_nombre} · {d.horario ?? ''}
                   </div>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-3 text-sm">
@@ -242,7 +242,7 @@ export const PanelRepresentante = ({ datos }: { datos: TableroRepresentante }) =
               <div className="flex flex-wrap gap-2">
                 {hijo.disciplinas.map((d, i) => (
                   <Badge key={`${d.act_nombre}-${i}`} variant="secondary">
-                    {d.act_nombre} · {d.dia_nombre} {d.hora ?? ''}
+                    {d.act_nombre} · {d.horario ?? ''}
                   </Badge>
                 ))}
               </div>

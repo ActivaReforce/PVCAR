@@ -52,8 +52,8 @@ export interface DisciplinaDelEntrenador {
   colacthor_id: number;
   act_nombre: string;
   col_nombre: string;
-  dia_nombre: string;
-  hora: string | null;
+  /** "Lun y Mié 15:00–16:00". */
+  horario: string | null;
   alumnos: number;
   pendientes: number;
 }
@@ -71,7 +71,7 @@ export interface HijoDelRepresentante {
   nino_nombre: string;
   col_nombre: string | null;
   catninograd_nombre: string | null;
-  disciplinas: Array<{ act_nombre: string; dia_nombre: string; hora: string | null }>;
+  disciplinas: Array<{ act_nombre: string; horario: string | null }>;
   asistencia: Asistencia;
   evaluacionesPendientes: number;
   evaluacionesHechas: number;

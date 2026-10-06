@@ -1,6 +1,6 @@
 # Disciplinas v2 — una disciplina con varios horarios (propuesta, 2026-10-05)
 
-**Estado: análisis cerrado, sin construir.** Las 6 preguntas de §7 respondidas el 2026-10-06; lo que cambian está en §8.
+**Estado: construido el 2026-10-06, sin probar en pantalla.** Migración `0021_disciplinas_horarios.sql`. Las 6 preguntas de §7 respondidas el 2026-10-06; lo que cambian está en §8; lo construido, en §9.
 
 ## 1. Cómo funciona el negocio (cliente, 2026-10-05)
 
@@ -94,3 +94,17 @@ Tamaño: unos 30 archivos leen el día o la hora de la disciplina. Es una reestr
 - **Contrato sin `{{horario}}`**: la cláusula 1 no se toca.
 - **Máximo por niño** en la configuración, aplicado solo en `inscripcion-publica`; Estudiantes solo comprueba cruces.
 - **Auxiliar con varios titulares** (Fase 9 §1b, pendiente desde el 2026-10-02) se construye en el mismo paquete: quitar la regla de "ya respalda a otro", unicidad parcial `(usu_id, ent_id) WHERE est_id = 1`, selector "de quién ver" + "Todos". El choque de horario del entrenador sale de la regla de cruce de §4.
+
+## 9. Lo construido (2026-10-06)
+
+- **Base:** `0021` crea `disciplina_horario` (un día por fila, `UNIQUE (colacthor_id, dia_id)`, fin > inicio), junta los grupos partidos por día (mismo colegio, actividad, estado y franja), borra `dia_id` y las horas de la madre, añade `inscripcion_config.inscfg_max_disciplinas` (1–10, por defecto 2), la función `disciplina_horario_texto(id)` y la unicidad parcial `(usu_id, ent_id)` de `entrenador_auxiliar`. Probada en un Postgres local con datos como los de dev y reaplicada sin daño.
+- **Reglas en el backend** (`lib/horarios.ts`): cruce = mismo día y horas que se pisan; 15–16 y 16–17 no se cruzan.
+  - Estudiantes: no deja inscribir en dos que se crucen; **sin tope**.
+  - Formulario público: tope `inscfg_max_disciplinas` y cruces; las opciones que no se pueden marcar salen desactivadas con el motivo. El tope se cambia en Inscripciones → Documentos → Configuración.
+  - Entrenadores: no deja asignar una disciplina que se cruce con otra que ya da, aunque sea de otro colegio.
+  - Editar horarios: si el cambio cruza a un alumno o a un entrenador, 409 con los nombres.
+  - Misma actividad en el mismo colegio: dos grupos no pueden pisarse ningún día (sustituye al "duplicado exacto" y al "solape" de antes).
+- **Asistencias:** la fecha tiene que caer en uno de los días de la disciplina; la hora que se muestra es la de ese día. Reportes: "Día" de asistencias es el de la fecha.
+- **Auxiliar con varios titulares** (Fase 9 §1b): se puede atar a varios; `GET /me/titulares`; selector "de quién ver" en la cabecera con "Todos mis entrenadores", que viaja en `X-Titular` y solo **estrecha** el alcance.
+- **Pantallas:** Disciplinas (alta y edición con días y horas por día; la tarjeta sale en cada uno de sus días), Estudiantes (horario completo y aviso de cruce antes de guardar), Entrenadores, Evaluaciones, Asistencias, Tablero, Reportes e Inscripción pública.
+- Verificado: los 267 SQL del backend con `PREPARE` contra el esquema nuevo, un escenario de punta a punta contra la base local, 558 pruebas, lint, tipos y build.

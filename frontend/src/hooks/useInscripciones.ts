@@ -161,6 +161,10 @@ export function useGuardarCuentaBancaria() {
   return useMutacion((texto: string) => inscripcionesApi.guardarCuentaBancaria(texto), 'Cuenta bancaria guardada');
 }
 
+export function useGuardarMaxDisciplinas() {
+  return useMutacion((maximo: number) => inscripcionesApi.guardarMaxDisciplinas(maximo), 'Máximo de disciplinas guardado');
+}
+
 export function useSubirMembrete() {
   return useMutacion(
     (datos: { mime: string; base64: string }) => inscripcionesApi.subirMembrete(datos),

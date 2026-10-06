@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { titularElegido } from '@/lib/titular';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -66,6 +67,9 @@ export async function apiFetch<T>(
   if (session?.access_token) {
     headers.set('Authorization', `Bearer ${session.access_token}`);
   }
+  // Auxiliar con varios titulares: de quién quiere ver (lib/titular.ts).
+  const titular = titularElegido();
+  if (titular !== null) headers.set('X-Titular', String(titular));
 
   const res = await fetch(`${API_URL}${normalizarRuta(path)}`, { ...init, headers });
 

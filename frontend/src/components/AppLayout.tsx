@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import EncuestaPendiente from "@/components/encuestas/EncuestaPendiente";
+import SelectorTitular from "@/components/SelectorTitular";
 import { CATALOGO_REPORTES } from "@/hooks/useTablero";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -45,6 +46,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4">
             <SidebarTrigger />
             <div className="flex-1" />
+            <SelectorTitular />
             <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto p-4">{children}</main>

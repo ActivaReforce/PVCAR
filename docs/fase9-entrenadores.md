@@ -21,7 +21,7 @@ Este módulo no da de alta personas — un entrenador **es** un usuario con el r
 | Historial | El botón muestra las 39 asignaciones cerradas de dev con sus fechas |
 | Atar auxiliar | Salen los candidatos activos con rol 6 o 7, **aunque ya respalden a otro entrenador** (pedido del 2026-10-01, ver §1b) |
 | Atar a alguien sin rol 6/7 | 400 |
-| Atar a quien ya respalda a otro | **Debe dejarlo** y sumar el segundo titular. Hoy da 409: hay que cambiarlo antes de probar (§1b) |
+| Atar a quien ya respalda a otro | Lo deja y suma el segundo titular (hecho el 2026-10-06, `0021`) |
 | Atar al mismo auxiliar dos veces al mismo titular | 409 |
 | Auto-auxiliar | 400 |
 | Soltar auxiliar | Baja lógica (`est_id = 2`), no DELETE; deja de heredar el alcance |
@@ -39,7 +39,7 @@ Este módulo no da de alta personas — un entrenador **es** un usuario con el r
 | # | Pedido | Estado en el código | Prueba |
 |---|---|---|---|
 | 3 | Un entrenador puede estar en **varios colegios** | ✅ Ya funciona: la asignación es por disciplina, y cada disciplina es de un colegio | Asignar a un entrenador disciplinas de dos colegios: su ficha muestra los dos y ve los dos |
-| 4 | Un asistente o respaldo puede estar con **varios entrenadores** y **varias disciplinas** | ❌ **Hay que cambiarlo.** `entrenadores.service.ts` rechaza con 409 al que ya respalda a alguien y `listarCandidatosAAuxiliar` lo excluye. Cambio: quitar esa regla y poner unicidad parcial `(usu_id, ent_id) WHERE est_id = 1` (migración nueva). El alcance ya es la **unión** de las disciplinas de todos sus titulares | Atarlo a dos titulares: ve las disciplinas de los dos. Soltar uno: deja de ver solo las de ese |
+| 4 | Un asistente o respaldo puede estar con **varios entrenadores** y **varias disciplinas** | ✅ **Hecho el 2026-10-06** con Disciplinas v2 (`0021`, `GET /me/titulares`, cabecera `X-Titular`). Lo que había: `entrenadores.service.ts` rechaza con 409 al que ya respalda a alguien y `listarCandidatosAAuxiliar` lo excluye. Cambio: quitar esa regla y poner unicidad parcial `(usu_id, ent_id) WHERE est_id = 1` (migración nueva). El alcance ya es la **unión** de las disciplinas de todos sus titulares | Atarlo a dos titulares: ve las disciplinas de los dos. Soltar uno: deja de ver solo las de ese |
 | 5 | Si un entrenador se va (le quitan la disciplina o lo dan de baja), **sus registros se quedan** y el siguiente sigue con normalidad | ✅ Diseñado así: quitar cierra con `entasig_fecha_fin`, la baja cierra todas, nada se borra; las asistencias guardan `ent_id` / `usu_registrador`; el borrado permanente se bloquea si hay historial. **Falta probarlo de punta a punta** | Entrenador A con asistencias en una disciplina → darlo de baja → asignar B a la misma disciplina → B pasa lista normal; en Reportes salen las asistencias de A **y** las de B, y A aparece con su nombre aunque esté inactivo |
 
 **Decidido por el cliente el 2026-10-02 (al probar la Fase 8):** el asistente con varios titulares, al entrar, **elige de quién quiere ver** —un selector arriba, con la opción **"Todos"**— y lo puede cambiar cuando quiera. Hereda todas las disciplinas de cada titular. Se construye antes de abrir la Fase 9, junto con:

@@ -64,6 +64,7 @@ import DocumentoVista from './DocumentoVista';
 import DatosColegio from './DatosColegio';
 import Membrete from './Membrete';
 import CuentaBancaria from './CuentaBancaria';
+import MaxDisciplinas from './MaxDisciplinas';
 import { EstadoDelColegio } from './EstadoInscripciones';
 import { REGLAS, porcentaje, problemasDePlantilla, tarifa, type DatosDocumento } from './documento';
 import { fechaCorta } from './formato';
@@ -185,6 +186,7 @@ const DocumentosLegales = () => {
         <TabsContent value="configuracion" className="space-y-6 pt-3">
           <Membrete />
           <CuentaBancaria />
+          <MaxDisciplinas />
         </TabsContent>
       </Tabs>
     </div>

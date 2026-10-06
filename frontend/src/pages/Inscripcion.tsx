@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ApiError } from '@/lib/api';
+import { diaDeCruce } from '@/lib/horarios';
 import { compressImage } from '@/lib/imageCompression';
 import {
   dinero,
@@ -295,7 +296,7 @@ function datosDocumento(
       fecha_nacimiento: alumno.fecha_nacimiento ? fechaNacimiento(alumno.fecha_nacimiento) : '',
       curso: curso?.catninograd_nombre ?? '',
       actividades: [...new Set(elegidas.map((d) => d.actividad))].join(', '),
-      horarios: elegidas.map((d) => `${d.actividad}: ${d.dia} ${d.hora_inicio} a ${d.hora_fin}`).join('; '),
+      horarios: elegidas.map((d) => `${d.actividad}: ${d.horario}`).join('; '),
       emergencia: alumno.emergencia,
       retiro: (() => {
         const r = retiroDe(alumno, rep);
@@ -800,7 +801,7 @@ const FichaAlumno = ({
   const id = (campo: string) => `alumno-${alumno.clave}-${campo}`;
   const colegio = formulario.colegios.find((c) => String(c.col_id) === alumno.col_id);
 
-  /** Agrupadas por actividad: "Fútbol" con sus días, no 18 filas sueltas. */
+  /** Agrupadas por actividad: "Fútbol" con sus grupos, cada uno con sus días. */
   const porActividad = useMemo(() => {
     const grupos = new Map<string, DisciplinaOfertada[]>();
     for (const d of colegio?.disciplinas ?? []) {
@@ -808,6 +809,22 @@ const FichaAlumno = ({
     }
     return [...grupos.entries()];
   }, [colegio]);
+
+  const maximo = formulario.max_disciplinas;
+  const elegidas = (colegio?.disciplinas ?? []).filter((d) => alumno.disciplinas.includes(d.colacthor_id));
+  /**
+   * Por qué no se puede marcar una: el tope por alumno o un cruce de horario
+   * con una ya elegida. El backend lo comprueba igual; aquí se explica antes.
+   */
+  const bloqueo = (d: DisciplinaOfertada): string | null => {
+    if (alumno.disciplinas.includes(d.colacthor_id)) return null;
+    if (alumno.disciplinas.length >= maximo) return `Ya elegiste ${maximo}, el máximo`;
+    for (const otra of elegidas) {
+      const dia = diaDeCruce(d.horarios, otra.horarios);
+      if (dia) return `Se cruza con ${otra.actividad} el ${dia.toLowerCase()}`;
+    }
+    return null;
+  };
 
   const alternar = (colacthorId: number, marcado: boolean) =>
     onChange({
@@ -897,21 +914,32 @@ const FichaAlumno = ({
               · {dinero(colegio.precio)} al mes más IVA, cada una
             </span>
           </h2>
+          <p className="text-sm text-muted-foreground">
+            Puedes elegir hasta {maximo} {maximo === 1 ? 'disciplina' : 'disciplinas'}, sin que sus
+            horarios se crucen. Cada una incluye todos sus días.
+          </p>
           {porActividad.map(([actividad, horarios]) => (
             <div key={actividad} className="rounded-md bg-muted/40 p-3">
               <p className="mb-2 text-sm font-medium">{actividad}</p>
               <div className="space-y-1">
                 {horarios.map((d) => {
                   const cid = id(`disc-${d.colacthor_id}`);
+                  const motivo = bloqueo(d);
                   return (
-                    <label key={d.colacthor_id} htmlFor={cid} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-1">
+                    <label
+                      key={d.colacthor_id}
+                      htmlFor={cid}
+                      className={`flex min-h-11 items-center gap-3 rounded px-1 ${motivo ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
                       <Checkbox
                         id={cid}
                         checked={alumno.disciplinas.includes(d.colacthor_id)}
+                        disabled={motivo !== null}
                         onCheckedChange={(v) => alternar(d.colacthor_id, v === true)}
                       />
-                      <span className="text-sm">
-                        {d.dia} · {d.hora_inicio} a {d.hora_fin}
+                      <span className={`min-w-0 text-sm ${motivo ? 'text-muted-foreground' : ''}`}>
+                        <span className="break-words">{d.horario}</span>
+                        {motivo && <span className="block text-xs">{motivo}</span>}
                       </span>
                     </label>
                   );

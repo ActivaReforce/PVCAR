@@ -23,7 +23,6 @@ interface Props {
   onAsignar: () => void;
 }
 
-const hhmm = (hora: string | null) => hora?.slice(0, 5) ?? '--:--';
 const fecha = (f: string | null) => (f ? new Date(f).toLocaleDateString() : '—');
 
 /**
@@ -77,13 +76,11 @@ const EntrenadorFicha = ({ entId, onAsignar }: Props) => {
       >
         <div className="min-w-0">
           <p className="break-words font-medium">{a.act_nombre}</p>
-          <p className="text-sm text-muted-foreground">
-            {variosColegios ? a.dia_nombre : `${a.col_nombre} · ${a.dia_nombre.toLowerCase()}`}
-          </p>
+          {!variosColegios && <p className="text-sm text-muted-foreground">{a.col_nombre}</p>}
           <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {hhmm(a.colacthor_hora_inicio)}–{hhmm(a.colacthor_hora_fin)}
+              {a.horario_texto}
             </span>
             <span className="flex items-center gap-1">
               <GraduationCap className="h-3 w-3" />

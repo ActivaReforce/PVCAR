@@ -1,3 +1,4 @@
+import type { HorarioDisciplina } from '@/api/disciplinas';
 import { api } from '@/lib/api';
 
 /**
@@ -64,10 +65,9 @@ export interface Inscripcion {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  horarios: HorarioDisciplina[];
+  /** "Lun y Mié 15:00–16:00". */
+  horario_texto: string | null;
   ninoasig_fecha_inscripcion: string;
   ninoasig_fecha_baja: string | null;
   est_id: number;
@@ -123,10 +123,9 @@ export interface FiltrosEstudiantes {
 export interface DisciplinaDisponible {
   colacthor_id: number;
   act_nombre: string;
-  dia_id: number;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
-  colacthor_hora_fin: string | null;
+  horarios: HorarioDisciplina[];
+  /** "Lun y Mié 15:00–16:00". */
+  horario_texto: string | null;
   alumnos: number;
   entrenador: string | null;
   /** Ya estuvo inscrito antes: reinscribirlo reabre su fila y sus evaluaciones. */

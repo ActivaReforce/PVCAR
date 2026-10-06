@@ -128,8 +128,8 @@ export interface DisciplinaVinculada {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
+  /** "Lun y Mié 15:00–16:00". */
+  horario_texto: string | null;
   est_id: number;
   alumnos: number;
   pendientes: number;
@@ -141,8 +141,8 @@ export interface DisciplinaDisponible {
   col_id: number;
   col_nombre: string;
   act_nombre: string;
-  dia_nombre: string;
-  colacthor_hora_inicio: string | null;
+  /** "Lun y Mié 15:00–16:00". */
+  horario_texto: string | null;
   alumnos: number;
   estuvo: boolean;
 }

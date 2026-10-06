@@ -12,7 +12,7 @@ import {
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
 import DisciplinaCalendar from '@/components/disciplinas/DisciplinaCalendar';
 import DisciplinaForm from '@/components/disciplinas/DisciplinaForm';
-import DisciplinaLoteForm from '@/components/disciplinas/DisciplinaLoteForm';
+import NuevaDisciplinaForm from '@/components/disciplinas/NuevaDisciplinaForm';
 import BajaDisciplinaDialog from '@/components/disciplinas/BajaDisciplinaDialog';
 import EliminarDisciplinaDialog from '@/components/disciplinas/EliminarDisciplinaDialog';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -108,7 +108,7 @@ const Disciplinas = () => {
         {canCreate('disciplinas') && (
           <Button variant="brand" className="w-full sm:w-auto" onClick={() => setCreando(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Nuevas Disciplinas
+            Nueva disciplina
           </Button>
         )}
       </div>
@@ -187,9 +187,9 @@ const Disciplinas = () => {
       <Dialog open={creando} onOpenChange={(abierto) => !abierto && setCreando(false)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Crear disciplinas</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">Nueva disciplina</DialogTitle>
           </DialogHeader>
-          <DisciplinaLoteForm
+          <NuevaDisciplinaForm
             onSuccess={() => setCreando(false)}
             onCancel={() => setCreando(false)}
           />

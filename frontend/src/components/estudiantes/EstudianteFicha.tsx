@@ -20,12 +20,12 @@ import {
   useGuardarInscripciones,
   useSoltarRepresentante,
 } from '@/hooks/useEstudiantes';
+import { primerCruce } from '@/lib/horarios';
 
 interface Props {
   ninoId: number;
 }
 
-const hhmm = (hora: string | null) => hora?.slice(0, 5) ?? '--:--';
 const fecha = (f: string | null) => (f ? new Date(f).toLocaleDateString() : '—');
 
 /**
@@ -71,6 +71,17 @@ const EstudianteFicha = ({ ninoId }: Props) => {
   }
 
   const { estudiante, inscripciones, representantes } = ficha.data;
+
+  // Aviso antes de guardar: el backend rechaza dos disciplinas que se pisan.
+  const horariosDe = new Map(
+    [...inscripciones, ...(disponibles.data ?? [])].map((d) => [
+      d.colacthor_id,
+      { nombre: d.act_nombre, horarios: d.horarios },
+    ]),
+  );
+  const cruce = primerCruce(
+    marcadas.map((id) => horariosDe.get(id)).filter((d) => d !== undefined),
+  );
 
   const alternar = (colacthorId: number) => {
     const base = seleccion ?? activas;
@@ -171,9 +182,8 @@ const EstudianteFicha = ({ ninoId }: Props) => {
                   className={`rounded-lg border p-3 ${cerrada ? 'border-dashed bg-muted/40' : ''}`}
                 >
                   <p className="break-words font-medium">{i.act_nombre}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {i.dia_nombre.toLowerCase()} · {hhmm(i.colacthor_hora_inicio)}–
-                    {hhmm(i.colacthor_hora_fin)} · {i.entrenador ?? 'sin entrenador'}
+                  <p className="break-words text-sm text-muted-foreground">
+                    {i.horario_texto} · {i.entrenador ?? 'sin entrenador'}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     Inscrito el {fecha(i.ninoasig_fecha_inscripcion)}
@@ -212,9 +222,8 @@ const EstudianteFicha = ({ ninoId }: Props) => {
                       checked={marcadas.includes(i.colacthor_id)}
                       onCheckedChange={() => alternar(i.colacthor_id)}
                     />
-                    <span className="min-w-0 flex-1 truncate text-sm">
-                      {i.act_nombre} · {i.dia_nombre.toLowerCase()}{' '}
-                      {hhmm(i.colacthor_hora_inicio)}
+                    <span className="min-w-0 flex-1 break-words text-sm">
+                      {i.act_nombre} · {i.horario_texto}
                     </span>
                   </label>
                 ))}
@@ -228,8 +237,8 @@ const EstudianteFicha = ({ ninoId }: Props) => {
                     checked={marcadas.includes(d.colacthor_id)}
                     onCheckedChange={() => alternar(d.colacthor_id)}
                   />
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {d.act_nombre} · {d.dia_nombre.toLowerCase()} {hhmm(d.colacthor_hora_inicio)}
+                  <span className="min-w-0 flex-1 break-words text-sm">
+                    {d.act_nombre} · {d.horario_texto}
                     <span className="text-muted-foreground">
                       {' '}
                       · {d.alumnos} alumnos
@@ -245,6 +254,13 @@ const EstudianteFicha = ({ ninoId }: Props) => {
               ))}
             </div>
 
+            {hayCambios && cruce && (
+              <p className="flex items-start gap-1.5 text-sm text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                {cruce}: no puede estar en las dos.
+              </p>
+            )}
+
             <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
               {hayCambios && (
                 <Button variant="outline" size="sm" onClick={() => setSeleccion(null)}>
@@ -254,7 +270,7 @@ const EstudianteFicha = ({ ninoId }: Props) => {
               <Button
                 variant="brand"
                 size="sm"
-                disabled={!hayCambios || guardar.isPending}
+                disabled={!hayCambios || Boolean(cruce) || guardar.isPending}
                 onClick={async () => {
                   await guardar.mutateAsync({ id: ninoId, colacthorIds: marcadas });
                   setSeleccion(null);
