@@ -59,7 +59,7 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 ## 5. Dinero
 
 - Tarifa mensual por disciplina, por colegio, **sin IVA**. **IVA fijo 15 %** (`IVA_PCT` en `inscripciones.precios.ts`; no se configura). Descuento por hermano según la regla de la 0015.
-- **Pendiente: el cobro por disciplina.** En el sistema cada día de una actividad es una disciplina; el contrato dice que una disciplina son dos sesiones semanales. Hasta definir qué es una disciplina en su módulo, se cobra como está (cada día elegido).
+- **Pendiente: el cobro por disciplina.** El cliente lo aclaró el 2026-10-05: una disciplina son varios días (hoy dos) y se paga una vez; máximo 2 por niño sin cruces. Lo resuelve **Disciplinas v2** (`docs/disciplinas-v2.md`), que espera sus respuestas. Hasta entonces se cobra cada día elegido.
 
 ## 6. Dónde queda cada cosa
 
@@ -79,7 +79,9 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 
 ## 8. Pendiente
 
-1. **El cobro por disciplina** (§5).
+1. **El cobro por disciplina** (§5) → Disciplinas v2.
 2. **Representante que ya tenía cuenta:** hoy se le añaden los alumnos y la factura y se completa su cédula si no la tenía, pero no se le cambian nombre ni teléfono. El cliente lo deja para después.
 3. **Probar en pantalla** el recorrido completo: publicar los seis, valores y apertura de un colegio, inscribir con dos hermanos, aprobar (correo con los PDF adjuntos), rechazar.
-4. Antes de lanzar, en prod: quitar el "Colegio de Pruebas Dev" de la 0004 y crear el primer Propietario.
+4. ~~Antes de lanzar, en prod: quitar el colegio de prueba y crear el primer Propietario.~~ Hecho el 2026-10-05 (`SQL/limpieza_prod_2026-10-05.sql`): prod limpia, Flowward único Propietario.
+5. **PDF único** (0020): al aprobar, el aprobado sustituye al enviado; del enviado queda su huella. Representantes muestra la ficha y los documentos firmados (solo personal).
+6. **Representante con permiso de ver Inscripciones:** ve solo las suyas ("Mis inscripciones").

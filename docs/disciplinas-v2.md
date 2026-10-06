@@ -1,6 +1,6 @@
 # Disciplinas v2 — una disciplina con varios horarios (propuesta, 2026-10-05)
 
-**Estado: análisis, sin construir.** Espera las respuestas del cliente (§7).
+**Estado: análisis, sin construir.** Espera las respuestas del cliente (§7). **Al retomar, hacerle las 6 preguntas una por una** (lo pidió así para quedar conforme), anotar aquí sus respuestas y solo entonces construir.
 
 ## 1. Cómo funciona el negocio (cliente, 2026-10-05)
 
