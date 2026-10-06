@@ -43,6 +43,18 @@ import type { UsuarioConRoles } from '../modules/auth/auth.repository.js';
  * Ahora un representante solo trae `ninos` (sus hijos) y `disciplinasDeHijos`
  * (para que Disciplinas le ensene las de sus hijos). Los modulos que no
  * miran esas dos listas no le ensenan nada: es el valor seguro por defecto.
+ *
+ * ---------------------------------------------------------------------------
+ * Los colegios solo los da el coordinador (2026-10-05)
+ *
+ * Antes `colegios` sumaba tambien los colegios de las disciplinas del
+ * entrenador y de sus auxiliares. Como Estudiantes, los reportes y la
+ * tendencia del tablero filtran "por colegio O por disciplina", un
+ * entrenador veia a TODOS los alumnos de los colegios donde da clase (con
+ * su informacion de salud), no solo a los suyos, contra lo decidido en la
+ * Fase 10 ("entrenador: solo los inscritos en sus disciplinas"). Ahora
+ * `colegios` es solo colegio_coordinador; el entrenador y los auxiliares
+ * llegan a todo por sus disciplinas.
  */
 export interface Alcance {
   /** True para Propietario y Admin: ven todo y no se les filtra nada. */
@@ -120,10 +132,6 @@ const SQL_ALCANCE = `
   ),
   colegios AS (
       SELECT col_id FROM col_coordinador
-      UNION
-      SELECT cah.col_id
-      FROM public.colegio_actividad_horario cah
-      JOIN disciplinas d ON d.colacthor_id = cah.colacthor_id
   )
   SELECT
       COALESCE((SELECT array_agg(col_id ORDER BY col_id) FROM colegios), '{}')                AS colegios,

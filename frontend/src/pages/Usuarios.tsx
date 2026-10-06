@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import UserForm from '@/components/users/UserForm';
 import UserDetail from '@/components/users/UserDetail';
 import UsuariosHeader from '@/components/users/UsuariosHeader';
-import UsuariosFilters from '@/components/users/UsuariosFilters';
+import RoleSelect from '@/components/users/RoleSelect';
+import { EstadoSelect } from '@/components/users/UserStatusFilters';
 import UserTable from '@/components/users/UserTable';
 import UserStatusFilters from '@/components/users/UserStatusFilters';
 import { UserDeactivationDialog } from '@/components/users/UserDeactivationDialog';
@@ -181,35 +182,45 @@ const Usuarios = () => {
         }}
       />
 
-      <UsuariosFilters
-        roles={roles}
-        conteosPorRol={conteos.porRol}
-        totalUsuarios={conteos.totalDelEstado}
-        totalFiltrado={totalItems}
-        sinRol={conteos.sinRol}
-        selectedRoles={selectedRoles}
-        sinRolSeleccionado={sinRolSeleccionado}
-        onRoleToggle={alternarRol}
-        onSinRolToggle={alternarSinRol}
-        onViewAll={verTodos}
-        getSelectedRoleNames={() => nombresDeRolesSeleccionados}
-        statusFilter={statusFilter}
-        onStatusChange={(estado) => cambiarFiltro(() => setStatusFilter(estado))}
-        userCounts={{
-          active: conteos.activos,
-          inactive: conteos.inactivos,
-          total: conteos.total,
-        }}
-      />
-
-      {/* Ancho completo: con max-w-sm el placeholder se cortaba a media
-          palabra teniendo media pantalla libre al lado. */}
-      <DebouncedSearchInput
-        placeholder="Buscar por nombre o correo..."
-        value={busqueda}
-        onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
-        className="w-full"
-      />
+      {/* Buscador y rol en la misma fila. En el teléfono el estado va aquí
+          también (sus botones solo se ven desde sm). */}
+      <div className="space-y-2">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+          <DebouncedSearchInput
+            placeholder="Buscar por nombre o correo..."
+            value={busqueda}
+            onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
+            className="w-full min-w-0 sm:flex-1"
+          />
+          <div className="grid grid-cols-2 gap-2 sm:block sm:w-64 sm:flex-shrink-0">
+            <div className="sm:hidden">
+              <EstadoSelect
+                statusFilter={statusFilter}
+                onStatusChange={(estado) => cambiarFiltro(() => setStatusFilter(estado))}
+                userCounts={{
+                  active: conteos.activos,
+                  inactive: conteos.inactivos,
+                  total: conteos.total,
+                }}
+              />
+            </div>
+            <RoleSelect
+              roles={roles}
+              conteosPorRol={conteos.porRol}
+              totalUsuarios={conteos.totalDelEstado}
+              sinRol={conteos.sinRol}
+              selectedRoles={selectedRoles}
+              sinRolSeleccionado={sinRolSeleccionado}
+              onRoleToggle={alternarRol}
+              onSinRolToggle={alternarSinRol}
+              onViewAll={verTodos}
+            />
+          </div>
+        </div>
+        <p className="truncate text-sm text-muted-foreground">
+          Mostrando: {nombresDeRolesSeleccionados} ({totalItems} usuarios)
+        </p>
+      </div>
 
       <div className="space-y-4">
         <div className="overflow-x-auto">

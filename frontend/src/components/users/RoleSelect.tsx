@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/select';
 import type { Rol } from '@/api/usuarios';
 
-interface MobileRoleSelectorProps {
+interface RoleSelectProps {
   roles: Rol[];
   conteosPorRol: Record<string, number>;
   totalUsuarios: number;
@@ -19,7 +19,11 @@ interface MobileRoleSelectorProps {
   onViewAll: () => void;
 }
 
-const MobileRoleSelector = ({
+/**
+ * Filtro de rol de Usuarios: un select en la fila del buscador, en todos los
+ * tamaños (decisión del cliente, 2026-10-05: fuera la fila de botones).
+ */
+const RoleSelect = ({
   roles,
   conteosPorRol,
   totalUsuarios,
@@ -29,7 +33,7 @@ const MobileRoleSelector = ({
   onRoleToggle,
   onSinRolToggle,
   onViewAll,
-}: MobileRoleSelectorProps) => {
+}: RoleSelectProps) => {
   const cuenta = (roleId: number) => conteosPorRol[String(roleId)] ?? 0;
 
   const etiqueta = () => {
@@ -60,8 +64,7 @@ const MobileRoleSelector = ({
    * quitarlo salvo pasando por "Ver Todos". Con el valor explicito el control
    * dice siempre lo que hay puesto.
    *
-   * En el telefono el filtro es de un rol a la vez; para combinar varios esta
-   * la fila de botones del escritorio. "Ver Todos" limpia.
+   * Un rol a la vez. "Ver Todos" limpia.
    */
   const valorActual = sinRolSeleccionado
     ? 'sin-rol'
@@ -71,7 +74,7 @@ const MobileRoleSelector = ({
 
   return (
     <Select value={valorActual} onValueChange={alElegir}>
-      <SelectTrigger className="h-11 w-full max-w-full min-w-0">
+      <SelectTrigger className="h-11 w-full max-w-full min-w-0 sm:h-10" aria-label="Filtrar por rol">
         <SelectValue placeholder={etiqueta()} />
       </SelectTrigger>
       <SelectContent className="max-w-[calc(100vw-2rem)]">
@@ -89,4 +92,4 @@ const MobileRoleSelector = ({
   );
 };
 
-export default MobileRoleSelector;
+export default RoleSelect;

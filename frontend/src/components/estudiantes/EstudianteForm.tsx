@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import ImageUpload from '@/components/ImageUpload';
 import { useToast } from '@/hooks/use-toast';
-import { useColegios } from '@/hooks/useColegios';
+import { useColegiosVisibles } from '@/hooks/useColegios';
 import {
   useActualizarEstudiante,
   useCrearEstudiante,
@@ -101,7 +101,7 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
   const esEdicion = Boolean(estudiante);
   const { toast } = useToast();
 
-  const colegios = useColegios({ limit: 200, orden: 'nombre' });
+  const colegios = useColegiosVisibles();
   const grados = useGrados();
   const crear = useCrearEstudiante();
   const actualizar = useActualizarEstudiante();

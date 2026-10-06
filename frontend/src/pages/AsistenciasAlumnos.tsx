@@ -15,7 +15,7 @@ import BarraGuardar from '@/components/asistencias/BarraGuardar';
 import FilaAsistencia from '@/components/asistencias/FilaAsistencia';
 import HistorialDisciplina from '@/components/asistencias/HistorialDisciplina';
 import ResumenAsistencia from '@/components/asistencias/ResumenAsistencia';
-import { useColegios } from '@/hooks/useColegios';
+import { useColegiosVisibles } from '@/hooks/useColegios';
 import { useDias, useDisciplinas } from '@/hooks/useDisciplinas';
 import {
   useAsistenciaAlumnos,
@@ -82,7 +82,7 @@ const AsistenciasAlumnos = () => {
   const [fecha, setFecha] = useState('');
   const [verHistorial, setVerHistorial] = useState(false);
 
-  const colegios = useColegios({ limit: 200, orden: 'nombre' });
+  const colegios = useColegiosVisibles();
   const dias = useDias();
 
   const disciplinas = useDisciplinas({

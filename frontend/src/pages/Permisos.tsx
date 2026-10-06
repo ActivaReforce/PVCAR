@@ -49,6 +49,10 @@ const MODULE_ACTIONS: Record<string, string[]> = {
   asistencias_estudiantes: ['ver'],
   asistencias_entrenadores: ['ver'],
   encuestas: ['ver'],
+  // Ver = la lista (un representante solo ve las suyas); Editar = aprobar,
+  // documentos y valores; Eliminar = rechazar. Editar y Eliminar solo
+  // funcionan para Propietario y Admin, se marquen a quien se marquen.
+  inscripciones: ['ver', 'editar', 'eliminar'],
   reportes: ['ver', 'crear'],
   reporte_estudiante: ['ver'],
   perfil: ['ver'],

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
 import { subirFoto } from '@/hooks/useUsuarios';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useDisciplinas } from '@/hooks/useDisciplinas';
 import {
   colegiosApi,
   type DatosColegio,
@@ -129,4 +131,36 @@ export function useSubirFotoColegio() {
       });
     },
   });
+}
+
+/**
+ * Los colegios que puede elegir esta persona en un filtro o selector.
+ *
+ * Quien tiene permiso de Colegios los saca de ahí. Quien no (entrenador,
+ * asistente, respaldo, representante) los deduce de sus propias disciplinas,
+ * que el backend ya filtra por alcance. Sin esto, la lista de Colegios le
+ * respondía 403 y el selector salía vacío: un entrenador no podía ni elegir
+ * colegio para pasar lista.
+ */
+export function useColegiosVisibles(): {
+  data: { items: Array<{ col_id: number; col_nombre: string }> } | undefined;
+  isLoading: boolean;
+} {
+  const { hasPermission } = usePermissions();
+  const veColegios = hasPermission('colegios', 'ver');
+  const colegios = useColegios({ limit: 200, orden: 'nombre' }, veColegios);
+  const disciplinas = useDisciplinas({ limit: 200, estado: 1, orden: 'horario' }, !veColegios);
+
+  if (veColegios) return { data: colegios.data, isLoading: colegios.isLoading };
+  if (!disciplinas.data) return { data: undefined, isLoading: disciplinas.isLoading };
+  const unicos = new Map<number, string>();
+  for (const d of disciplinas.data.items) unicos.set(d.col_id, d.col_nombre);
+  return {
+    data: {
+      items: [...unicos.entries()]
+        .map(([col_id, col_nombre]) => ({ col_id, col_nombre }))
+        .sort((a, b) => a.col_nombre.localeCompare(b.col_nombre, 'es')),
+    },
+    isLoading: false,
+  };
 }

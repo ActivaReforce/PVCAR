@@ -17,7 +17,7 @@ import DebouncedSearchInput from '@/components/ui/debounced-search-input';
 import Grafica from '@/components/graficas/Grafica';
 import { DataPagination } from '@/components/ui/data-pagination';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
-import { useColegios } from '@/hooks/useColegios';
+import { useColegiosVisibles } from '@/hooks/useColegios';
 import {
   useAnalisisReporte,
   useCatalogoReportes,
@@ -54,7 +54,7 @@ const ReporteDetalle = () => {
 
   const catalogo = useCatalogoReportes();
   const definicion = catalogo.data?.find((r) => r.id === modulo);
-  const colegios = useColegios({ limit: 200, orden: 'nombre' });
+  const colegios = useColegiosVisibles();
   const exportar = useExportarReporte();
 
   const filtros: FiltrosReporte = {

@@ -15,11 +15,12 @@ const CLAVE = {
   impacto: (id: number) => ['disciplinas', 'impacto', id] as const,
 };
 
-export function useDisciplinas(filtros: FiltrosDisciplinas) {
+export function useDisciplinas(filtros: FiltrosDisciplinas, enabled = true) {
   return useQuery({
     queryKey: CLAVE.lista(filtros),
     queryFn: () => disciplinasApi.listar(filtros),
     placeholderData: (anterior) => anterior,
+    enabled,
   });
 }
 

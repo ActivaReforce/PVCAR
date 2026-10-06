@@ -1,6 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { requireAuth } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/requirePermission.js';
+import { requirePersonal } from '../../middleware/requirePersonal.js';
 import { ApiError } from '../../middleware/error.js';
 import {
   actualizarEncuestaSchema,
@@ -83,6 +84,11 @@ encuestasRouter.post(
 
 // ---------------------------------------------------------------------------
 // Gestion
+
+// De aquí abajo, solo el personal: estas rutas no filtran por alcance y el
+// permiso "ver" basta para crear, publicar, borrar y ver las respuestas de
+// todos los padres.
+encuestasRouter.use(requirePersonal);
 
 encuestasRouter.get(
   '/',

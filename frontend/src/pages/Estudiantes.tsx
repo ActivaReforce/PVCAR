@@ -26,7 +26,7 @@ import EstudianteForm from '@/components/estudiantes/EstudianteForm';
 import EstudianteFicha from '@/components/estudiantes/EstudianteFicha';
 import EliminarEstudianteDialog from '@/components/estudiantes/EliminarEstudianteDialog';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useColegios } from '@/hooks/useColegios';
+import { useColegiosVisibles } from '@/hooks/useColegios';
 import {
   useDarDeBajaEstudiante,
   useEstudiantes,
@@ -64,7 +64,7 @@ const Estudiantes = () => {
   const [aDarDeBaja, setADarDeBaja] = useState<Estudiante | null>(null);
   const [aEliminar, setAEliminar] = useState<Estudiante | null>(null);
 
-  const colegios = useColegios({ limit: 200, orden: 'nombre' });
+  const colegios = useColegiosVisibles();
   const grados = useGrados();
   const baja = useDarDeBajaEstudiante();
   const reactivar = useReactivarEstudiante();
