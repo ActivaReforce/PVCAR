@@ -1,6 +1,6 @@
 # Disciplinas v2 — una disciplina con varios horarios (propuesta, 2026-10-05)
 
-**Estado: análisis, sin construir.** Espera las respuestas del cliente (§7). **Al retomar, hacerle las 6 preguntas una por una** (lo pidió así para quedar conforme), anotar aquí sus respuestas y solo entonces construir.
+**Estado: análisis cerrado, sin construir.** Las 6 preguntas de §7 respondidas el 2026-10-06; lo que cambian está en §8.
 
 ## 1. Cómo funciona el negocio (cliente, 2026-10-05)
 
@@ -50,13 +50,13 @@ La clave: **el id de la disciplina no cambia**. Inscripciones de niños, entrena
 | Regla | Hoy | Dónde se cambia |
 |---|---|---|
 | Días por disciplina | 2 | **No es regla del sistema**: cada disciplina lleva los que tenga (1, 2, 3…), y cada día puede tener su propia hora |
-| Máximo de disciplinas por niño | 2 | Un número en la configuración (por defecto 2). Se aplica en la inscripción en línea **y** al inscribir desde Estudiantes |
+| Máximo de disciplinas por niño | 2 | Un número en la configuración (por defecto 2). **Solo en la inscripción en línea** (cliente, 2026-10-06): desde la plataforma (Estudiantes) el personal puede pasarse del límite |
 | No cruzar horarios | sí | Siempre. Cruce = mismo día y horas que se pisan (15–16 y 16–17 **no** se cruzan) |
 | Precio | tarifa del colegio | La del colegio por defecto; opcional, un precio propio por disciplina (por si una de 3 días cuesta más) |
 
 **Dónde se comprueba el cruce:**
 
-- Al inscribir (formulario y Estudiantes): el niño no puede quedar en dos disciplinas que se pisen.
+- Al inscribir (formulario y Estudiantes): el niño no puede quedar en dos disciplinas que se pisen. El límite de 2 no aplica en Estudiantes; el cruce sí, porque el niño no puede estar en dos sitios.
 - Al **editar los horarios** de una disciplina con niños inscritos: si el cambio hace que algún niño quede cruzado con su otra disciplina, se avisa con sus nombres antes de guardar.
 - Entrenador: no puede dar dos disciplinas que se pisen (hoy no se controla).
 
@@ -76,11 +76,21 @@ Tamaño: unos 30 archivos leen el día o la hora de la disciplina. Es una reestr
 - **Agrupar sin cambiar nada** (un campo "grupo" que junta filas de un día): el niño, el entrenador y la evaluación seguirían colgando de cada día, y la inconsistencia de hoy (entrenador en un día y no en el otro) seguiría siendo posible.
 - **Renombrar la tabla a `disciplina`:** más claro, pero toca 48 archivos solo por el nombre. Se deja, como con `padre`.
 
-## 7. Preguntas para el cliente
+## 7. Preguntas para el cliente — respondidas el 2026-10-06
 
-1. ¿Cada día de una disciplina puede tener **su propia hora** (lunes 15:00, miércoles 16:00)? El sistema lo permitiría igual; es para saber cómo presentarlo.
-2. **Máximo 2 disciplinas por niño:** ¿igual para todos los colegios? ¿El Propietario puede saltárselo desde Estudiantes en un caso especial?
-3. ¿Quieren **precio propio por disciplina**, o siempre la tarifa del colegio?
-4. **Entrenador:** ¿uno por disciplina para todos sus días? (Si un día falta, lo cubre el Respaldo.)
-5. ¿Le ponemos **nombre al grupo** ("G1", "Sub-10", "Avanzado") separado del nombre de la actividad?
-6. **Contrato:** ¿cambiamos "dos sesiones semanales de 60 minutos" por los días y horas reales de la disciplina?
+| # | Pregunta | Respuesta |
+|---|---|---|
+| 1 | ¿Cada día con su propia hora? | **Sí**, pueden ser distintas |
+| 2 | Máximo 2 disciplinas por niño | **Solo en la inscripción en línea**; desde la plataforma se puede pasar sin límite (el cruce sí se bloquea siempre) |
+| 3 | Precio propio por disciplina | **No**: siempre la tarifa del colegio |
+| 4 | Un entrenador por disciplina | **Sí**. Un entrenador puede estar en varios colegios y disciplinas; un auxiliar/respaldo también en varias disciplinas (y con varios titulares) |
+| 5 | Nombre del grupo aparte | **No**, se deja como está |
+| 6 | Contrato con los días reales | **No**, la cláusula se queda escrita a mano |
+
+## 8. Lo que cambia respecto a §3–§5
+
+- **Sin precio propio** ni columna de precio: cobro = tarifa del colegio por disciplina.
+- **Sin nombre de grupo**: dos disciplinas de la misma actividad en un colegio se distinguen por sus horarios. Las etiquetas quedan "Fútbol (Lun 15:00 · Mié 16:00)".
+- **Contrato sin `{{horario}}`**: la cláusula 1 no se toca.
+- **Máximo por niño** en la configuración, aplicado solo en `inscripcion-publica`; Estudiantes solo comprueba cruces.
+- **Auxiliar con varios titulares** (Fase 9 §1b, pendiente desde el 2026-10-02) se construye en el mismo paquete: quitar la regla de "ya respalda a otro", unicidad parcial `(usu_id, ent_id) WHERE est_id = 1`, selector "de quién ver" + "Todos". El choque de horario del entrenador sale de la regla de cruce de §4.
