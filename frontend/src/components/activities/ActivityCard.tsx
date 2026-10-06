@@ -25,6 +25,7 @@ const ActivityCard = ({ actividad, onEdit, onDelete }: Props) => {
     <TarjetaDesplegable
       id={`act-${actividad.act_id}`}
       titulo={actividad.act_nombre}
+      color={actividad.act_color}
       subtitulo={`${actividad.disciplinas} disciplina${actividad.disciplinas === 1 ? '' : 's'}`}
       acciones={
         <MenuAcciones

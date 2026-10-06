@@ -29,6 +29,8 @@ export interface Disciplina {
   col_nombre: string;
   act_id: number;
   act_nombre: string;
+  /** Color pastel de la actividad (lib/colores.ts) o null. */
+  act_color: string | null;
   cat_nombre: string | null;
   /** Ordenados de lunes a domingo. */
   horarios: HorarioDisciplina[];

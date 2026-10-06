@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Pin, X } from 'lucide-react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { claseTarjeta } from '@/lib/colores';
 import { cn } from '@/lib/utils';
 
 /**
@@ -45,6 +46,8 @@ interface Props {
   aviso?: boolean;
   /** De baja: borde discontinuo y fondo apagado. */
   apagada?: boolean;
+  /** Color pastel de la actividad (lib/colores.ts). No se aplica si está apagada. */
+  color?: string | null;
   /** Texto pequeño junto al título: "De baja". */
   etiqueta?: ReactNode;
   children: ReactNode;
@@ -57,6 +60,7 @@ const TarjetaDesplegable = ({
   acciones,
   aviso = false,
   apagada = false,
+  color,
   etiqueta,
   children,
 }: Props) => {
@@ -88,6 +92,8 @@ const TarjetaDesplegable = ({
           }}
           className={cn(
             'flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border bg-card px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            // El color va antes que el aviso: el borde ámbar siempre gana.
+            !apagada && claseTarjeta(color),
             aviso && 'border-2 border-amber-500 dark:border-amber-400',
             apagada && 'border-dashed bg-muted/40',
             fijada && 'ring-2 ring-primary/40',
@@ -101,7 +107,14 @@ const TarjetaDesplegable = ({
               )}
             </p>
             {(subtitulo || etiqueta) && (
-              <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <p
+                className={cn(
+                  'mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground',
+                  // Sobre el pastel, el gris de serie queda justo por debajo del
+                  // contraste legible (≈4,2:1): se oscurece un poco.
+                  color && !apagada && 'text-foreground/75',
+                )}
+              >
                 {subtitulo}
                 {etiqueta}
               </p>

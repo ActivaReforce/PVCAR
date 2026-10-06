@@ -47,6 +47,7 @@ const DisciplinaCard = ({ disciplina, diaId, onEdit, onBaja, onReactivar, onElim
       subtitulo={horario}
       aviso={sinEntrenador}
       apagada={!activa}
+      color={disciplina.act_color}
       etiqueta={
         !activa ? (
           <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">

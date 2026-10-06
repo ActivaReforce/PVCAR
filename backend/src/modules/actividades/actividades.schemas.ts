@@ -24,6 +24,17 @@ const materiales = z
   .max(30)
   .optional();
 
+/**
+ * Colores de la actividad (0022). Se guarda el nombre; los tonos pastel los
+ * pone el frontend (lib/colores.ts). Tiene que coincidir con el CHECK.
+ */
+export const COLORES_ACTIVIDAD = [
+  'rosa', 'coral', 'menta', 'verde', 'turquesa', 'cielo', 'azul', 'lavanda', 'violeta', 'gris',
+] as const;
+
+/** null = sin color. */
+const color = z.enum(COLORES_ACTIVIDAD).nullable().optional();
+
 export const listarActividadesSchema = paginacionSchema.extend({
   buscar: z.string().trim().max(120).optional(),
   /** 0 = sin categoría. */
@@ -43,6 +54,7 @@ export const crearActividadSchema = z.object({
   act_tipo_espacio: textoOpcional(120),
   act_espacio_secundario: textoOpcional(120),
   act_materiales_alumno: materiales,
+  act_color: color,
 });
 
 export type CrearActividadInput = z.infer<typeof crearActividadSchema>;
@@ -57,6 +69,7 @@ export const actualizarActividadSchema = z
     act_tipo_espacio: textoOpcional(120),
     act_espacio_secundario: textoOpcional(120),
     act_materiales_alumno: materiales,
+    act_color: color,
   })
   .refine((v) => Object.keys(v).length > 0, 'No hay nada que actualizar');
 

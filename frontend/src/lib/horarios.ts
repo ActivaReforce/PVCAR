@@ -36,3 +36,25 @@ export function problemaDeHorarios(horarios: Franja[]): string | null {
   if (mal) return 'En cada día, la hora de fin tiene que ser posterior a la de inicio';
   return null;
 }
+
+/**
+ * El horario con los días completos: "Lunes y Miércoles 15:00–16:00" o
+ * "Lunes 15:00–16:00 · Miércoles 16:00–17:00". Es lo que ve el representante
+ * en el formulario público y en su ficha (pedido del cliente, 2026-10-06);
+ * las pantallas internas usan la abreviada de `disciplina_horario_texto`.
+ */
+export function horarioLargo(horarios: HorarioDisciplina[]): string {
+  const franjas = new Map<string, HorarioDisciplina[]>();
+  for (const h of [...horarios].sort((a, b) => a.dia_id - b.dia_id)) {
+    const clave = `${h.inicio}–${h.fin}`;
+    franjas.set(clave, [...(franjas.get(clave) ?? []), h]);
+  }
+  return [...franjas.entries()]
+    .map(([horas, dias]) => {
+      const nombres = dias.map((d) => d.dia_nombre);
+      const lista =
+        nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : nombres[0];
+      return `${lista} ${horas}`;
+    })
+    .join(' · ');
+}

@@ -6,7 +6,7 @@ import { ApiError } from '../../middleware/error.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { auditar } from '../../lib/auditoria.js';
 import { ESTADO, ROLES_GLOBALES } from '../../lib/constants.js';
-import { diaDeCruce } from '../../lib/horarios.js';
+import { diaDeCruce, horarioLargo, type HorarioDisciplina } from '../../lib/horarios.js';
 import { enTransaccion } from '../../lib/tx.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { enviarCorreo, escaparHtml } from '../../lib/correo.js';
@@ -65,8 +65,8 @@ import {
 
 type DisciplinaConEstado = Awaited<ReturnType<typeof repo.disciplinasPorId>>[number];
 
-export function describirDisciplina(d: { actividad: string; horario: string | null }): string {
-  return `${d.actividad} — ${d.horario ?? 'sin horario'}`;
+export function describirDisciplina(d: { actividad: string; horarios: HorarioDisciplina[] }): string {
+  return `${d.actividad} — ${d.horarios.length > 0 ? horarioLargo(d.horarios) : 'sin horario'}`;
 }
 
 /**
@@ -478,7 +478,7 @@ export function actividadesYHorarios(disciplinas: DisciplinaConEstado[]): {
 } {
   return {
     actividades: [...new Set(disciplinas.map((d) => d.actividad))],
-    horarios: disciplinas.map((d) => `${d.actividad}: ${d.horario}`),
+    horarios: disciplinas.map((d) => `${d.actividad}: ${horarioLargo(d.horarios)}`),
   };
 }
 

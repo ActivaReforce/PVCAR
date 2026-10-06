@@ -68,6 +68,7 @@ export async function crear(
       tipoEspacio: vacioANulo(input.act_tipo_espacio),
       espacioSecundario: vacioANulo(input.act_espacio_secundario),
       materiales: normalizarMateriales(input.act_materiales_alumno),
+      color: input.act_color ?? null,
     });
 
     await auditar(
@@ -122,6 +123,8 @@ export async function actualizar(
       tocarEspacioSecundario: input.act_espacio_secundario !== undefined,
       materiales: normalizarMateriales(input.act_materiales_alumno),
       tocarMateriales: input.act_materiales_alumno !== undefined,
+      color: input.act_color ?? null,
+      tocarColor: input.act_color !== undefined,
     });
 
     await auditar(

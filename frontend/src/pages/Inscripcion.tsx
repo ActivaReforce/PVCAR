@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ApiError } from '@/lib/api';
-import { diaDeCruce } from '@/lib/horarios';
+import { diaDeCruce, horarioLargo } from '@/lib/horarios';
 import { compressImage } from '@/lib/imageCompression';
 import {
   dinero,
@@ -296,7 +296,7 @@ function datosDocumento(
       fecha_nacimiento: alumno.fecha_nacimiento ? fechaNacimiento(alumno.fecha_nacimiento) : '',
       curso: curso?.catninograd_nombre ?? '',
       actividades: [...new Set(elegidas.map((d) => d.actividad))].join(', '),
-      horarios: elegidas.map((d) => `${d.actividad}: ${d.horario}`).join('; '),
+      horarios: elegidas.map((d) => `${d.actividad}: ${horarioLargo(d.horarios)}`).join('; '),
       emergencia: alumno.emergencia,
       retiro: (() => {
         const r = retiroDe(alumno, rep);
@@ -938,7 +938,7 @@ const FichaAlumno = ({
                         onCheckedChange={(v) => alternar(d.colacthor_id, v === true)}
                       />
                       <span className={`min-w-0 text-sm ${motivo ? 'text-muted-foreground' : ''}`}>
-                        <span className="break-words">{d.horario}</span>
+                        <span className="break-words">{horarioLargo(d.horarios)}</span>
                         {motivo && <span className="block text-xs">{motivo}</span>}
                       </span>
                     </label>

@@ -25,6 +25,8 @@ export interface Actividad {
   act_tipo_espacio: string | null;
   act_espacio_secundario: string | null;
   act_materiales_alumno: string[] | null;
+  /** Color pastel (lib/colores.ts) o null. */
+  act_color: string | null;
   act_fecha_creacion: string | null;
   /** Disciplinas activas que la usan y en cuántos colegios. Contados en SQL. */
   disciplinas: number;
@@ -57,6 +59,7 @@ export interface DatosActividad {
   act_tipo_espacio?: string;
   act_espacio_secundario?: string;
   act_materiales_alumno?: string[];
+  act_color?: string | null;
 }
 
 export interface ImpactoActividad {

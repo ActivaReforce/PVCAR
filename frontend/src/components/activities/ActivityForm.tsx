@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import MaterialesInput from './MaterialesInput';
+import SelectorColor from './SelectorColor';
 import { useToast } from '@/hooks/use-toast';
 import {
   useActualizarActividad,
@@ -54,6 +55,7 @@ const ActivityForm = ({ actividad, onSuccess, onCancel }: Props) => {
     actividad?.act_espacio_secundario ?? '',
   );
   const [materiales, setMateriales] = useState<string[]>(actividad?.act_materiales_alumno ?? []);
+  const [color, setColor] = useState<string | null>(actividad?.act_color ?? null);
 
   const guardando = crear.isPending || actualizar.isPending;
 
@@ -74,6 +76,7 @@ const ActivityForm = ({ actividad, onSuccess, onCancel }: Props) => {
       act_tipo_espacio: tipoEspacio.trim(),
       act_espacio_secundario: espacioSecundario.trim(),
       act_materiales_alumno: materiales,
+      act_color: color,
     };
 
     try {
@@ -181,6 +184,8 @@ const ActivityForm = ({ actividad, onSuccess, onCancel }: Props) => {
           <MaterialesInput valor={materiales} onChange={setMateriales} />
         </div>
       </div>
+
+      <SelectorColor valor={color} onChange={setColor} />
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={guardando}>

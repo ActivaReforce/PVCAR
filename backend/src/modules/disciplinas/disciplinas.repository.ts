@@ -18,6 +18,8 @@ export interface DisciplinaListada {
   col_nombre: string;
   act_id: number;
   act_nombre: string;
+  /** Color pastel de la actividad (0022) o null. */
+  act_color: string | null;
   cat_nombre: string | null;
   /** Sus dias, cada uno con su hora, ordenados de lunes a domingo. */
   horarios: HorarioDisciplina[];
@@ -98,6 +100,7 @@ const COLUMNAS = `
         col.col_nombre,
         d.act_id,
         act.act_nombre,
+        act.act_color,
         cat.cat_nombre,
         ${horariosJson('d')} AS horarios,
         ${horarioTexto('d')} AS horario_texto,

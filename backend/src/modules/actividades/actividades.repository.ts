@@ -24,6 +24,8 @@ export interface ActividadListada {
   act_tipo_espacio: string | null;
   act_espacio_secundario: string | null;
   act_materiales_alumno: string[] | null;
+  /** Nombre del color pastel (0022) o null. */
+  act_color: string | null;
   act_fecha_creacion: string | null;
   /** Disciplinas activas que usan esta actividad. */
   disciplinas: number;
@@ -68,6 +70,7 @@ const COLUMNAS = `
         a.act_tipo_espacio,
         a.act_espacio_secundario,
         a.act_materiales_alumno,
+        a.act_color,
         a.act_fecha_creacion,
         COALESCE(u.n, 0)::int        AS disciplinas,
         COALESCE(u.colegios, 0)::int AS colegios
@@ -167,6 +170,7 @@ export interface CamposActividad {
   tipoEspacio: string | null;
   espacioSecundario: string | null;
   materiales: string[] | null;
+  color: string | null;
 }
 
 export async function insertarActividad(
@@ -176,8 +180,8 @@ export async function insertarActividad(
   const { rows } = await client.query<{ act_id: number }>(
     `INSERT INTO public.actividad
          (act_nombre, act_descripcion, cat_id, act_indumentaria_tipo,
-          act_espacio_trabajo, act_tipo_espacio, act_espacio_secundario, act_materiales_alumno)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          act_espacio_trabajo, act_tipo_espacio, act_espacio_secundario, act_materiales_alumno, act_color)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING act_id`,
     [
       datos.nombre,
@@ -188,6 +192,7 @@ export async function insertarActividad(
       datos.tipoEspacio,
       datos.espacioSecundario,
       datos.materiales,
+      datos.color,
     ],
   );
   return rows[0]!.act_id;
@@ -213,6 +218,8 @@ export async function actualizarActividad(
     tocarEspacioSecundario: boolean;
     materiales: string[] | null;
     tocarMateriales: boolean;
+    color: string | null;
+    tocarColor: boolean;
   },
 ): Promise<void> {
   await client.query(
@@ -225,6 +232,7 @@ export async function actualizarActividad(
             act_tipo_espacio       = CASE WHEN $11::boolean THEN $12::text  ELSE act_tipo_espacio       END,
             act_espacio_secundario = CASE WHEN $13::boolean THEN $14::text  ELSE act_espacio_secundario END,
             act_materiales_alumno  = CASE WHEN $15::boolean THEN $16::text[] ELSE act_materiales_alumno END,
+            act_color              = CASE WHEN $17::boolean THEN $18::text  ELSE act_color              END,
             act_fecha_modificacion = now()
       WHERE act_id = $1`,
     [
@@ -244,6 +252,8 @@ export async function actualizarActividad(
       campos.espacioSecundario,
       campos.tocarMateriales,
       campos.materiales,
+      campos.tocarColor,
+      campos.color,
     ],
   );
 }
