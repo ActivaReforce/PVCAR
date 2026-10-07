@@ -86,7 +86,7 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 5. **PDF único** (0020): al aprobar, el aprobado sustituye al enviado; del enviado queda su huella. Representantes muestra la ficha y los documentos firmados (solo personal).
 6. **Representante con permiso de ver Inscripciones:** ve solo las suyas ("Mis inscripciones").
 
-## 9. Representante que ya tiene cuenta (decidido con el cliente, 2026-10-06)
+## 9. Representante que ya tiene cuenta (decidido con el cliente y construido el 2026-10-06)
 
 **La inscripción es de una vez en la vida.** Se vuelve solo para añadir disciplinas a un hijo o para inscribir a otro. Nada se da de baja automáticamente: sacar a un alumno de una disciplina es cosa del admin.
 
@@ -112,3 +112,5 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 - El hijo elegido se actualiza y recibe las disciplinas nuevas, sin duplicarse.
 - **Mismo niño desde otro padre:** si un alumno nuevo coincide en nombre, fecha de nacimiento y colegio con uno que ya existe, el admin elige "es el mismo" (se ata también a este representante) o "es otro".
 - Se siguen bloqueando: la cédula de otra persona y el correo de otra cuenta.
+
+**Construido el 2026-10-06** (backend `c778a28` y frontend): `POST /inscripcion/identificar` (30/h por IP), `GET /inscripcion/mis-datos`, envío y cotización con sesión opcional, `nino_id` por alumno, `calcularCobro(…, externos)`, ficha con `cuenta` y `posibles` y `aprobar` con `{ mismos }`. El formulario no manda el token salvo que la persona haya elegido "Continuar con mi cuenta" o haya entrado en él (`sinSesion`): alguien del personal con la sesión abierta inscribe a otra persona como anónimo. Recorrido completo probado contra un Postgres local con almacenamiento y correo simulados. Sin migración: `inscripcion.usu_id` e `inscripcion_nino.nino_id` ya existían; ahora se llenan al enviar cuando hay cuenta o hijo.

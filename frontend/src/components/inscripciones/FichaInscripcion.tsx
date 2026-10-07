@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -62,18 +62,23 @@ const FichaInscripcion = ({ id, onClose }: Props) => {
   const { toast } = useToast();
   const [confirmarAprobacion, setConfirmarAprobacion] = useState(false);
   const [rechazando, setRechazando] = useState(false);
+  /** Los alumnos nuevos que el admin dice que son uno que ya existe: { insnino_id: nino_id }. */
+  const [mismos, setMismos] = useState<Record<number, number>>({});
+  useEffect(() => setMismos({}), [id]);
 
   const datos = ficha.data;
+  /** El correo de acceso: el de la cuenta, si ya tenía una. */
+  const correoAcceso = datos ? (datos.cuenta?.usu_correo ?? datos.ins_representante.correo) : '';
 
   const aprobarAhora = async () => {
     if (!datos) return;
     setConfirmarAprobacion(false);
     try {
-      const r = await aprobar.mutateAsync(datos.ins_id);
+      const r = await aprobar.mutateAsync({ id: datos.ins_id, mismos });
       toast({
         title: 'Inscripción aprobada',
         description: r.correo_enviado
-          ? `Se envió el correo de acceso a ${datos.ins_representante.correo}.`
+          ? `Se envió el correo de acceso a ${correoAcceso}.`
           : `El correo NO salió. Avísale a ${datos.ins_representante.nombre} por teléfono: entra con su correo y ${r.cuenta_nueva ? 'su cédula como contraseña' : 'la contraseña que ya tenía'}.`,
         variant: r.correo_enviado ? 'default' : 'destructive',
       });
@@ -111,7 +116,20 @@ const FichaInscripcion = ({ id, onClose }: Props) => {
             </p>
           )}
 
-          {datos && <Contenido datos={datos} />}
+          {datos && (
+            <Contenido
+              datos={datos}
+              mismos={mismos}
+              onMismo={(insninoId, ninoId) =>
+                setMismos((m) => {
+                  const nuevo = { ...m };
+                  if (ninoId === null) delete nuevo[insninoId];
+                  else nuevo[insninoId] = ninoId;
+                  return nuevo;
+                })
+              }
+            />
+          )}
 
           {datos && (
             <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-2">
@@ -152,7 +170,7 @@ const FichaInscripcion = ({ id, onClose }: Props) => {
             <AlertDialogTitle>¿Aprobar la inscripción?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
-                {datos && <ResumenAprobacion datos={datos} />}
+                {datos && <ResumenAprobacion datos={datos} mismos={mismos} />}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -175,7 +193,7 @@ const FichaInscripcion = ({ id, onClose }: Props) => {
   );
 };
 
-const ResumenAprobacion = ({ datos }: { datos: InscripcionDetalle }) => {
+const ResumenAprobacion = ({ datos, mismos }: { datos: InscripcionDetalle; mismos: Record<number, number> }) => {
   const existente = datos.coincidencias.find((c) => c.por_correo);
   const rep = datos.ins_representante;
   return (
@@ -183,7 +201,13 @@ const ResumenAprobacion = ({ datos }: { datos: InscripcionDetalle }) => {
       <p>Al aprobar pasa esto:</p>
       <ul className="list-disc space-y-1 pl-5">
         <li>
-          {existente ? (
+          {datos.cuenta ? (
+            <>
+              Se usa la cuenta de <strong>{datos.cuenta.usu_nombre}</strong> ({datos.cuenta.usu_correo})
+              {datos.cuenta.reactiva && ', que estaba dada de baja y se reactiva'}
+              {datos.cuenta.cambios.length > 0 && ` y se actualiza: ${datos.cuenta.cambios.join('; ')}`}.
+            </>
+          ) : existente ? (
             <>
               <strong>{existente.usu_nombre}</strong> ya tiene cuenta: no se crea otra. Se le añaden los
               alumnos y entra con su contraseña de siempre.
@@ -195,15 +219,24 @@ const ResumenAprobacion = ({ datos }: { datos: InscripcionDetalle }) => {
             </>
           )}
         </li>
-        {datos.ninos.map((n) => (
-          <li key={n.insnino_id}>
-            <strong>{n.datos.nombre}</strong> pasa a Estudiantes en {n.colegio ?? n.datos.documento.colegio.sede},
-            inscrito en {n.disciplinas.length} {n.disciplinas.length === 1 ? 'disciplina' : 'disciplinas'}.
-          </li>
-        ))}
+        {datos.ninos.map((n) => {
+          const mismo = n.posibles.find((p) => p.nino_id === mismos[n.insnino_id]);
+          const cuantas = `${n.disciplinas.length} ${n.disciplinas.length === 1 ? 'disciplina' : 'disciplinas'}`;
+          return (
+            <li key={n.insnino_id}>
+              <strong>{n.datos.nombre}</strong>{' '}
+              {n.existente
+                ? `ya es alumno: se actualizan sus datos y se le añaden ${cuantas}.`
+                : mismo
+                  ? `es el mismo alumno que ${mismo.nino_nombre} (hijo de ${mismo.representantes.join(', ') || 'nadie'}): se ata también a este representante y se le añaden ${cuantas}.`
+                  : `pasa a Estudiantes en ${n.colegio ?? n.datos.documento.colegio.sede}, inscrito en ${cuantas}.`}
+            </li>
+          );
+        })}
         <li>Los documentos quedan firmados por Activa ("Aprobado por" con tu nombre).</li>
         <li>
-          Le llega un correo a <strong>{rep.correo}</strong> con su acceso y los documentos en PDF.
+          Le llega un correo a <strong>{datos.cuenta?.usu_correo ?? rep.correo}</strong> con su acceso y los
+          documentos en PDF.
         </li>
       </ul>
       <p>No se puede deshacer desde aquí: para quitar a un alumno habrá que darlo de baja en Estudiantes.</p>
@@ -218,7 +251,15 @@ const Fila = ({ etiqueta, children }: { etiqueta: string; children: React.ReactN
   </div>
 );
 
-const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
+const Contenido = ({
+  datos,
+  mismos,
+  onMismo,
+}: {
+  datos: InscripcionDetalle;
+  mismos: Record<number, number>;
+  onMismo: (insninoId: number, ninoId: number | null) => void;
+}) => {
   const rep = datos.ins_representante;
   const whatsapp = enlaceWhatsApp(rep.telefono);
 
@@ -237,7 +278,29 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
         </div>
       )}
 
+      {datos.cuenta && (
+        <div className="rounded-md border border-sky-600/40 bg-sky-600/5 p-3 text-sm">
+          <p className="flex items-center gap-2 font-medium">
+            <UserCheck className="h-4 w-4" /> Enviada con la cuenta de {datos.cuenta.usu_nombre}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {datos.cuenta.usu_correo}. No se crea otra cuenta.
+            {datos.cuenta.reactiva && (
+              <strong className="text-foreground"> La cuenta está dada de baja: al aprobar se reactiva.</strong>
+            )}
+          </p>
+          {datos.cuenta.cambios.length > 0 && (
+            <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+              {datos.cuenta.cambios.map((c) => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {datos.ins_estado === 'pendiente' &&
+        !datos.cuenta &&
         datos.coincidencias.length > 0 &&
         datos.bloqueos.length === 0 && (
           <div className="rounded-md border border-sky-600/40 bg-sky-600/5 p-3 text-sm">
@@ -320,7 +383,13 @@ const Contenido = ({ datos }: { datos: InscripcionDetalle }) => {
           {datos.ninos.length === 1 ? 'Alumno' : `Alumnos (${datos.ninos.length})`}
         </h3>
         {datos.ninos.map((n) => (
-          <FichaNino key={n.insnino_id} n={n} pendiente={datos.ins_estado === 'pendiente'} />
+          <FichaNino
+            key={n.insnino_id}
+            n={n}
+            pendiente={datos.ins_estado === 'pendiente'}
+            mismo={mismos[n.insnino_id] ?? null}
+            onMismo={(ninoId) => onMismo(n.insnino_id, ninoId)}
+          />
         ))}
       </section>
 
@@ -354,10 +423,61 @@ function resumenConstancia(c: ConstanciaDetalle): string {
   return 'Aceptado';
 }
 
-const FichaNino = ({ n, pendiente }: { n: NinoDetalle; pendiente: boolean }) => {
+const FichaNino = ({
+  n,
+  pendiente,
+  mismo,
+  onMismo,
+}: {
+  n: NinoDetalle;
+  pendiente: boolean;
+  /** El alumno existente que el admin eligió como el mismo, o null ("es otro"). */
+  mismo: number | null;
+  onMismo: (ninoId: number | null) => void;
+}) => {
   const d = n.datos;
   return (
     <div className="space-y-3 rounded-md border p-3">
+      {n.existente && (
+        <p className="flex items-center gap-2 rounded-md bg-sky-600/5 px-3 py-2 text-sm">
+          <UserCheck className="h-4 w-4 flex-shrink-0" />
+          Ya es alumno: se actualizan sus datos y se le añaden estas disciplinas, sin duplicarlo.
+        </p>
+      )}
+      {pendiente && n.posibles.length > 0 && (
+        <fieldset className="space-y-2 rounded-md border border-amber-500/50 bg-amber-500/5 p-3 text-sm">
+          <legend className="px-1 font-medium">¿Es un alumno que ya existe?</legend>
+          <p className="text-muted-foreground">
+            Coincide en nombre, fecha de nacimiento y colegio con otro alumno. Si es el mismo niño (por ejemplo,
+            inscrito antes por el otro padre), se ata también a este representante en vez de crearlo dos veces.
+          </p>
+          <label className="flex min-h-11 cursor-pointer items-center gap-2">
+            <input
+              type="radio"
+              name={`mismo-${n.insnino_id}`}
+              checked={mismo === null}
+              onChange={() => onMismo(null)}
+              className="h-4 w-4 accent-primary"
+            />
+            Es otro alumno: crearlo nuevo
+          </label>
+          {n.posibles.map((p) => (
+            <label key={p.nino_id} className="flex min-h-11 cursor-pointer items-center gap-2">
+              <input
+                type="radio"
+                name={`mismo-${n.insnino_id}`}
+                checked={mismo === p.nino_id}
+                onChange={() => onMismo(p.nino_id)}
+                className="h-4 w-4 accent-primary"
+              />
+              <span>
+                Es el mismo que <strong>{p.nino_nombre}</strong> ({p.col_nombre}), hijo de{' '}
+                {p.representantes.join(', ') || 'nadie'}
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-medium">{d.nombre}</p>
         {n.paquete_url && (
