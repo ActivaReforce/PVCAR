@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { getSupabaseAdmin } from '../../config/supabase.js';
@@ -5,7 +6,7 @@ import { frontendBaseUrl } from '../../config/env.js';
 import { ApiError } from '../../middleware/error.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { auditar } from '../../lib/auditoria.js';
-import { ESTADO, ROLES_GLOBALES } from '../../lib/constants.js';
+import { ESTADO, ROL, ROLES_GLOBALES } from '../../lib/constants.js';
 import { diaDeCruce, horarioLargo, type HorarioDisciplina } from '../../lib/horarios.js';
 import { enTransaccion } from '../../lib/tx.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
@@ -74,15 +75,26 @@ export function describirDisciplina(d: { actividad: string; horarios: HorarioDis
  * del alumno. Se usa dos veces: al recibir el envio y al aprobar, porque
  * entre una cosa y otra pueden pasar dias y alguien pudo dar de baja una.
  */
+/** Una disciplina que el alumno ya tiene activa (§9): no se elige ni se cobra, pero cuenta. */
+export interface DisciplinaYaActiva {
+  colacthor_id: number;
+  actividad: string;
+  horarios: HorarioDisciplina[];
+}
+
 export function problemasDeDisciplinas(
-  ninos: Array<{ nombre: string; col_id: number; disciplinas: number[] }>,
+  ninos: Array<{ nombre: string; col_id: number; disciplinas: number[]; activas?: DisciplinaYaActiva[] }>,
   encontradas: Map<number, DisciplinaConEstado>,
 ): string[] {
   const problemas: string[] = [];
   for (const nino of ninos) {
+    const activas = nino.activas ?? [];
     for (const id of nino.disciplinas) {
       const d = encontradas.get(id);
-      if (!d) {
+      const yaActiva = activas.find((a) => a.colacthor_id === id);
+      if (yaActiva) {
+        problemas.push(`${nino.nombre}: ya está inscrito en ${yaActiva.actividad}`);
+      } else if (!d) {
         problemas.push(`${nino.nombre}: una de las disciplinas ya no existe`);
       } else if (d.est_id !== ESTADO.ACTIVO) {
         problemas.push(`${nino.nombre}: ${describirDisciplina(d)} ya no está abierta`);
@@ -91,9 +103,13 @@ export function problemasDeDisciplinas(
       }
     }
     // Un alumno no puede estar en dos disciplinas que se pisen (Disciplinas v2).
-    const elegidas = nino.disciplinas
-      .map((id) => encontradas.get(id))
-      .filter((d): d is DisciplinaConEstado => d !== undefined);
+    const elegidas: Array<{ actividad: string; horarios: HorarioDisciplina[] }> = [
+      ...activas,
+      ...nino.disciplinas
+        .filter((id) => !activas.some((a) => a.colacthor_id === id))
+        .map((id) => encontradas.get(id))
+        .filter((d): d is DisciplinaConEstado => d !== undefined),
+    ];
     for (let i = 0; i < elegidas.length; i++) {
       for (let j = i + 1; j < elegidas.length; j++) {
         const dia = diaDeCruce(elegidas[i]!.horarios, elegidas[j]!.horarios);
@@ -417,7 +433,8 @@ export async function formulario(): Promise<Formulario> {
  * total antes del comprobante) y el envio (para congelarlo en el contrato).
  */
 async function cobroDe(
-  ninos: Array<{ nombre: string; col_id: number; disciplinas: number[] }>,
+  ninos: Array<{ nombre: string; col_id: number; disciplinas: number[]; activas?: DisciplinaYaActiva[] }>,
+  externos: number[] = [],
 ): Promise<{
   cobro: Cobro;
   encontradas: Map<number, DisciplinaConEstado>;
@@ -429,20 +446,24 @@ async function cobroDe(
 
   // El tope por alumno es solo del formulario público: desde la plataforma
   // el personal puede inscribir en más (cliente, 2026-10-06).
-  const pasados = ninos.filter((n) => n.disciplinas.length > config.max_disciplinas);
+  // Cuentan también las que ya tiene activas (§9).
+  const total = (n: (typeof ninos)[number]) => n.disciplinas.length + (n.activas?.length ?? 0);
+  const pasados = ninos.filter((n) => total(n) > config.max_disciplinas);
   if (pasados.length > 0) {
-    throw new ApiError(409, `Cada alumno puede elegir como mucho ${config.max_disciplinas} disciplinas.`, {
-      problemas: pasados.map((n) => `${n.nombre}: eligió ${n.disciplinas.length}`),
-    });
+    throw new ApiError(
+      409,
+      `Cada alumno puede tener como mucho ${config.max_disciplinas} disciplinas, contando las que ya tiene.`,
+      { problemas: pasados.map((n) => `${n.nombre}: quedaría con ${total(n)}`) },
+    );
   }
 
   const problemas = problemasDeDisciplinas(ninos, encontradas);
   if (problemas.length > 0) {
-    const cruce = problemas.some((p) => p.includes(' se cruzan el '));
+    const cruce = problemas.some((p) => p.includes(' se cruzan el ') || p.includes(' ya está inscrito en '));
     throw new ApiError(
       409,
       cruce
-        ? 'Dos de las disciplinas elegidas se dan a la misma hora: elige otra.'
+        ? 'Revisa las disciplinas elegidas: alguna se cruza de horario o ya la tiene.'
         : 'Alguna disciplina elegida ya no está disponible. Recarga la página.',
       { problemas },
     );
@@ -460,14 +481,20 @@ async function cobroDe(
     ninos.map((n) => ({ colId: n.col_id, disciplinas: n.disciplinas.length })),
     precios,
     IVA_PCT,
+    externos,
   );
   return { cobro, encontradas, precios };
 }
 
 export async function cotizar(
-  ninos: Array<{ col_id: number; disciplinas: number[] }>,
+  ninos: Array<{ col_id: number; disciplinas: number[]; nino_id: number | null }>,
+  actor: AuthUser | null,
 ): Promise<Cobro> {
-  const { cobro } = await cobroDe(ninos.map((n, i) => ({ ...n, nombre: `Alumno ${i + 1}` })));
+  const contexto = await contextoDeHijos(actor, ninos);
+  const { cobro } = await cobroDe(
+    ninos.map((n, i) => ({ ...n, nombre: `Alumno ${i + 1}`, activas: contexto.activas[i] })),
+    contexto.externos,
+  );
   return cobro;
 }
 
@@ -499,9 +526,16 @@ export interface EnvioRecibido {
 }
 
 export async function enviar(
-  input: EnvioInscripcion,
+  entrada: EnvioInscripcion,
   meta: { ip: string | null; navegador: string | null },
+  actor: AuthUser | null = null,
 ): Promise<EnvioRecibido> {
+  // Quién envía (§9): su cuenta si inició sesión, una dada de baja si la
+  // cédula es suya, o nadie si es nuevo. Corrige correo y cédula a los de la cuenta.
+  const { usuId, representante } = await cuentaDelEnvio(actor, entrada.representante);
+  const input = { ...entrada, representante };
+  const contexto = await contextoDeHijos(actor, input.ninos);
+
   const situacion = await estado();
   if (!situacion.abiertas) throw new ApiError(503, 'Las inscripciones están cerradas.');
   const abiertos = new Set(situacion.colegios.filter((c) => c.abierto).map((c) => c.col_id));
@@ -529,7 +563,10 @@ export async function enviar(
     });
   }
 
-  const { cobro, encontradas, precios } = await cobroDe(input.ninos);
+  const { cobro, encontradas, precios } = await cobroDe(
+    input.ninos.map((n, i) => ({ ...n, activas: contexto.activas[i] })),
+    contexto.externos,
+  );
 
   const comprobante = Buffer.from(input.comprobante.base64, 'base64');
   if (comprobante.length > 2 * 1024 * 1024) {
@@ -545,7 +582,7 @@ export async function enviar(
 
   // Lo que se guarda de cada alumno lleva una foto de lo que el sistema puso
   // en sus documentos: así se regeneran idénticos al aprobar.
-  const guardados: repo.NinoGuardado[] = input.ninos.map(({ disciplinas, ...nino }) => ({
+  const guardados: repo.NinoGuardado[] = input.ninos.map(({ disciplinas, nino_id: _n, ...nino }) => ({
     ...nino,
     documento: {
       colegio: precios.get(nino.col_id)!.documento,
@@ -590,6 +627,7 @@ export async function enviar(
         ip: meta.ip,
         navegador: meta.navegador,
         fecha,
+        usuId,
       });
       for (const [i, nino] of guardados.entries()) {
         const insninoId = await repo.insertarNinoDeInscripcion(client, {
@@ -600,6 +638,7 @@ export async function enviar(
           pdf: rutas[i]!,
           sha256: paquetes[i]!.sha256,
           cobro: cobro.alumnos[i]!,
+          ninoId: input.ninos[i]!.nino_id,
         });
         for (const h of paquetes[i]!.huellas) {
           await repo.insertarAceptacion(client, {
@@ -676,6 +715,21 @@ export interface NinoDetalle {
   constancias: ConstanciaDetalle[];
   cobro: CobroAlumno | null;
   nino_id: number | null;
+  /** Pendiente y con un alumno que ya existía: se le añaden disciplinas, no se crea (§9). */
+  existente: boolean;
+  /** Pendiente y nuevo: alumnos que coinciden en nombre, nacimiento y colegio (¿el mismo?). */
+  posibles: repo.PosibleMismo[];
+}
+
+/** La cuenta que ya tenía quien envió (§9), con lo que cambia al aprobar. */
+export interface CuentaPrevia {
+  usu_id: number;
+  usu_nombre: string;
+  usu_correo: string;
+  /** Está dada de baja: aprobar la reactiva. */
+  reactiva: boolean;
+  /** "Teléfono: 0991… → 0987…". */
+  cambios: string[];
 }
 
 export interface InscripcionDetalle extends Omit<repo.InscripcionFila, 'ins_comprobante'> {
@@ -683,6 +737,8 @@ export interface InscripcionDetalle extends Omit<repo.InscripcionFila, 'ins_comp
   ninos: NinoDetalle[];
   /** Usuarios que ya existen con ese correo o esa cedula. */
   coincidencias: repo.UsuarioCoincidente[];
+  /** Pendiente y enviada desde una cuenta que ya existía. Solo para el personal. */
+  cuenta: CuentaPrevia | null;
   /** Lo que impide aprobar ahora mismo, en frases para el admin. Vacio si se puede. */
   bloqueos: string[];
 }
@@ -712,6 +768,44 @@ export function bloqueosDeAprobacion(
   return [...bloqueos, ...problemasDisciplinas];
 }
 
+/** Lo que cambia en la cuenta al aprobar: lo que escribió frente a lo guardado. */
+function cambiosDeCuenta(cuenta: repo.CuentaExistente, rep: RepresentanteFormulario): string[] {
+  const cambios: string[] = [];
+  if (cuenta.usu_nombre.trim() !== rep.nombre.trim()) cambios.push(`Nombre: ${cuenta.usu_nombre} → ${rep.nombre}`);
+  if ((cuenta.usu_telefono ?? '') !== rep.telefono) {
+    cambios.push(`Teléfono: ${cuenta.usu_telefono ?? 'sin teléfono'} → ${rep.telefono}`);
+  }
+  if (!cuenta.usu_cedula) cambios.push(`Cédula: se añade ${rep.cedula}`);
+  return cambios;
+}
+
+/**
+ * Lo que impide aprobar una enviada desde una cuenta que ya existía: que su
+ * cédula sea de otra persona. El correo es el de la cuenta, no se compara.
+ */
+async function bloqueosDeCuentaPrevia(cuenta: repo.CuentaExistente, rep: RepresentanteFormulario): Promise<string[]> {
+  const porCedula = await repo.cuentaPorCedula(rep.cedula);
+  if (porCedula && porCedula.usu_id !== cuenta.usu_id) {
+    return [
+      `La cédula ya pertenece a otro usuario (${porCedula.usu_nombre}, ${porCedula.usu_correo}). Hay que aclararlo con el representante antes de aprobar.`,
+    ];
+  }
+  return [];
+}
+
+/** Lo que ya tiene activo cada alumno existente, con horarios, para los cruces. */
+async function activasDe(ninoIds: Array<number | null>, client?: PoolClient): Promise<DisciplinaYaActiva[][]> {
+  const ids = await Promise.all(ninoIds.map((id) => (id === null ? [] : repo.activasDeNino(id, client))));
+  const todas = [...new Set(ids.flat())];
+  const porId = new Map((await repo.disciplinasPorId(todas, client)).map((d) => [d.colacthor_id, d]));
+  return ids.map((lista) =>
+    lista
+      .map((id) => porId.get(id))
+      .filter((d): d is DisciplinaConEstado => d !== undefined)
+      .map((d) => ({ colacthor_id: d.colacthor_id, actividad: d.actividad, horarios: d.horarios })),
+  );
+}
+
 export async function detalle(actor: AuthUser, insId: number): Promise<InscripcionDetalle> {
   const fila = await repo.obtener(insId);
   // A un representante, una que no es suya es como si no existiera.
@@ -732,16 +826,36 @@ export async function detalle(actor: AuthUser, insId: number): Promise<Inscripci
   const porId = new Map(disciplinas.map((d) => [d.colacthor_id, d]));
 
   const pendiente = fila.ins_estado === 'pendiente';
+  const cuentaPrevia = pendiente && fila.usu_id !== null ? await repo.cuentaPorId(fila.usu_id) : null;
+  // Las que ya tiene activas el alumno existente se saltan al aprobar: no bloquean.
+  const activas = pendiente ? await activasDe(ninos.map((n) => n.nino_id)) : ninos.map(() => []);
   const problemas = pendiente
     ? problemasDeDisciplinas(
-        ninos.map((n) => ({
+        ninos.map((n, i) => ({
           nombre: n.insnino_datos.nombre,
           col_id: n.insnino_datos.col_id,
-          disciplinas: n.insnino_disciplinas,
+          disciplinas: n.insnino_disciplinas.filter((id) => !activas[i]!.some((a) => a.colacthor_id === id)),
+          activas: activas[i],
         })),
         porId,
       )
     : [];
+  const posibles =
+    pendiente && personal
+      ? await Promise.all(
+          ninos.map((n) =>
+            n.nino_id === null
+              ? repo.posiblesMismos(n.insnino_datos.nombre, n.insnino_datos.fecha_nacimiento, n.insnino_datos.col_id)
+              : Promise.resolve([]),
+          ),
+        )
+      : ninos.map(() => []);
+  const bloqueos =
+    personal && pendiente
+      ? cuentaPrevia
+        ? [...(await bloqueosDeCuentaPrevia(cuentaPrevia, fila.ins_representante)), ...problemas]
+        : bloqueosDeAprobacion(coincidencias, problemas)
+      : [];
 
   const { ins_comprobante, ...resto } = fila;
   return {
@@ -750,7 +864,17 @@ export async function detalle(actor: AuthUser, insId: number): Promise<Inscripci
     // Lo que sirve para decidir (otros usuarios con su correo o cédula) es
     // solo del personal.
     coincidencias: personal ? coincidencias : [],
-    bloqueos: personal && pendiente ? bloqueosDeAprobacion(coincidencias, problemas) : [],
+    cuenta:
+      personal && cuentaPrevia
+        ? {
+            usu_id: cuentaPrevia.usu_id,
+            usu_nombre: cuentaPrevia.usu_nombre,
+            usu_correo: cuentaPrevia.usu_correo,
+            reactiva: cuentaPrevia.est_id !== ESTADO.ACTIVO,
+            cambios: cambiosDeCuenta(cuentaPrevia, fila.ins_representante),
+          }
+        : null,
+    bloqueos,
     ninos: ninos.map((n, i) => {
       const propias = n.insnino_disciplinas.map((id) => porId.get(id));
       return {
@@ -779,6 +903,8 @@ export async function detalle(actor: AuthUser, insId: number): Promise<Inscripci
           })),
         cobro: n.insnino_precio,
         nino_id: n.nino_id,
+        existente: pendiente && n.nino_id !== null,
+        posibles: posibles[i] ?? [],
       };
     }),
   };
@@ -808,17 +934,29 @@ export interface ResultadoAprobacion {
  * aprobar es la firma de Activa). Sale de los mismos datos y versiones que
  * el de envio, asi que solo cambia esa linea.
  */
-export async function aprobar(actor: AuthUser, insId: number): Promise<ResultadoAprobacion> {
+export async function aprobar(
+  actor: AuthUser,
+  insId: number,
+  mismos: Map<number, number> = new Map(),
+): Promise<ResultadoAprobacion> {
   const fila = await repo.obtener(insId);
   if (!fila) throw new ApiError(404, 'Inscripción no encontrada');
   if (fila.ins_estado !== 'pendiente') throw new ApiError(409, 'Esta inscripción ya está aprobada');
 
   const rep = fila.ins_representante;
-  const coincidencias = await repo.usuariosCoincidentes(rep.correo, rep.cedula);
-  const bloqueos = bloqueosDeAprobacion(coincidencias, []);
+  // Enviada desde una cuenta que ya existía (§9): esa es la cuenta, y si está
+  // dada de baja se reactiva. Si no, se busca por correo como siempre.
+  const cuentaPrevia = fila.usu_id !== null ? await repo.cuentaPorId(fila.usu_id) : null;
+  const coincidencias = cuentaPrevia ? [] : await repo.usuariosCoincidentes(rep.correo, rep.cedula);
+  const bloqueos = cuentaPrevia
+    ? await bloqueosDeCuentaPrevia(cuentaPrevia, rep)
+    : bloqueosDeAprobacion(coincidencias, []);
   if (bloqueos.length > 0) throw new ApiError(409, bloqueos[0]!, { bloqueos });
 
-  const existente = coincidencias.find((c) => c.por_correo) ?? null;
+  const existente = cuentaPrevia
+    ? null
+    : (coincidencias.find((c) => c.por_correo) ?? null);
+  const reactivar = cuentaPrevia !== null && cuentaPrevia.est_id !== ESTADO.ACTIVO;
 
   // Los paquetes aprobados, antes de crear nada: si uno falla, no hay que deshacer.
   const fechaAprobacion = new Date();
@@ -859,9 +997,12 @@ export async function aprobar(actor: AuthUser, insId: number): Promise<Resultado
       subidos.push(await subirArchivo('contratos', p.pdf, 'application/pdf', 'pdf'));
     }
 
-    if (!existente) {
+    // Cuenta de acceso nueva: para el representante nuevo, y para una cuenta
+    // dada de baja que no tenía (la contraseña es su cédula, como siempre).
+    const sinAcceso = cuentaPrevia ? reactivar && !cuentaPrevia.auth_user_id : !existente;
+    if (sinAcceso) {
       const { data, error } = await getSupabaseAdmin().auth.admin.createUser({
-        email: rep.correo,
+        email: cuentaPrevia?.usu_correo ?? rep.correo,
         password: rep.cedula,
         email_confirm: true,
       });
@@ -879,22 +1020,64 @@ export async function aprobar(actor: AuthUser, insId: number): Promise<Resultado
       }
 
       const ninos = await repo.ninosDe(insId, client);
-      const ids = [...new Set(ninos.flatMap((n) => n.insnino_disciplinas))];
+
+      // A quién va cada alumno: el que ya existía (§9), el que el admin dijo
+      // que es el mismo, o uno nuevo.
+      const destinos: Array<number | null> = [];
+      for (const n of ninos) {
+        if (n.nino_id !== null) {
+          if (!cuentaPrevia || !(await repo.esHijoDe(n.nino_id, cuentaPrevia.usu_id, client))) {
+            throw new ApiError(409, `${n.insnino_datos.nombre} ya no está entre los hijos de esta cuenta.`);
+          }
+          destinos.push(n.nino_id);
+          continue;
+        }
+        const elegido = mismos.get(n.insnino_id) ?? null;
+        if (elegido !== null) {
+          const d = n.insnino_datos;
+          const candidatos = await repo.posiblesMismos(d.nombre, d.fecha_nacimiento, d.col_id, client);
+          if (!candidatos.some((c) => c.nino_id === elegido)) {
+            throw new ApiError(409, `El alumno elegido no coincide con ${d.nombre}.`);
+          }
+        }
+        destinos.push(elegido);
+      }
+
+      // Las que ya tiene activas se saltan; el resto no puede cruzarse con ellas.
+      const activas = await activasDe(destinos, client);
+      const nuevas = ninos.map((n, i) =>
+        n.insnino_disciplinas.filter((id) => !activas[i]!.some((a) => a.colacthor_id === id)),
+      );
+      const ids = [...new Set(nuevas.flat())];
       const porId = new Map(
         (await repo.disciplinasPorId(ids, client)).map((d) => [d.colacthor_id, d]),
       );
       const problemas = problemasDeDisciplinas(
-        ninos.map((n) => ({
+        ninos.map((n, i) => ({
           nombre: n.insnino_datos.nombre,
           col_id: n.insnino_datos.col_id,
-          disciplinas: n.insnino_disciplinas,
+          disciplinas: nuevas[i]!,
+          activas: activas[i],
         })),
         porId,
       );
       if (problemas.length > 0) throw new ApiError(409, problemas[0]!, { bloqueos: problemas });
 
       let usuId: number;
-      if (existente) {
+      if (cuentaPrevia) {
+        usuId = cuentaPrevia.usu_id;
+        await repo.actualizarRepresentante(client, usuId, { nombre: rep.nombre, telefono: rep.telefono });
+        await repo.completarCedula(client, usuId, rep.cedula);
+        if (reactivar) {
+          // Como Reactivar en Usuarios: la cuenta de acceso si faltaba, el
+          // estado y, si además entrena, su ficha de entrenador.
+          if (authCreada) await usuariosRepo.fijarAuthUserId(client, usuId, authCreada);
+          await usuariosRepo.cambiarEstado(client, usuId, ESTADO.ACTIVO);
+          if ((await usuariosRepo.rolesDe(usuId, client)).includes(ROL.ENTRENADOR)) {
+            await usuariosRepo.upsertEntrenador(client, usuId, ESTADO.ACTIVO);
+          }
+        }
+      } else if (existente) {
         usuId = existente.usu_id;
         await repo.completarCedula(client, usuId, rep.cedula);
       } else {
@@ -915,6 +1098,43 @@ export async function aprobar(actor: AuthUser, insId: number): Promise<Resultado
       const creados: number[] = [];
       for (const [i, n] of ninos.entries()) {
         const d = n.insnino_datos;
+        const destino = destinos[i]!;
+        if (destino !== null) {
+          // Alumno que ya existía: se actualiza con lo último que dio el
+          // representante y recibe solo las disciplinas nuevas. Su colegio no
+          // se mueve si tiene disciplinas activas.
+          await estudiantesRepo.actualizarEstudiante(client, destino, {
+            nombre: d.nombre,
+            colId: activas[i]!.length > 0 ? undefined : d.col_id,
+            gradoId: d.catninograd_id,
+            tocarGrado: true,
+            fechaNacimiento: d.fecha_nacimiento,
+            tocarFechaNacimiento: true,
+            modalidadSalida: d.modalidad_salida,
+            tocarModalidad: true,
+            detalleRetiro: d.detalle_retiro,
+            tocarDetalleRetiro: true,
+            salud: d.salud.detalle,
+            tocarSalud: true,
+            imagen: d.imagen,
+            tocarImagen: true,
+            foto: null,
+            tocarFoto: false,
+          });
+          await repo.marcarSaludAutorizada(client, destino, d.salud.autoriza);
+          await estudiantesRepo.guardarContacto(client, destino, 'emergencia', { ...d.emergencia, cedula: null });
+          await estudiantesRepo.guardarContacto(client, destino, 'retiro', d.retiro);
+          await repo.atarConParentesco(client, destino, padreId, d.parentesco);
+          for (const colacthorId of nuevas[i]!) {
+            await repo.inscribirEnDisciplina(client, destino, colacthorId, n.insnino_id);
+          }
+          await repo.fijarNino(client, n.insnino_id, destino, {
+            ruta: subidos[i]!,
+            sha256: aprobados[i]!.sha256,
+          });
+          creados.push(destino);
+          continue;
+        }
         const ninoId = await estudiantesRepo.insertarEstudiante(client, {
           nombre: d.nombre,
           colId: d.col_id,
@@ -949,12 +1169,18 @@ export async function aprobar(actor: AuthUser, insId: number): Promise<Resultado
           accion: 'crear',
           entidad: 'inscripcion',
           entidadId: insId,
-          detalle: { aprobada: true, usu_id: usuId, cuenta_nueva: !existente, ninos: creados },
+          detalle: {
+            aprobada: true,
+            usu_id: usuId,
+            cuenta_nueva: authCreada !== null && !cuentaPrevia,
+            reactivada: reactivar,
+            ninos: creados,
+          },
         },
         client,
       );
 
-      return { usu_id: usuId, cuenta_nueva: !existente, ninos: creados };
+      return { usu_id: usuId, cuenta_nueva: authCreada !== null, ninos: creados };
     });
   } catch (err) {
     await borrarArchivos(subidos);
@@ -976,7 +1202,7 @@ export async function aprobar(actor: AuthUser, insId: number): Promise<Resultado
   await borrarArchivos(ninosPrevios.map((n) => n.insnino_pdf));
 
   const correo_enviado = await enviarCorreo({
-    ...correoDeAprobacion(rep.nombre, rep.correo, resultado.cuenta_nueva),
+    ...correoDeAprobacion(rep.nombre, cuentaPrevia?.usu_correo ?? rep.correo, resultado.cuenta_nueva),
     adjuntos: ninosPrevios.map((n, i) => ({
       nombre: `Inscripcion ${n.insnino_datos.nombre}.pdf`,
       contenido: aprobados[i]!.pdf,
@@ -1385,4 +1611,149 @@ export async function restaurarMembrete(actor: AuthUser): Promise<void> {
     return previo;
   });
   if (anterior) await borrarArchivos([anterior]);
+}
+
+// ---------------------------------------------------------------------------
+// Representante que ya tiene cuenta (fase14b-contratos.md §9, 2026-10-06)
+
+export type Identificacion =
+  | { estado: 'nuevo' }
+  /** Tiene cuenta activa: que entre. La pista ayuda a recordar con qué correo. */
+  | { estado: 'cuenta'; correo_pista: string }
+  /** Cuenta dada de baja: puede inscribir igual y se reactiva al aprobar. */
+  | { estado: 'inactiva' };
+
+/** "juan.perez@gmail.com" → "ju•••@gmail.com". */
+export function pistaDeCorreo(correo: string): string {
+  const [local = '', dominio = ''] = correo.split('@');
+  return `${local.slice(0, 2)}•••@${dominio}`;
+}
+
+/**
+ * Con la cédula sola no se enseña nada (son datos de menores): solo si hay
+ * cuenta. Los datos se ven después de iniciar sesión.
+ */
+export async function identificar(cedula: string): Promise<Identificacion> {
+  const cuenta = await repo.cuentaPorCedula(cedula);
+  if (!cuenta) return { estado: 'nuevo' };
+  if (cuenta.est_id === ESTADO.ACTIVO) return { estado: 'cuenta', correo_pista: pistaDeCorreo(cuenta.usu_correo) };
+  return { estado: 'inactiva' };
+}
+
+export interface MisDatos {
+  representante: {
+    nombre: string;
+    cedula: string | null;
+    correo: string;
+    telefono: string | null;
+    factura: RepresentanteFormulario['factura'] | null;
+  };
+  hijos: repo.HijoDelRepresentante[];
+}
+
+/** Lo que el formulario rellena solo a quien inició sesión: él y sus hijos, nada más. */
+export async function misDatos(actor: AuthUser): Promise<MisDatos> {
+  const [cuenta, factura, hijos] = await Promise.all([
+    repo.cuentaPorId(actor.usuario.usu_id),
+    repo.facturaDe(actor.usuario.usu_id),
+    repo.hijosDe(actor.usuario.usu_id),
+  ]);
+  if (!cuenta) throw new ApiError(404, 'Cuenta no encontrada');
+  return {
+    representante: {
+      nombre: cuenta.usu_nombre,
+      cedula: cuenta.usu_cedula,
+      correo: cuenta.usu_correo,
+      telefono: cuenta.usu_telefono,
+      factura,
+    },
+    hijos,
+  };
+}
+
+/**
+ * Lo que aportan los hijos que ya existen: por cada alumno del envío, las
+ * disciplinas que ya tiene activas (no se cobran, cuentan para el máximo y
+ * los cruces); y, de los hermanos que no van en este envío, cuántas tienen
+ * activas (cuentan para el descuento de hermano).
+ *
+ * Un `nino_id` solo vale con sesión iniciada y si es hijo de quien envía.
+ */
+async function contextoDeHijos(
+  actor: AuthUser | null,
+  ninos: Array<{ col_id: number; nino_id: number | null }>,
+): Promise<{ activas: DisciplinaYaActiva[][]; externos: number[] }> {
+  const pedidos = ninos.map((n) => n.nino_id).filter((id): id is number => id !== null);
+  if (new Set(pedidos).size !== pedidos.length) {
+    throw new ApiError(400, 'El mismo alumno aparece dos veces en la inscripción');
+  }
+  if (!actor) {
+    if (pedidos.length > 0) throw new ApiError(401, 'Inicia sesión para inscribir a un hijo que ya tienes');
+    return { activas: ninos.map(() => []), externos: [] };
+  }
+
+  const hijos = await repo.hijosDe(actor.usuario.usu_id);
+  const porId = new Map(hijos.map((h) => [h.nino_id, h]));
+  const activas = ninos.map((n) => {
+    if (n.nino_id === null) return [];
+    const hijo = porId.get(n.nino_id);
+    if (!hijo) throw new ApiError(403, 'Ese alumno no está entre tus hijos');
+    if (hijo.activas.length > 0 && hijo.col_id !== n.col_id) {
+      throw new ApiError(
+        409,
+        `${hijo.nombre} tiene disciplinas activas en ${hijo.col_nombre}: su colegio no se cambia desde aquí.`,
+      );
+    }
+    return hijo.activas;
+  });
+  const externos = hijos
+    .filter((h) => !pedidos.includes(h.nino_id) && h.activas.length > 0)
+    .map((h) => h.activas.length);
+  return { activas, externos };
+}
+
+/**
+ * La cuenta del envío y el representante corregido.
+ *
+ * - Con sesión: su cuenta. El correo es el de la cuenta (se cambia en Perfil)
+ *   y la cédula también, si ya tenía una.
+ * - Sin sesión: si la cédula o el correo son de una cuenta activa, tiene que
+ *   entrar (así no nace un duplicado). Si son de una dada de baja, se ata a
+ *   ella y se reactiva al aprobar.
+ */
+async function cuentaDelEnvio(
+  actor: AuthUser | null,
+  rep: RepresentanteFormulario,
+): Promise<{ usuId: number | null; representante: RepresentanteFormulario }> {
+  if (actor) {
+    const cuenta = await repo.cuentaPorId(actor.usuario.usu_id);
+    if (!cuenta) throw new ApiError(401, 'No autenticado');
+    const cedula = cuenta.usu_cedula ?? rep.cedula;
+    if (!cuenta.usu_cedula) {
+      const otra = await repo.cuentaPorCedula(cedula);
+      if (otra && otra.usu_id !== cuenta.usu_id) {
+        throw new ApiError(409, 'Esa cédula ya pertenece a otra cuenta. Escríbenos para aclararlo.');
+      }
+    }
+    return { usuId: cuenta.usu_id, representante: { ...rep, correo: cuenta.usu_correo, cedula } };
+  }
+
+  const [porCedula, porCorreo] = await Promise.all([
+    repo.cuentaPorCedula(rep.cedula),
+    repo.cuentaPorCorreo(rep.correo),
+  ]);
+  const activa = [porCedula, porCorreo].find((c) => c?.est_id === ESTADO.ACTIVO);
+  if (activa) {
+    throw new ApiError(409, 'Ya tienes una cuenta en Activa Reforce. Inicia sesión para inscribir sin volver a llenar tus datos.', {
+      codigo: 'tiene_cuenta',
+      correo_pista: pistaDeCorreo(activa.usu_correo),
+    });
+  }
+  if (porCedula && porCorreo && porCedula.usu_id !== porCorreo.usu_id) {
+    throw new ApiError(409, 'Ese correo es de otra cuenta. Usa el tuyo o escríbenos para aclararlo.');
+  }
+  if (porCorreo && porCorreo.usu_cedula && porCorreo.usu_cedula.toUpperCase() !== rep.cedula.toUpperCase()) {
+    throw new ApiError(409, 'Ese correo es de una cuenta con otra cédula. Escríbenos para aclararlo.');
+  }
+  return { usuId: (porCedula ?? porCorreo)?.usu_id ?? null, representante: rep };
 }

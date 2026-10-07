@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { horarioTexto, horariosJson, primerHorario, type HorarioDisciplina } from '../../lib/horarios.js';
-import { contieneSinTildes } from '../../lib/sql.js';
+import { contieneSinTildes, sinTildes } from '../../lib/sql.js';
 import { offsetDe } from '../../lib/paginacion.js';
 import type { CobroAlumno, PrecioColegio } from './inscripciones.precios.js';
 import type { TipoDocumento } from './inscripciones.documentos.js';
@@ -480,12 +480,14 @@ export async function insertarInscripcion(
     ip: string | null;
     navegador: string | null;
     fecha: Date;
+    /** La cuenta que ya tenía (sesión iniciada o dada de baja por cédula); null si es nuevo. */
+    usuId: number | null;
   },
 ): Promise<number> {
   const { rows } = await client.query<{ ins_id: number }>(
     `INSERT INTO public.inscripcion
-         (ins_representante, ins_comprobante, ins_ip, ins_navegador, ins_total, ins_fecha)
-     VALUES ($1, $2, $3, $4, $5, $6)
+         (ins_representante, ins_comprobante, ins_ip, ins_navegador, ins_total, ins_fecha, usu_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING ins_id`,
     [
       JSON.stringify(datos.representante),
@@ -494,6 +496,7 @@ export async function insertarInscripcion(
       datos.navegador,
       datos.total,
       datos.fecha,
+      datos.usuId,
     ],
   );
   return rows[0]!.ins_id;
@@ -505,7 +508,7 @@ export async function insertarInscripcion(
  * curso, disciplinas y horarios). Con eso el paquete se vuelve a generar
  * idéntico al aprobar, aunque luego cambien los precios o las disciplinas.
  */
-export type NinoGuardado = Omit<NinoFormulario, 'disciplinas'> & {
+export type NinoGuardado = Omit<NinoFormulario, 'disciplinas' | 'nino_id'> & {
   documento: {
     colegio: ColegioDocumento;
     curso: string | null;
@@ -524,13 +527,15 @@ export async function insertarNinoDeInscripcion(
     pdf: string;
     sha256: string;
     cobro: CobroAlumno;
+    /** El alumno que ya existía, si se le añaden disciplinas; null si es nuevo. */
+    ninoId: number | null;
   },
 ): Promise<number> {
   const { rows } = await client.query<{ insnino_id: number }>(
     `INSERT INTO public.inscripcion_nino
          (ins_id, insnino_orden, insnino_datos, insnino_disciplinas,
-          insnino_pdf, insnino_pdf_sha256, insnino_pdf_enviado_sha256, insnino_precio)
-     VALUES ($1, $2, $3, $4, $5, $6, $6, $7)
+          insnino_pdf, insnino_pdf_sha256, insnino_pdf_enviado_sha256, insnino_precio, nino_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8)
      RETURNING insnino_id`,
     [
       datos.insId,
@@ -540,6 +545,7 @@ export async function insertarNinoDeInscripcion(
       datos.pdf,
       datos.sha256,
       JSON.stringify(datos.cobro),
+      datos.ninoId,
     ],
   );
   return rows[0]!.insnino_id;
@@ -947,4 +953,204 @@ export async function nombresDeGrados(ids: number[]): Promise<Map<number, string
   );
   for (const r of rows) mapa.set(r.catninograd_id, r.catninograd_nombre);
   return mapa;
+}
+
+// ---------------------------------------------------------------------------
+// Representante que ya tiene cuenta (fase14b-contratos.md §9, 2026-10-06)
+
+export interface CuentaExistente {
+  usu_id: number;
+  usu_nombre: string;
+  usu_correo: string;
+  usu_cedula: string | null;
+  usu_telefono: string | null;
+  est_id: number;
+  auth_user_id: string | null;
+}
+
+const COLUMNAS_CUENTA = `u.usu_id, u.usu_nombre, u.usu_correo, u.usu_cedula, u.usu_telefono, u.est_id,
+                         u.auth_user_id::text AS auth_user_id`;
+
+/** Si hay varias con la misma cédula (no debería), manda la activa. */
+export async function cuentaPorCedula(cedula: string, client?: PoolClient): Promise<CuentaExistente | null> {
+  const { rows } = await (client ?? getPool()).query<CuentaExistente>(
+    `SELECT ${COLUMNAS_CUENTA} FROM public.usuario u
+      WHERE upper(trim(u.usu_cedula)) = upper(trim($1))
+      ORDER BY (u.est_id = $2) DESC, u.usu_id
+      LIMIT 1`,
+    [cedula, ESTADO.ACTIVO],
+  );
+  return rows[0] ?? null;
+}
+
+export async function cuentaPorCorreo(correo: string, client?: PoolClient): Promise<CuentaExistente | null> {
+  const { rows } = await (client ?? getPool()).query<CuentaExistente>(
+    `SELECT ${COLUMNAS_CUENTA} FROM public.usuario u
+      WHERE lower(trim(u.usu_correo)) = lower(trim($1))
+      LIMIT 1`,
+    [correo],
+  );
+  return rows[0] ?? null;
+}
+
+export async function cuentaPorId(usuId: number, client?: PoolClient): Promise<CuentaExistente | null> {
+  const { rows } = await (client ?? getPool()).query<CuentaExistente>(
+    `SELECT ${COLUMNAS_CUENTA} FROM public.usuario u WHERE u.usu_id = $1`,
+    [usuId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Datos de factura guardados del representante, si ya los dio alguna vez. */
+export async function facturaDe(usuId: number): Promise<RepresentanteFormulario['factura'] | null> {
+  const { rows } = await getPool().query<RepresentanteFormulario['factura']>(
+    `SELECT padre_factura_nombre AS nombre, padre_factura_identificacion AS identificacion,
+            padre_factura_correo AS correo, padre_factura_direccion AS direccion
+       FROM public.padre
+      WHERE usu_id = $1 AND padre_factura_nombre IS NOT NULL`,
+    [usuId],
+  );
+  return rows[0] ?? null;
+}
+
+export interface DisciplinaActiva {
+  colacthor_id: number;
+  actividad: string;
+  horarios: HorarioDisciplina[];
+}
+
+export interface HijoDelRepresentante {
+  nino_id: number;
+  nombre: string;
+  fecha_nacimiento: string | null;
+  col_id: number;
+  col_nombre: string;
+  catninograd_id: number | null;
+  parentesco: string | null;
+  modalidad_salida: 'escolar' | 'privado' | null;
+  detalle_retiro: string | null;
+  salud: string | null;
+  imagen: { familias: boolean; redes: boolean; promocional: boolean };
+  emergencia: { nombre: string; relacion: string; telefono: string; cedula: string | null } | null;
+  retiro: { nombre: string; relacion: string; telefono: string; cedula: string | null } | null;
+  /** Disciplinas activas hoy: "ya inscrito", no se cobran y cuentan para el máximo. */
+  activas: DisciplinaActiva[];
+}
+
+const ACTIVAS_DE = (alias: string) => `COALESCE((
+    SELECT json_agg(json_build_object(
+               'colacthor_id', d.colacthor_id,
+               'actividad', act.act_nombre,
+               'horarios', ${horariosJson('d')}) ORDER BY act.act_nombre)
+      FROM public.nino_asignacion na
+      JOIN public.colegio_actividad_horario d ON d.colacthor_id = na.colacthor_id
+      JOIN public.actividad act ON act.act_id = d.act_id
+     WHERE na.nino_id = ${alias}.nino_id AND na.est_id = ${ESTADO.ACTIVO}
+  ), '[]'::json)`;
+
+const CONTACTO_DE = (alias: string, tipo: 'emergencia' | 'retiro') => `(
+    SELECT json_build_object('nombre', c.nincon_nombre, 'relacion', c.nincon_relacion,
+                             'telefono', c.nincon_telefono, 'cedula', c.nincon_cedula)
+      FROM public.nino_contacto c
+     WHERE c.nino_id = ${alias}.nino_id AND c.nincon_tipo = '${tipo}')`;
+
+/**
+ * Los hijos activos del representante, con lo necesario para no volver a
+ * llenar nada. Datos de menores: solo se piden con su sesión iniciada.
+ */
+export async function hijosDe(usuId: number, client?: PoolClient): Promise<HijoDelRepresentante[]> {
+  const { rows } = await (client ?? getPool()).query<HijoDelRepresentante>(
+    `SELECT n.nino_id, n.nino_nombre AS nombre,
+            to_char(n.nino_fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
+            n.col_id, col.col_nombre, n.catninograd_id, np.ninopadre_parentesco AS parentesco,
+            n.nino_modalidad_salida AS modalidad_salida, n.nino_detalle_retiro AS detalle_retiro,
+            n.nino_info_salud AS salud,
+            json_build_object('familias', COALESCE(n.nino_imagen_familias, false),
+                              'redes', COALESCE(n.nino_imagen_redes, false),
+                              'promocional', COALESCE(n.nino_imagen_promocional, false)) AS imagen,
+            ${CONTACTO_DE('n', 'emergencia')} AS emergencia,
+            ${CONTACTO_DE('n', 'retiro')} AS retiro,
+            ${ACTIVAS_DE('n')} AS activas
+       FROM public.padre p
+       JOIN public.nino_padre np ON np.padre_id = p.padre_id
+       JOIN public.nino n ON n.nino_id = np.nino_id
+       JOIN public.colegio col ON col.col_id = n.col_id
+      WHERE p.usu_id = $1 AND n.est_id = $2
+      ORDER BY n.nino_nombre`,
+    [usuId, ESTADO.ACTIVO],
+  );
+  return rows;
+}
+
+export interface PosibleMismo {
+  nino_id: number;
+  nino_nombre: string;
+  col_nombre: string;
+  representantes: string[];
+}
+
+/** Espacios repetidos fuera, para comparar nombres escritos por personas distintas. */
+const NOMBRE_NORMALIZADO = (expr: string) => sinTildes(`regexp_replace(trim(${expr}), '\\s+', ' ', 'g')`);
+
+/**
+ * Alumnos que ya existen con el mismo nombre (sin tildes ni mayúsculas),
+ * fecha de nacimiento y colegio: puede ser el mismo niño inscrito por el
+ * otro padre. Lo decide el admin al aprobar.
+ */
+export async function posiblesMismos(
+  nombre: string,
+  fechaNacimiento: string,
+  colId: number,
+  client?: PoolClient,
+): Promise<PosibleMismo[]> {
+  const { rows } = await (client ?? getPool()).query<PosibleMismo>(
+    `SELECT n.nino_id, n.nino_nombre, col.col_nombre,
+            COALESCE((SELECT array_agg(u.usu_nombre ORDER BY u.usu_nombre)
+                        FROM public.nino_padre np
+                        JOIN public.padre p ON p.padre_id = np.padre_id
+                        JOIN public.usuario u ON u.usu_id = p.usu_id
+                       WHERE np.nino_id = n.nino_id), '{}') AS representantes
+       FROM public.nino n
+       JOIN public.colegio col ON col.col_id = n.col_id
+      WHERE ${NOMBRE_NORMALIZADO('n.nino_nombre')} = ${NOMBRE_NORMALIZADO('$1::text')}
+        AND n.nino_fecha_nacimiento = $2::date
+        AND n.col_id = $3
+      ORDER BY n.nino_id`,
+    [nombre, fechaNacimiento, colId],
+  );
+  return rows;
+}
+
+/** Si el alumno es hijo de ese representante (para no dejar tocar a un niño ajeno). */
+export async function esHijoDe(ninoId: number, usuId: number, client?: PoolClient): Promise<boolean> {
+  const { rows } = await (client ?? getPool()).query(
+    `SELECT 1 FROM public.nino_padre np
+       JOIN public.padre p ON p.padre_id = np.padre_id
+      WHERE np.nino_id = $1 AND p.usu_id = $2`,
+    [ninoId, usuId],
+  );
+  return rows.length > 0;
+}
+
+/** Disciplinas activas de un alumno (ids), para no volver a inscribirlo en ellas. */
+export async function activasDeNino(ninoId: number, client?: PoolClient): Promise<number[]> {
+  const { rows } = await (client ?? getPool()).query<{ colacthor_id: number }>(
+    'SELECT colacthor_id FROM public.nino_asignacion WHERE nino_id = $1 AND est_id = $2',
+    [ninoId, ESTADO.ACTIVO],
+  );
+  return rows.map((r) => r.colacthor_id);
+}
+
+/** Pone los datos que el representante corrigió en el formulario. El correo no: es el de la cuenta. */
+export async function actualizarRepresentante(
+  client: PoolClient,
+  usuId: number,
+  datos: { nombre: string; telefono: string },
+): Promise<void> {
+  await client.query(
+    `UPDATE public.usuario
+        SET usu_nombre = $2, usu_telefono = $3, usu_fecha_modificacion = now()
+      WHERE usu_id = $1`,
+    [usuId, datos.nombre, datos.telefono],
+  );
 }

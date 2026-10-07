@@ -10,7 +10,9 @@ import {
   cotizacionSchema,
   envioSchema,
   abrirSchema,
+  aprobarSchema,
   cuentaBancariaSchema,
+  identificarSchema,
   maxDisciplinasSchema,
   idParamSchema,
   listarSchema,
@@ -49,7 +51,57 @@ const envioLimiter = rateLimit({
   },
 });
 
+/** Frena a quien prueba cédulas en lote para saber quién tiene cuenta. */
+const identificarLimiter = rateLimit({
+  windowMs: 60 * 60_000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    data: null,
+    error: { message: 'Demasiadas consultas desde esta conexión. Intenta en una hora.' },
+  },
+});
+
+/**
+ * El formulario público también lo usa quien ya tiene cuenta (§9): si llega
+ * con su token, se le reconoce; si no, sigue como anónimo. Un token que no
+ * vale da 401, igual que en el resto del API.
+ */
+function sesionOpcional(req: Request, res: Response, next: NextFunction): void {
+  if (!req.headers.authorization) return next();
+  void requireAuth(req, res, next);
+}
+
 export const inscripcionPublicaRouter = Router();
+
+/** "Ya inscribí antes": dice si esa cédula tiene cuenta. No enseña ningún dato. */
+inscripcionPublicaRouter.post(
+  '/identificar',
+  identificarLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { cedula } = identificarSchema.parse(req.body);
+      res.json({ data: await service.identificar(cedula), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Con la sesión iniciada: sus datos y sus hijos, para no volver a llenar nada. */
+inscripcionPublicaRouter.get(
+  '/mis-datos',
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) throw new ApiError(401, 'No autenticado');
+      res.json({ data: await service.misDatos(req.user), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 inscripcionPublicaRouter.get(
   '/formulario',
@@ -65,10 +117,11 @@ inscripcionPublicaRouter.get(
 /** Cuanto se paga con lo elegido. Solo lee: no guarda nada. */
 inscripcionPublicaRouter.post(
   '/cotizacion',
+  sesionOpcional,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { ninos } = cotizacionSchema.parse(req.body);
-      res.json({ data: await service.cotizar(ninos), error: null });
+      res.json({ data: await service.cotizar(ninos, req.user ?? null), error: null });
     } catch (err) {
       next(err);
     }
@@ -78,6 +131,7 @@ inscripcionPublicaRouter.post(
 inscripcionPublicaRouter.post(
   '/',
   envioLimiter,
+  sesionOpcional,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validado = envioSchema.safeParse(req.body);
@@ -86,7 +140,7 @@ inscripcionPublicaRouter.post(
       }
       const input = validado.data;
       const navegador = req.get('user-agent')?.slice(0, 300) ?? null;
-      const recibido = await service.enviar(input, { ip: req.ip ?? null, navegador });
+      const recibido = await service.enviar(input, { ip: req.ip ?? null, navegador }, req.user ?? null);
       res.status(201).json({ data: recibido, error: null });
     } catch (err) {
       next(err);
@@ -409,7 +463,8 @@ inscripcionesRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
-      res.json({ data: await service.aprobar(actor(req), id), error: null });
+      const mismos = aprobarSchema.parse(req.body);
+      res.json({ data: await service.aprobar(actor(req), id, mismos), error: null });
     } catch (err) {
       next(err);
     }

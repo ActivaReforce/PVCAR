@@ -9,6 +9,7 @@ const {
   nombreDeDescarga,
   correoDeAprobacion,
   firmaDeImagenValida,
+  pistaDeCorreo,
   problemasDeDisciplinas,
 } = await import('./inscripciones.service.js');
 const { rellenar } = await import('./inscripciones.documentos.js');
@@ -62,6 +63,21 @@ describe('problemasDeDisciplinas', () => {
     ]);
     const problemas = problemasDeDisciplinas([{ nombre: 'A', col_id: 10, disciplinas: [1, 4] }], conCruce);
     expect(problemas).toEqual(['A: Act1 y Act4 se cruzan el miércoles']);
+  });
+
+  it('una disciplina que ya tiene activa no se puede volver a elegir', () => {
+    const activas = [{ colacthor_id: 1, actividad: 'Act1', horarios: disciplina(1, 10).horarios }];
+    expect(
+      problemasDeDisciplinas([{ nombre: 'A', col_id: 10, disciplinas: [1], activas }], encontradas),
+    ).toEqual(['A: ya está inscrito en Act1']);
+  });
+
+  it('una nueva no puede cruzarse con una que ya tiene activa', () => {
+    const activas = [{ colacthor_id: 9, actividad: 'Futbol', horarios: disciplina(9, 10, 1, [1]).horarios }];
+    const nuevas = new Map([[1, disciplina(1, 10, 1, [1])]]);
+    expect(
+      problemasDeDisciplinas([{ nombre: 'A', col_id: 10, disciplinas: [1], activas }], nuevas),
+    ).toEqual(['A: Futbol y Act1 se cruzan el lunes']);
   });
 
   it('una que acaba cuando empieza la otra no se cruza', () => {
@@ -369,6 +385,54 @@ describe('calcularCobro', () => {
     expect(c.subtotal).toBe(60);
     expect(c.iva).toBe(9);
     expect(c.total).toBe(69);
+  });
+
+  describe('con un hermano que ya estaba inscrito (no se cobra)', () => {
+    it('el hermano de fuera lidera y el nuevo lleva descuento', () => {
+      const c = calcularCobro([{ colId: 2, disciplinas: 1 }], precios, 0, [1]);
+      expect(c.alumnos).toHaveLength(1);
+      expect(c.alumnos[0]!.paga_completo).toBe(false);
+      expect(c.alumnos[0]!.total).toBe(20);
+    });
+
+    it('en empate lidera el que ya estaba: ya paga completo', () => {
+      const c = calcularCobro([{ colId: 2, disciplinas: 2 }], precios, 0, [2]);
+      expect(c.alumnos[0]!.disciplinas_con_descuento).toBe(2);
+      expect(c.total).toBe(40);
+    });
+
+    it('si el nuevo tiene mas disciplinas, lidera el nuevo y paga completo', () => {
+      const c = calcularCobro([{ colId: 2, disciplinas: 2 }], precios, 0, [1]);
+      expect(c.alumnos[0]!.paga_completo).toBe(true);
+      expect(c.total).toBe(80);
+    });
+
+    it('el cupo de descuento es el del que lidera', () => {
+      // Fuera lidera con 1: de las 2 nuevas, solo 1 lleva descuento.
+      const c = calcularCobro(
+        [
+          { colId: 2, disciplinas: 1 },
+          { colId: 2, disciplinas: 1 },
+        ],
+        precios,
+        0,
+        [1],
+      );
+      expect(c.alumnos.every((a) => !a.paga_completo)).toBe(true);
+      expect(c.total).toBe(40);
+    });
+
+    it('un hermano sin disciplinas activas no cuenta', () => {
+      const c = calcularCobro([{ colId: 2, disciplinas: 1 }], precios, 0, [0]);
+      expect(c.alumnos[0]!.paga_completo).toBe(true);
+      expect(c.total).toBe(40);
+    });
+  });
+});
+
+describe('pistaDeCorreo', () => {
+  it('deja ver las dos primeras letras y el dominio', () => {
+    expect(pistaDeCorreo('juan.perez@gmail.com')).toBe('ju•••@gmail.com');
   });
 });
 
