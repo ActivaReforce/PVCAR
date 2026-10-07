@@ -45,19 +45,21 @@ export function AppSidebar() {
   const { setOpenMobile } = useSidebar();
 
   /**
-   * Inscripciones pendientes de aprobar: una bolita roja en el menú (pedido
-   * del cliente, 2026-10-07). Solo para quien puede aprobar. La clave empieza
-   * por 'inscripciones', así que aprobar o rechazar la refresca al momento.
+   * Inscripciones pendientes de aprobar: un número rojo en el menú (pedido
+   * del cliente, 2026-10-07). Solo se consulta para quien puede aprobar; para
+   * el resto no hay ni una llamada. Se repite cada minuto **solo mientras las
+   * inscripciones están abiertas** (cerradas no llegan nuevas; las que queden
+   * pendientes se ven igual). La clave empieza por 'inscripciones', así que
+   * aprobar o rechazar la refresca al momento.
    */
   const puedeAprobar = hasPermission("inscripciones", "editar");
-  const pendientes = useQuery({
-    queryKey: ["inscripciones", "pendientes-menu"],
-    queryFn: () => inscripcionesApi.listar({ estado: "pendiente" }),
+  const aviso = useQuery({
+    queryKey: ["inscripciones", "aviso-menu"],
+    queryFn: () => inscripcionesApi.aviso(),
     enabled: puedeAprobar,
-    refetchInterval: 60_000,
-    select: (d) => d.conteos.pendientes,
+    refetchInterval: (q) => (q.state.data?.abiertas ? 60_000 : false),
   });
-  const avisos: Record<string, number> = { "/inscripciones": pendientes.data ?? 0 };
+  const avisos: Record<string, number> = { "/inscripciones": aviso.data?.pendientes ?? 0 };
 
   const handleLogout = async () => {
     try {

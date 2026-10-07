@@ -428,6 +428,8 @@ export const inscripcionesApi = {
     return api.get<ListaInscripciones>(`/inscripciones${sufijo ? `?${sufijo}` : ''}`);
   },
   detalle: (id: number) => api.get<InscripcionDetalle>(`/inscripciones/${id}`),
+  /** El número rojo del menú: pendientes y si las inscripciones están abiertas. */
+  aviso: () => api.get<{ pendientes: number; abiertas: boolean }>('/inscripciones/aviso'),
   documentosDeRepresentante: (usuId: number) =>
     api.get<DocumentoDeRepresentante[]>(`/inscripciones/representantes/${usuId}/documentos`),
   /** `mismos`: { insnino_id: nino_id } de los que el admin dijo que son el mismo alumno. */

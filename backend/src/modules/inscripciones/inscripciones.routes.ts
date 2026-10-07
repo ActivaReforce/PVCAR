@@ -290,6 +290,23 @@ inscripcionesRouter.get(
   },
 );
 
+/**
+ * GET /inscripciones/aviso — pendientes y si están abiertas, para el número
+ * rojo del menú. Solo para quien aprueba; el menú solo repite la consulta
+ * mientras están abiertas.
+ */
+inscripcionesRouter.get(
+  '/aviso',
+  requirePermission('inscripciones', 'editar'),
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.avisoDelMenu(), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 inscripcionesRouter.get(
   '/estado',
   requirePermission('inscripciones', 'ver'),

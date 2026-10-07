@@ -686,6 +686,18 @@ export async function listar(
   };
 }
 
+/**
+ * El aviso del menú (2026-10-07): cuántas pendientes y si el interruptor
+ * general está encendido. Una sola consulta, sin listas: se pide cada minuto.
+ */
+export async function avisoDelMenu(): Promise<{ pendientes: number; abiertas: boolean }> {
+  const { rows } = await getPool().query<{ pendientes: number; abiertas: boolean }>(
+    `SELECT (SELECT count(*) FROM public.inscripcion WHERE ins_estado = 'pendiente')::int AS pendientes,
+            COALESCE((SELECT inscfg_abiertas FROM public.inscripcion_config WHERE inscfg_id = 1), false) AS abiertas`,
+  );
+  return rows[0] ?? { pendientes: 0, abiertas: false };
+}
+
 export async function contarPorEstado(
   usuId: number | null,
 ): Promise<{ pendientes: number; aprobadas: number }> {

@@ -682,6 +682,10 @@ export interface ListaInscripciones extends Pagina<repo.InscripcionListada> {
  * permiso de verlas (un representante) solo ve las suyas: las que le dieron
  * de alta, con sus hijos (decisión del cliente, 2026-10-05).
  */
+export async function avisoDelMenu(): Promise<{ pendientes: number; abiertas: boolean }> {
+  return repo.avisoDelMenu();
+}
+
 export function esPersonal(actor: AuthUser): boolean {
   return actor.usuario.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id));
 }
