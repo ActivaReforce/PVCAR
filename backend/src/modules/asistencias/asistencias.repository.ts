@@ -158,7 +158,8 @@ export async function listarAlumnosDeSesion(
 ): Promise<AlumnoDeSesion[]> {
   const { rows } = await getPool().query<AlumnoDeSesion>(
     `WITH inscritos AS (
-         SELECT na.nino_id
+         -- DISTINCT: dado de baja y reinscrito, puede tener dos vigentes esa fecha.
+         SELECT DISTINCT na.nino_id
            FROM public.nino_asignacion na
           WHERE na.colacthor_id = $1 AND ${VIGENTE_A_FECHA}
      ),
@@ -390,9 +391,9 @@ const SQL_PERSONAL = `
            x.usu_id         AS id,
            u.usu_nombre,
            u.usu_foto,
-           tit.usu_nombre   AS titular,
+           tit.nombres      AS titular,
            '{}'::text[]     AS imparte,
-           (av.usu_id IS NOT NULL) AS activo_hoy,
+           (tit.nombres IS NOT NULL) AS activo_hoy,
            aa.asisest_id,
            to_char(aa.asisaux_hora_tarde, 'HH24:MI') AS hora_tarde,
            aa.asisaux_razon_justificado              AS razon,
@@ -400,8 +401,14 @@ const SQL_PERSONAL = `
            reg.usu_nombre                            AS registrado_por
       FROM aux_todos x
       JOIN public.usuario u ON u.usu_id = x.usu_id
-      LEFT JOIN aux_vivos av ON av.usu_id = x.usu_id
-      LEFT JOIN public.usuario tit ON tit.usu_id = av.ent_id
+      -- Con varios titulares (2026-10-06) sale una vez, con todos: "X y Y".
+      -- Un JOIN a aux_vivos lo duplicaba y el resumen contaba de más.
+      LEFT JOIN LATERAL (
+          SELECT string_agg(t.usu_nombre, ' y ' ORDER BY t.usu_nombre) AS nombres
+            FROM aux_vivos av
+            JOIN public.usuario t ON t.usu_id = av.ent_id
+           WHERE av.usu_id = x.usu_id
+      ) tit ON TRUE
       LEFT JOIN public.asistencia_auxiliar aa
              ON aa.usu_id = x.usu_id AND aa.col_id = $1 AND aa.asisaux_fecha = $2::date
       LEFT JOIN public.usuario reg ON reg.usu_id = aa.usu_registrador

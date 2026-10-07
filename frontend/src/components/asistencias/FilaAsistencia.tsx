@@ -108,12 +108,13 @@ const FilaAsistencia = ({
                 aria-pressed={elegido}
                 aria-label={`${pinta.etiqueta} — ${nombre}`}
                 onClick={() => onEstado(clave, id)}
-                className={`h-11 px-1 text-xs font-medium sm:text-sm ${
+                // En el teléfono, la palabra entera en una línea: la letra se
+                // ajusta al ancho (≈10 px a 360 px) y el botón no cambia.
+                className={`h-11 whitespace-nowrap px-0.5 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tracking-tight sm:px-1 sm:text-sm sm:tracking-normal ${
                   elegido ? `${pinta.lleno} hover:opacity-90` : pinta.suave
                 }`}
               >
-                <span className="sm:hidden">{pinta.inicial}</span>
-                <span className="hidden truncate sm:inline">{pinta.etiqueta}</span>
+                {pinta.etiqueta}
               </Button>
             );
           })}

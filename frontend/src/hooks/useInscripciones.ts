@@ -82,7 +82,10 @@ function useMutacion<TVars, TData>(fn: (vars: TVars) => Promise<TData>, exito: s
 
 /** El aviso lo da la pantalla: depende de si el correo salió o no. */
 export function useAprobarInscripcion() {
-  return useMutacion((id: number) => inscripcionesApi.aprobar(id), null);
+  return useMutacion(
+    ({ id, mismos }: { id: number; mismos: Record<number, number> }) => inscripcionesApi.aprobar(id, mismos),
+    null,
+  );
 }
 
 export function useRechazarInscripcion() {

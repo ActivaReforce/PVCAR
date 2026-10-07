@@ -67,6 +67,27 @@ const Disciplinas = () => {
   const disciplinas = lista.data?.items ?? [];
   const conteos = lista.data?.conteos;
 
+  /**
+   * Un representante ve una sección por hijo (pedido del cliente, 2026-10-07):
+   * cada disciplina dice cuáles de SUS hijos van. Si todas lo dicen, es que
+   * solo ve las de sus hijos; si alguna no (un entrenador que además es
+   * padre), queda la vista de siempre por colegio.
+   */
+  const porHijo =
+    disciplinas.length > 0 && disciplinas.every((d) => (d.hijos?.length ?? 0) > 0)
+      ? [
+          ...new Map(
+            disciplinas.flatMap((d) => d.hijos ?? []).map((h) => [h.nino_id, h.nino_nombre] as const),
+          ).entries(),
+        ]
+          .sort(([, a], [, b]) => a.localeCompare(b, 'es'))
+          .map(([ninoId, nombre]) => ({
+            ninoId,
+            nombre,
+            lista: disciplinas.filter((d) => d.hijos?.some((h) => h.nino_id === ninoId)),
+          }))
+      : null;
+
   if (lista.isLoading && !lista.data) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -172,6 +193,22 @@ const Disciplinas = () => {
         <div className="py-12 text-center text-muted-foreground">
           <p className="text-lg">No hay disciplinas que mostrar</p>
           <p className="mt-2 text-sm">Ajusta los filtros o crea las primeras.</p>
+        </div>
+      ) : porHijo ? (
+        <div className="space-y-10">
+          {porHijo.map((h) => (
+            <section key={h.ninoId} className="min-w-0 space-y-3">
+              <h2 className="text-xl font-semibold">{h.nombre}</h2>
+              <DisciplinaCalendar
+                disciplinas={h.lista}
+                dias={dias.data ?? []}
+                onEdit={setEditando}
+                onBaja={setADarDeBaja}
+                onReactivar={(d) => reactivar.mutate(d.colacthor_id)}
+                onEliminar={setAEliminar}
+              />
+            </section>
+          ))}
         </div>
       ) : (
         <DisciplinaCalendar

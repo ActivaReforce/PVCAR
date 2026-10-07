@@ -46,6 +46,12 @@ export interface ApiFetchOptions {
    * de quien ya estaba dentro y se equivoco al reautenticarse.
    */
   signOutOn401?: boolean;
+  /**
+   * No manda el token aunque haya sesión. Lo usa el formulario público: quien
+   * del personal lo abra con su sesión puesta no debe inscribirse como él
+   * por accidente (fase14b-contratos.md §9).
+   */
+  sinSesion?: boolean;
 }
 
 /**
@@ -56,7 +62,7 @@ export interface ApiFetchOptions {
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
-  { signOutOn401 = true }: ApiFetchOptions = {},
+  { signOutOn401 = true, sinSesion = false }: ApiFetchOptions = {},
 ): Promise<T> {
   const {
     data: { session },
@@ -64,7 +70,7 @@ export async function apiFetch<T>(
 
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
-  if (session?.access_token) {
+  if (session?.access_token && !sinSesion) {
     headers.set('Authorization', `Bearer ${session.access_token}`);
   }
   // Auxiliar con varios titulares: de quién quiere ver (lib/titular.ts).
@@ -92,7 +98,7 @@ export async function apiFetch<T>(
 }
 
 export const api = {
-  get: <T>(path: string) => apiFetch<T>(path, { method: 'GET' }),
+  get: <T>(path: string, options?: ApiFetchOptions) => apiFetch<T>(path, { method: 'GET' }, options),
   post: <T>(path: string, body?: unknown, options?: ApiFetchOptions) =>
     apiFetch<T>(
       path,

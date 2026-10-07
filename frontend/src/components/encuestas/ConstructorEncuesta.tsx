@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import {
   useGuardarPreguntas,
   useTiposRespuesta,
 } from '@/hooks/useEncuestas';
+import VistaPreviaEncuesta from './VistaPreviaEncuesta';
 
 interface Props {
   /** Null al crear. */
@@ -50,6 +51,7 @@ const ConstructorEncuesta = ({ ficha, onListo, onCancelar }: Props) => {
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [preguntas, setPreguntas] = useState<PreguntaInput[]>([preguntaVacia()]);
+  const [previa, setPrevia] = useState(false);
 
   const tipos = useTiposRespuesta();
   const crear = useCrearEncuesta();
@@ -98,10 +100,20 @@ const ConstructorEncuesta = ({ ficha, onListo, onCancelar }: Props) => {
     });
   };
 
+  /** Escala sin mínimo, sin máximo o con el máximo por debajo del mínimo. */
+  const escalaMala = (p: PreguntaInput) =>
+    p.encutiporesp_id === TIPO.ESCALA &&
+    (p.encupreg_escala_min === null ||
+      p.encupreg_escala_max === null ||
+      p.encupreg_escala_max <= p.encupreg_escala_min);
+
   const faltaAlgo =
     titulo.trim().length < 3 ||
     preguntas.length === 0 ||
-    preguntas.some((p) => p.encupreg_pregunta.trim().length < 3);
+    preguntas.some((p) => p.encupreg_pregunta.trim().length < 3 || escalaMala(p));
+
+  /** Un número del campo, o null si está vacío: así se puede borrar el 0 y escribir 10. */
+  const numeroONulo = (texto: string) => (texto.trim() === '' ? null : Number(texto));
 
   const guardando = crear.isPending || actualizar.isPending || guardarPreguntas.isPending;
 
@@ -156,15 +168,6 @@ const ConstructorEncuesta = ({ ficha, onListo, onCancelar }: Props) => {
               · {preguntas.length}
             </span>
           </h3>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 sm:h-10"
-            onClick={() => setPreguntas((p) => [...p, preguntaVacia()])}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Añadir
-          </Button>
         </div>
 
         {preguntas.map((pregunta, indice) => (
@@ -259,9 +262,9 @@ const ConstructorEncuesta = ({ ficha, onListo, onCancelar }: Props) => {
                       id={`min-${indice}`}
                       type="number"
                       min={0}
-                      value={pregunta.encupreg_escala_min ?? 1}
+                      value={pregunta.encupreg_escala_min ?? ''}
                       onChange={(e) =>
-                        cambiar(indice, { encupreg_escala_min: Number(e.target.value) })
+                        cambiar(indice, { encupreg_escala_min: numeroONulo(e.target.value) })
                       }
                       className="h-11 sm:h-10"
                     />
@@ -272,9 +275,9 @@ const ConstructorEncuesta = ({ ficha, onListo, onCancelar }: Props) => {
                       id={`max-${indice}`}
                       type="number"
                       min={1}
-                      value={pregunta.encupreg_escala_max ?? 5}
+                      value={pregunta.encupreg_escala_max ?? ''}
                       onChange={(e) =>
-                        cambiar(indice, { encupreg_escala_max: Number(e.target.value) })
+                        cambiar(indice, { encupreg_escala_max: numeroONulo(e.target.value) })
                       }
                       className="h-11 sm:h-10"
                     />
@@ -282,13 +285,33 @@ const ConstructorEncuesta = ({ ficha, onListo, onCancelar }: Props) => {
                 </div>
               )}
             </div>
+            {escalaMala(pregunta) && (
+              <p className="text-sm text-destructive">
+                La escala necesita un mínimo y un máximo, y el máximo tiene que ser mayor.
+              </p>
+            )}
           </div>
         ))}
+
+        {/* Abajo, junto a la última: así no hay que volver arriba para seguir. */}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-full border-dashed"
+          onClick={() => setPreguntas((p) => [...p, preguntaVacia()])}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Añadir pregunta
+        </Button>
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" className="h-11 sm:h-10" onClick={onCancelar}>
           Cancelar
+        </Button>
+        <Button type="button" variant="outline" className="h-11 sm:h-10" onClick={() => setPrevia(true)}>
+          <Eye className="mr-2 h-4 w-4" />
+          Previsualizar
         </Button>
         <Button
           type="button"
@@ -300,6 +323,14 @@ const ConstructorEncuesta = ({ ficha, onListo, onCancelar }: Props) => {
           {guardando ? 'Guardando…' : ficha ? 'Guardar cambios' : 'Crear en borrador'}
         </Button>
       </div>
+
+      <VistaPreviaEncuesta
+        abierta={previa}
+        titulo={titulo}
+        descripcion={descripcion}
+        preguntas={preguntas}
+        onCerrar={() => setPrevia(false)}
+      />
     </div>
   );
 };

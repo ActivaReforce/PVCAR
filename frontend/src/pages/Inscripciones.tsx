@@ -94,7 +94,7 @@ const InscripcionesPersonal = () => {
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TabsList className="w-max">
             <TabsTrigger value="inscripciones">Inscripciones</TabsTrigger>
-            <TabsTrigger value="documentos">Documentos</TabsTrigger>
+            <TabsTrigger value="documentos">Configuración</TabsTrigger>
           </TabsList>
         </div>
 

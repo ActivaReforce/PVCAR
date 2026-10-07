@@ -102,6 +102,11 @@ export const ninoSchema = z
     /** "Curso" en la ficha. */
     catninograd_id: z.number().int().positive(),
     parentesco: z.enum(PARENTESCOS),
+    /**
+     * El alumno que ya existe, cuando un representante con sesión le añade
+     * disciplinas (fase14b-contratos.md §9). Se comprueba que sea su hijo.
+     */
+    nino_id: z.number().int().positive().nullable().optional().transform((v) => v ?? null),
     disciplinas: z
       .array(z.number().int().positive())
       .min(1, 'Elige al menos una disciplina')
@@ -298,6 +303,25 @@ export const cuentaBancariaSchema = z.object({
 /** Tope de disciplinas por alumno en el formulario público (1 a 10). */
 export const maxDisciplinasSchema = z.object({ maximo: z.number().int().min(1).max(10) });
 
+/** "Ya inscribí antes": solo la cédula. Responde si hay cuenta, nada más. */
+export const identificarSchema = z.object({ cedula: cedulaRepresentante });
+
+/**
+ * Al aprobar: para cada alumno nuevo que coincide con uno existente (nombre,
+ * fecha de nacimiento y colegio), el admin dice si es el mismo.
+ * `{ [insnino_id]: nino_id }`; los que no aparecen se crean nuevos.
+ */
+export const aprobarSchema = z
+  .object({
+    mismos: z.record(z.string().regex(/^\d+$/), z.number().int().positive()).optional(),
+  })
+  .optional()
+  .transform((v) => {
+    const mapa = new Map<number, number>();
+    for (const [k, n] of Object.entries(v?.mismos ?? {})) mapa.set(Number(k), n);
+    return mapa;
+  });
+
 export const colIdParamSchema = z.object({ colId: z.coerce.number().int().positive() });
 
 /** Dolares con dos decimales como mucho; descuento en porcentaje. */
@@ -334,6 +358,7 @@ export const cotizacionSchema = z.object({
       z.object({
         col_id: z.number().int().positive(),
         disciplinas: z.array(z.number().int().positive()).min(1).max(10),
+        nino_id: z.number().int().positive().nullable().optional().transform((v) => v ?? null),
       }),
     )
     .min(1)

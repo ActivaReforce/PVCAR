@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { BarChart3, CheckCircle2, Pencil, Plus, Send, Trash2, Undo2 } from 'lucide-react';
+import { BarChart3, CheckCircle2, Eye, Pencil, Plus, Send, Settings, Trash2, Undo2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import VistaPreviaEncuesta from '@/components/encuestas/VistaPreviaEncuesta';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -72,6 +80,9 @@ const Encuestas = () => {
     estado: estado === TODOS ? undefined : Number(estado),
   });
   const fichaEdicion = useFichaEncuesta(editandoId);
+  /** La encuesta que se previsualiza desde la lista (sus preguntas vienen en la ficha). */
+  const [previaId, setPreviaId] = useState<number | null>(null);
+  const fichaPrevia = useFichaEncuesta(previaId);
   const impacto = useImpactoEncuesta(aEliminar?.encu_id ?? null);
 
   const finalizar = useFinalizarEncuesta();
@@ -185,29 +196,28 @@ const Encuestas = () => {
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-1 sm:flex-shrink-0">
+                <div className="flex flex-wrap items-center gap-1 sm:flex-shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    onClick={() => setPreviaId(e.encu_id)}
+                    title="Previsualizar"
+                    aria-label={`Previsualizar ${e.encu_titulo}`}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+
                   {borrador && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-11 w-11 sm:h-9 sm:w-9"
-                        onClick={() => setEditandoId(e.encu_id)}
-                        title="Editar"
-                        aria-label={`Editar ${e.encu_titulo}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="h-11 sm:h-9"
-                        onClick={() => finalizar.mutate(e.encu_id)}
-                        disabled={e.preguntas === 0 || finalizar.isPending}
-                      >
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Finalizar
-                      </Button>
-                    </>
+                    <Button
+                      variant="outline"
+                      className="h-11 sm:h-9"
+                      onClick={() => finalizar.mutate(e.encu_id)}
+                      disabled={e.preguntas === 0 || finalizar.isPending}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Finalizar
+                    </Button>
                   )}
 
                   {finalizada && (
@@ -244,19 +254,41 @@ const Encuestas = () => {
                     </Button>
                   )}
 
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-11 w-11 text-destructive hover:text-destructive sm:h-9 sm:w-9"
-                    onClick={() => {
-                      setAEliminar(e);
-                      setConfirmacion('');
-                    }}
-                    title="Eliminar"
-                    aria-label={`Eliminar ${e.encu_titulo}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-11 w-11 sm:h-9 sm:w-9"
+                        title="Más acciones"
+                        aria-label={`Más acciones de ${e.encu_titulo}`}
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {/* Solo un borrador se edita: lo publicado no se toca. */}
+                      {borrador && (
+                        <>
+                          <DropdownMenuItem onSelect={() => setEditandoId(e.encu_id)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => {
+                          setAEliminar(e);
+                          setConfirmacion('');
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </li>
@@ -285,6 +317,14 @@ const Encuestas = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <VistaPreviaEncuesta
+        abierta={previaId !== null && fichaPrevia.data !== undefined}
+        titulo={fichaPrevia.data?.encuesta.encu_titulo ?? ''}
+        descripcion={fichaPrevia.data?.encuesta.encu_descripcion ?? null}
+        preguntas={fichaPrevia.data?.preguntas ?? []}
+        onCerrar={() => setPreviaId(null)}
+      />
 
       <Dialog open={viendoId !== null} onOpenChange={(a) => !a && setViendoId(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">

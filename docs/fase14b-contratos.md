@@ -80,8 +80,37 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 ## 8. Pendiente
 
 1. ~~**El cobro por disciplina** (§5)~~ → resuelto con Disciplinas v2 el 2026-10-06.
-2. **Representante que ya tenía cuenta:** hoy se le añaden los alumnos y la factura y se completa su cédula si no la tenía, pero no se le cambian nombre ni teléfono. El cliente lo deja para después.
+2. ~~**Representante que ya tenía cuenta**~~ → diseñado el 2026-10-06, §9.
 3. **Probar en pantalla** el recorrido completo: publicar los seis, valores y apertura de un colegio, inscribir con dos hermanos, aprobar (correo con los PDF adjuntos), rechazar.
 4. ~~Antes de lanzar, en prod: quitar el colegio de prueba y crear el primer Propietario.~~ Hecho el 2026-10-05 (`SQL/limpieza_prod_2026-10-05.sql`): prod limpia, Flowward único Propietario.
 5. **PDF único** (0020): al aprobar, el aprobado sustituye al enviado; del enviado queda su huella. Representantes muestra la ficha y los documentos firmados (solo personal).
 6. **Representante con permiso de ver Inscripciones:** ve solo las suyas ("Mis inscripciones").
+
+## 9. Representante que ya tiene cuenta (decidido con el cliente y construido el 2026-10-06)
+
+**La inscripción es de una vez en la vida.** Se vuelve solo para añadir disciplinas a un hijo o para inscribir a otro. Nada se da de baja automáticamente: sacar a un alumno de una disciplina es cosa del admin.
+
+**Entrada a `/inscripcion`:** "Es mi primera vez" o "Ya inscribí antes". Y el paso **Tus datos**, al pulsar Continuar, comprueba la cédula:
+
+| La cédula… | Qué pasa |
+|---|---|
+| no existe | sigue como nuevo |
+| es de una cuenta activa | "Ya tienes cuenta: entra" → correo y contraseña (la cédula, si no la cambió) y "Olvidé mi contraseña" (el mismo del login: plantilla de Supabase con Resend) |
+| es de una cuenta dada de baja | puede inscribir igual, llenando el formulario; la inscripción queda atada a esa cuenta y **al aprobar se reactiva** (el admin lo ve antes de aprobar) |
+
+**Con la cédula sola no se enseña nada:** son datos de menores (salud, contactos). Solo dice si hay cuenta; los datos se ven después de iniciar sesión. Al enviar como nuevo se vuelven a comprobar cédula y correo: si alguno es de una cuenta activa, se le pide entrar.
+
+**Con sesión iniciada:**
+- Sus datos y los de facturación salen llenos y se editan; al aprobar se guardan (nombre, teléfono, factura). El correo es el de la cuenta: se cambia en Perfil.
+- Ve a sus hijos. Puede **añadir disciplinas** a uno (sus datos salen llenos y editables) o **inscribir otro hijo**. Así no se duplica ningún alumno.
+- Las disciplinas que el hijo ya tiene activas salen como **"ya inscrito"**: no se eligen ni se cobran, pero cuentan para el máximo (2) y para los cruces. Si el admin lo sacó de una, vuelve a poder elegirla.
+- Si el hijo tiene disciplinas activas, su colegio no se cambia desde aquí.
+- **Descuento de hermano:** si algún hijo ya tiene disciplinas activas, lidera el que más tenga **en total** (activas + las que se le añaden ahora): ya paga completo, y lo que se le añade también va completo. Los demás llevan descuento en hasta tantas disciplinas como tenga ese hijo en total; a un hijo que ya tenía activas, sus activas ocupan primero ese cupo. La familia paga lo mismo que si los hubiera inscrito a todos juntos. Corregido el 2026-10-07 en dos pasos (antes podía liderar un nuevo, o solo contaban las nuevas). Entre hijos todos nuevos, la regla de siempre: lidera el que más tiene.
+
+**Al aprobar:**
+- La cuenta es la que envió (o la dada de baja por cédula, que se reactiva). Se actualizan sus datos; el admin ve qué cambia.
+- El hijo elegido se actualiza y recibe las disciplinas nuevas, sin duplicarse.
+- **Mismo niño desde otro padre:** si un alumno nuevo coincide en nombre, fecha de nacimiento y colegio con uno que ya existe, el admin elige "es el mismo" (se ata también a este representante) o "es otro".
+- Se siguen bloqueando: la cédula de otra persona y el correo de otra cuenta.
+
+**Construido el 2026-10-06** (backend `c778a28` y frontend): `POST /inscripcion/identificar` (30/h por IP), `GET /inscripcion/mis-datos`, envío y cotización con sesión opcional, `nino_id` por alumno, `calcularCobro(…, externos)`, ficha con `cuenta` y `posibles` y `aprobar` con `{ mismos }`. El formulario no manda el token salvo que la persona haya elegido "Continuar con mi cuenta" o haya entrado en él (`sinSesion`): alguien del personal con la sesión abierta inscribe a otra persona como anónimo. Recorrido completo probado contra un Postgres local con almacenamiento y correo simulados. Sin migración: `inscripcion.usu_id` e `inscripcion_nino.nino_id` ya existían; ahora se llenan al enviar cuando hay cuenta o hijo.

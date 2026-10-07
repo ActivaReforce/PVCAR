@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ApiError } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { diaDeCruce, horarioLargo } from '@/lib/horarios';
 import { compressImage } from '@/lib/imageCompression';
 import {
@@ -48,8 +49,11 @@ import {
   type ModalidadSalida,
   type PermisosImagen,
   type TipoDocumento,
+  type DisciplinaActiva,
+  type HijoDelRepresentante,
 } from '@/api/inscripciones';
 import DocumentoVista from '@/components/inscripciones/DocumentoVista';
+import { AccesoCuenta, EntradaInscripcion, MisHijos } from '@/components/inscripciones/CuentaPrevia';
 import {
   analizar,
   fechaLarga,
@@ -96,6 +100,12 @@ interface Representante {
 
 interface Alumno {
   clave: number;
+  /** El hijo que ya existe (§9): se le añaden disciplinas en vez de crearlo. */
+  nino_id: number | null;
+  /** Lo que ya tiene activo: "ya inscrito", no se cobra, cuenta para el máximo y los cruces. */
+  activas: DisciplinaActiva[];
+  /** Con disciplinas activas su colegio no se cambia desde aquí. */
+  colFijo: boolean;
   nombre: string;
   fecha_nacimiento: string;
   col_id: string;
@@ -117,6 +127,9 @@ interface Alumno {
 let siguienteClave = 1;
 const alumnoVacio = (): Alumno => ({
   clave: siguienteClave++,
+  nino_id: null,
+  activas: [],
+  colFijo: false,
   nombre: '',
   fecha_nacimiento: '',
   col_id: '',
@@ -132,6 +145,30 @@ const alumnoVacio = (): Alumno => ({
   salud_detalle: '',
   salud_autoriza: false,
   imagen: { familias: false, redes: false, promocional: false },
+});
+
+/** Un hijo que ya existe, con sus datos llenos para revisarlos. */
+const alumnoDeHijo = (h: HijoDelRepresentante): Alumno => ({
+  ...alumnoVacio(),
+  nino_id: h.nino_id,
+  activas: h.activas,
+  colFijo: h.activas.length > 0,
+  nombre: h.nombre,
+  fecha_nacimiento: h.fecha_nacimiento ?? '',
+  col_id: String(h.col_id),
+  catninograd_id: h.catninograd_id ? String(h.catninograd_id) : '',
+  parentesco: h.parentesco ?? '',
+  emergencia: h.emergencia
+    ? { nombre: h.emergencia.nombre, relacion: h.emergencia.relacion, telefono: h.emergencia.telefono }
+    : { nombre: '', relacion: '', telefono: '' },
+  retiro: h.retiro
+    ? { nombre: h.retiro.nombre, cedula: h.retiro.cedula ?? '', relacion: h.retiro.relacion, telefono: h.retiro.telefono }
+    : { nombre: '', cedula: '', relacion: '', telefono: '' },
+  modalidad_salida: h.modalidad_salida ?? '',
+  detalle_retiro: h.detalle_retiro ?? '',
+  salud_tiene: h.salud ? 'si' : 'no',
+  salud_detalle: h.salud ?? '',
+  imagen: h.imagen,
 });
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -186,6 +223,7 @@ const quienDe = (alumnos: Alumno[], i: number) =>
 
 function erroresAlumnos(alumnos: Alumno[]): string[] {
   const e: string[] = [];
+  if (alumnos.length === 0) e.push('Elige a qué hijo le añades disciplinas o inscribe a otro.');
   alumnos.forEach((a, i) => {
     const quien = quienDe(alumnos, i);
     if (a.nombre.trim().length < 3) e.push(`${quien}escribe su nombre completo.`);
@@ -324,6 +362,16 @@ const Inscripcion = () => {
     staleTime: 5 * 60_000,
   });
 
+  const { user } = useAuth();
+  /**
+   * inicio: "primera vez" o "ya inscribí antes". nuevo: el formulario de
+   * siempre, sin sesión. cuenta: entró con su cuenta y se le rellena todo (§9).
+   */
+  const [modo, setModo] = useState<'inicio' | 'nuevo' | 'cuenta'>('inicio');
+  const conSesion = modo === 'cuenta' && user !== null;
+  /** Al continuar en "Tus datos", si la cédula ya tiene cuenta: que entre. */
+  const [pistaCuenta, setPistaCuenta] = useState<string | null | undefined>(undefined);
+  const [comprobandoCedula, setComprobandoCedula] = useState(false);
   const [paso, setPaso] = useState(0);
   const [rep, setRep] = useState<Representante>({
     nombre: '',
@@ -345,15 +393,47 @@ const Inscripcion = () => {
   const [resultado, setResultado] = useState<EnvioRecibido | null>(null);
   const arriba = useRef<HTMLDivElement>(null);
 
+  const misDatos = useQuery({
+    queryKey: ['inscripcion-publica', 'mis-datos', user?.usu_id],
+    queryFn: () => inscripcionesApi.misDatos(),
+    enabled: conSesion,
+    // Una sola vez: recargarlo al volver a la pestaña borraría lo que lleva escrito.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
+  /** Al entrar con su cuenta: sus datos llenos; los hijos los elige él. */
+  useEffect(() => {
+    const d = misDatos.data;
+    if (!d) return;
+    const r = d.representante;
+    const f = r.factura;
+    const cedula = r.cedula ?? '';
+    setRep({
+      nombre: r.nombre,
+      cedula,
+      correo: r.correo,
+      telefono: r.telefono ?? '',
+      facturaPropia: !f || (f.nombre === r.nombre && f.identificacion === cedula && f.correo === r.correo),
+      factura: f ?? { nombre: '', identificacion: '', correo: '', direccion: '' },
+    });
+    setAlumnos([]);
+    setPistaCuenta(undefined);
+  }, [misDatos.data]);
+
   // El total lo calcula el backend con los precios de la base, para que lo
   // que se ve aquí sea exactamente lo que dirán los documentos.
   const seleccion = alumnos
     .filter((a) => a.col_id && a.disciplinas.length > 0)
-    .map((a) => ({ col_id: Number(a.col_id), disciplinas: [...a.disciplinas].sort((x, y) => x - y) }));
+    .map((a) => ({
+      col_id: Number(a.col_id),
+      disciplinas: [...a.disciplinas].sort((x, y) => x - y),
+      nino_id: a.nino_id,
+    }));
   const cotizacion = useQuery({
-    queryKey: ['inscripcion-publica', 'cotizacion', seleccion],
-    queryFn: () => inscripcionesApi.cotizar(seleccion),
-    enabled: paso >= 2 && seleccion.length === alumnos.length,
+    queryKey: ['inscripcion-publica', 'cotizacion', seleccion, conSesion],
+    queryFn: () => inscripcionesApi.cotizar(seleccion, conSesion),
+    enabled: paso >= 2 && seleccion.length > 0 && seleccion.length === alumnos.length,
   });
 
   const subir = () => arriba.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -364,7 +444,7 @@ const Inscripcion = () => {
     subir();
   };
 
-  const siguiente = () => {
+  const siguiente = async () => {
     const e =
       paso === 0
         ? erroresRepresentante(rep)
@@ -382,6 +462,23 @@ const Inscripcion = () => {
       setErrores(e);
       subir();
       return;
+    }
+    // Sin sesión, "Tus datos" comprueba la cédula: si ya tiene cuenta, que
+    // entre en vez de llenar todo de nuevo (§9).
+    if (paso === 0 && !conSesion) {
+      setComprobandoCedula(true);
+      try {
+        const r = await inscripcionesApi.identificar(rep.cedula.trim());
+        if (r.estado === 'cuenta') {
+          setPistaCuenta(r.correo_pista);
+          subir();
+          return;
+        }
+      } catch {
+        // Si falla la consulta se sigue: el envío vuelve a comprobarlo.
+      } finally {
+        setComprobandoCedula(false);
+      }
     }
     irA(paso + 1);
   };
@@ -441,6 +538,7 @@ const Inscripcion = () => {
           col_id: Number(a.col_id),
           catninograd_id: Number(a.catninograd_id),
           parentesco: a.parentesco,
+          nino_id: a.nino_id,
           disciplinas: a.disciplinas,
           emergencia: {
             nombre: a.emergencia.nombre.trim(),
@@ -465,11 +563,17 @@ const Inscripcion = () => {
         ) as Record<TipoDocumento, number>,
         acepta: Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, true])) as Record<TipoDocumento, true>,
         comprobante: { mime, base64: await aBase64(comprobante) },
-      });
+      }, conSesion);
       setResultado(recibido);
       subir();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
+      const detalles = err instanceof ApiError ? (err.details as { codigo?: string; correo_pista?: string } | undefined) : undefined;
+      if (err instanceof ApiError && detalles?.codigo === 'tiene_cuenta') {
+        // Su cédula o su correo ya tienen cuenta: que entre (§9).
+        setPistaCuenta(detalles.correo_pista ?? null);
+        setErrores([err.message]);
+        setPaso(0);
+      } else if (err instanceof ApiError && err.status === 409) {
         // Cambió un documento o una disciplina mientras llenaba: se recarga
         // y se le devuelve al paso que tiene que revisar.
         await formulario.refetch();
@@ -516,9 +620,23 @@ const Inscripcion = () => {
           <Aviso titulo="Las inscripciones no están abiertas">Vuelve a intentarlo más tarde o escríbenos.</Aviso>
         )}
 
-        {resultado && <Exito resultado={resultado} correo={rep.correo.trim()} />}
+        {resultado && <Exito resultado={resultado} correo={rep.correo.trim()} cuenta={conSesion} />}
 
-        {formulario.data?.disponible && !resultado && (
+        {formulario.data?.disponible && !resultado && modo === 'inicio' && (
+          <EntradaInscripcion
+            onNuevo={(cedula) => {
+              setRep((r) => ({ ...r, cedula }));
+              setModo('nuevo');
+            }}
+            onCuenta={() => setModo('cuenta')}
+          />
+        )}
+
+        {formulario.data?.disponible && !resultado && modo === 'cuenta' && misDatos.isLoading && (
+          <p className="py-16 text-center text-muted-foreground">Cargando tus datos…</p>
+        )}
+
+        {formulario.data?.disponible && !resultado && modo !== 'inicio' && !(modo === 'cuenta' && !misDatos.data) && (
           <div className="space-y-5">
             <ol className="grid grid-cols-5 gap-2" aria-label="Pasos">
               {PASOS.map((nombre, i) => (
@@ -548,9 +666,27 @@ const Inscripcion = () => {
             )}
 
             <section className="space-y-5 rounded-lg border bg-background p-4 sm:p-6">
-              {paso === 0 && <PasoRepresentante rep={rep} onChange={setRep} />}
+              {paso === 0 && (
+                <>
+                  <PasoRepresentante
+                    rep={rep}
+                    onChange={setRep}
+                    cuenta={conSesion}
+                    cedulaFija={conSesion && Boolean(misDatos.data?.representante.cedula)}
+                  />
+                  {pistaCuenta !== undefined && !conSesion && (
+                    <AccesoCuenta pista={pistaCuenta} onEntrar={() => setModo('cuenta')} />
+                  )}
+                </>
+              )}
               {paso === 1 && (
-                <PasoAlumnos alumnos={alumnos} onChange={setAlumnos} formulario={formulario.data} rep={rep} />
+                <PasoAlumnos
+                  alumnos={alumnos}
+                  onChange={setAlumnos}
+                  formulario={formulario.data}
+                  rep={rep}
+                  hijos={conSesion ? (misDatos.data?.hijos ?? []) : null}
+                />
               )}
               {paso === 2 && (
                 <PasoSalud
@@ -581,6 +717,7 @@ const Inscripcion = () => {
                   alumnos={alumnos}
                   cobro={cotizacion.data}
                   cargandoCobro={cotizacion.isFetching}
+                  cuenta={conSesion}
                 />
               )}
             </section>
@@ -596,10 +733,10 @@ const Inscripcion = () => {
               {paso < PASOS.length - 1 ? (
                 <Button
                   className="h-12 sm:h-10"
-                  onClick={siguiente}
-                  disabled={paso === 3 && A_ACEPTAR.some(([t]) => !acepta[t])}
+                  onClick={() => void siguiente()}
+                  disabled={(paso === 3 && A_ACEPTAR.some(([t]) => !acepta[t])) || comprobandoCedula}
                 >
-                  Continuar <ArrowRight className="ml-2 h-4 w-4" />
+                  {comprobandoCedula ? 'Comprobando…' : 'Continuar'} <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
                 <Button className="h-12 sm:h-10" onClick={enviar} disabled={enviando || preparando || !comprobante}>
@@ -660,7 +797,19 @@ const Texto = ({
   </Campo>
 );
 
-const PasoRepresentante = ({ rep, onChange }: { rep: Representante; onChange: (r: Representante) => void }) => {
+const PasoRepresentante = ({
+  rep,
+  onChange,
+  cuenta,
+  cedulaFija,
+}: {
+  rep: Representante;
+  onChange: (r: Representante) => void;
+  /** Entró con su cuenta: el correo es el de la cuenta (se cambia en Perfil). */
+  cuenta: boolean;
+  /** Su cuenta ya tiene cédula: no se cambia desde aquí. */
+  cedulaFija: boolean;
+}) => {
   const poner = (campo: 'nombre' | 'cedula' | 'correo' | 'telefono') => (v: string) =>
     onChange({ ...rep, [campo]: v });
   const ponerFactura = (campo: keyof Representante['factura']) => (v: string) =>
@@ -670,14 +819,21 @@ const PasoRepresentante = ({ rep, onChange }: { rep: Representante; onChange: (r
       <div>
         <h1 className="text-xl font-semibold">Tus datos</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Eres el representante legal: con estos datos se crea tu cuenta en la plataforma.
+          {cuenta
+            ? 'Revisa tus datos: si algo cambió, corrígelo y se actualizará al aprobar la inscripción.'
+            : 'Eres el representante legal: con estos datos se crea tu cuenta en la plataforma.'}
         </p>
       </div>
       <Texto id="rep-nombre" etiqueta="Nombres y apellidos" valor={rep.nombre} onChange={poner('nombre')} autoComplete="name" />
       <Texto
         id="rep-cedula"
         etiqueta="Cédula"
-        ayuda="Su cédula será su contraseña para entrar a la plataforma. Podrás cambiarla después."
+        ayuda={
+          cedulaFija
+            ? 'Es la de tu cuenta.'
+            : 'Su cédula será su contraseña para entrar a la plataforma. Podrás cambiarla después.'
+        }
+        disabled={cedulaFija}
         valor={rep.cedula}
         onChange={(v) => poner('cedula')(soloNumeros(v))}
         autoComplete="off"
@@ -687,7 +843,12 @@ const PasoRepresentante = ({ rep, onChange }: { rep: Representante; onChange: (r
       <Texto
         id="rep-correo"
         etiqueta="Correo electrónico"
-        ayuda="Aquí te llegará el aviso cuando se apruebe la inscripción."
+        ayuda={
+          cuenta
+            ? 'Es el de tu cuenta: se cambia desde tu Perfil en la plataforma.'
+            : 'Aquí te llegará el aviso cuando se apruebe la inscripción.'
+        }
+        disabled={cuenta}
         valor={rep.correo}
         onChange={poner('correo')}
         type="email"
@@ -744,11 +905,14 @@ const PasoAlumnos = ({
   onChange,
   formulario,
   rep,
+  hijos,
 }: {
   alumnos: Alumno[];
   onChange: (a: Alumno[]) => void;
   formulario: Formulario;
   rep: Representante;
+  /** Con sesión: sus hijos, para añadirles disciplinas (§9). null sin sesión. */
+  hijos: HijoDelRepresentante[] | null;
 }) => {
   const cambiar = (clave: number, cambios: Partial<Alumno>) =>
     onChange(alumnos.map((a) => (a.clave === clave ? { ...a, ...cambios } : a)));
@@ -758,9 +922,19 @@ const PasoAlumnos = ({
       <div>
         <h1 className="text-xl font-semibold">Alumnos</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Si inscribes a más de un hijo, agrégalos aquí. Cada uno tendrá sus propios documentos.
+          {hijos
+            ? 'Añade disciplinas a uno de tus hijos o inscribe a otro. Cada uno tendrá sus propios documentos.'
+            : 'Si inscribes a más de un hijo, agrégalos aquí. Cada uno tendrá sus propios documentos.'}
         </p>
       </div>
+
+      {hijos && (
+        <MisHijos
+          hijos={hijos}
+          elegidos={alumnos.map((a) => a.nino_id).filter((id): id is number => id !== null)}
+          onElegir={(h) => onChange([...alumnos, alumnoDeHijo(h)])}
+        />
+      )}
 
       {alumnos.map((a, i) => (
         <FichaAlumno
@@ -770,13 +944,17 @@ const PasoAlumnos = ({
           formulario={formulario}
           rep={rep}
           onChange={(c) => cambiar(a.clave, c)}
-          onQuitar={alumnos.length > 1 ? () => onChange(alumnos.filter((x) => x.clave !== a.clave)) : null}
+          onQuitar={
+            alumnos.length > 1 || hijos
+              ? () => onChange(alumnos.filter((x) => x.clave !== a.clave))
+              : null
+          }
         />
       ))}
 
       {alumnos.length < 8 && (
         <Button variant="outline" className="h-11 w-full" onClick={() => onChange([...alumnos, alumnoVacio()])}>
-          <Plus className="mr-2 h-4 w-4" /> Agregar otro alumno
+          <Plus className="mr-2 h-4 w-4" /> {hijos ? 'Inscribir a otro hijo' : 'Agregar otro alumno'}
         </Button>
       )}
     </>
@@ -811,14 +989,23 @@ const FichaAlumno = ({
   }, [colegio]);
 
   const maximo = formulario.max_disciplinas;
-  const elegidas = (colegio?.disciplinas ?? []).filter((d) => alumno.disciplinas.includes(d.colacthor_id));
+  // Las que ya tiene activas cuentan para el máximo y para los cruces (§9).
+  const yaActiva = (id: number) => alumno.activas.some((a) => a.colacthor_id === id);
+  const elegidas = [
+    ...alumno.activas,
+    ...(colegio?.disciplinas ?? []).filter((d) => alumno.disciplinas.includes(d.colacthor_id)),
+  ];
   /**
-   * Por qué no se puede marcar una: el tope por alumno o un cruce de horario
-   * con una ya elegida. El backend lo comprueba igual; aquí se explica antes.
+   * Por qué no se puede marcar una: ya la tiene, el tope por alumno o un
+   * cruce de horario con una elegida. El backend lo comprueba igual; aquí se
+   * explica antes.
    */
   const bloqueo = (d: DisciplinaOfertada): string | null => {
+    if (yaActiva(d.colacthor_id)) return 'Ya inscrito';
     if (alumno.disciplinas.includes(d.colacthor_id)) return null;
-    if (alumno.disciplinas.length >= maximo) return `Ya elegiste ${maximo}, el máximo`;
+    if (alumno.disciplinas.length + alumno.activas.length >= maximo) {
+      return `Ya tiene ${maximo}, el máximo`;
+    }
     for (const otra of elegidas) {
       const dia = diaDeCruce(d.horarios, otra.horarios);
       if (dia) return `Se cruza con ${otra.actividad} el ${dia.toLowerCase()}`;
@@ -837,7 +1024,9 @@ const FichaAlumno = ({
     <div className="space-y-4 rounded-md border p-3 sm:p-4">
       {(numero !== null || onQuitar) && (
         <div className="flex items-center justify-between">
-          <p className="font-medium">Alumno {numero}</p>
+          <p className="font-medium">
+            {alumno.nino_id !== null ? alumno.nombre || 'Tu hijo' : numero !== null ? `Alumno ${numero}` : 'Alumno'}
+          </p>
           {onQuitar && (
             <Button variant="ghost" size="sm" onClick={onQuitar} className="text-destructive">
               <Trash2 className="mr-1 h-4 w-4" /> Quitar
@@ -877,7 +1066,11 @@ const FichaAlumno = ({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Campo id={id('colegio')} etiqueta="Colegio">
-          <Select value={alumno.col_id} onValueChange={(v) => onChange({ col_id: v, disciplinas: [] })}>
+          <Select
+            value={alumno.col_id}
+            onValueChange={(v) => onChange({ col_id: v, disciplinas: [] })}
+            disabled={alumno.colFijo}
+          >
             <SelectTrigger id={id('colegio')} className="h-11">
               <SelectValue placeholder="Elige el colegio" />
             </SelectTrigger>
@@ -933,7 +1126,7 @@ const FichaAlumno = ({
                     >
                       <Checkbox
                         id={cid}
-                        checked={alumno.disciplinas.includes(d.colacthor_id)}
+                        checked={alumno.disciplinas.includes(d.colacthor_id) || yaActiva(d.colacthor_id)}
                         disabled={motivo !== null}
                         onCheckedChange={(v) => alternar(d.colacthor_id, v === true)}
                       />
@@ -1339,6 +1532,7 @@ const PasoPago = ({
   alumnos,
   cobro,
   cargandoCobro,
+  cuenta,
 }: {
   cuentaBancaria: string | null;
   vista: string | null;
@@ -1347,6 +1541,8 @@ const PasoPago = ({
   alumnos: Alumno[];
   cobro: Cobro | undefined;
   cargandoCobro: boolean;
+  /** Entró con su cuenta: ya está activa, solo lo nuevo espera la aprobación. */
+  cuenta: boolean;
 }) => (
   <>
     <div>
@@ -1436,12 +1632,14 @@ const PasoPago = ({
     />
 
     <p className="text-xs text-muted-foreground">
-      Al enviar, tu inscripción queda en revisión. No se crea tu cuenta hasta que la aprobemos.
+      {cuenta
+        ? 'Al enviar, la inscripción queda en revisión. Tu cuenta y lo que tus hijos ya tienen siguen igual: las disciplinas nuevas (y el hijo nuevo, si inscribes a otro) se suman cuando la aprobemos.'
+        : 'Al enviar, tu inscripción queda en revisión. No se crea tu cuenta hasta que la aprobemos.'}
     </p>
   </>
 );
 
-const Exito = ({ resultado, correo }: { resultado: EnvioRecibido; correo: string }) => (
+const Exito = ({ resultado, correo, cuenta }: { resultado: EnvioRecibido; correo: string; cuenta: boolean }) => (
   <div className="space-y-5 rounded-lg border bg-background p-6">
     <div className="text-center">
       <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
@@ -1450,11 +1648,16 @@ const Exito = ({ resultado, correo }: { resultado: EnvioRecibido; correo: string
     <div className="space-y-2 text-sm">
       <p>
         Vamos a revisar tus datos y el comprobante. Cuando la aprobemos te llegará un correo a{' '}
-        <strong className="break-all">{correo}</strong> con tu acceso a la plataforma y los documentos aprobados.
+        <strong className="break-all">{correo}</strong> con los documentos aprobados.
       </p>
-      <p>
-        Tu contraseña será tu <strong>número de cédula o pasaporte</strong>, tal como lo escribiste.
-      </p>
+      {cuenta ? (
+        <p>Entra a la plataforma con tu cuenta de siempre.</p>
+      ) : (
+        <p>
+          Si es tu primera inscripción, tu contraseña será tu <strong>número de cédula o pasaporte</strong>, tal
+          como lo escribiste.
+        </p>
+      )}
     </div>
     {resultado.paquetes.some((c) => c.url) && (
       <div className="space-y-2">

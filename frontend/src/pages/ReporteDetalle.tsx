@@ -139,67 +139,76 @@ const ReporteDetalle = () => {
         </ConditionalAction>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <DebouncedSearchInput
-          placeholder="Buscar…"
-          value={busqueda}
-          onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
-          className="w-full"
-        />
-
-        <Select value={colegio} onValueChange={(v) => cambiarFiltro(() => setColegio(v))}>
-          <SelectTrigger className="h-11 sm:h-10">
-            <SelectValue placeholder="Todos los colegios" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TODOS}>Todos los colegios</SelectItem>
-            {(colegios.data?.items ?? []).map((c) => (
-              <SelectItem key={c.col_id} value={String(c.col_id)}>
-                {c.col_nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="grid grid-cols-2 gap-3 sm:col-span-2">
-          <div className="space-y-1">
-            <Label htmlFor="desde" className="text-xs">
-              Desde {definicion.exigeRango && <span className="text-destructive">*</span>}
-            </Label>
-            <Input
-              id="desde"
-              type="date"
-              value={desde}
-              max={hasta || undefined}
-              onChange={(e) => cambiarFiltro(() => setDesde(e.target.value))}
-              className="h-11 sm:h-10"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="hasta" className="text-xs">
-              Hasta {definicion.exigeRango && <span className="text-destructive">*</span>}
-            </Label>
-            <Input
-              id="hasta"
-              type="date"
-              value={hasta}
-              min={desde || undefined}
-              onChange={(e) => cambiarFiltro(() => setHasta(e.target.value))}
-              className="h-11 sm:h-10"
-            />
-          </div>
+      {/* Cinco filtros con la misma forma (etiqueta y campo), alineados abajo. */}
+      <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+          <Label className="text-xs">Buscar</Label>
+          <DebouncedSearchInput
+            placeholder="Buscar…"
+            value={busqueda}
+            onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
+            className="w-full"
+          />
         </div>
 
-        <Select value={estado} onValueChange={(v) => cambiarFiltro(() => setEstado(v))}>
-          <SelectTrigger className="h-11 sm:h-10">
-            <SelectValue placeholder="Todos los estados" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TODOS}>Todos los estados</SelectItem>
-            <SelectItem value="1">Activo</SelectItem>
-            <SelectItem value="2">Inactivo</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="space-y-1">
+          <Label className="text-xs">Colegio</Label>
+          <Select value={colegio} onValueChange={(v) => cambiarFiltro(() => setColegio(v))}>
+            <SelectTrigger className="h-11 sm:h-10" aria-label="Colegio">
+              <SelectValue placeholder="Todos los colegios" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todos los colegios</SelectItem>
+              {(colegios.data?.items ?? []).map((c) => (
+                <SelectItem key={c.col_id} value={String(c.col_id)}>
+                  {c.col_nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs">Estado</Label>
+          <Select value={estado} onValueChange={(v) => cambiarFiltro(() => setEstado(v))}>
+            <SelectTrigger className="h-11 sm:h-10" aria-label="Estado">
+              <SelectValue placeholder="Todos los estados" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todos los estados</SelectItem>
+              <SelectItem value="1">Activo</SelectItem>
+              <SelectItem value="2">Inactivo</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="desde" className="text-xs">
+            Desde {definicion.exigeRango && <span className="text-destructive">*</span>}
+          </Label>
+          <Input
+            id="desde"
+            type="date"
+            value={desde}
+            max={hasta || undefined}
+            onChange={(e) => cambiarFiltro(() => setDesde(e.target.value))}
+            className="h-11 sm:h-10"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="hasta" className="text-xs">
+            Hasta {definicion.exigeRango && <span className="text-destructive">*</span>}
+          </Label>
+          <Input
+            id="hasta"
+            type="date"
+            value={hasta}
+            min={desde || undefined}
+            onChange={(e) => cambiarFiltro(() => setHasta(e.target.value))}
+            className="h-11 sm:h-10"
+          />
+        </div>
       </div>
 
       {/*

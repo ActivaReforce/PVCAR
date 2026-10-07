@@ -153,7 +153,7 @@ const Permisos: React.FC = () => {
             <SelectContent>
               {matriz.data?.roles.map((r) => (
                 <SelectItem key={r.rol_id} value={String(r.rol_id)}>
-                  {r.rol_id} — {r.rol_titulo}
+                  {r.rol_titulo}
                 </SelectItem>
               ))}
             </SelectContent>

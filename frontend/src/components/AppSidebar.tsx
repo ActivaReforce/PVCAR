@@ -34,13 +34,32 @@ import {
   ShieldCheck,
   FileSignature
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { inscripcionesApi } from "@/api/inscripciones";
 
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
   const { setOpenMobile } = useSidebar();
+
+  /**
+   * Inscripciones pendientes de aprobar: un número rojo en el menú (pedido
+   * del cliente, 2026-10-07). Solo se consulta para quien puede aprobar; para
+   * el resto no hay ni una llamada. Se repite cada minuto **solo mientras las
+   * inscripciones están abiertas** (cerradas no llegan nuevas; las que queden
+   * pendientes se ven igual). La clave empieza por 'inscripciones', así que
+   * aprobar o rechazar la refresca al momento.
+   */
+  const puedeAprobar = hasPermission("inscripciones", "editar");
+  const aviso = useQuery({
+    queryKey: ["inscripciones", "aviso-menu"],
+    queryFn: () => inscripcionesApi.aviso(),
+    enabled: puedeAprobar,
+    refetchInterval: (q) => (q.state.data?.abiertas ? 60_000 : false),
+  });
+  const avisos: Record<string, number> = { "/inscripciones": aviso.data?.pendientes ?? 0 };
 
   const handleLogout = async () => {
     try {
@@ -103,8 +122,22 @@ export function AppSidebar() {
                       transition-all duration-200
                     `}
                   >
-                    <item.icon />
+                    <span className="relative flex">
+                      <item.icon className="h-4 w-4" />
+                      {(avisos[item.path] ?? 0) > 0 && (
+                        // Con el menú plegado solo se ve el icono: el punto va encima.
+                        <span className="absolute -right-1 -top-1 hidden h-2 w-2 rounded-full bg-destructive group-data-[collapsible=icon]:block" />
+                      )}
+                    </span>
                     <span>{item.title}</span>
+                    {(avisos[item.path] ?? 0) > 0 && (
+                      <span
+                        className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground"
+                        aria-label={`${avisos[item.path]} pendientes`}
+                      >
+                        {avisos[item.path]}
+                      </span>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

@@ -135,6 +135,8 @@ export interface NinoEnvio {
   /** "Curso" en la ficha. */
   catninograd_id: number;
   parentesco: string;
+  /** El hijo que ya existe, si se le añaden disciplinas (§9); null si es nuevo. */
+  nino_id: number | null;
   disciplinas: number[];
   emergencia: Persona;
   /** Quien puede retirarlo; null si no indicó a nadie. */
@@ -155,7 +157,7 @@ export interface ColegioDocumento {
 }
 
 /** Lo que se guarda de cada alumno: lo enviado y lo que el sistema puso en sus documentos. */
-export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas'> {
+export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id'> {
   documento: {
     colegio: ColegioDocumento;
     curso: string | null;
@@ -238,6 +240,27 @@ export interface NinoDetalle {
   constancias: ConstanciaDetalle[];
   cobro: CobroAlumno | null;
   nino_id: number | null;
+  /** Pendiente y con un hijo que ya existía: se le añaden disciplinas, no se crea. */
+  existente: boolean;
+  /** Pendiente y nuevo: alumnos que coinciden en nombre, nacimiento y colegio. */
+  posibles: PosibleMismo[];
+}
+
+export interface PosibleMismo {
+  nino_id: number;
+  nino_nombre: string;
+  col_nombre: string;
+  representantes: string[];
+}
+
+/** La cuenta que ya tenía quien envió (§9). */
+export interface CuentaPrevia {
+  usu_id: number;
+  usu_nombre: string;
+  usu_correo: string;
+  /** Está dada de baja: aprobar la reactiva. */
+  reactiva: boolean;
+  cambios: string[];
 }
 
 export interface InscripcionDetalle {
@@ -254,7 +277,48 @@ export interface InscripcionDetalle {
   comprobante_url: string | null;
   ninos: NinoDetalle[];
   coincidencias: UsuarioCoincidente[];
+  cuenta: CuentaPrevia | null;
   bloqueos: string[];
+}
+
+/** "Ya inscribí antes": solo si hay cuenta, sin ningún dato. */
+export type Identificacion =
+  | { estado: 'nuevo' }
+  | { estado: 'cuenta'; correo_pista: string }
+  | { estado: 'inactiva' };
+
+export interface DisciplinaActiva {
+  colacthor_id: number;
+  actividad: string;
+  horarios: HorarioDisciplina[];
+}
+
+export interface HijoDelRepresentante {
+  nino_id: number;
+  nombre: string;
+  fecha_nacimiento: string | null;
+  col_id: number;
+  col_nombre: string;
+  catninograd_id: number | null;
+  parentesco: string | null;
+  modalidad_salida: ModalidadSalida | null;
+  detalle_retiro: string | null;
+  salud: string | null;
+  imagen: PermisosImagen;
+  emergencia: (Persona & { cedula: string | null }) | null;
+  retiro: (Persona & { cedula: string | null }) | null;
+  activas: DisciplinaActiva[];
+}
+
+export interface MisDatos {
+  representante: {
+    nombre: string;
+    cedula: string | null;
+    correo: string;
+    telefono: string | null;
+    factura: Factura | null;
+  };
+  hijos: HijoDelRepresentante[];
 }
 
 export interface ResultadoAprobacion {
@@ -345,9 +409,14 @@ export interface DocumentoDeRepresentante {
 
 export const inscripcionesApi = {
   formulario: () => api.get<Formulario>('/inscripcion/formulario'),
-  enviar: (envio: Envio) => api.post<EnvioRecibido>('/inscripcion', envio),
-  cotizar: (ninos: Array<{ col_id: number; disciplinas: number[] }>) =>
-    api.post<Cobro>('/inscripcion/cotizacion', { ninos }),
+  /** `conSesion`: solo si entró en el propio formulario (§9); si no, va como anónimo. */
+  enviar: (envio: Envio, conSesion: boolean) =>
+    api.post<EnvioRecibido>('/inscripcion', envio, { sinSesion: !conSesion }),
+  cotizar: (ninos: Array<{ col_id: number; disciplinas: number[]; nino_id: number | null }>, conSesion: boolean) =>
+    api.post<Cobro>('/inscripcion/cotizacion', { ninos }, { sinSesion: !conSesion }),
+  identificar: (cedula: string) =>
+    api.post<Identificacion>('/inscripcion/identificar', { cedula }, { sinSesion: true }),
+  misDatos: () => api.get<MisDatos>('/inscripcion/mis-datos'),
 
   listar: (filtros: { estado?: EstadoInscripcion; buscar?: string; colegio?: number; page?: number }) => {
     const qs = new URLSearchParams();
@@ -359,9 +428,13 @@ export const inscripcionesApi = {
     return api.get<ListaInscripciones>(`/inscripciones${sufijo ? `?${sufijo}` : ''}`);
   },
   detalle: (id: number) => api.get<InscripcionDetalle>(`/inscripciones/${id}`),
+  /** El número rojo del menú: pendientes y si las inscripciones están abiertas. */
+  aviso: () => api.get<{ pendientes: number; abiertas: boolean }>('/inscripciones/aviso'),
   documentosDeRepresentante: (usuId: number) =>
     api.get<DocumentoDeRepresentante[]>(`/inscripciones/representantes/${usuId}/documentos`),
-  aprobar: (id: number) => api.post<ResultadoAprobacion>(`/inscripciones/${id}/aprobar`),
+  /** `mismos`: { insnino_id: nino_id } de los que el admin dijo que son el mismo alumno. */
+  aprobar: (id: number, mismos: Record<number, number> = {}) =>
+    api.post<ResultadoAprobacion>(`/inscripciones/${id}/aprobar`, { mismos }),
   rechazar: (id: number, confirmacion: string) =>
     api.delete<{ ins_id: number }>(`/inscripciones/${id}`, { confirmacion }),
 
