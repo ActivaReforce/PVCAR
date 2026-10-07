@@ -34,13 +34,30 @@ import {
   ShieldCheck,
   FileSignature
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { inscripcionesApi } from "@/api/inscripciones";
 
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
   const { setOpenMobile } = useSidebar();
+
+  /**
+   * Inscripciones pendientes de aprobar: una bolita roja en el menú (pedido
+   * del cliente, 2026-10-07). Solo para quien puede aprobar. La clave empieza
+   * por 'inscripciones', así que aprobar o rechazar la refresca al momento.
+   */
+  const puedeAprobar = hasPermission("inscripciones", "editar");
+  const pendientes = useQuery({
+    queryKey: ["inscripciones", "pendientes-menu"],
+    queryFn: () => inscripcionesApi.listar({ estado: "pendiente" }),
+    enabled: puedeAprobar,
+    refetchInterval: 60_000,
+    select: (d) => d.conteos.pendientes,
+  });
+  const avisos: Record<string, number> = { "/inscripciones": pendientes.data ?? 0 };
 
   const handleLogout = async () => {
     try {
@@ -103,8 +120,22 @@ export function AppSidebar() {
                       transition-all duration-200
                     `}
                   >
-                    <item.icon />
+                    <span className="relative flex">
+                      <item.icon className="h-4 w-4" />
+                      {(avisos[item.path] ?? 0) > 0 && (
+                        // Con el menú plegado solo se ve el icono: el punto va encima.
+                        <span className="absolute -right-1 -top-1 hidden h-2 w-2 rounded-full bg-destructive group-data-[collapsible=icon]:block" />
+                      )}
+                    </span>
                     <span>{item.title}</span>
+                    {(avisos[item.path] ?? 0) > 0 && (
+                      <span
+                        className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground"
+                        aria-label={`${avisos[item.path]} pendientes`}
+                      >
+                        {avisos[item.path]}
+                      </span>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

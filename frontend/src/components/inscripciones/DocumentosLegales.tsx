@@ -170,7 +170,7 @@ const DocumentosLegales = () => {
         <TabsList>
           <TabsTrigger value="generales">Generales</TabsTrigger>
           <TabsTrigger value="colegio">Por colegio</TabsTrigger>
-          <TabsTrigger value="configuracion">Configuración</TabsTrigger>
+          <TabsTrigger value="configuracion">Más</TabsTrigger>
         </TabsList>
         <TabsContent value="generales" className="space-y-3 pt-3">
           <p className="text-sm text-muted-foreground">

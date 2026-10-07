@@ -8,10 +8,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Textarea } from '@/components/ui/textarea';
 import { TIPO, type RespuestaInput } from '@/api/encuestas';
+import CampoPregunta from './CampoPregunta';
+import { valorVacio, type ValorRespuesta } from './respuesta';
 import {
   useEncuestaParaResponder,
   useMisEncuestas,
@@ -19,15 +19,8 @@ import {
 } from '@/hooks/useEncuestas';
 import { usePermissions } from '@/hooks/usePermissions';
 
-interface Valor {
-  texto: string;
-  numero: number | null;
-  fecha: string;
-  hora: string;
-  sino: boolean | null;
-}
-
-const vacio = (): Valor => ({ texto: '', numero: null, fecha: '', hora: '', sino: null });
+type Valor = ValorRespuesta;
+const vacio = valorVacio;
 
 /**
  * La encuesta pendiente de un representante.
@@ -172,96 +165,7 @@ const EncuestaPendiente = () => {
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-2">
-              <div>
-                <h3 className="break-words font-medium">{pregunta.encupreg_pregunta}</h3>
-                {pregunta.encupreg_nota && (
-                  <p className="mt-1 text-sm text-muted-foreground">{pregunta.encupreg_nota}</p>
-                )}
-              </div>
-
-              {pregunta.encutiporesp_id === TIPO.TEXTO_CORTO && (
-                <Input
-                  value={valor.texto}
-                  onChange={(e) => cambiar({ texto: e.target.value })}
-                  className="h-11 sm:h-10"
-                  aria-label={pregunta.encupreg_pregunta}
-                />
-              )}
-
-              {pregunta.encutiporesp_id === TIPO.TEXTO_LARGO && (
-                <Textarea
-                  value={valor.texto}
-                  onChange={(e) => cambiar({ texto: e.target.value })}
-                  rows={4}
-                  className="resize-none"
-                  aria-label={pregunta.encupreg_pregunta}
-                />
-              )}
-
-              {pregunta.encutiporesp_id === TIPO.ESCALA && (
-                <div className="flex flex-wrap gap-2">
-                  {Array.from(
-                    {
-                      length:
-                        (pregunta.encupreg_escala_max ?? 5) -
-                        (pregunta.encupreg_escala_min ?? 1) +
-                        1,
-                    },
-                    (_, i) => (pregunta.encupreg_escala_min ?? 1) + i,
-                  ).map((n) => (
-                    <Button
-                      key={n}
-                      type="button"
-                      variant={valor.numero === n ? 'default' : 'outline'}
-                      className="h-11 w-11 p-0"
-                      onClick={() => cambiar({ numero: n })}
-                    >
-                      {n}
-                    </Button>
-                  ))}
-                </div>
-              )}
-
-              {pregunta.encutiporesp_id === TIPO.FECHA && (
-                <Input
-                  type="date"
-                  value={valor.fecha}
-                  onChange={(e) => cambiar({ fecha: e.target.value })}
-                  className="h-11 sm:h-10"
-                  aria-label={pregunta.encupreg_pregunta}
-                />
-              )}
-
-              {pregunta.encutiporesp_id === TIPO.HORA && (
-                <Input
-                  type="time"
-                  value={valor.hora}
-                  onChange={(e) => cambiar({ hora: e.target.value })}
-                  className="h-11 w-36 sm:h-10"
-                  aria-label={pregunta.encupreg_pregunta}
-                />
-              )}
-
-              {pregunta.encutiporesp_id === TIPO.SI_NO && (
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant={valor.sino === true ? 'default' : 'outline'}
-                    className="h-11"
-                    onClick={() => cambiar({ sino: true })}
-                  >
-                    Sí
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={valor.sino === false ? 'default' : 'outline'}
-                    className="h-11"
-                    onClick={() => cambiar({ sino: false })}
-                  >
-                    No
-                  </Button>
-                </div>
-              )}
+              <CampoPregunta pregunta={pregunta} valor={valor} onCambio={cambiar} />
             </div>
 
             <div className="space-y-2 border-t pt-3">
