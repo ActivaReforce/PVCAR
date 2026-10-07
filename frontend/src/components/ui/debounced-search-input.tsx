@@ -56,14 +56,17 @@ const DebouncedSearchInput = ({
   }, [onChange]);
 
   return (
-    <div className={cn("relative", className)}>
+    // h-fit: en una rejilla la celda se estira a la altura de la fila, y la
+    // lupa (top-1/2) se centraba en la celda estirada en vez de en el campo.
+    <div className={cn("relative h-fit", className)}>
       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
       <Input
         type="text"
         placeholder={placeholder}
         value={localValue}
         onChange={handleChange}
-        className={cn("pl-10", showClearButton && localValue && "pr-10")}
+        aria-label={placeholder}
+        className={cn("h-11 pl-10 sm:h-10", showClearButton && localValue && "pr-10")}
       />
       {showClearButton && localValue && (
         <button
