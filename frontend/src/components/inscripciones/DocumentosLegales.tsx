@@ -65,6 +65,7 @@ import DatosColegio from './DatosColegio';
 import Membrete from './Membrete';
 import CuentaBancaria from './CuentaBancaria';
 import MaxDisciplinas from './MaxDisciplinas';
+import ConfigCorreo from '@/components/correos/ConfigCorreo';
 import { EstadoDelColegio } from './EstadoInscripciones';
 import { REGLAS, porcentaje, problemasDePlantilla, tarifa, type DatosDocumento } from './documento';
 import { fechaCorta } from './formato';
@@ -188,6 +189,10 @@ const DocumentosLegales = () => {
           <Membrete />
           <CuentaBancaria />
           <MaxDisciplinas />
+          <ConfigCorreo
+            tipo="inscripciones"
+            descripcion="El correo de inscripción aprobada, que llega al representante con los documentos."
+          />
         </TabsContent>
       </Tabs>
     </div>

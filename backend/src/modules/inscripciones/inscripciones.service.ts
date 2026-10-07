@@ -10,7 +10,8 @@ import { ESTADO, ROL, ROLES_GLOBALES } from '../../lib/constants.js';
 import { diaDeCruce, horarioLargo, type HorarioDisciplina } from '../../lib/horarios.js';
 import { enTransaccion } from '../../lib/tx.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
-import { enviarCorreo, escaparHtml } from '../../lib/correo.js';
+import { escaparHtml } from '../../lib/correo.js';
+import { enviarComo } from '../correos/correos.service.js';
 import {
   MIME_COMPROBANTE,
   borrarArchivos,
@@ -1205,7 +1206,7 @@ export async function aprobar(
   // De él queda la huella en insnino_pdf_enviado_sha256.
   await borrarArchivos(ninosPrevios.map((n) => n.insnino_pdf));
 
-  const correo_enviado = await enviarCorreo({
+  const correo_enviado = await enviarComo('inscripciones', {
     ...correoDeAprobacion(rep.nombre, cuentaPrevia?.usu_correo ?? rep.correo, resultado.cuenta_nueva),
     adjuntos: ninosPrevios.map((n, i) => ({
       nombre: `Inscripcion ${n.insnino_datos.nombre}.pdf`,
