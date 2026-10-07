@@ -59,7 +59,7 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 ## 5. Dinero
 
 - Tarifa mensual por disciplina, por colegio, **sin IVA**. **IVA fijo 15 %** (`IVA_PCT` en `inscripciones.precios.ts`; no se configura). Descuento por hermano según la regla de la 0015.
-- **Pendiente: el cobro por disciplina.** El cliente lo aclaró el 2026-10-05: una disciplina son varios días (hoy dos) y se paga una vez; máximo 2 por niño sin cruces. Lo resuelve **Disciplinas v2** (`docs/disciplinas-v2.md`), que espera sus respuestas. Hasta entonces se cobra cada día elegido.
+- **Cobro por disciplina: resuelto el 2026-10-06** con Disciplinas v2 (`docs/disciplinas-v2.md`): una disciplina con todos sus días se cobra una vez; el formulario deja elegir como mucho `inscfg_max_disciplinas` (2, se cambia en Configuración) y bloquea las que se cruzan, con el motivo. Los horarios salen con los días completos ("Lunes y Miércoles 15:00–16:00") en el formulario, la ficha y el contrato.
 
 ## 6. Dónde queda cada cosa
 
@@ -79,7 +79,7 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 
 ## 8. Pendiente
 
-1. **El cobro por disciplina** (§5) → Disciplinas v2.
+1. ~~**El cobro por disciplina** (§5)~~ → resuelto con Disciplinas v2 el 2026-10-06.
 2. **Representante que ya tenía cuenta:** hoy se le añaden los alumnos y la factura y se completa su cédula si no la tenía, pero no se le cambian nombre ni teléfono. El cliente lo deja para después.
 3. **Probar en pantalla** el recorrido completo: publicar los seis, valores y apertura de un colegio, inscribir con dos hermanos, aprobar (correo con los PDF adjuntos), rechazar.
 4. ~~Antes de lanzar, en prod: quitar el colegio de prueba y crear el primer Propietario.~~ Hecho el 2026-10-05 (`SQL/limpieza_prod_2026-10-05.sql`): prod limpia, Flowward único Propietario.

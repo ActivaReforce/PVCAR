@@ -1,6 +1,6 @@
 # Disciplinas v2 — una disciplina con varios horarios (propuesta, 2026-10-05)
 
-**Estado: construido el 2026-10-06, sin probar en pantalla.** Migración `0021_disciplinas_horarios.sql`. Las 6 preguntas de §7 respondidas el 2026-10-06; lo que cambian está en §8; lo construido, en §9.
+**Estado: construido y probado en pantalla por el cliente el 2026-10-06.** Migración `0021_disciplinas_horarios.sql`. Las 6 preguntas de §7 respondidas el 2026-10-06; lo que cambian está en §8; lo construido, en §9.
 
 ## 1. Cómo funciona el negocio (cliente, 2026-10-05)
 
@@ -108,3 +108,8 @@ Tamaño: unos 30 archivos leen el día o la hora de la disciplina. Es una reestr
 - **Auxiliar con varios titulares** (Fase 9 §1b): se puede atar a varios; `GET /me/titulares`; selector "de quién ver" en la cabecera con "Todos mis entrenadores", que viaja en `X-Titular` y solo **estrecha** el alcance.
 - **Pantallas:** Disciplinas (alta y edición con días y horas por día; la tarjeta sale en cada uno de sus días), Estudiantes (horario completo y aviso de cruce antes de guardar), Entrenadores, Evaluaciones, Asistencias, Tablero, Reportes e Inscripción pública.
 - Verificado: los 267 SQL del backend con `PREPARE` contra el esquema nuevo, un escenario de punta a punta contra la base local, 558 pruebas, lint, tipos y build.
+
+## 10. Ajustes tras la prueba del cliente (2026-10-06)
+
+- **`/inscripcion` con los días completos:** "Lunes y Miércoles 15:00–16:00" (`horarioLargo`, en `lib/horarios.ts` de backend y frontend), también en la ficha y el contrato generados. Las pantallas internas siguen con la forma corta de `disciplina_horario_texto`.
+- **Color por actividad** (`0022`, paleta cambiada por la `0023`): 10 tonos sobrios —marino, acero, cielo, petróleo, bosque, oliva, piedra, grafito, índigo, vino— o ninguno. Tiñen la tarjeta de la actividad y las de sus disciplinas; el borde ámbar de "sin entrenador" va por encima y no hay amarillos ni naranjas. La primera paleta (pastel) le pareció poco sobria y en la segunda los azules no se distinguían (ΔE2000 4,3): la vigente está diseñada en OKLCH con un mínimo de 7 entre cualquier par, en claro y en oscuro (`frontend/src/lib/colores.ts`).
