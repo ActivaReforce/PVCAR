@@ -24,6 +24,7 @@ import {
   type GraficaHistorico,
 } from './historico.resumen.js';
 import type { ConsultaQuery, ExportacionBody } from './historico.schemas.js';
+import { ahoraEc } from '../../lib/fecha.js';
 
 /**
  * Data anterior: la plataforma vieja, de solo lectura.
@@ -311,7 +312,7 @@ function nuevoLibro(destino: Writable): ExcelJS.stream.xlsx.WorkbookWriter {
   return libro;
 }
 
-const generado = () => new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+const generado = () => `${ahoraEc()} (hora de Ecuador)`;
 
 /** Los filtros escritos en palabras, con los nombres y no los ids. */
 async function describirFiltros(conjunto: Conjunto, f: FiltrosHistorico): Promise<Array<[string, string]>> {

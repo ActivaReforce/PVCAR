@@ -10,6 +10,7 @@ import type { AuthUser } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
 import * as repo from './entrenadores.repository.js';
 import type { AsignarInput, ListarEntrenadoresQuery } from './entrenadores.schemas.js';
+import { hoyEc } from '../../lib/fecha.js';
 
 /**
  * Entrenadores: quien imparte cada disciplina y quien lo respalda.
@@ -150,7 +151,7 @@ export async function asignar(
   if (entrenador.est_id !== ESTADO.ACTIVO || entrenador.usuario_est_id !== ESTADO.ACTIVO) {
     throw new ApiError(409, 'El entrenador esta dado de baja: reactivalo antes de asignarle nada');
   }
-  if (input.desde && input.desde > new Date().toISOString().slice(0, 10)) {
+  if (input.desde && input.desde > hoyEc()) {
     throw new ApiError(400, 'La fecha de inicio no puede ser futura');
   }
 

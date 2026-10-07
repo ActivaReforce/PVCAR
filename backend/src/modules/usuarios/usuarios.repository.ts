@@ -5,6 +5,7 @@ import { ESTADO, ROL } from '../../lib/constants.js';
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import type { ListarUsuariosQuery } from './usuarios.schemas.js';
+import { HOY_EC } from '../../lib/fecha.js';
 
 export interface RolResumen {
   rol_id: number;
@@ -525,7 +526,7 @@ export async function desactivarEntrenador(client: PoolClient, entId: number): P
   );
   await client.query(
     `UPDATE public.entrenador_asignacion
-        SET est_id = $2, entasig_fecha_fin = CURRENT_DATE
+        SET est_id = $2, entasig_fecha_fin = ${HOY_EC}
       WHERE ent_id = $1 AND est_id = $3 AND entasig_fecha_fin IS NULL`,
     [entId, ESTADO.INACTIVO, ESTADO.ACTIVO],
   );

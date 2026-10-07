@@ -68,6 +68,7 @@ import MaxDisciplinas from './MaxDisciplinas';
 import { EstadoDelColegio } from './EstadoInscripciones';
 import { REGLAS, porcentaje, problemasDePlantilla, tarifa, type DatosDocumento } from './documento';
 import { fechaCorta } from './formato';
+import { ZONA } from '@/lib/fecha';
 
 /** Iguales para cualquier colegio: se leen y se aceptan. */
 const GENERALES: TipoDocumento[] = ['autorizacion_datos', 'datos_medicos', 'imagen', 'politica'];
@@ -199,7 +200,7 @@ const DocumentosLegales = () => {
  */
 const EJEMPLO: DatosDocumento = {
   valores: {
-    fecha: new Intl.DateTimeFormat('es-EC', { dateStyle: 'long' }).format(new Date()),
+    fecha: new Intl.DateTimeFormat('es-EC', { dateStyle: 'long', timeZone: ZONA }).format(new Date()),
     representante_nombre: 'Nombre del representante',
     representante_cedula: '0000000000',
     alumno_nombre: 'Nombre del alumno',

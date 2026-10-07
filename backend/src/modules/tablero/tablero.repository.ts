@@ -1,6 +1,7 @@
 import { getPool } from '../../config/db.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
+import { textoEc } from '../../lib/fecha.js';
 
 /**
  * Consultas del Tablero.
@@ -326,7 +327,7 @@ export async function tendenciaAsistencia(
 /** Hoy en Ecuador, para que el periodo por defecto no salga del navegador. */
 export async function hoyEnEcuador(): Promise<string> {
   const { rows } = await getPool().query<{ hoy: string }>(
-    `SELECT to_char(now() AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD') AS hoy`,
+    `SELECT ${textoEc('now()', 'YYYY-MM-DD')} AS hoy`,
   );
   return rows[0]?.hoy ?? '';
 }

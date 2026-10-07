@@ -3,6 +3,7 @@ import { getPool } from '../../config/db.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import type { PreguntaInput } from './encuestas.schemas.js';
+import { textoEc } from '../../lib/fecha.js';
 
 /**
  * Consultas de Encuestas.
@@ -322,7 +323,7 @@ export async function resultados(encuId: number): Promise<ResultadoPregunta[]> {
                            SELECT json_agg(x.texto)
                            FROM (SELECT COALESCE(
                                             r3.encurespu_texto,
-                                            to_char(r3.encurespu_fecha, 'DD/MM/YYYY'),
+                                            ${textoEc('r3.encurespu_fecha', 'DD/MM/YYYY')},
                                             to_char(r3.encurespu_hora::time, 'HH24:MI')
                                         ) AS texto
                                    FROM public.encuesta_respuesta r3

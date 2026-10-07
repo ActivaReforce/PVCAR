@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { DialogFooter } from '@/components/ui/dialog';
 import type { UsuarioDetalle } from '@/api/usuarios';
+import { fechaDia } from '@/lib/fecha';
 
 interface UserDetailProps {
   user: UsuarioDetalle;
@@ -26,8 +27,7 @@ const UserDetail = ({ user, onClose }: UserDetailProps) => {
     .toUpperCase()
     .slice(0, 2);
 
-  const fecha = (valor: string | null) =>
-    valor ? new Date(valor).toLocaleDateString() : '—';
+  const fecha = fechaDia;
 
   return (
     <div className="space-y-6">

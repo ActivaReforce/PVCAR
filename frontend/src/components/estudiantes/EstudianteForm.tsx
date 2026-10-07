@@ -27,6 +27,7 @@ import type {
   ModalidadSalida,
   PermisosImagen,
 } from '@/api/estudiantes';
+import { hoyEc } from '@/lib/fecha';
 
 interface Props {
   estudiante?: EstudianteDetalle | null;
@@ -255,7 +256,7 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
               <Input
                 id="nacimiento"
                 type="date"
-                max={new Date().toISOString().slice(0, 10)}
+                max={hoyEc()}
                 value={nacimiento}
                 onChange={(ev) => setNacimiento(ev.target.value)}
                 className="h-11 sm:h-10"

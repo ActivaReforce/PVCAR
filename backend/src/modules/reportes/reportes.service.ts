@@ -15,6 +15,7 @@ import {
 } from './reportes.definiciones.js';
 import { GRAFICAS, type DefinicionGrafica, type FormaGrafica, type SerieGrafica } from './reportes.analisis.js';
 import type { ConsultaQuery, FiltrosQuery } from './reportes.schemas.js';
+import { ahoraEc, hoyEc } from '../../lib/fecha.js';
 
 /**
  * Reportes.
@@ -241,7 +242,7 @@ export async function exportar(
 
   const lineas: Array<[string, string]> = [
     ['Reporte', definicion.titulo],
-    ['Generado', new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'],
+    ['Generado', `${ahoraEc()} (hora de Ecuador)`],
     ['Generado por', actor.usuario.usu_nombre],
     ['Filas', String(rows.length)],
     ['Texto buscado', filtros.buscar ?? '—'],
@@ -287,7 +288,7 @@ export async function exportar(
     });
   }
 
-  const sello = new Date().toISOString().slice(0, 10);
+  const sello = hoyEc();
   return { nombreArchivo: `${definicion.id}-${sello}.xlsx`, filas: rows.length };
 }
 

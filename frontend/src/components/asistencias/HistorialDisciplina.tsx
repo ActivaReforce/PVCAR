@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useHistorialAsistencias } from '@/hooks/useAsistencias';
+import { haceDiasEc, hoyEc } from '@/lib/fecha';
 
 interface Props {
   disciplina: number;
@@ -11,13 +12,8 @@ interface Props {
   onAbrirFecha: (fecha: string) => void;
 }
 
-const hace = (dias: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() - dias);
-  return d.toISOString().slice(0, 10);
-};
-
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hace = haceDiasEc;
+const hoy = hoyEc;
 
 const conDia = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString('es-EC', {

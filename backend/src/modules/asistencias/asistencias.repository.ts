@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
 import { ESTADO } from '../../lib/constants.js';
 import { horarioTexto, horariosJson, tieneDia, type HorarioDisciplina } from '../../lib/horarios.js';
+import { diaEc, textoEc } from '../../lib/fecha.js';
 
 /**
  * Consultas de Asistencias.
@@ -97,7 +98,7 @@ export async function listarEstados(): Promise<EstadoAsistencia[]> {
  */
 export async function horaDeEcuador(): Promise<string> {
   const { rows } = await getPool().query<{ hora: string }>(
-    `SELECT to_char(now() AT TIME ZONE 'America/Guayaquil', 'HH24:MI') AS hora`,
+    `SELECT ${textoEc('now()', 'HH24:MI')} AS hora`,
   );
   return rows[0]?.hora ?? '00:00';
 }
@@ -105,7 +106,7 @@ export async function horaDeEcuador(): Promise<string> {
 /** La fecha de hoy en Ecuador, para que el front no proponga la del navegador. */
 export async function hoyEnEcuador(): Promise<string> {
   const { rows } = await getPool().query<{ hoy: string }>(
-    `SELECT to_char(now() AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD') AS hoy`,
+    `SELECT ${textoEc('now()', 'YYYY-MM-DD')} AS hoy`,
   );
   return rows[0]?.hoy ?? '';
 }
@@ -148,8 +149,8 @@ export async function obtenerSesion(colacthorId: number): Promise<Sesion | null>
  * baja). Por eso la condicion sirve para el pasado y para el presente.
  */
 const VIGENTE_A_FECHA = `
-    na.ninoasig_fecha_inscripcion::date <= $2::date
-    AND (na.est_id = ${ESTADO.ACTIVO} OR na.ninoasig_fecha_baja::date >= $2::date)
+    ${diaEc('na.ninoasig_fecha_inscripcion')} <= $2::date
+    AND (na.est_id = ${ESTADO.ACTIVO} OR ${diaEc('na.ninoasig_fecha_baja')} >= $2::date)
 `;
 
 export async function listarAlumnosDeSesion(

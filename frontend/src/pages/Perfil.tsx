@@ -1,7 +1,5 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Baby, CalendarDays, Mail, Phone, School, Settings, UserCog, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -9,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import ConfiguracionPerfil from "@/components/perfil/ConfiguracionPerfil";
 import { useAuth } from "@/contexts/AuthContext";
 import { perfilApi } from "@/api/perfil";
+import { ZONA } from "@/lib/fecha";
 
 const fecha = (iso?: string | null) => {
   if (!iso) return "—";
   try {
-    return format(new Date(iso), "d 'de' MMMM 'de' yyyy", { locale: es });
+    return new Intl.DateTimeFormat("es-EC", { dateStyle: "long", timeZone: ZONA }).format(new Date(iso));
   } catch {
     return "—";
   }

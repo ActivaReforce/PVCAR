@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import MenuAcciones from '@/components/ui/menu-acciones';
 import type { UsuarioListado } from '@/api/usuarios';
+import { fechaDia } from '@/lib/fecha';
 
 /**
  * Lista de usuarios.
@@ -237,9 +238,7 @@ const UserTable = ({
                 {/* La fecha de creacion solo desde md: en 360 px se comia una
                     linea entera para un dato que casi nunca se mira. */}
                 <div className="hidden text-sm text-muted-foreground md:block">
-                  {user.usu_fecha_creacion
-                    ? new Date(user.usu_fecha_creacion).toLocaleDateString()
-                    : '—'}
+                  {fechaDia(user.usu_fecha_creacion)}
                 </div>
 
                 {/* Acciones: las mismas y con los mismos permisos en los dos

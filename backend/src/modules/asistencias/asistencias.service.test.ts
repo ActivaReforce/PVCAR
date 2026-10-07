@@ -46,10 +46,10 @@ const query = vi.fn(async (sql: string, _parametros?: unknown[]) => {
   if (sql.includes('WITH col_coordinador')) {
     return { rows: [{ colegios: [14], disciplinas: [135] }] };
   }
-  if (sql.includes("'HH24:MI'") && sql.includes('America/Guayaquil')) {
+  if (sql.includes('AS hora') && sql.includes('now() AT TIME ZONE')) {
     return { rows: [{ hora: '16:35' }] };
   }
-  if (sql.includes("'YYYY-MM-DD'") && sql.includes('America/Guayaquil')) {
+  if (sql.includes('AS hoy') && sql.includes('now() AT TIME ZONE')) {
     return { rows: [{ hoy: '2026-07-16' }] };
   }
   if (sql.includes('FROM public.colegio_actividad_horario cah')) {

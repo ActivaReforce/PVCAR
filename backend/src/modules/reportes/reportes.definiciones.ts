@@ -1,6 +1,7 @@
 import { ESTADO } from '../../lib/constants.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
+import { HOY_EC, textoEc } from '../../lib/fecha.js';
 
 /**
  * El catálogo de reportes.
@@ -134,7 +135,7 @@ const usuarios: Definicion = {
                          JOIN public.rol r ON r.rol_id = ur.rol_id
                         WHERE ur.usu_id = u.usu_id), 'Sin rol') AS roles,
              e.est_nombre                                       AS estado,
-             to_char(u.usu_fecha_creacion, 'DD/MM/YYYY')        AS usu_fecha_creacion
+             ${textoEc('u.usu_fecha_creacion', 'DD/MM/YYYY')}        AS usu_fecha_creacion
         FROM public.usuario u
         JOIN public.estado e ON e.est_id = u.est_id
        WHERE ($1::boolean OR u.usu_id IN (SELECT usu_id FROM visibles) OR u.usu_id = $3)
@@ -353,7 +354,7 @@ const estudiantes: Definicion = {
       SELECT n.nino_id,
              n.nino_nombre,
              COALESCE(to_char(n.nino_fecha_nacimiento, 'YYYY-MM-DD'), '') AS nino_fecha_nacimiento,
-             date_part('year', age(CURRENT_DATE, n.nino_fecha_nacimiento))::int AS nino_edad,
+             date_part('year', age(${HOY_EC}, n.nino_fecha_nacimiento))::int AS nino_edad,
              c.col_nombre,
              COALESCE(g.catninograd_nombre, '')                    AS catninograd_nombre,
              CASE n.nino_modalidad_salida WHEN 'escolar' THEN 'Transporte escolar'
@@ -372,7 +373,7 @@ const estudiantes: Definicion = {
                          JOIN public.usuario u ON u.usu_id = p.usu_id
                         WHERE np.nino_id = n.nino_id), '')          AS representantes,
              COALESCE(n.nino_info_salud, '')                        AS nino_info_salud,
-             to_char(n.nino_fecha_creacion, 'DD/MM/YYYY')           AS nino_fecha_creacion
+             ${textoEc('n.nino_fecha_creacion', 'DD/MM/YYYY')}           AS nino_fecha_creacion
         FROM public.nino n
         JOIN public.colegio c ON c.col_id = n.col_id
         JOIN public.estado e  ON e.est_id = n.est_id
@@ -576,7 +577,7 @@ const evaluaciones: Definicion = {
              CASE WHEN e.eva_puntaje_total > 0
                   THEN round(COALESCE(p.puntaje, 0) * 100 / e.eva_puntaje_total)::int
                   ELSE 0 END                          AS porcentaje,
-             COALESCE(to_char(np.evaninopen_fecha_finalizacion, 'DD/MM/YYYY'), '') AS finalizacion,
+             COALESCE(${textoEc('np.evaninopen_fecha_finalizacion', 'DD/MM/YYYY')}, '') AS finalizacion,
              COALESCE(reg.usu_nombre, '')             AS evaluado_por
         FROM public.evaluacion_nino_pendiente np
         JOIN public.evaluacion e ON e.eva_id = np.eva_id
