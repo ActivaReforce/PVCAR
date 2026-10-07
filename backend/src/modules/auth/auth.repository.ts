@@ -32,6 +32,11 @@ export interface UsuarioConRoles {
   est_id: number;
   roles: Rol[];
   permisos: Permiso[];
+  /**
+   * Solo auxiliares con varios titulares: de quien quiere ver ahora (cabecera
+   * `X-Titular`). Nulo = de todos. No sale de la base: lo pone requireAuth.
+   */
+  titularElegido?: number | null;
 }
 
 /**

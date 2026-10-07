@@ -19,6 +19,16 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600",
         ghost: "hover:bg-accent hover:text-accent-foreground dark:gray-400 dark:hover:bg-gray-700 dark:hover:text-white",
         link: "text-primary underline-offset-4 hover:underline dark:text-blue-400 dark:hover:text-blue-300",
+        /**
+         * Rojo de Activa Reforce. Existe como variante y no como className
+         * suelto por un motivo concreto: la variante `default` trae
+         * `dark:bg-primary dark:text-black`, y en el tema oscuro --primary es
+         * casi blanco. Al escribir `className="bg-[#FD5757] text-white"`,
+         * tailwind-merge quita el `bg-primary` sin modificador pero NO el
+         * `dark:bg-primary`, asi que en oscuro el boton salia blanco con
+         * texto blanco: invisible. Le pasaba al de "Subir Foto".
+         */
+        brand: "bg-[#FD5757] text-white hover:bg-[#E04747] dark:bg-[#FD5757] dark:text-white dark:hover:bg-[#E04747]",
       },
       size: {
         default: "h-10 px-4 py-2",

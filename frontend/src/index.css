@@ -43,6 +43,30 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* ---------------------------------------------------------------
+       Gráficas. Roles, no colores sueltos: el modo oscuro los redefine
+       abajo y las gráficas no saben en qué tema están.
+
+       Los valores salen de la paleta de referencia de dataviz y están
+       VALIDADOS con su script contra estas superficies (#ffffff en claro,
+       #24272e en oscuro), no elegidos a ojo. El porqué de cada uno está en
+       components/graficas/paleta.ts.
+       --------------------------------------------------------------- */
+    --graf-superficie: #ffffff;
+    --graf-serie-1: #2a78d6;
+    --graf-serie-2: #eb6834;
+    --graf-serie-3: #1baf7a;
+
+    /* Escala ordenada de asistencia: divergente azul↔rojo con gris neutro. */
+    --graf-presente: #1c5cab;
+    --graf-tarde: #86b6ef;
+    --graf-justificado: #8a8a85;
+    --graf-ausente: #d03b3b;
+
+    --graf-rejilla: #e1e0d9;
+    --graf-eje: #c3c2b7;
+    --graf-tinta: #898781;
   }
 
   .dark {
@@ -83,6 +107,21 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 220 13% 20%;
     --sidebar-ring: 0 84% 65%;
+
+    --graf-superficie: #24272e;
+    --graf-serie-1: #3987e5;
+    --graf-serie-2: #d95926;
+    --graf-serie-3: #199e70;
+
+    --graf-presente: #9ec5f4;
+    --graf-tarde: #2a78d6;
+    --graf-justificado: #8a8a85;
+    --graf-ausente: #d03b3b;
+
+    --graf-rejilla: #2c2c2a;
+    --graf-eje: #383835;
+    --graf-tinta: #898781;
+
   }
 }
 

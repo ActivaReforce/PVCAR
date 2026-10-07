@@ -7,6 +7,7 @@ interface BasicUserFieldsProps {
     usu_nombre: string;
     usu_correo: string;
     usu_telefono: string;
+    usu_cedula: string;
     usu_contrasena: string;
   };
   isEditMode: boolean;
@@ -43,6 +44,16 @@ const BasicUserFields = ({ formData, isEditMode, onInputChange }: BasicUserField
           id="usu_telefono"
           value={formData.usu_telefono}
           onChange={(e) => onInputChange("usu_telefono", e.target.value)}
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="usu_cedula">Cédula o pasaporte</Label>
+        <Input
+          id="usu_cedula"
+          value={formData.usu_cedula}
+          onChange={(e) => onInputChange("usu_cedula", e.target.value)}
+          maxLength={20}
         />
       </div>
 

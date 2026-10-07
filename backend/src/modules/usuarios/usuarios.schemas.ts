@@ -1,0 +1,159 @@
+import { z } from 'zod';
+import { paginacionSchema } from '../../lib/paginacion.js';
+
+/**
+ * Validacion de entrada del modulo de usuarios.
+ * Regla del plan: ningun endpoint sin zod y sin chequeo de permisos.
+ */
+
+const nombre = z.string().trim().min(3, 'El nombre debe tener al menos 3 caracteres').max(120);
+
+/**
+ * El correo se normaliza aqui, no en la consulta: la tabla tiene un indice
+ * unico sobre lower(trim(usu_correo)) y Supabase Auth guarda el correo en
+ * minusculas. Sin normalizar, 'Juan@x.com' crearia un choque que solo
+ * aparece al hacer el insert.
+ */
+const correo = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email('Correo invalido')
+  .max(160);
+
+const telefono = z
+  .string()
+  .trim()
+  .max(30)
+  .regex(/^[0-9+()\s-]*$/, 'El telefono solo admite numeros y los signos + ( ) -')
+  .optional()
+  .or(z.literal(''));
+
+/**
+ * 8 caracteres minimo. El sistema viejo no exigia nada y quedaron 7 cuentas
+ * con contrasenas de 4 a 6 caracteres (Anexo A); esas se arrastran, pero las
+ * nuevas no nacen asi.
+ */
+const password = z.string().min(8, 'La contrasena debe tener al menos 8 caracteres').max(72);
+
+const roles = z
+  .array(z.number().int().positive())
+  .min(1, 'Debe seleccionar al menos un rol')
+  .max(7)
+  .refine((r) => new Set(r).size === r.length, 'Hay roles repetidos');
+
+/**
+ * Cedula o pasaporte, de cualquier rol (antes era solo del entrenador). Unica
+ * en la base desde la migracion 0014; en mayusculas porque un pasaporte lleva
+ * letras.
+ */
+const cedula = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .max(20)
+  .regex(/^[0-9A-Z-]*$/, 'La cedula solo admite numeros, letras y guiones')
+  .optional()
+  .or(z.literal(''));
+
+/** Ruta del objeto en el bucket usufoto. null borra la foto actual. */
+const foto = z.string().trim().max(255).nullable().optional();
+
+/**
+ * `rol` admite varios separados por coma (?rol=2,3): la pantalla vieja deja
+ * marcar varios roles a la vez y se mantiene. Vacio = sin filtro.
+ */
+const rolesFiltro = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .transform((valor) => {
+    if (valor === undefined) return undefined;
+    const texto = Array.isArray(valor) ? valor.join(',') : valor;
+    const ids = texto
+      .split(',')
+      .map((t) => Number(t.trim()))
+      .filter((n) => Number.isInteger(n) && n > 0);
+    return ids.length > 0 ? ids : undefined;
+  });
+
+/**
+ * Filtro "sin rol". Existe porque los usuarios sin ningun rol no aparecian en
+ * ninguna tarjeta y la suma no cuadraba con el total: en los datos reales hay
+ * dos (inactivos, sin cuenta de acceso). Dejarlos invisibles era peor que
+ * ensenarlos.
+ *
+ * No se usa z.coerce.boolean(): convierte la cadena 'false' en true.
+ */
+const banderaFiltro = z
+  .enum(['true', 'false', '1', '0'])
+  .optional()
+  .transform((v) => v === 'true' || v === '1');
+
+export const listarUsuariosSchema = paginacionSchema.extend({
+  buscar: z.string().trim().max(120).optional(),
+  rol: rolesFiltro,
+  sinRol: banderaFiltro,
+  estado: z.coerce.number().int().positive().optional(),
+  orden: z.enum(['nombre', 'correo', 'creacion', 'estado']).optional(),
+  dir: z.enum(['asc', 'desc']).optional(),
+});
+
+export type ListarUsuariosQuery = z.infer<typeof listarUsuariosSchema>;
+
+export const crearUsuarioSchema = z.object({
+  usu_nombre: nombre,
+  usu_correo: correo,
+  usu_telefono: telefono,
+  password,
+  roles,
+  usu_cedula: cedula,
+  usu_foto: foto,
+});
+
+export type CrearUsuarioInput = z.infer<typeof crearUsuarioSchema>;
+
+/**
+ * En la edicion todo es opcional menos lo que se manda. `roles` ausente
+ * significa "no toques los roles"; `roles: []` no existe, lo rechaza el min(1).
+ */
+export const actualizarUsuarioSchema = z
+  .object({
+    usu_nombre: nombre.optional(),
+    usu_correo: correo.optional(),
+    usu_telefono: telefono,
+    password: password.optional(),
+    roles: roles.optional(),
+    usu_cedula: cedula,
+    usu_foto: foto,
+  })
+  .refine((v) => Object.keys(v).length > 0, 'No hay nada que actualizar');
+
+export type ActualizarUsuarioInput = z.infer<typeof actualizarUsuarioSchema>;
+
+/**
+ * Reactivar.
+ *
+ * `password` solo hace falta cuando el usuario no tiene cuenta de Supabase
+ * Auth. Pasa con los 23 inactivos que trae la carga: el backfill solo creo
+ * cuentas para los activos, porque una cuenta que nadie usa es una cuenta de
+ * mas. Al reactivarlo hay que creársela, y el CHECK del baseline
+ * —`est_id <> 1 OR auth_user_id IS NOT NULL`— no admite lo contrario.
+ */
+export const reactivarUsuarioSchema = z.object({
+  password: password.optional(),
+});
+
+export type ReactivarUsuarioInput = z.infer<typeof reactivarUsuarioSchema>;
+
+/**
+ * Borrado permanente. El cliente pidio (2026-08-07) que confirmar no sea un
+ * clic: hay que escribir el nombre exacto. La comparacion se hace en el
+ * servidor, porque si vive en el modal se la salta cualquiera.
+ */
+export const eliminarUsuarioSchema = z.object({
+  confirmacion: z.string().trim().min(1, 'Escribe el nombre del usuario para confirmar'),
+});
+
+export const idParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});

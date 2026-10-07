@@ -2,7 +2,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 
 export const usePermissions = () => {
-  const { hasPermission, permissionMap } = useAuth();
+  const { hasPermission } = useAuth();
   
   return {
     canView: (modulo: string) => hasPermission(modulo, 'ver'),

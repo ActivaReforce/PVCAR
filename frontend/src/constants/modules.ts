@@ -12,8 +12,12 @@ export const MODULES = [
   'asistencias_entrenadores',
   'encuestas',
   'reportes',
+  // Existe en los datos reales de rol_permiso aunque el sistema viejo no lo
+  // declaraba aqui: sin el, la matriz de Permisos lo pintaba sin nombre.
+  'reporte_estudiante',
   'perfil',
   'permisos',
+  'inscripciones',
 ] as const;
 
 export type Module = typeof MODULES[number];
@@ -31,8 +35,10 @@ export const MODULE_LABELS: Record<Module, string> = {
   asistencias_entrenadores: 'Asistencias Entrenadores',
   encuestas: 'Encuestas',
   reportes: 'Reportes',
+  reporte_estudiante: 'Reporte del Estudiante',
   perfil: 'Perfil',
   permisos: 'Permisos',
+  inscripciones: 'Inscripciones',
 };
 
 // Helper to map a pathname to a module key
@@ -52,5 +58,6 @@ export const pathToModule = (pathname: string): Module | null => {
   if (pathname.startsWith('/reportes')) return 'reportes';
   if (pathname.startsWith('/perfil')) return 'perfil';
   if (pathname.startsWith('/permisos')) return 'permisos';
+  if (pathname.startsWith('/inscripciones')) return 'inscripciones';
   return null;
 };

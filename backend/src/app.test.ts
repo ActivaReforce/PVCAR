@@ -123,6 +123,201 @@ describe('Autenticacion — puertas que no dependen de la red', () => {
   });
 });
 
+/**
+ * Modulo de la Fase 6. Igual que arriba: solo lo que se decide antes de tocar
+ * la base. Que ninguna de estas rutas conteste sin token es la mitad del
+ * arreglo — en el sistema viejo la pantalla de usuarios consultaba la tabla
+ * entera con la anon key del bundle.
+ */
+describe('Modulos de negocio — cerrados sin token', () => {
+  const rutas: Array<[string, string]> = [
+    ['GET', '/api/v1/usuarios'],
+    ['GET', '/api/v1/usuarios/roles'],
+    ['GET', '/api/v1/usuarios/1'],
+    ['GET', '/api/v1/usuarios/1/impacto'],
+    ['POST', '/api/v1/usuarios'],
+    ['POST', '/api/v1/usuarios/foto'],
+    ['PATCH', '/api/v1/usuarios/1'],
+    ['POST', '/api/v1/usuarios/1/baja'],
+    ['POST', '/api/v1/usuarios/1/reactivar'],
+    ['DELETE', '/api/v1/usuarios/1'],
+    ['GET', '/api/v1/colegios'],
+    ['GET', '/api/v1/colegios/coordinadores'],
+    ['GET', '/api/v1/colegios/1'],
+    ['GET', '/api/v1/colegios/1/impacto'],
+    ['POST', '/api/v1/colegios'],
+    ['POST', '/api/v1/colegios/foto'],
+    ['PATCH', '/api/v1/colegios/1'],
+    ['PUT', '/api/v1/colegios/1/coordinadores'],
+    ['DELETE', '/api/v1/colegios/1'],
+    ['GET', '/api/v1/actividades'],
+    ['GET', '/api/v1/actividades/categorias'],
+    ['GET', '/api/v1/actividades/1'],
+    ['POST', '/api/v1/actividades'],
+    ['PATCH', '/api/v1/actividades/1'],
+    ['DELETE', '/api/v1/actividades/1'],
+    ['GET', '/api/v1/disciplinas'],
+    ['GET', '/api/v1/disciplinas/dias'],
+    ['GET', '/api/v1/disciplinas/1'],
+    ['GET', '/api/v1/disciplinas/1/previo-baja'],
+    ['GET', '/api/v1/disciplinas/1/impacto'],
+    ['POST', '/api/v1/disciplinas'],
+    ['PATCH', '/api/v1/disciplinas/1'],
+    ['POST', '/api/v1/disciplinas/1/baja'],
+    ['POST', '/api/v1/disciplinas/1/reactivar'],
+    ['DELETE', '/api/v1/disciplinas/1'],
+    ['GET', '/api/v1/entrenadores'],
+    ['GET', '/api/v1/entrenadores/candidatos-auxiliar'],
+    ['GET', '/api/v1/entrenadores/1'],
+    ['GET', '/api/v1/entrenadores/1/disponibles'],
+    ['POST', '/api/v1/entrenadores/1/asignaciones'],
+    ['DELETE', '/api/v1/entrenadores/1/asignaciones/2'],
+    ['POST', '/api/v1/entrenadores/1/auxiliares'],
+    ['DELETE', '/api/v1/entrenadores/1/auxiliares/2'],
+    ['GET', '/api/v1/estudiantes'],
+    ['GET', '/api/v1/estudiantes/grados'],
+    ['GET', '/api/v1/estudiantes/candidatos-representante'],
+    ['POST', '/api/v1/estudiantes/foto'],
+    ['GET', '/api/v1/estudiantes/1'],
+    ['GET', '/api/v1/estudiantes/1/disponibles'],
+    ['GET', '/api/v1/estudiantes/1/impacto'],
+    ['POST', '/api/v1/estudiantes'],
+    ['PATCH', '/api/v1/estudiantes/1'],
+    ['PUT', '/api/v1/estudiantes/1/inscripciones'],
+    ['POST', '/api/v1/estudiantes/1/baja'],
+    ['POST', '/api/v1/estudiantes/1/reactivar'],
+    ['DELETE', '/api/v1/estudiantes/1'],
+    ['POST', '/api/v1/estudiantes/1/representantes'],
+    ['DELETE', '/api/v1/estudiantes/1/representantes/2'],
+    ['GET', '/api/v1/asistencias/estados'],
+    ['GET', '/api/v1/asistencias/contexto'],
+    ['GET', '/api/v1/asistencias/alumnos'],
+    ['PUT', '/api/v1/asistencias/alumnos'],
+    ['GET', '/api/v1/asistencias/historial'],
+    ['GET', '/api/v1/asistencias/entrenadores'],
+    ['PUT', '/api/v1/asistencias/entrenadores'],
+    ['GET', '/api/v1/evaluaciones'],
+    ['GET', '/api/v1/evaluaciones/metodos'],
+    ['GET', '/api/v1/evaluaciones/categorias'],
+    ['GET', '/api/v1/evaluaciones/pendientes'],
+    ['GET', '/api/v1/evaluaciones/pendientes/1'],
+    ['PUT', '/api/v1/evaluaciones/pendientes/1/intentos'],
+    ['DELETE', '/api/v1/evaluaciones/pendientes/1'],
+    ['GET', '/api/v1/evaluaciones/1'],
+    ['GET', '/api/v1/evaluaciones/1/disciplinas'],
+    ['GET', '/api/v1/evaluaciones/1/impacto'],
+    ['POST', '/api/v1/evaluaciones'],
+    ['PATCH', '/api/v1/evaluaciones/1'],
+    ['PUT', '/api/v1/evaluaciones/1/parametros'],
+    ['PUT', '/api/v1/evaluaciones/1/disciplinas'],
+    ['POST', '/api/v1/evaluaciones/1/baja'],
+    ['POST', '/api/v1/evaluaciones/1/reactivar'],
+    ['DELETE', '/api/v1/evaluaciones/1'],
+    ['GET', '/api/v1/tablero'],
+    ['GET', '/api/v1/reportes'],
+    ['GET', '/api/v1/reportes/usuarios'],
+    ['POST', '/api/v1/reportes/usuarios/export'],
+    ['GET', '/api/v1/historico/conjuntos'],
+    ['GET', '/api/v1/historico/opciones'],
+    ['GET', '/api/v1/historico/resumen'],
+    ['GET', '/api/v1/historico/conjuntos/alumnos'],
+    ['POST', '/api/v1/historico/conjuntos/alumnos/export'],
+    ['POST', '/api/v1/historico/export'],
+    ['GET', '/api/v1/representantes'],
+    ['GET', '/api/v1/representantes/1'],
+    ['GET', '/api/v1/representantes/1/disponibles'],
+    ['PUT', '/api/v1/representantes/1/hijos'],
+    ['PATCH', '/api/v1/representantes/1'],
+    ['GET', '/api/v1/encuestas'],
+    ['GET', '/api/v1/encuestas/tipos'],
+    ['GET', '/api/v1/encuestas/mias'],
+    ['GET', '/api/v1/encuestas/mias/1'],
+    ['POST', '/api/v1/encuestas/mias/1/responder'],
+    ['GET', '/api/v1/encuestas/1'],
+    ['GET', '/api/v1/encuestas/1/resultados'],
+    ['GET', '/api/v1/encuestas/1/impacto'],
+    ['POST', '/api/v1/encuestas'],
+    ['PATCH', '/api/v1/encuestas/1'],
+    ['PUT', '/api/v1/encuestas/1/preguntas'],
+    ['POST', '/api/v1/encuestas/1/finalizar'],
+    ['POST', '/api/v1/encuestas/1/borrador'],
+    ['POST', '/api/v1/encuestas/1/publicar'],
+    ['DELETE', '/api/v1/encuestas/1'],
+    ['GET', '/api/v1/permisos'],
+    ['PUT', '/api/v1/permisos/rol/1'],
+    ['GET', '/api/v1/perfil'],
+    ['PATCH', '/api/v1/perfil'],
+    ['POST', '/api/v1/perfil/foto'],
+    ['GET', '/api/v1/inscripciones'],
+    ['GET', '/api/v1/inscripciones/1'],
+    ['GET', '/api/v1/inscripciones/documentos'],
+    ['POST', '/api/v1/inscripciones/documentos'],
+    ['POST', '/api/v1/inscripciones/1/aprobar'],
+    ['DELETE', '/api/v1/inscripciones/1'],
+    ['POST', '/api/v1/inscripciones/documentos/1/publicar'],
+    ['POST', '/api/v1/inscripciones/documentos/1/ejemplo'],
+    ['DELETE', '/api/v1/inscripciones/documentos/1'],
+    ['GET', '/api/v1/inscripciones/precios'],
+    ['PUT', '/api/v1/inscripciones/precios/1'],
+    ['DELETE', '/api/v1/inscripciones/precios/1'],
+  ];
+
+  it.each(rutas)('%s %s responde 401 sin token', async (metodo, ruta) => {
+    const res = await fetch(`${base}${ruta}`, {
+      method: metodo,
+      headers: { 'Content-Type': 'application/json' },
+      body: metodo === 'GET' ? undefined : JSON.stringify({}),
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
+/**
+ * El formulario de inscripcion es la unica escritura publica del API. Un
+ * envio mal formado tiene que morir en la validacion, antes de tocar la base
+ * o Storage (que en las pruebas no existen: si llegara, seria un 500).
+ */
+describe('Inscripcion publica — validacion antes de tocar nada', () => {
+  it('POST /inscripcion sin las tres casillas responde 400', async () => {
+    const res = await fetch(`${base}/api/v1/inscripcion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        representante: {
+          nombre: 'Ana Pérez',
+          cedula: '1712345678',
+          correo: 'a@b.co',
+          telefono: '0991234567',
+        },
+        ninos: [],
+        documentos: { contrato: 1, terminos: 1, privacidad: 1 },
+        acepta: { contrato: true, terminos: false, privacidad: true },
+        comprobante: { mime: 'image/jpeg', base64: 'x' },
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('admite un cuerpo de mas de 1 MB (el comprobante viaja en base64)', async () => {
+    const res = await fetch(`${base}/api/v1/inscripcion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ relleno: 'A'.repeat(1_500_000) }),
+    });
+    // 400 de validacion, no 413 del limite general.
+    expect(res.status).toBe(400);
+  });
+
+  it('el resto del API sigue con el limite de 1 MB', async () => {
+    const res = await fetch(`${base}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ relleno: 'A'.repeat(1_500_000) }),
+    });
+    expect(res.status).toBe(413);
+  });
+});
+
 describe('404', () => {
   it('devuelve 404 con la forma { data, error } en una ruta inexistente', async () => {
     const res = await fetch(`${base}/api/v1/no-existe`);

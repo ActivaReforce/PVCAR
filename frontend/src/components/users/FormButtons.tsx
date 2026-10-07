@@ -13,7 +13,7 @@ const FormButtons = ({ onCancel, loading, isEditMode }: FormButtonsProps) => {
       <Button type="button" variant="outline" onClick={onCancel}>
         Cancelar
       </Button>
-      <Button type="submit" disabled={loading} className="bg-[#FD5757] hover:bg-[#E04747]">
+      <Button type="submit" variant="brand" disabled={loading}>
         {loading ? "Guardando..." : isEditMode ? "Actualizar" : "Crear"}
       </Button>
     </div>

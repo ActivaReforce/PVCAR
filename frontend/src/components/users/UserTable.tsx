@@ -1,68 +1,115 @@
+import { ArrowDown, ArrowUp, ArrowUpDown, Edit, Eye, RotateCcw, Trash2, UserX } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import MenuAcciones from '@/components/ui/menu-acciones';
+import type { UsuarioListado } from '@/api/usuarios';
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Eye, Edit, UserX, RotateCcw, Trash2 } from "lucide-react";
-import { Database } from "@/integrations/supabase/types";
-import { SortDirection } from "@/hooks/useSorting";
-import { ConditionalAction } from "@/components/ui/conditional-actions";
-import { useIsMobile } from "@/hooks/use-mobile";
-import UserActionMenu from "./UserActionMenu";
-
-type Usuario = Database['public']['Tables']['usuario']['Row'];
-type Rol = Database['public']['Tables']['rol']['Row'];
-
-interface UserWithRoles extends Usuario {
-  user_roles: Array<{ rol_id: number }>;
-}
+/**
+ * Lista de usuarios.
+ *
+ * Un solo markup para movil y escritorio.
+ *
+ * Antes eran dos ramas (`if (isMobile) return ...`) y la de movil se habia
+ * quedado atras: no mostraba ni los roles ni el estado, no se podia ordenar, y
+ * — lo serio — pasaba canEdit/canDelete en `true` fijo, asi que en el telefono
+ * aparecian acciones que el servidor iba a rechazar con un 403. Es la misma
+ * trampa que ya costo una tanda de arreglos en esta fase: dos copias del mismo
+ * markup divergen siempre.
+ *
+ * Ahora la fila es una rejilla: en pantalla ancha son columnas, en el telefono
+ * se apila como tarjeta. "Ver detalles" se queda a la vista porque es lo que
+ * se hace casi siempre; editar, dar de baja, reactivar y eliminar viven en el
+ * menu de ajustes de la fila, que ya filtra por permiso y separa lo
+ * destructivo. Area tactil de 44 px en los dos tamanos.
+ */
 
 interface UserTableProps {
-  users: UserWithRoles[];
-  roles: Rol[];
-  onView: (user: UserWithRoles) => void;
-  onEdit: (user: UserWithRoles) => void;
+  users: UsuarioListado[];
+  onView: (user: UsuarioListado) => void;
+  onEdit: (user: UsuarioListado) => void;
   onDelete: (userId: number) => void;
   onReactivate: (userId: number) => void;
   onPermanentDelete: (userId: number) => void;
-  sortKey?: keyof Usuario | string | null;
-  sortDirection?: SortDirection;
-  onSort?: (key: keyof Usuario | string) => void;
-  selectedRoles: number[];
-  statusFilter: 'active' | 'inactive' | 'all';
-  onRoleFilterChange: () => void;
+  sortKey?: string | null;
+  sortDirection?: 'asc' | 'desc' | null;
+  onSort?: (key: string) => void;
 }
 
-const UserTable = ({ 
-  users, 
-  roles, 
-  onView, 
-  onEdit, 
+/** Misma rejilla en la cabecera y en cada fila: si cambia, cambia en un sitio. */
+const REJILLA =
+  'grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.6fr)_7rem_7rem_11rem] md:items-center md:gap-4';
+
+const COLUMNAS_ORDENABLES = [
+  { clave: 'nombre', etiqueta: 'Usuario' },
+  { clave: 'estado', etiqueta: 'Estado' },
+  { clave: 'creacion', etiqueta: 'Creado' },
+] as const;
+
+function iniciales(nombre: string): string {
+  return nombre
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+const Cabecera = ({
+  clave,
+  children,
+  sortKey,
+  sortDirection,
+  onSort,
+  className,
+}: {
+  clave: string;
+  children: React.ReactNode;
+  sortKey?: string | null;
+  sortDirection?: 'asc' | 'desc' | null;
+  onSort?: (key: string) => void;
+  className?: string;
+}) => {
+  const activa = sortKey === clave;
+  const Icono = !activa ? ArrowUpDown : sortDirection === 'asc' ? ArrowUp : ArrowDown;
+
+  if (!onSort) {
+    return <div className={className}>{children}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(clave)}
+      className={`flex items-center gap-1 text-left font-medium hover:text-foreground ${
+        activa ? 'text-foreground' : ''
+      } ${className ?? ''}`}
+      aria-label={`Ordenar por ${String(children)}`}
+    >
+      {children}
+      <Icono className="h-3.5 w-3.5 flex-shrink-0" />
+    </button>
+  );
+};
+
+const UserTable = ({
+  users,
+  onView,
+  onEdit,
   onDelete,
   onReactivate,
   onPermanentDelete,
   sortKey,
   sortDirection,
   onSort,
-  selectedRoles,
-  statusFilter,
-  onRoleFilterChange
 }: UserTableProps) => {
-  const isMobile = useIsMobile();
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const getUserRoles = (user: UserWithRoles) => {
-    const userRoleIds = user.user_roles?.map(ur => ur.rol_id) || [];
-    return roles.filter(role => userRoleIds.includes(role.rol_id));
-  };
-
   if (users.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -72,167 +119,190 @@ const UserTable = ({
     );
   }
 
-  if (isMobile) {
-    return (
-      <div className="border rounded-lg overflow-hidden min-w-0 max-w-full">
-        <Table className="table-fixed w-full">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-2/3 min-w-0">Usuario</TableHead>
-              <TableHead className="w-1/3 min-w-0">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map((user) => {
-              const userRoles = getUserRoles(user);
-              
-              return (
-                <TableRow key={user.usu_id}>
-                  <TableCell className="min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarImage src={user.usu_foto || undefined} />
-                        <AvatarFallback>
-                          {getInitials(user.usu_nombre)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium truncate text-sm">{user.usu_nombre}</div>
-                        <div className="text-xs text-muted-foreground truncate">{user.usu_correo}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <UserActionMenu
-                      user={user}
-                      onView={onView}
-                      onEdit={onEdit}
-                      onDelete={(user) => onDelete(user.usu_id)}
-                      onReactivate={(user) => onReactivate(user.usu_id)}
-                      onPermanentDelete={(user) => onPermanentDelete(user.usu_id)}
-                      canEdit={true}
-                      canDelete={true}
-                    />
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  }
-
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[250px]">Usuario</TableHead>
-            <TableHead>Roles</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead className="w-[150px]">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+    <div className="space-y-3 min-w-0">
+      {/* Ordenar en el telefono: las cabeceras de columna no existen ahi, y
+          sin esto la lista solo se podia ordenar desde el escritorio. */}
+      {onSort && (
+        <div className="flex items-center gap-2 md:hidden">
+          <Select value={sortKey ?? 'nombre'} onValueChange={(valor) => onSort(valor)}>
+            <SelectTrigger className="h-11 flex-1 min-w-0">
+              <SelectValue placeholder="Ordenar por" />
+            </SelectTrigger>
+            <SelectContent>
+              {COLUMNAS_ORDENABLES.map(({ clave, etiqueta }) => (
+                <SelectItem key={clave} value={clave}>
+                  Ordenar por {etiqueta.toLowerCase()}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-11 flex-shrink-0"
+            onClick={() => onSort(sortKey ?? 'nombre')}
+            aria-label={sortDirection === 'asc' ? 'Orden ascendente' : 'Orden descendente'}
+            title={sortDirection === 'asc' ? 'Ascendente' : 'Descendente'}
+          >
+            {sortDirection === 'asc' ? (
+              <ArrowUp className="h-4 w-4" />
+            ) : (
+              <ArrowDown className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      )}
+
+      <div className="rounded-lg border overflow-hidden">
+        {/* Cabecera: solo desde md. En el telefono cada fila se lee sola. */}
+        <div
+          className={`${REJILLA} hidden md:grid bg-muted/50 px-4 py-2 text-sm text-muted-foreground`}
+        >
+          <Cabecera
+            clave="nombre"
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={onSort}
+          >
+            Usuario
+          </Cabecera>
+          <div className="font-medium">Roles</div>
+          <Cabecera
+            clave="estado"
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={onSort}
+          >
+            Estado
+          </Cabecera>
+          <Cabecera
+            clave="creacion"
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={onSort}
+          >
+            Creado
+          </Cabecera>
+          <div className="font-medium">Acciones</div>
+        </div>
+
+        <ul className="divide-y">
           {users.map((user) => {
-            const userRoles = getUserRoles(user);
-            
+            const activo = user.est_id === 1;
             return (
-              <TableRow key={user.usu_id}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.usu_foto || undefined} />
-                      <AvatarFallback>
-                        {getInitials(user.usu_nombre)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium">{user.usu_nombre}</div>
-                      <div className="text-sm text-muted-foreground">{user.usu_correo}</div>
+              <li key={user.usu_id} className={`${REJILLA} px-4 py-3`}>
+                {/* Identidad */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="h-10 w-10 flex-shrink-0">
+                    <AvatarImage src={user.usu_foto_url ?? undefined} alt="" />
+                    <AvatarFallback>{iniciales(user.usu_nombre)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <div className="font-medium truncate" title={user.usu_nombre}>
+                      {user.usu_nombre}
+                    </div>
+                    <div
+                      className="text-sm text-muted-foreground truncate"
+                      title={user.usu_correo}
+                    >
+                      {user.usu_correo}
                     </div>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {userRoles.map((role) => (
-                      <Badge key={role.rol_id} variant="outline" className="text-xs">
-                        {role.rol_titulo}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={user.est_id === 1 ? "default" : "secondary"}>
-                    {user.est_id === 1 ? "Activo" : "Inactivo"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onView(user)}
-                      title="Ver detalles"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    
-                    <ConditionalAction module="usuarios" action="editar">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onEdit(user)}
-                        title="Editar"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </ConditionalAction>
+                </div>
 
-                    {user.est_id === 1 ? (
-                      <ConditionalAction module="usuarios" action="eliminar">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onDelete(user.usu_id)}
-                          title="Desactivar"
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <UserX className="h-4 w-4" />
-                        </Button>
-                      </ConditionalAction>
+                {/* Roles y estado.
+                    En el telefono comparten una sola linea; desde md el
+                    `contents` disuelve este contenedor y cada uno vuelve a ser
+                    su columna de la rejilla. Un solo markup, sin copias. */}
+                <div className="flex min-w-0 flex-wrap items-center gap-2 md:contents">
+                  <div className="flex min-w-0 flex-wrap gap-1">
+                    {user.roles.length > 0 ? (
+                      user.roles.map((rol) => (
+                        <Badge key={rol.rol_id} variant="outline" className="text-xs max-w-full">
+                          <span className="truncate">{rol.rol_titulo}</span>
+                        </Badge>
+                      ))
                     ) : (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onReactivate(user.usu_id)}
-                          title="Reactivar"
-                          className="text-green-600 hover:text-green-700"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                        <ConditionalAction module="usuarios" action="eliminar">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onPermanentDelete(user.usu_id)}
-                            title="Eliminar permanentemente"
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </ConditionalAction>
-                      </>
+                      <span className="text-xs text-muted-foreground">Sin rol</span>
                     )}
                   </div>
-                </TableCell>
-              </TableRow>
+                  <div>
+                    <Badge variant={activo ? 'default' : 'secondary'}>
+                      {activo ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* La fecha de creacion solo desde md: en 360 px se comia una
+                    linea entera para un dato que casi nunca se mira. */}
+                <div className="hidden text-sm text-muted-foreground md:block">
+                  {user.usu_fecha_creacion
+                    ? new Date(user.usu_fecha_creacion).toLocaleDateString()
+                    : '—'}
+                </div>
+
+                {/* Acciones: las mismas y con los mismos permisos en los dos
+                    tamanos. 44 px de alto en el telefono, compactas en md. */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 md:h-9 md:w-9"
+                    onClick={() => onView(user)}
+                    title="Ver detalles"
+                    aria-label={`Ver detalles de ${user.usu_nombre}`}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+
+                  <MenuAcciones
+                    nombre={user.usu_nombre}
+                    acciones={[
+                      {
+                        etiqueta: 'Editar',
+                        icono: Edit,
+                        onSelect: () => onEdit(user),
+                        modulo: 'usuarios',
+                        accion: 'editar',
+                      },
+                      {
+                        /* Reactivar escribe: exige el mismo permiso que
+                           editar, que es lo que pide el backend. Antes no lo
+                           pedia. */
+                        etiqueta: 'Reactivar',
+                        icono: RotateCcw,
+                        onSelect: () => onReactivate(user.usu_id),
+                        modulo: 'usuarios',
+                        accion: 'editar',
+                        visible: !activo,
+                      },
+                      {
+                        etiqueta: 'Dar de baja',
+                        icono: UserX,
+                        onSelect: () => onDelete(user.usu_id),
+                        modulo: 'usuarios',
+                        accion: 'eliminar',
+                        destructivo: true,
+                        visible: activo,
+                      },
+                      {
+                        etiqueta: 'Eliminar',
+                        icono: Trash2,
+                        onSelect: () => onPermanentDelete(user.usu_id),
+                        modulo: 'usuarios',
+                        accion: 'eliminar',
+                        destructivo: true,
+                        visible: !activo,
+                      },
+                    ]}
+                  />
+                </div>
+              </li>
             );
           })}
-        </TableBody>
-      </Table>
+        </ul>
+      </div>
     </div>
   );
 };

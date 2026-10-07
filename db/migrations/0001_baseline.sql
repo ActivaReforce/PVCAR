@@ -4,7 +4,7 @@
 --
 -- Origen: Backup_bd/prod_schema_public_2026-07-27.sql (35 tablas).
 -- Curado a mano: se quitó el preámbulo de pg_dump, la propiedad de
--- objetos, los duplicados y el residuo del scaffold de Lovable.
+-- objetos, los duplicados y el residuo de la plantilla con que se generó la app original.
 --
 -- Orden de ejecución: PVCAR_Dev primero. Solo si sale limpio, PVCAR.
 -- Todo va en una transacción: si algo falla, no queda nada a medias.
@@ -878,7 +878,7 @@ CREATE INDEX idx_encurespu_encupreg_id ON public.encuesta_respuesta (encupreg_id
 -- 13. FUNCIONES
 --
 -- [FIX] handle_new_user() NO se replica. Insertaba en public.profiles,
--- una tabla que no existe en la base: es residuo del scaffold de Lovable.
+-- una tabla que no existe en la base: es residuo de la plantilla con que se generó la app original.
 -- Si quedó un trigger sobre auth.users invocándola, toda alta en Supabase
 -- Auth falla — justo lo que la Fase 5 necesita que funcione.
 --

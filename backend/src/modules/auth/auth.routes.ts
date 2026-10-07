@@ -1,5 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
+import { titularesDe } from '../../lib/alcance.js';
 import { readBearer, requireAuth } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
 import { changePasswordSchema, forgotPasswordSchema, loginSchema } from './auth.schemas.js';
@@ -125,4 +126,18 @@ meRouter.get('/me', requireAuth, (req: Request, res: Response, next: NextFunctio
     return;
   }
   res.json({ data: req.user.usuario, error: null });
+});
+
+/**
+ * GET /api/v1/me/titulares — los entrenadores a los que respalda (auxiliar).
+ * Con dos o mas, la pantalla ofrece el selector "de quien ver" + "Todos" y lo
+ * manda en la cabecera `X-Titular`.
+ */
+meRouter.get('/me/titulares', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) throw new ApiError(401, 'No autenticado');
+    res.json({ data: await titularesDe(req.user.usuario), error: null });
+  } catch (err) {
+    next(err);
+  }
 });

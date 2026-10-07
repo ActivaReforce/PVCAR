@@ -1,9 +1,24 @@
 import { supabase } from '@/integrations/supabase/client';
+import { titularElegido } from '@/lib/titular';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 if (!API_URL) {
   throw new Error('Falta VITE_API_URL. Revisa tu .env (ver .env.example).');
+}
+
+/**
+ * VITE_API_URL YA incluye el prefijo /api/v1 (asi esta sembrada en Vercel, en
+ * los dos ambientes). Las rutas que se le pasan a este cliente van sin el:
+ * '/usuarios', no '/api/v1/usuarios'.
+ *
+ * Duplicarlo costo una tanda de pruebas: la llamada salia a
+ * .../api/v1/api/v1/usuarios y el backend contestaba 404 "Recurso no
+ * encontrado", que parece que falta el endpoint y no que sobra el prefijo.
+ * Por si vuelve a pasar, aqui se quita.
+ */
+function normalizarRuta(path: string): string {
+  return path.startsWith('/api/v1/') ? path.slice('/api/v1'.length) : path;
 }
 
 /** Forma estandar de respuesta del backend: { data, error }. */
@@ -52,8 +67,11 @@ export async function apiFetch<T>(
   if (session?.access_token) {
     headers.set('Authorization', `Bearer ${session.access_token}`);
   }
+  // Auxiliar con varios titulares: de quién quiere ver (lib/titular.ts).
+  const titular = titularElegido();
+  if (titular !== null) headers.set('X-Titular', String(titular));
 
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  const res = await fetch(`${API_URL}${normalizarRuta(path)}`, { ...init, headers });
 
   if (res.status === 401 && signOutOn401) {
     await supabase.auth.signOut();
@@ -85,5 +103,66 @@ export const api = {
     apiFetch<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body?: unknown) =>
     apiFetch<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
-  delete: <T>(path: string) => apiFetch<T>(path, { method: 'DELETE' }),
+  /**
+   * DELETE con cuerpo: el borrado permanente manda el texto de confirmacion.
+   * No es lo mas ortodoxo del REST, pero la alternativa —mandarlo por la
+   * query string— lo dejaria escrito en los logs del servidor.
+   */
+  delete: <T>(path: string, body?: unknown) =>
+    apiFetch<T>(path, { method: 'DELETE', body: body ? JSON.stringify(body) : undefined }),
+
+  /**
+   * Descarga un archivo que genera el backend.
+   *
+   * No pasa por `apiFetch` porque la respuesta no es `{ data, error }`: es el
+   * binario. Lo que sí comparte es el token, y la comprobación de que lo que
+   * llegó **no** es un JSON de error disfrazado de descarga — sin eso el
+   * navegador guardaría un .xlsx que en realidad dice "403 Sin permiso".
+   */
+  descargar: async (path: string, body: unknown, nombrePorDefecto: string): Promise<void> => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (session?.access_token) {
+      headers.set('Authorization', `Bearer ${session.access_token}`);
+    }
+
+    const res = await fetch(`${API_URL}${normalizarRuta(path)}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body ?? {}),
+    });
+
+    if (!res.ok) {
+      let mensaje = `No se pudo generar el archivo (${res.status})`;
+      try {
+        const cuerpo = (await res.json()) as ApiResponse<unknown>;
+        if (cuerpo.error?.message) mensaje = cuerpo.error.message;
+      } catch {
+        // La respuesta no era JSON: se queda el mensaje generico.
+      }
+      throw new ApiError(res.status, mensaje);
+    }
+
+    const tipo = res.headers.get('content-type') ?? '';
+    if (tipo.includes('application/json')) {
+      throw new ApiError(500, 'El servidor devolvio un error en vez del archivo');
+    }
+
+    // El nombre lo manda el backend en Content-Disposition; si no, el de aqui.
+    const disposicion = res.headers.get('content-disposition') ?? '';
+    const encontrado = /filename="([^"]+)"/.exec(disposicion)?.[1];
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = encontrado ?? nombrePorDefecto;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(url);
+  },
 };

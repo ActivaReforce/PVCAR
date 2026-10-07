@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,8 +13,15 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { isDarkMode, toggleTheme } = useTheme();
+
+  /**
+   * A donde ir tras entrar: la pagina que se estaba pidiendo cuando saltó el
+   * login, si la hay. ProtectedRoute la deja en location.state.from.
+   */
+  const destino = (location.state as { from?: string } | null)?.from ?? '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +40,7 @@ const Login = () => {
           description: "Bienvenido a Activa Reforce",
           variant: "default"
         });
-        navigate("/dashboard");
+        navigate(destino, { replace: true });
       }
     } catch (error) {
       console.error("Login error:", error);

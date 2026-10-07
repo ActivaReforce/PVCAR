@@ -1,12 +1,11 @@
 
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Moon, Sun, Home, ArrowLeft } from "lucide-react";
 
 const NotFound = () => {
   const { isDarkMode, toggleTheme } = useTheme();
-  const navigate = useNavigate();
 
   const handleGoBack = () => {
     window.history.back();

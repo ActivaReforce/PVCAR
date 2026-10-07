@@ -1,5 +1,6 @@
 import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
+import { fallosDeProduccion } from './validacion.js';
 
 loadEnv();
 
@@ -15,6 +16,11 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().optional(),
 
   DATABASE_URL: z.string().optional(),
+
+  // Correo propio de la aplicacion (Resend). Opcionales: sin ellas, lo que
+  // manda correo sigue funcionando y avisa de que no salio.
+  RESEND_API_KEY: z.string().optional(),
+  CORREO_REMITENTE: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -40,6 +46,29 @@ export const allowedOrigins: string[] = env.FRONTEND_ORIGIN.split(',')
  */
 export const frontendBaseUrl: string =
   allowedOrigins[0] ?? 'http://localhost:5173';
+
+/**
+ * El guardia vive en `validacion.ts` porque este modulo hace `process.exit(1)`
+ * al importarse si falta una variable, y en CI no hay ninguna: una prueba que
+ * importara este archivo tumbaria el proceso entero antes de empezar.
+ */
+if (env.NODE_ENV === 'production') {
+  const fallos = fallosDeProduccion(
+    {
+      SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+      SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY,
+      DATABASE_URL: env.DATABASE_URL,
+    },
+    allowedOrigins,
+  );
+  if (fallos.length > 0) {
+    console.error('❌ Configuracion de produccion invalida:');
+    for (const fallo of fallos) {
+      console.error(`   - ${fallo}`);
+    }
+    process.exit(1);
+  }
+}
 
 /** Lanza si falta un secreto que un endpoint requiere en runtime. */
 export function requireSecret(

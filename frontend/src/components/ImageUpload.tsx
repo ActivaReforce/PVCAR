@@ -116,11 +116,7 @@ const ImageUpload = ({
           </button>
         </div>
       ) : (
-        <Button 
-          type="button"
-          onClick={triggerFileInput}
-          className="mb-3 bg-[#FD5757] hover:bg-[#E04747] text-white dark:text-white"
-        >
+        <Button type="button" variant="brand" onClick={triggerFileInput} className="mb-3">
           <Upload className="mr-2" size={18} />
           {buttonText}
         </Button>

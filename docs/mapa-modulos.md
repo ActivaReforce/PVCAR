@@ -48,6 +48,18 @@ Dos triggers escriben solos y hay que tenerlos presentes al diseñar la API:
 
 ---
 
+### Reglas de alcance vigentes (2026-10-05)
+
+| Rol | Llega a… | Por |
+|---|---|---|
+| Propietario, Admin | todo | `global` |
+| Coordinador | sus colegios y todo lo que cuelga de ellos | `colegios` (`colegio_coordinador`) |
+| Entrenador | solo sus disciplinas y sus inscritos | `disciplinas` (`entrenador_asignacion`) |
+| Asistente, Respaldo | las disciplinas de su(s) titular(es) | `disciplinas` (`entrenador_auxiliar`) |
+| Representante | solo sus hijos y las disciplinas de sus hijos | `ninos`, `disciplinasDeHijos` |
+
+Varios roles = unión. `colegios` **no** se deduce de las disciplinas (antes sí, y el entrenador veía el colegio entero). Encuestas (gestión) e Inscripciones no filtran por alcance: llevan guarda de personal.
+
 ## 3. Los módulos
 
 | Módulo | Ruta | Tablas que toca | Dónde vive la lógica |

@@ -1,408 +1,156 @@
-import { useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase/types";
-import { usePagination } from "@/hooks/usePagination";
-import { useSorting } from "@/hooks/useSorting";
-import { useCoachStatusUpdates } from "@/hooks/useCoachStatusUpdates";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import UserForm from "@/components/users/UserForm";
-import UserDetail from "@/components/users/UserDetail";
-import UsuariosHeader from "@/components/users/UsuariosHeader";
-import UsuariosSearch from "@/components/users/UsuariosSearch";
-import UsuariosFilters from "@/components/users/UsuariosFilters";
-import UsuariosContent from "@/components/users/UsuariosContent";
-import UserStatusFilters from "@/components/users/UserStatusFilters";
-import { UserDeactivationDialog } from "@/components/users/UserDeactivationDialog";
+import { useMemo, useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import UserForm from '@/components/users/UserForm';
+import UserDetail from '@/components/users/UserDetail';
+import UsuariosHeader from '@/components/users/UsuariosHeader';
+import RoleSelect from '@/components/users/RoleSelect';
+import { EstadoSelect } from '@/components/users/UserStatusFilters';
+import UserTable from '@/components/users/UserTable';
+import UserStatusFilters from '@/components/users/UserStatusFilters';
+import { UserDeactivationDialog } from '@/components/users/UserDeactivationDialog';
+import EliminarUsuarioDialog from '@/components/users/EliminarUsuarioDialog';
+import ReactivarUsuarioDialog from '@/components/users/ReactivarUsuarioDialog';
+import DebouncedSearchInput from '@/components/ui/debounced-search-input';
+import { DataPagination } from '@/components/ui/data-pagination';
+import { useDarDeBaja, useRoles, useUsuario, useUsuarios } from '@/hooks/useUsuarios';
+import type { FiltrosUsuarios, UsuarioListado } from '@/api/usuarios';
 
-type Usuario = Database['public']['Tables']['usuario']['Row'];
-type Rol = Database['public']['Tables']['rol']['Row'];
+const POR_PAGINA = 10;
 
-interface UserWithRoles extends Usuario {
-  user_roles: Array<{ rol_id: number }>;
-}
+type FiltroEstado = 'active' | 'inactive' | 'all';
 
-interface UserCounts {
-  active: number;
-  inactive: number;
-  total: number;
-}
+const EST_ID: Record<FiltroEstado, number | undefined> = {
+  active: 1,
+  inactive: 2,
+  all: undefined,
+};
 
+const CONTEOS_VACIOS = {
+  total: 0,
+  activos: 0,
+  inactivos: 0,
+  porRol: {} as Record<string, number>,
+  totalDelEstado: 0,
+  sinRol: 0,
+};
+
+/**
+ * Usuarios.
+ *
+ * Abre directamente en la lista, con Activos y todos los roles. La pantalla de
+ * tarjetas por rol que habia antes obligaba a un clic extra para llegar a lo
+ * que se hace siempre, y sus numeros vivian aparte de los de la tabla.
+ *
+ * Todo el trabajo pesado esta en el servidor: filtro, busqueda, orden,
+ * paginacion y conteos. Antes esta pantalla se traia la tabla `usuario`
+ * entera con sus roles anidados y filtraba, ordenaba, contaba y paginaba en
+ * el navegador — y lo hacia con la anon key, asi que el filtro por alcance
+ * era decorativo.
+ */
 const Usuarios = () => {
-  const [usuarios, setUsuarios] = useState<UserWithRoles[]>([]);
-  const [allUsuarios, setAllUsuarios] = useState<UserWithRoles[]>([]);
-  const [userCounts, setUserCounts] = useState<UserCounts>({ active: 0, inactive: 0, total: 0 });
-  const [roles, setRoles] = useState<Rol[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  // El input ya trae su propio debounce de 300 ms; no hace falta otro encima.
+  const [busqueda, setBusqueda] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
-  const [showForm, setShowForm] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  const [editingUser, setEditingUser] = useState<Usuario | null>(null);
-  const [viewingUser, setViewingUser] = useState<UserWithRoles | null>(null);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
-  const [showDeactivationDialog, setShowDeactivationDialog] = useState(false);
-  const [userToDeactivate, setUserToDeactivate] = useState<UserWithRoles | null>(null);
-  const { toast } = useToast();
-  const { updateCoachStatus } = useCoachStatusUpdates();
+  const [sinRolSeleccionado, setSinRolSeleccionado] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<FiltroEstado>('active');
+  const [orden, setOrden] = useState<FiltrosUsuarios['orden']>('nombre');
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc');
 
-  // Calculate user counts from all users
-  const calculateUserCounts = (users: UserWithRoles[]): UserCounts => {
-    const active = users.filter(u => u.est_id === 1).length;
-    const inactive = users.filter(u => u.est_id === 2).length;
-    const total = users.length;
-    return { active, inactive, total };
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [creando, setCreando] = useState(false);
+  const [viendoId, setViendoId] = useState<number | null>(null);
+  const [aDarDeBaja, setADarDeBaja] = useState<UsuarioListado | null>(null);
+  const [aEliminar, setAEliminar] = useState<UsuarioListado | null>(null);
+  const [aReactivar, setAReactivar] = useState<UsuarioListado | null>(null);
+
+  const filtros: FiltrosUsuarios = {
+    page,
+    limit: POR_PAGINA,
+    buscar: busqueda || undefined,
+    rol: selectedRoles.length > 0 ? selectedRoles : undefined,
+    sinRol: sinRolSeleccionado || undefined,
+    estado: EST_ID[statusFilter],
+    orden,
+    dir,
   };
 
-  // Load users and roles
-  useEffect(() => {
-    loadData();
-  }, []);
+  const lista = useUsuarios(filtros);
+  const rolesQuery = useRoles();
+  const fichaEdicion = useUsuario(editandoId);
+  const fichaDetalle = useUsuario(viendoId);
 
-  // Filter displayed users when statusFilter changes
-  useEffect(() => {
-    filterUsers();
-  }, [statusFilter, allUsuarios]);
+  const darDeBaja = useDarDeBaja();
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
+  const roles = useMemo(() => rolesQuery.data ?? [], [rolesQuery.data]);
+  const usuarios = lista.data?.items ?? [];
+  const conteos = lista.data?.conteos ?? CONTEOS_VACIOS;
+  const totalPages = lista.data?.totalPages ?? 0;
+  const totalItems = lista.data?.total ?? 0;
 
-      // Load all users regardless of status
-      const { data: usuariosData, error: usuariosError } = await supabase
-        .from('usuario')
-        .select(`
-          *,
-          user_roles:usuario_rol(rol_id)
-        `)
-        .order('usu_fecha_creacion', { ascending: false });
-      
-      if (usuariosError) throw usuariosError;
-
-      // Load roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('rol')
-        .select('*')
-        .order('rol_nombre', { ascending: true });
-      
-      if (rolesError) throw rolesError;
-
-      const allUsers = usuariosData || [];
-      setAllUsuarios(allUsers);
-      setRoles(rolesData || []);
-      
-      // Calculate and store counts
-      const counts = calculateUserCounts(allUsers);
-      setUserCounts(counts);
-      
-    } catch (error) {
-      console.error("Error loading data:", error);
-      toast({
-        title: "Error",
-        description: "Error al cargar los datos",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+  /** Cualquier cambio de filtro vuelve a la primera pagina. */
+  const cambiarFiltro = (accion: () => void) => {
+    accion();
+    setPage(1);
   };
 
-  const filterUsers = () => {
-    let filtered = [...allUsuarios];
-    
-    // Apply status filter
-    if (statusFilter === 'active') {
-      filtered = filtered.filter(u => u.est_id === 1);
-    } else if (statusFilter === 'inactive') {
-      filtered = filtered.filter(u => u.est_id === 2);
-    }
-    
-    setUsuarios(filtered);
-  };
+  /** Roles y "sin rol" son excluyentes: no existe quien cumpla las dos cosas. */
+  const alternarRol = (rolId: number) =>
+    cambiarFiltro(() => {
+      setSinRolSeleccionado(false);
+      setSelectedRoles((prev) =>
+        prev.includes(rolId) ? prev.filter((id) => id !== rolId) : [...prev, rolId],
+      );
+    });
 
-  const handleCreateUser = () => {
-    setEditingUser(null);
-    setShowForm(true);
-  };
+  const alternarSinRol = () =>
+    cambiarFiltro(() => {
+      setSelectedRoles([]);
+      setSinRolSeleccionado((prev) => !prev);
+    });
 
-  const handleViewUser = (user: UserWithRoles) => {
-    setViewingUser(user);
-    setShowDetails(true);
-  };
+  const verTodos = () =>
+    cambiarFiltro(() => {
+      setSelectedRoles([]);
+      setSinRolSeleccionado(false);
+    });
 
-  const handleEditUser = (user: UserWithRoles) => {
-    setEditingUser(user);
-    setShowForm(true);
-  };
-
-  const handleDeleteUser = async (userId: number) => {
-    const user = allUsuarios.find(u => u.usu_id === userId);
-    if (!user) return;
-    
-    setUserToDeactivate(user);
-    setShowDeactivationDialog(true);
-  };
-
-  const confirmDeactivateUser = async () => {
-    if (!userToDeactivate) return;
-
-    try {
-      // Get user roles before updating
-      const userRoleIds = userToDeactivate.user_roles?.map(ur => ur.rol_id) || [];
-
-      // Update usuario status
-      const { error } = await supabase
-        .from('usuario')
-        .update({ 
-          est_id: 2,
-          usu_fecha_modificacion: new Date().toISOString()
-        })
-        .eq('usu_id', userToDeactivate.usu_id);
-
-      if (error) throw error;
-
-      // Handle coach-specific updates
-      await updateCoachStatus(userToDeactivate.usu_id, 2, userRoleIds);
-
-      toast({
-        title: "Éxito",
-        description: "Usuario desactivado correctamente"
-      });
-      
-      // Reload data to update counts and lists
-      await loadData();
-    } catch (error) {
-      console.error("Error deactivating user:", error);
-      toast({
-        title: "Error",
-        description: "Error al desactivar el usuario",
-        variant: "destructive"
-      });
-    } finally {
-      setShowDeactivationDialog(false);
-      setUserToDeactivate(null);
-    }
-  };
-
-  const handleDeactivationDialogClose = () => {
-    setShowDeactivationDialog(false);
-    setUserToDeactivate(null);
-  };
-
-  const handleReactivateUser = async (userId: number) => {
-    if (!confirm("¿Estás seguro de que quieres reactivar este usuario?")) {
-      return;
-    }
-
-    try {
-      // Get user roles before updating
-      const user = allUsuarios.find(u => u.usu_id === userId);
-      const userRoleIds = user?.user_roles?.map(ur => ur.rol_id) || [];
-
-      // Update usuario status
-      const { error } = await supabase
-        .from('usuario')
-        .update({ 
-          est_id: 1,
-          usu_fecha_modificacion: new Date().toISOString()
-        })
-        .eq('usu_id', userId);
-
-      if (error) throw error;
-
-      // Handle coach-specific updates
-      await updateCoachStatus(userId, 1, userRoleIds);
-
-      toast({
-        title: "Éxito",
-        description: "Usuario reactivado correctamente"
-      });
-      
-      // Reload data to update counts and lists
-      await loadData();
-    } catch (error) {
-      console.error("Error reactivating user:", error);
-      toast({
-        title: "Error",
-        description: "Error al reactivar el usuario",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handlePermanentDelete = async (userId: number) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar permanentemente este usuario? Esta acción no se puede deshacer.")) {
-      return;
-    }
-
-    try {
-      // First, try to delete associated user_role records
-      const { error: roleError } = await supabase
-        .from('usuario_rol')
-        .delete()
-        .eq('usu_id', userId);
-
-      if (roleError) {
-        console.error("Error deleting user roles:", roleError);
-        toast({
-          title: "Error",
-          description: "No se puede eliminar el usuario: Error al eliminar los roles asociados",
-          variant: "destructive"
-        });
-        return;
+  /**
+   * La cabecera manda el nombre logico de la columna ('nombre', 'estado',
+   * 'creacion'); el backend lo traduce a SQL contra una lista blanca. Pulsar
+   * la columna que ya ordena invierte el sentido.
+   */
+  const handleSort = (key: string) => {
+    const columna = key as FiltrosUsuarios['orden'];
+    cambiarFiltro(() => {
+      if (columna === orden) {
+        setDir(dir === 'asc' ? 'desc' : 'asc');
+      } else {
+        setOrden(columna);
+        setDir('asc');
       }
-
-      // Then delete the user
-      const { error } = await supabase
-        .from('usuario')
-        .delete()
-        .eq('usu_id', userId);
-
-      if (error) {
-        // Check for specific constraint violations
-        if (error.code === '23503') {
-          const constraintMatch = error.message.match(/violates foreign key constraint "([^"]+)"/);
-          const tableName = error.message.match(/table "([^"]+)"/);
-          
-          let detailedMessage = "No se puede eliminar el usuario porque tiene datos relacionados";
-          
-          if (constraintMatch && tableName) {
-            const constraint = constraintMatch[1];
-            const table = tableName[1];
-            
-            // Provide user-friendly messages for known constraints
-            const constraintMessages: Record<string, string> = {
-              'padre_usu_id_fkey': 'porque está registrado como padre de familia',
-              'entrenador_ent_id_fkey': 'porque está registrado como entrenador',
-              'colegio_coordinador_usu_id_fkey': 'porque es coordinador de un colegio',
-              'encuesta_encu_creador_fkey': 'porque ha creado encuestas',
-              'evaluacion_eva_creador_fkey': 'porque ha creado evaluaciones',
-              'asistencia_entrenador_usu_registrador_fkey': 'porque ha registrado asistencias de entrenadores',
-              'asistencia_nino_usu_registrador_fkey': 'porque ha registrado asistencias de niños',
-              'evaluacion_nino_pendiente_usu_id_registrador_fkey': 'porque ha registrado evaluaciones'
-            };
-            
-            detailedMessage = constraintMessages[constraint] || 
-              `porque tiene registros relacionados en ${table}`;
-          }
-          
-          toast({
-            title: "No se puede eliminar",
-            description: `${detailedMessage}. Primero debe desactivar o transferir estos registros.`,
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: `Error al eliminar permanentemente el usuario: ${error.message}`,
-            variant: "destructive"
-          });
-        }
-        return;
-      }
-
-      toast({
-        title: "Éxito",
-        description: "Usuario eliminado permanentemente"
-      });
-      
-      // Reload data to update counts and lists
-      await loadData();
-    } catch (error) {
-      console.error("Error permanently deleting user:", error);
-      toast({
-        title: "Error",
-        description: "Error inesperado al eliminar permanentemente el usuario",
-        variant: "destructive"
-      });
-    }
+    });
   };
 
-  const handleFormSuccess = () => {
-    setShowForm(false);
-    setEditingUser(null);
-    loadData();
-  };
-
-  const handleFormCancel = () => {
-    setShowForm(false);
-    setEditingUser(null);
-  };
-
-  const handleDetailsClose = () => {
-    setShowDetails(false);
-    setViewingUser(null);
-  };
-
-  const handleRoleSelect = (roleId: number) => {
-    setSelectedRoles([roleId]);
-    setViewMode('table');
-  };
-
-  const handleRoleToggle = (roleId: number) => {
-    if (selectedRoles.includes(roleId)) {
-      setSelectedRoles(selectedRoles.filter(id => id !== roleId));
-    } else {
-      setSelectedRoles([...selectedRoles, roleId]);
-    }
-    setViewMode('table');
-  };
-
-  const handleViewAll = () => {
-    setSelectedRoles([]);
-    setViewMode('table');
-  };
-
-  const handleBackToCards = () => {
-    setViewMode('cards');
-    setSelectedRoles([]);
-  };
-
-  // Filter users based on search term and selected roles
-  const filteredUsuarios = usuarios.filter(user => {
-    const matchesSearch = user.usu_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.usu_correo.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const userRoleIds = user.user_roles?.map(ur => ur.rol_id) || [];
-    const matchesRole = selectedRoles.length === 0 || 
-                       selectedRoles.some(roleId => userRoleIds.includes(roleId));
-    
-    return matchesSearch && matchesRole;
-  });
-
-  // Sorting for filtered users
-  const { sortedData: sortedUsuarios, sortKey, sortDirection, handleSort } = useSorting({
-    data: filteredUsuarios,
-    defaultSortKey: 'usu_fecha_creacion',
-    defaultSortDirection: 'desc'
-  });
-
-  // Pagination for sorted users
-  const { 
-    currentPage, 
-    totalPages, 
-    paginatedData: paginatedUsuarios, 
-    goToPage, 
-    canGoNext, 
-    canGoPrevious, 
-    startIndex, 
-    endIndex, 
-    totalItems 
-  } = usePagination({
-    data: sortedUsuarios,
-    itemsPerPage: 5
-  });
-
-  const getSelectedRoleNames = () => {
-    if (selectedRoles.length === 0) return "Todos los usuarios";
+  const nombresDeRolesSeleccionados = useMemo(() => {
+    if (sinRolSeleccionado) return 'Usuarios sin rol';
+    if (selectedRoles.length === 0) return 'Todos los usuarios';
     return roles
-      .filter(role => selectedRoles.includes(role.rol_id))
-      .map(role => role.rol_nombre)
-      .join(", ");
+      .filter((r) => selectedRoles.includes(r.rol_id))
+      .map((r) => r.rol_nombre)
+      .join(', ');
+  }, [roles, selectedRoles, sinRolSeleccionado]);
+
+  const confirmarBaja = async () => {
+    if (!aDarDeBaja) return;
+    try {
+      await darDeBaja.mutateAsync(aDarDeBaja.usu_id);
+    } finally {
+      setADarDeBaja(null);
+    }
   };
 
-  if (loading) {
+  if (lista.isLoading && !lista.data) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-lg">Cargando usuarios...</div>
@@ -410,106 +158,171 @@ const Usuarios = () => {
     );
   }
 
+  if (lista.isError) {
+    return (
+      <div className="container mx-auto p-6">
+        <p className="text-destructive">
+          No se pudieron cargar los usuarios: {(lista.error as Error).message}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-4 lg:p-6 space-y-6 min-w-0 max-w-full overflow-hidden">
-      <UsuariosHeader
-        viewMode={viewMode}
-        onCreateUser={handleCreateUser}
-        onBackToCards={handleBackToCards}
-      />
+      <UsuariosHeader onCreateUser={() => setCreando(true)} />
 
       <UserStatusFilters
         statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
-        userCounts={userCounts}
+        onStatusChange={(estado) => cambiarFiltro(() => setStatusFilter(estado))}
+        userCounts={{
+          active: conteos.activos,
+          inactive: conteos.inactivos,
+          total: conteos.total,
+        }}
       />
 
-      <UsuariosFilters
-        viewMode={viewMode}
-        roles={roles}
-        users={usuarios}
-        selectedRoles={selectedRoles}
-        filteredUsuarios={filteredUsuarios}
-        onRoleToggle={handleRoleToggle}
-        onViewAll={handleViewAll}
-        getSelectedRoleNames={getSelectedRoleNames}
-      />
-      
-      {/* Only show search in table view */}
-      {viewMode === 'table' && (
-        <UsuariosSearch
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
+      {/* Buscador y rol en la misma fila. En el teléfono el estado va aquí
+          también (sus botones solo se ven desde sm). */}
+      <div className="space-y-2">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+          <DebouncedSearchInput
+            placeholder="Buscar por nombre o correo..."
+            value={busqueda}
+            onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
+            className="w-full min-w-0 sm:flex-1"
+          />
+          <div className="grid grid-cols-2 gap-2 sm:block sm:w-64 sm:flex-shrink-0">
+            <div className="sm:hidden">
+              <EstadoSelect
+                statusFilter={statusFilter}
+                onStatusChange={(estado) => cambiarFiltro(() => setStatusFilter(estado))}
+                userCounts={{
+                  active: conteos.activos,
+                  inactive: conteos.inactivos,
+                  total: conteos.total,
+                }}
+              />
+            </div>
+            <RoleSelect
+              roles={roles}
+              conteosPorRol={conteos.porRol}
+              totalUsuarios={conteos.totalDelEstado}
+              sinRol={conteos.sinRol}
+              selectedRoles={selectedRoles}
+              sinRolSeleccionado={sinRolSeleccionado}
+              onRoleToggle={alternarRol}
+              onSinRolToggle={alternarSinRol}
+              onViewAll={verTodos}
+            />
+          </div>
+        </div>
+        <p className="truncate text-sm text-muted-foreground">
+          Mostrando: {nombresDeRolesSeleccionados} ({totalItems} usuarios)
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="overflow-x-auto">
+          <UserTable
+            users={usuarios}
+            sortKey={orden}
+            sortDirection={dir}
+            onView={(user) => setViendoId(user.usu_id)}
+            onEdit={(user) => setEditandoId(user.usu_id)}
+            onDelete={(userId) => setADarDeBaja(usuarios.find((u) => u.usu_id === userId) ?? null)}
+            onReactivate={(userId) =>
+              setAReactivar(usuarios.find((u) => u.usu_id === userId) ?? null)
+            }
+            onPermanentDelete={(userId) =>
+              setAEliminar(usuarios.find((u) => u.usu_id === userId) ?? null)
+            }
+            onSort={handleSort}
+          />
+        </div>
+
+        {/* La paginacion la manda el servidor: estos numeros vienen de la
+            respuesta, no de cortar un array en el navegador. */}
+        <DataPagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          canGoNext={page < totalPages}
+          canGoPrevious={page > 1}
+          startIndex={(page - 1) * POR_PAGINA}
+          endIndex={Math.min(page * POR_PAGINA, totalItems)}
+          totalItems={totalItems}
+          itemName="usuarios"
         />
-      )}
+      </div>
 
-      <UsuariosContent
-        viewMode={viewMode}
-        roles={roles}
-        usuarios={usuarios}
-        paginatedUsuarios={paginatedUsuarios}
-        selectedRoles={selectedRoles}
-        sortKey={sortKey}
-        sortDirection={sortDirection}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        canGoNext={canGoNext}
-        canGoPrevious={canGoPrevious}
-        startIndex={startIndex}
-        endIndex={endIndex}
-        totalItems={totalItems}
-        statusFilter={statusFilter}
-        onRoleSelect={handleRoleSelect}
-        onView={handleViewUser}
-        onEdit={handleEditUser}
-        onDelete={handleDeleteUser}
-        onReactivate={handleReactivateUser}
-        onPermanentDelete={handlePermanentDelete}
-        onSort={handleSort}
-        onPageChange={goToPage}
-      />
-
-      {/* User Form Modal */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="sm:max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+      {/* Alta y edicion comparten formulario; en edicion se espera a la ficha. */}
+      <Dialog
+        open={creando || editandoId !== null}
+        onOpenChange={(abierto) => {
+          if (!abierto) {
+            setCreando(false);
+            setEditandoId(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              {editingUser ? "Editar Usuario" : "Crear Nuevo Usuario"}
+              {editandoId !== null ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
             </DialogTitle>
           </DialogHeader>
 
-          <UserForm 
-            user={editingUser} 
-            roles={roles} 
-            onSuccess={handleFormSuccess} 
-            onCancel={handleFormCancel} 
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* User Details Modal */}
-      <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent className="sm:max-w-md md:max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Detalles del Usuario</DialogTitle>
-          </DialogHeader>
-
-          {viewingUser && (
-            <UserDetail 
-              user={viewingUser} 
-              roles={roles} 
-              onClose={handleDetailsClose} 
+          {editandoId !== null && fichaEdicion.isLoading ? (
+            <p className="py-6 text-center text-muted-foreground">Cargando ficha…</p>
+          ) : (
+            <UserForm
+              user={editandoId !== null ? fichaEdicion.data : null}
+              roles={roles}
+              onSuccess={() => {
+                setCreando(false);
+                setEditandoId(null);
+              }}
+              onCancel={() => {
+                setCreando(false);
+                setEditandoId(null);
+              }}
             />
           )}
         </DialogContent>
       </Dialog>
 
-      {/* User Deactivation Confirmation Dialog */}
+      <Dialog open={viendoId !== null} onOpenChange={(abierto) => !abierto && setViendoId(null)}>
+        <DialogContent className="sm:max-w-md md:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl">Detalles del Usuario</DialogTitle>
+          </DialogHeader>
+
+          {fichaDetalle.data ? (
+            <UserDetail user={fichaDetalle.data} onClose={() => setViendoId(null)} />
+          ) : (
+            <p className="py-6 text-center text-muted-foreground">Cargando…</p>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <UserDeactivationDialog
-        isOpen={showDeactivationDialog}
-        onClose={handleDeactivationDialogClose}
-        onConfirm={confirmDeactivateUser}
-        userName={userToDeactivate?.usu_nombre || ''}
+        isOpen={aDarDeBaja !== null}
+        onClose={() => setADarDeBaja(null)}
+        onConfirm={confirmarBaja}
+        userName={aDarDeBaja?.usu_nombre ?? ''}
+      />
+
+      <ReactivarUsuarioDialog
+        usuario={aReactivar}
+        onClose={() => setAReactivar(null)}
+        onReactivado={() => setAReactivar(null)}
+      />
+
+      <EliminarUsuarioDialog
+        usuario={aEliminar}
+        onClose={() => setAEliminar(null)}
+        onEliminado={() => setAEliminar(null)}
       />
     </div>
   );

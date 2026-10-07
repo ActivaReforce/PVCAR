@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { elegirTitular } from '@/lib/titular';
 import { supabase } from '@/integrations/supabase/client';
 import { api, ApiError } from '@/lib/api';
 
@@ -246,6 +247,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (err) {
       console.error('No se pudo revocar la sesion en el servidor:', err);
     }
+    elegirTitular(null);
     await supabase.auth.signOut();
     setUser(null);
   }, []);

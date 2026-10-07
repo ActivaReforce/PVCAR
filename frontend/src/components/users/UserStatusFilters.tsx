@@ -1,9 +1,14 @@
-
-import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, XCircle, Users } from 'lucide-react';
-import { useIsMobile } from '@/hooks/use-mobile';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { CheckCircle, Users, XCircle } from 'lucide-react';
+
+export type FiltroEstado = 'active' | 'inactive' | 'all';
 
 interface UserCounts {
   active: number;
@@ -11,94 +16,84 @@ interface UserCounts {
   total: number;
 }
 
-interface UserStatusFiltersProps {
-  statusFilter: 'active' | 'inactive' | 'all';
-  onStatusChange: (status: 'active' | 'inactive' | 'all') => void;
+interface Props {
+  statusFilter: FiltroEstado;
+  onStatusChange: (status: FiltroEstado) => void;
   userCounts: UserCounts;
 }
 
-const UserStatusFilters = ({ 
-  statusFilter, 
-  onStatusChange, 
-  userCounts 
-}: UserStatusFiltersProps) => {
-  const isMobile = useIsMobile();
+/**
+ * Filtro de estado.
+ *
+ * Dos presentaciones del mismo estado y los mismos numeros: botones cuando hay
+ * sitio, un select en el telefono. Los tres botones en 360 px quedaban tan
+ * estrechos que no se leia ninguno (probado el 2026-09-17), y ocupaban una
+ * fila entera para tres palabras.
+ *
+ * Las dos salen de `OPCIONES` y de `cuenta()`: no hay forma de que una ensene
+ * un numero y la otra otro, que es lo que pasaba cuando eran dos markups
+ * copiados.
+ */
+const OPCIONES = [
+  { valor: 'active', etiqueta: 'Activos', Icono: CheckCircle },
+  { valor: 'inactive', etiqueta: 'Inactivos', Icono: XCircle },
+  { valor: 'all', etiqueta: 'Todos', Icono: Users },
+] as const;
 
-  if (isMobile) {
-    return (
-      <div className="flex justify-between gap-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg min-w-0 max-w-full">
+function contar(userCounts: UserCounts, valor: FiltroEstado): number {
+  if (valor === 'active') return userCounts.active;
+  if (valor === 'inactive') return userCounts.inactive;
+  return userCounts.total;
+}
+
+/**
+ * La version de telefono. Se exporta para poder colocarla junto al selector de
+ * rol, en la misma fila: son los dos filtros que se usan a la vez.
+ */
+export const EstadoSelect = ({ statusFilter, onStatusChange, userCounts }: Props) => (
+  <Select value={statusFilter} onValueChange={(v) => onStatusChange(v as FiltroEstado)}>
+    <SelectTrigger className="h-11 w-full min-w-0">
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      {OPCIONES.map(({ valor, etiqueta }) => (
+        <SelectItem key={valor} value={valor}>
+          {etiqueta} ({contar(userCounts, valor)})
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+);
+
+/** La version de escritorio: botones con su contador. */
+const UserStatusFilters = ({ statusFilter, onStatusChange, userCounts }: Props) => (
+  <div className="hidden min-w-0 flex-wrap gap-2 rounded-lg bg-muted/50 p-3 sm:flex sm:gap-3 sm:p-4">
+    {OPCIONES.map(({ valor, etiqueta, Icono }) => {
+      const activo = statusFilter === valor;
+      return (
         <Button
-          variant={statusFilter === 'active' ? "default" : "outline"}
+          key={valor}
+          variant={activo ? 'default' : 'outline'}
           size="sm"
-          onClick={() => onStatusChange('active')}
-          className="flex-1 flex items-center justify-center text-xs min-w-0 px-2"
+          onClick={() => onStatusChange(valor)}
+          className="flex min-w-0 items-center justify-center gap-2"
         >
-          <span className="truncate">Activos</span>
+          <Icono className="h-4 w-4 flex-shrink-0" />
+          <span className="truncate">{etiqueta}</span>
+          {/* Contador legible sobre los dos fondos, en claro y en oscuro. */}
+          <span
+            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+              activo
+                ? 'bg-primary-foreground/20 text-primary-foreground'
+                : 'bg-muted text-muted-foreground'
+            }`}
+          >
+            {contar(userCounts, valor)}
+          </span>
         </Button>
-        
-        <Button
-          variant={statusFilter === 'inactive' ? "default" : "outline"}
-          size="sm"
-          onClick={() => onStatusChange('inactive')}
-          className="flex-1 flex items-center justify-center text-xs min-w-0 px-2"
-        >
-          <span className="truncate">Inactivos</span>
-        </Button>
-
-        <Button
-          variant={statusFilter === 'all' ? "default" : "outline"}
-          size="sm"
-          onClick={() => onStatusChange('all')}
-          className="flex-1 flex items-center justify-center text-xs min-w-0 px-2"
-        >
-          <span className="truncate">Todos</span>
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-wrap gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-      <Button
-        variant={statusFilter === 'active' ? "default" : "outline"}
-        size="sm"
-        onClick={() => onStatusChange('active')}
-        className="flex items-center gap-2"
-      >
-        <CheckCircle className="h-4 w-4" />
-        Activos
-        <Badge variant="secondary" className="ml-1">
-          {userCounts.active}
-        </Badge>
-      </Button>
-      
-      <Button
-        variant={statusFilter === 'inactive' ? "default" : "outline"}
-        size="sm"
-        onClick={() => onStatusChange('inactive')}
-        className="flex items-center gap-2"
-      >
-        <XCircle className="h-4 w-4" />
-        Inactivos
-        <Badge variant="secondary" className="ml-1">
-          {userCounts.inactive}
-        </Badge>
-      </Button>
-
-      <Button
-        variant={statusFilter === 'all' ? "default" : "outline"}
-        size="sm"
-        onClick={() => onStatusChange('all')}
-        className="flex items-center gap-2"
-      >
-        <Users className="h-4 w-4" />
-        Todos
-        <Badge variant="secondary" className="ml-1">
-          {userCounts.total}
-        </Badge>
-      </Button>
-    </div>
-  );
-};
+      );
+    })}
+  </div>
+);
 
 export default UserStatusFilters;
