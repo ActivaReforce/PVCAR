@@ -77,7 +77,7 @@ export const AccesoCuenta = ({ pista, onEntrar }: { pista: string | null; onEntr
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <a
-          href="/forgot-password"
+          href="/forgot-password?desde=inscripcion"
           target="_blank"
           rel="noreferrer"
           className="inline-flex min-h-11 items-center gap-1.5 text-sm text-primary underline-offset-4 hover:underline"

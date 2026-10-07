@@ -13,6 +13,32 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   );
 }
 
+/**
+ * El enlace del correo de "olvidé mi contraseña" llega con
+ * `#access_token=…&type=recovery` (o `#error_code=otp_expired…` si caducó).
+ * supabase-js lo consume y lo BORRA de la URL al crearse el cliente, y emite
+ * PASSWORD_RECOVERY una sola vez. Como /reset-password se carga en diferido,
+ * llegaba tarde a las dos cosas y daba por malo un enlace bueno (2026-10-07).
+ * Por eso se lee aquí, antes de crear el cliente, y se escucha desde ya.
+ */
+const HASH_INICIAL = typeof window !== 'undefined' ? window.location.hash : '';
+let recuperacion = HASH_INICIAL.includes('type=recovery');
+const errorDelEnlace = new URLSearchParams(HASH_INICIAL.replace(/^#/, '')).get('error_code');
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+supabase.auth.onAuthStateChange((evento) => {
+  if (evento === 'PASSWORD_RECOVERY') recuperacion = true;
+});
+
+/** Si esta visita llegó por un enlace de recuperación de contraseña. */
+export function llegoPorRecuperacion(): boolean {
+  return recuperacion;
+}
+
+/** El error que trajo el enlace (`otp_expired`, …), o null. */
+export function errorDeEnlace(): string | null {
+  return errorDelEnlace;
+}
