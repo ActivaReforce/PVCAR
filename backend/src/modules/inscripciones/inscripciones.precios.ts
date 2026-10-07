@@ -14,13 +14,15 @@
  * empate, el primero. Así el orden en que se escriben los hijos no cambia
  * el total salvo cuando de verdad da igual.
  *
- * Hermanos ya inscritos (2026-10-07): si hay un hermano con disciplinas
- * activas, él es quien lidera —ya está pagando completo— y no se cobra aquí.
- * Todos los alumnos del envío llevan descuento, en hasta tantas disciplinas
- * como tenga el hermano ya inscrito que más tenga. Así la familia paga lo
- * mismo que si los hubiera inscrito juntos. (Al principio podía liderar el
- * nuevo si tenía más disciplinas, y entonces el descuento le tocaba al que ya
- * estaba y no se cobra: la familia se quedaba sin descuento.)
+ * Hijos ya inscritos (2026-10-07): si alguno tiene disciplinas activas, lidera
+ * el que más tenga **en total** (las activas más las que se le añaden ahora),
+ * porque ya está pagando completo. Puede ir en este envío (se le añade una
+ * disciplina, que también paga completa) o no (no se cobra aquí). Los demás
+ * llevan descuento en hasta tantas disciplinas como tenga ese hijo en total;
+ * a un hijo que ya tenía activas, sus activas ocupan primero ese cupo. Así la
+ * familia paga lo mismo que si los hubiera inscrito a todos juntos.
+ * (Al principio podía liderar un nuevo con más disciplinas, o contaban solo
+ * las nuevas, y la familia se quedaba sin parte del descuento.)
  *
  * IVA (decisión del 2026-10-05): se suma y se muestra. Se calcula sobre lo
  * que paga cada alumno, ya con su descuento, y el total es la suma.
@@ -72,7 +74,8 @@ const aDolares = (centavos: number) => centavos / 100;
  * inscrito y no va en este envío. Cuentan para liderar; no se cobran.
  */
 export function calcularCobro(
-  alumnos: Array<{ colId: number; disciplinas: number }>,
+  /** `disciplinas`: las que se cobran ahora. `activas`: las que ya tenía (no se cobran). */
+  alumnos: Array<{ colId: number; disciplinas: number; activas?: number }>,
   precios: Map<number, PrecioColegio>,
   ivaPct: number,
   externos: number[] = [],
@@ -81,24 +84,43 @@ export function calcularCobro(
     const p = precios.get(a.colId);
     if (!p) throw new Error(`El colegio ${a.colId} no tiene precio configurado`);
     const precio = aCentavos(p.precio);
-    return { p, precio, n: a.disciplinas, subtotal: precio * a.disciplinas };
+    const activas = a.activas ?? 0;
+    return { p, precio, n: a.disciplinas, activas, total: activas + a.disciplinas, subtotal: precio * a.disciplinas };
   });
 
-  // -1 = lidera un hermano ya inscrito; si no, el índice del alumno del envío.
+  // Quién lidera. -1 = un hijo ya inscrito que no va en este envío.
   const mejorExterno = externos.filter((n) => n > 0).reduce((m, n) => Math.max(m, n), 0);
-  let lider = mejorExterno > 0 ? -1 : 0;
-  if (lider !== -1) {
+  const yaInscritos = base.map((b, i) => ({ b, i })).filter(({ b }) => b.activas > 0);
+  let lider: number;
+  let cupo: number;
+  if (mejorExterno > 0 || yaInscritos.length > 0) {
+    // Lidera el ya inscrito con más disciplinas en total; en empate, el de fuera.
+    const mejorDentro = yaInscritos.reduce<{ i: number; total: number } | null>(
+      (m, { b, i }) => (m === null || b.total > m.total ? { i, total: b.total } : m),
+      null,
+    );
+    if (mejorDentro && mejorDentro.total > mejorExterno) {
+      lider = mejorDentro.i;
+      cupo = mejorDentro.total;
+    } else {
+      lider = -1;
+      cupo = mejorExterno;
+    }
+  } else {
+    // Todos nuevos: la regla de siempre, con lo que se cobra ahora.
+    lider = 0;
     base.forEach((b, i) => {
       const l = base[lider]!;
       if (b.n > l.n || (b.n === l.n && b.subtotal > l.subtotal)) lider = i;
     });
+    cupo = base[lider]?.n ?? 0;
   }
   const hayHermanos = base.length + (mejorExterno > 0 ? 1 : 0) > 1;
-  const cupo = lider === -1 ? mejorExterno : (base[lider]?.n ?? 0);
 
   const resultado = base.map((b, i) => {
     const conDescuento = hayHermanos && i !== lider && b.p.descuentoHermano > 0;
-    const cubiertas = conDescuento ? Math.min(b.n, cupo) : 0;
+    // Sus activas ocupan primero el cupo; lo que queda cubre las nuevas.
+    const cubiertas = conDescuento ? Math.min(b.n, Math.max(0, cupo - b.activas)) : 0;
     const descuento = Math.round((b.precio * cubiertas * b.p.descuentoHermano) / 100);
     const neto = b.subtotal - descuento;
     const iva = Math.round((neto * ivaPct) / 100);

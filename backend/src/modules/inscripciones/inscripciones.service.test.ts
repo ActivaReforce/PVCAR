@@ -430,6 +430,45 @@ describe('calcularCobro', () => {
       expect(c.total).toBe(40);
     });
 
+    it('Ana (ya en 1) añade 1 y Luis nuevo en 2: Ana lidera con 2, Luis descuento en 2', () => {
+      const c = calcularCobro(
+        [
+          { colId: 2, disciplinas: 1, activas: 1 },
+          { colId: 2, disciplinas: 2 },
+        ],
+        precios,
+        0,
+      );
+      expect(c.alumnos[0]!.paga_completo).toBe(true);
+      expect(c.alumnos[1]!.disciplinas_con_descuento).toBe(2);
+      expect(c.total).toBe(80); // 40 + 20 + 20
+    });
+
+    it('Ana (ya en 1) añade 1 y Luis nuevo en 1: Luis descuento en 1', () => {
+      const c = calcularCobro(
+        [
+          { colId: 2, disciplinas: 1, activas: 1 },
+          { colId: 2, disciplinas: 1 },
+        ],
+        precios,
+        0,
+      );
+      expect(c.total).toBe(60);
+    });
+
+    it('solo añadir una disciplina a un hijo, sin hermanos: sin descuento', () => {
+      const c = calcularCobro([{ colId: 2, disciplinas: 1, activas: 1 }], precios, 0);
+      expect(c.alumnos[0]!.paga_completo).toBe(true);
+      expect(c.total).toBe(40);
+    });
+
+    it('un hermano ya inscrito que añade, frente a otro de fuera con más: sus activas ocupan el cupo', () => {
+      // Fuera: Ana con 2 (lidera). Dentro: Luis ya en 1, añade 1 → cupo 2 - 1 = 1 con descuento.
+      const c = calcularCobro([{ colId: 2, disciplinas: 1, activas: 1 }], precios, 0, [2]);
+      expect(c.alumnos[0]!.disciplinas_con_descuento).toBe(1);
+      expect(c.total).toBe(20);
+    });
+
     it('un hermano sin disciplinas activas no cuenta', () => {
       const c = calcularCobro([{ colId: 2, disciplinas: 1 }], precios, 0, [0]);
       expect(c.alumnos[0]!.paga_completo).toBe(true);

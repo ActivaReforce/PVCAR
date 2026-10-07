@@ -478,7 +478,7 @@ async function cobroDe(
   }
 
   const cobro = calcularCobro(
-    ninos.map((n) => ({ colId: n.col_id, disciplinas: n.disciplinas.length })),
+    ninos.map((n) => ({ colId: n.col_id, disciplinas: n.disciplinas.length, activas: n.activas?.length ?? 0 })),
     precios,
     IVA_PCT,
     externos,
