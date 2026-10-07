@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAvisoAuxiliares } from '@/contexts/AvisoAuxiliaresContext';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
 import {
@@ -96,7 +97,12 @@ export function useActualizarDisciplina() {
 }
 
 export function useDarDeBajaDisciplina() {
-  return useMutacion((id: number) => disciplinasApi.darDeBaja(id), 'Disciplina dada de baja');
+  const avisar = useAvisoAuxiliares();
+  return useMutacion(async (id: number) => {
+    const r = await disciplinasApi.darDeBaja(id);
+    avisar(r.auxiliares_desvinculados);
+    return r;
+  }, 'Disciplina dada de baja');
 }
 
 export function useReactivarDisciplina() {

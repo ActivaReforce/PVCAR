@@ -331,7 +331,7 @@ export async function cambiarEstado(
 export async function cerrarDependenciasActivas(
   client: PoolClient,
   colacthorId: number,
-): Promise<{ inscripciones: number; asignaciones: number }> {
+): Promise<{ inscripciones: number; asignaciones: number; entrenadores: number[] }> {
   const inscripciones = await client.query(
     `UPDATE public.nino_asignacion
         SET est_id = $2, ninoasig_fecha_baja = now()
@@ -341,12 +341,14 @@ export async function cerrarDependenciasActivas(
   const asignaciones = await client.query(
     `UPDATE public.entrenador_asignacion
         SET est_id = $2, entasig_fecha_fin = ${HOY_EC}
-      WHERE colacthor_id = $1 AND est_id = $3 AND entasig_fecha_fin IS NULL`,
+      WHERE colacthor_id = $1 AND est_id = $3 AND entasig_fecha_fin IS NULL
+      RETURNING ent_id`,
     [colacthorId, ESTADO.INACTIVO, ESTADO.ACTIVO],
   );
   return {
     inscripciones: inscripciones.rowCount ?? 0,
     asignaciones: asignaciones.rowCount ?? 0,
+    entrenadores: asignaciones.rows.map((r: { ent_id: number }) => r.ent_id),
   };
 }
 

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAvisoAuxiliares } from '@/contexts/AvisoAuxiliaresContext';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
 import { entrenadoresApi, type FiltrosEntrenadores } from '@/api/entrenadores';
@@ -79,17 +80,25 @@ function useMutacion<TVars, TData>(fn: (vars: TVars) => Promise<TData>, exito: s
 }
 
 export function useAsignarDisciplina() {
+  const avisar = useAvisoAuxiliares();
   return useMutacion(
-    ({ id, colacthorId, reemplazar }: { id: number; colacthorId: number; reemplazar?: boolean }) =>
-      entrenadoresApi.asignar(id, colacthorId, reemplazar ?? false),
+    async ({ id, colacthorId, reemplazar }: { id: number; colacthorId: number; reemplazar?: boolean }) => {
+      const r = await entrenadoresApi.asignar(id, colacthorId, reemplazar ?? false);
+      avisar(r.auxiliares_desvinculados);
+      return r;
+    },
     'Disciplina asignada',
   );
 }
 
 export function useCerrarAsignacion() {
+  const avisar = useAvisoAuxiliares();
   return useMutacion(
-    ({ id, entasigId }: { id: number; entasigId: number }) =>
-      entrenadoresApi.cerrar(id, entasigId),
+    async ({ id, entasigId }: { id: number; entasigId: number }) => {
+      const r = await entrenadoresApi.cerrar(id, entasigId);
+      avisar(r.auxiliares_desvinculados);
+      return r;
+    },
     'Asignación cerrada',
   );
 }

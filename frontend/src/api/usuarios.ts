@@ -1,3 +1,4 @@
+import type { AuxiliarDesvinculado } from '@/api/entrenadores';
 import { api } from '@/lib/api';
 
 /**
@@ -137,7 +138,8 @@ export const usuariosApi = {
   actualizar: (id: number, datos: DatosUsuario) =>
     api.patch<UsuarioDetalle>(`/usuarios/${id}`, datos),
 
-  darDeBaja: (id: number) => api.post<UsuarioDetalle>(`/usuarios/${id}/baja`),
+  darDeBaja: (id: number) =>
+    api.post<UsuarioDetalle & { auxiliares_desvinculados: AuxiliarDesvinculado[] }>(`/usuarios/${id}/baja`),
 
   /** `password` solo cuando el usuario no tiene cuenta de acceso todavia. */
   reactivar: (id: number, password?: string) =>

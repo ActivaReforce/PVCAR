@@ -81,7 +81,7 @@ describe('baja', () => {
   it('suelta sus vinculos de asistente como titular y como asistente', async () => {
     await service.darDeBaja(propietario, 70);
     expect(soltados()).toHaveLength(1);
-    expect(soltados()[0]).toContain('(ent_id = $1 OR usu_id = $1)');
+    expect(soltados()[0]).toContain('(aux.ent_id = $1 OR aux.usu_id = $1)');
     // y sigue cerrando ficha y disciplinas
     expect(escritas.some((s) => s.includes('UPDATE public.entrenador_asignacion'))).toBe(true);
   });

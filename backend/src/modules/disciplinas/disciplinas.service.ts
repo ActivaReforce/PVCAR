@@ -7,6 +7,7 @@ import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { enTransaccion } from '../../lib/tx.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
+import { soltarAuxiliaresSinClases, type AuxiliarDesvinculado } from '../../lib/auxiliares.js';
 import * as repo from './disciplinas.repository.js';
 import type {
   ActualizarDisciplinaInput,
@@ -260,7 +261,7 @@ export async function previoBaja(
 export async function darDeBaja(
   actor: AuthUser,
   colacthorId: number,
-): Promise<repo.DisciplinaListada> {
+): Promise<repo.DisciplinaListada & { auxiliares_desvinculados: AuxiliarDesvinculado[] }> {
   const antes = await repo.obtenerDisciplina(colacthorId);
   if (!antes) throw new ApiError(404, 'Disciplina no encontrada');
   await exigirAlcance(actor, antes);
@@ -269,22 +270,24 @@ export async function darDeBaja(
     throw new ApiError(409, 'La disciplina ya estaba dada de baja');
   }
 
-  await enTransaccion(async (client) => {
+  const auxiliares_desvinculados = await enTransaccion(async (client) => {
     await repo.cambiarEstado(client, colacthorId, ESTADO.INACTIVO);
-    const cerradas = await repo.cerrarDependenciasActivas(client, colacthorId);
+    const { entrenadores, ...cerradas } = await repo.cerrarDependenciasActivas(client, colacthorId);
+    const sueltos = await soltarAuxiliaresSinClases(client, entrenadores);
     await auditar(
       {
         actor,
         accion: 'baja',
         entidad: 'disciplina',
         entidadId: colacthorId,
-        detalle: { disciplina: nombreDe(antes), ...cerradas },
+        detalle: { disciplina: nombreDe(antes), ...cerradas, auxiliares_desvinculados: sueltos },
       },
       client,
     );
+    return sueltos;
   });
 
-  return (await repo.obtenerDisciplina(colacthorId))!;
+  return { ...(await repo.obtenerDisciplina(colacthorId))!, auxiliares_desvinculados };
 }
 
 /**

@@ -34,6 +34,18 @@ export interface Entrenador {
   auxiliares: number;
 }
 
+/** Un auxiliar que se quedó sin titular porque este ya no da ninguna disciplina. */
+export interface AuxiliarDesvinculado {
+  auxiliar: string;
+  titular: string;
+}
+
+/** Asignar y cerrar: la ficha al día y los auxiliares que quedaron sin titular. */
+export interface CambioDeAsignacion {
+  asignaciones: Asignacion[];
+  auxiliares_desvinculados: AuxiliarDesvinculado[];
+}
+
 export interface Asignacion {
   entasig_id: number;
   colacthor_id: number;
@@ -141,10 +153,10 @@ export const entrenadoresApi = {
     ),
 
   asignar: (id: number, colacthor_id: number, reemplazar = false) =>
-    api.post<Asignacion[]>(`/entrenadores/${id}/asignaciones`, { colacthor_id, reemplazar }),
+    api.post<CambioDeAsignacion>(`/entrenadores/${id}/asignaciones`, { colacthor_id, reemplazar }),
 
   cerrar: (id: number, entasigId: number) =>
-    api.delete<Asignacion[]>(`/entrenadores/${id}/asignaciones/${entasigId}`),
+    api.delete<CambioDeAsignacion>(`/entrenadores/${id}/asignaciones/${entasigId}`),
 
   candidatosAuxiliar: () => api.get<CandidatoAuxiliar[]>('/entrenadores/candidatos-auxiliar'),
 

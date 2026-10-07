@@ -6,6 +6,7 @@ import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js'
 import { contieneSinTildes } from '../../lib/sql.js';
 import type { ListarUsuariosQuery } from './usuarios.schemas.js';
 import { HOY_EC } from '../../lib/fecha.js';
+import type { AuxiliarDesvinculado } from '../../lib/auxiliares.js';
 
 export interface RolResumen {
   rol_id: number;
@@ -506,14 +507,23 @@ export async function soltarVinculosAuxiliares(
   client: PoolClient,
   usuId: number,
   lado: 'titular' | 'asistente' | 'ambos',
-): Promise<void> {
+): Promise<AuxiliarDesvinculado[]> {
   const condicion =
-    lado === 'titular' ? 'ent_id = $1' : lado === 'asistente' ? 'usu_id = $1' : '(ent_id = $1 OR usu_id = $1)';
-  await client.query(
-    `UPDATE public.entrenador_auxiliar SET est_id = $2
-      WHERE ${condicion} AND est_id = $3`,
+    lado === 'titular'
+      ? 'aux.ent_id = $1'
+      : lado === 'asistente'
+        ? 'aux.usu_id = $1'
+        : '(aux.ent_id = $1 OR aux.usu_id = $1)';
+  const { rows } = await client.query<AuxiliarDesvinculado & { ent_id: number }>(
+    `UPDATE public.entrenador_auxiliar aux SET est_id = $2
+       FROM public.usuario a, public.usuario t
+      WHERE ${condicion} AND aux.est_id = $3
+        AND a.usu_id = aux.usu_id AND t.usu_id = aux.ent_id
+      RETURNING aux.ent_id, a.usu_nombre AS auxiliar, t.usu_nombre AS titular`,
     [usuId, ESTADO.INACTIVO, ESTADO.ACTIVO],
   );
+  // Solo se recuerdan los auxiliares que se quedan sin este titular.
+  return rows.filter((r) => r.ent_id === usuId).map(({ auxiliar, titular }) => ({ auxiliar, titular }));
 }
 
 /** Baja del entrenador y cierre de sus asignaciones abiertas, en un paso. */
