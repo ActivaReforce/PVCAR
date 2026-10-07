@@ -15,6 +15,9 @@ import type { ConfigCorreoInput } from './correos.schemas.js';
  * permiso del modal de Permisos: es una regla fija, como la de no quedarse
  * sin Propietario, y se comprueba aqui aunque la pantalla ya la esconda.
  */
+/** Tipos que van a una lista fija de destinatarios (avisos internos). */
+export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = ['inscripciones_aviso'];
+
 function exigirPropietario(actor: AuthUser): void {
   if (!actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO)) {
     throw new ApiError(403, 'Solo el Propietario configura los correos');
@@ -42,7 +45,10 @@ export async function guardar(
   await enTransaccion(async (client) => {
     const antes = await repo.obtenerConfig(tipo, client);
     if (!antes) throw new ApiError(404, 'Ese tipo de correo no tiene configuracion');
-    await repo.guardarConfig(client, { tipo, ...input });
+    // Solo el aviso interno tiene destinatarios fijos: en el resto el
+    // destinatario es la persona del caso (el representante).
+    const para = TIPOS_CON_PARA.includes(tipo) ? input.para : [];
+    await repo.guardarConfig(client, { tipo, ...input, para });
     await auditar(
       {
         actor,
@@ -65,7 +71,7 @@ export async function guardar(
  */
 export async function enviarComo(
   tipo: repo.TipoCorreo,
-  correo: Omit<Correo, 'de' | 'cc' | 'responderA'>,
+  correo: Omit<Correo, 'de' | 'cc' | 'responderA' | 'para'> & { para?: string },
 ): Promise<boolean> {
   if (!env.CORREO_DOMINIO) {
     console.error('Correo no enviado: falta CORREO_DOMINIO.');
@@ -82,8 +88,15 @@ export async function enviarComo(
     console.error(`Correo no enviado: "${tipo}" no tiene fila en correo_config.`);
     return false;
   }
+  // Con destinatario propio (el representante) va a el; si no, a la lista fija.
+  const para = correo.para ? [correo.para] : config.para;
+  if (para.length === 0) {
+    console.error(`Correo "${tipo}" no enviado: no tiene destinatarios.`);
+    return false;
+  }
   return enviarCorreo({
     ...correo,
+    para,
     de: `${config.nombre} <${config.usuario}@${env.CORREO_DOMINIO}>`,
     cc: config.cc,
     responderA: config.responder_a,

@@ -8,6 +8,7 @@ const {
   calcularEstado,
   nombreDeDescarga,
   correoDeAprobacion,
+  correoDeInscripcionNueva,
   firmaDeImagenValida,
   pistaDeCorreo,
   problemasDeDisciplinas,
@@ -151,6 +152,34 @@ describe('correoDeAprobacion', () => {
 
   it('a un usuario existente no le habla de la cedula', () => {
     expect(correoDeAprobacion('Ana', 'ana@x.co', false).texto).not.toContain('cédula');
+  });
+});
+
+describe('correoDeInscripcionNueva', () => {
+  const correo = correoDeInscripcionNueva({
+    insId: 7,
+    representante: { nombre: 'Ana <Pérez>', cedula: '1712345678', correo: 'ana@x.com', telefono: '0991234567' },
+    alumnos: [{ nombre: 'Leo', colegio: 'Innova Calderón', disciplinas: ['Fútbol: Lun y Mié 15:00–16:00'], total: 34.5 }],
+    total: 34.5,
+    // 21:30 del 7 en Ecuador.
+    fecha: new Date('2026-10-08T02:30:00Z'),
+  });
+
+  it('asunto con el representante y fecha en hora de Ecuador', () => {
+    expect(correo.asunto).toBe('Inscripción nueva: Ana <Pérez>');
+    expect(correo.texto).toContain('2026-10-07 21:30');
+  });
+
+  it('lleva alumnos, disciplinas, total y enlace a Inscripciones', () => {
+    expect(correo.texto).toContain('Leo — Innova Calderón');
+    expect(correo.texto).toContain('Fútbol: Lun y Mié 15:00–16:00');
+    expect(correo.texto).toMatch(/Total: .*34,50/);
+    expect(correo.html).toContain('/inscripciones');
+  });
+
+  it('escapa el HTML de lo que escribió el representante', () => {
+    expect(correo.html).toContain('Ana &lt;Pérez&gt;');
+    expect(correo.html).not.toContain('Ana <Pérez>');
   });
 });
 

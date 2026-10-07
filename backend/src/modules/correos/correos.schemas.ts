@@ -13,6 +13,12 @@ export const configCorreoSchema = z.object({
     .trim()
     .toLowerCase()
     .regex(/^[a-z0-9][a-z0-9._-]{0,63}$/, 'Solo letras, números, punto, guion y guion bajo, sin @'),
+  /** Solo cuenta en los avisos internos; en el resto se guarda vacio. */
+  para: z
+    .array(correo)
+    .max(10, 'Como mucho 10 destinatarios')
+    .default([])
+    .transform((lista) => [...new Set(lista)]),
   cc: z
     .array(correo)
     .max(10, 'Como mucho 10 correos en copia')

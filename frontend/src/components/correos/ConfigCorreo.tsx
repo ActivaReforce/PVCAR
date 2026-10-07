@@ -11,8 +11,11 @@ import type { TipoCorreo } from '@/api/correos';
 
 interface Props {
   tipo: TipoCorreo;
+  titulo: string;
   /** Qué correos salen con esta configuración, en una frase. */
   descripcion: string;
+  /** Aviso interno: va a una lista fija de destinatarios ("Para"). */
+  conPara?: boolean;
 }
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,7 +34,7 @@ const lineas = (texto: string) =>
  * no se escribe: un dominio distinto haría que los correos dejaran de salir
  * sin avisar. Las copias son visibles: el destinatario ve a quién más llegó.
  */
-const ConfigCorreo = ({ tipo, descripcion }: Props) => {
+const ConfigCorreo = ({ tipo, titulo, descripcion, conPara = false }: Props) => {
   const { user } = useAuth();
   const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
   const config = useConfigCorreo(tipo, esPropietario);
@@ -39,6 +42,7 @@ const ConfigCorreo = ({ tipo, descripcion }: Props) => {
 
   const [nombre, setNombre] = useState('');
   const [usuario, setUsuario] = useState('');
+  const [destinatarios, setDestinatarios] = useState('');
   const [copias, setCopias] = useState('');
   const [responderA, setResponderA] = useState('');
 
@@ -47,12 +51,15 @@ const ConfigCorreo = ({ tipo, descripcion }: Props) => {
     if (!datos) return;
     setNombre(datos.nombre);
     setUsuario(datos.usuario);
+    setDestinatarios(datos.para.join('\n'));
     setCopias(datos.cc.join('\n'));
     setResponderA(datos.responder_a ?? '');
   }, [datos]);
 
   if (!esPropietario || !datos) return null;
 
+  const para = conPara ? lineas(destinatarios) : [];
+  const paraMalos = para.filter((c) => !CORREO.test(c));
   const cc = lineas(copias);
   const ccMalos = cc.filter((c) => !CORREO.test(c));
   const usuarioLimpio = usuario.trim().toLowerCase();
@@ -60,6 +67,9 @@ const ConfigCorreo = ({ tipo, descripcion }: Props) => {
   const errores = [
     nombre.trim().length === 0 && 'Escribe el nombre del remitente.',
     !USUARIO.test(usuarioLimpio) && 'La dirección solo admite letras, números, punto, guion y guion bajo, sin @.',
+    conPara && para.length === 0 && 'Escribe al menos un destinatario: sin él, el aviso no sale.',
+    paraMalos.length > 0 && `Correo mal escrito en "Para": ${paraMalos.join(', ')}.`,
+    para.length > 10 && 'Como mucho 10 destinatarios.',
     ccMalos.length > 0 && `Correo mal escrito en copia: ${ccMalos.join(', ')}.`,
     cc.length > 10 && 'Como mucho 10 correos en copia.',
     responder !== '' && !CORREO.test(responder) && 'El correo de "responder a" está mal escrito.',
@@ -68,12 +78,13 @@ const ConfigCorreo = ({ tipo, descripcion }: Props) => {
   const cambiado =
     nombre.trim() !== datos.nombre ||
     usuarioLimpio !== datos.usuario ||
+    para.join('\n') !== datos.para.join('\n') ||
     cc.join('\n') !== datos.cc.join('\n') ||
     responder !== (datos.responder_a ?? '');
 
   return (
     <section className="space-y-3 border-t pt-6">
-      <h2 className="text-lg font-semibold">Correo</h2>
+      <h2 className="text-lg font-semibold">{titulo}</h2>
       <p className="text-sm text-muted-foreground">{descripcion}</p>
 
       {!datos.dominio && (
@@ -109,6 +120,22 @@ const ConfigCorreo = ({ tipo, descripcion }: Props) => {
             <span className="shrink-0 text-sm text-muted-foreground">@{datos.dominio ?? '…'}</span>
           </div>
         </div>
+
+        {conPara && (
+          <div className="space-y-1.5">
+            <Label htmlFor={`correo-para-${tipo}`}>Para</Label>
+            <Textarea
+              id={`correo-para-${tipo}`}
+              value={destinatarios}
+              onChange={(e) => setDestinatarios(e.target.value)}
+              rows={3}
+              placeholder={'inscripciones@activareforce.com'}
+              autoCapitalize="none"
+              spellCheck={false}
+            />
+            <p className="text-xs text-muted-foreground">Un correo por línea, hasta 10.</p>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor={`correo-cc-${tipo}`}>Con copia a</Label>
@@ -155,7 +182,7 @@ const ConfigCorreo = ({ tipo, descripcion }: Props) => {
         className="h-11 sm:h-10"
         disabled={!cambiado || errores.length > 0 || guardar.isPending}
         onClick={() =>
-          guardar.mutate({ nombre: nombre.trim(), usuario: usuarioLimpio, cc, responder_a: responder || null })
+          guardar.mutate({ nombre: nombre.trim(), usuario: usuarioLimpio, para, cc, responder_a: responder || null })
         }
       >
         <Save className="mr-2 h-4 w-4" />

@@ -12,7 +12,7 @@ import { env } from '../config/env.js';
  * se lo cuenta al usuario.
  */
 export interface Correo {
-  para: string;
+  para: string | string[];
   asunto: string;
   html: string;
   texto: string;
@@ -40,7 +40,7 @@ export async function enviarCorreo(correo: Correo): Promise<boolean> {
       },
       body: JSON.stringify({
         from: correo.de,
-        to: [correo.para],
+        to: Array.isArray(correo.para) ? correo.para : [correo.para],
         ...(correo.cc?.length ? { cc: correo.cc } : {}),
         ...(correo.responderA ? { reply_to: correo.responderA } : {}),
         subject: correo.asunto,

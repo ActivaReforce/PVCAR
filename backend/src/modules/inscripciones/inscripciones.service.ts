@@ -39,7 +39,8 @@ import {
   type TipoDocumento,
 } from './inscripciones.documentos.js';
 import { PLANTILLAS_INICIALES } from './inscripciones.plantillas.js';
-import { IVA_PCT, calcularCobro, type Cobro, type CobroAlumno } from './inscripciones.precios.js';
+import { IVA_PCT, calcularCobro, dinero, type Cobro, type CobroAlumno } from './inscripciones.precios.js';
+import { ahoraEc } from '../../lib/fecha.js';
 import {
   BYTES_MAX_MEMBRETE,
   PARENTESCOS,
@@ -655,6 +656,24 @@ export async function enviar(
       return id;
     });
 
+    // Aviso al equipo (cliente, 2026-10-07). Sin await: el representante no
+    // espera a Resend, y un correo que no sale no deshace la inscripcion.
+    void enviarComo('inscripciones_aviso', {
+      ...correoDeInscripcionNueva({
+        insId,
+        representante: input.representante,
+        alumnos: guardados.map((n, i) => ({
+          nombre: n.nombre,
+          colegio: n.documento.colegio.sede,
+          disciplinas: n.documento.horarios,
+          total: cobro.alumnos[i]!.total,
+        })),
+        total: cobro.total,
+        fecha,
+      }),
+      adjuntos: guardados.map((n, i) => ({ nombre: nombreDeDescarga(n.nombre), contenido: paquetes[i]!.pdf })),
+    });
+
     // El representante se lleva su copia en el momento, con un nombre que
     // reconozca en su carpeta de descargas.
     const urls = await Promise.all(
@@ -1214,6 +1233,67 @@ export async function aprobar(
     })),
   });
   return { ...resultado, correo_enviado };
+}
+
+/**
+ * Aviso interno de inscripcion nueva: quien se inscribio, sus alumnos y el
+ * total, con los PDF adjuntos. Va a la lista fija de 'inscripciones_aviso'.
+ */
+export function correoDeInscripcionNueva(d: {
+  insId: number;
+  representante: { nombre: string; cedula: string; correo: string; telefono: string };
+  alumnos: Array<{ nombre: string; colegio: string; disciplinas: string[]; total: number }>;
+  total: number;
+  fecha: Date;
+}) {
+  const enlace = `${frontendBaseUrl}/inscripciones`;
+  const r = d.representante;
+  const cuando = ahoraEc(d.fecha);
+
+  const texto = [
+    `Llegó una inscripción nueva (nº ${d.insId}), el ${cuando}.`,
+    '',
+    `Representante: ${r.nombre}`,
+    `Cédula: ${r.cedula}`,
+    `Correo: ${r.correo}`,
+    `Teléfono: ${r.telefono}`,
+    '',
+    ...d.alumnos.flatMap((a) => [
+      `${a.nombre} — ${a.colegio} — ${dinero(a.total)}`,
+      ...a.disciplinas.map((x) => `  ${x}`),
+    ]),
+    '',
+    `Total: ${dinero(d.total)}`,
+    '',
+    `Revísala y apruébala en ${enlace}`,
+    'Los documentos de cada alumno van adjuntos.',
+  ].join('\n');
+
+  const fila = (etiqueta: string, valor: string) =>
+    `<tr><td style="padding:2px 12px 2px 0;color:#52606d;font-size:14px;white-space:nowrap">${etiqueta}</td><td style="padding:2px 0;font-size:14px">${escaparHtml(valor)}</td></tr>`;
+  const alumnos = d.alumnos
+    .map(
+      (a) => `<div style="border:1px solid #e4e7eb;border-radius:6px;padding:12px;margin:0 0 8px">
+<p style="margin:0 0 4px;font-size:15px"><strong>${escaparHtml(a.nombre)}</strong> · ${escaparHtml(a.colegio)}</p>
+${a.disciplinas.map((x) => `<p style="margin:0;font-size:14px;color:#3e4c59">${escaparHtml(x)}</p>`).join('')}
+<p style="margin:6px 0 0;font-size:14px">${escaparHtml(dinero(a.total))}</p></div>`,
+    )
+    .join('');
+
+  const html = `<!doctype html><html lang="es"><body style="margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2933">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:8px;padding:32px" cellpadding="0" cellspacing="0"><tr><td>
+<p style="margin:0 0 16px;font-size:16px">Llegó una <strong>inscripción nueva</strong> (nº ${d.insId}), el ${escaparHtml(cuando)}.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px">
+${fila('Representante', r.nombre)}${fila('Cédula', r.cedula)}${fila('Correo', r.correo)}${fila('Teléfono', r.telefono)}
+</table>
+${alumnos}
+<p style="margin:12px 0 24px;font-size:16px"><strong>Total: ${escaparHtml(dinero(d.total))}</strong></p>
+<p style="margin:0 0 16px"><a href="${escaparHtml(enlace)}" style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-size:15px">Revisar inscripciones</a></p>
+<p style="margin:0;font-size:13px;color:#52606d">Los documentos de cada alumno van adjuntos.</p>
+</td></tr></table></td></tr></table></body></html>`;
+
+  return { asunto: `Inscripción nueva: ${r.nombre}`, html, texto };
 }
 
 /**

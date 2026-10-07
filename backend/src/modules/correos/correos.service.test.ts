@@ -44,6 +44,7 @@ const persona = (rol: number) =>
 const entrada = {
   nombre: 'Inscripcion Activa Reforce',
   usuario: 'inscripciones',
+  para: [] as string[],
   cc: ['gerencia@activareforce.com'],
   responder_a: null,
 };
@@ -84,6 +85,31 @@ describe('el envio usa la configuracion del tipo', () => {
     expect(cuerpo.bcc).toBeUndefined();
     expect(cuerpo.reply_to).toBe('info@activareforce.com');
     expect(cuerpo.subject).toBe('Tu inscripción fue aprobada');
+  });
+
+  it('el aviso interno va a la lista fija "para", con sus copias', async () => {
+    const guardada = fila;
+    fila = { ...guardada!, tipo: 'inscripciones_aviso', para: ['ventas@activareforce.com', 'gerencia@activareforce.com'], cc: ['dueno@activareforce.com'] };
+    const salio = await service.enviarComo('inscripciones_aviso', { asunto: 'Inscripción nueva: Ana', html: 'x', texto: 'x' });
+    fila = guardada;
+    expect(salio).toBe(true);
+    const cuerpo = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body));
+    expect(cuerpo.to).toEqual(['ventas@activareforce.com', 'gerencia@activareforce.com']);
+    expect(cuerpo.cc).toEqual(['dueno@activareforce.com']);
+  });
+
+  it('un aviso sin destinatarios no sale', async () => {
+    const guardada = fila;
+    fila = { ...guardada!, tipo: 'inscripciones_aviso', para: [] };
+    const salio = await service.enviarComo('inscripciones_aviso', { asunto: 'x', html: 'x', texto: 'x' });
+    fila = guardada;
+    expect(salio).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('el de aprobacion no guarda "para" aunque llegue', async () => {
+    await service.guardar(persona(ROL.PROPIETARIO), 'inscripciones', { ...entrada, para: ['x@x.com'] });
+    expect(actualizaciones[0]![3]).toEqual([]);
   });
 
   it('sin fila de configuracion no sale y no lanza', async () => {

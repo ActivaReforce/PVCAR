@@ -190,8 +190,15 @@ const DocumentosLegales = () => {
           <CuentaBancaria />
           <MaxDisciplinas />
           <ConfigCorreo
+            tipo="inscripciones_aviso"
+            titulo="Correo: aviso de inscripción nueva"
+            descripcion="Sale cuando un representante envía la inscripción. Va al equipo, con el resumen y los documentos de cada alumno."
+            conPara
+          />
+          <ConfigCorreo
             tipo="inscripciones"
-            descripcion="El correo de inscripción aprobada, que llega al representante con los documentos."
+            titulo="Correo: inscripción aprobada"
+            descripcion="Sale al aprobar. Llega al representante con sus documentos aprobados."
           />
         </TabsContent>
       </Tabs>
