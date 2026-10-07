@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useConfigInscripciones, useGuardarCuentaBancaria } from '@/hooks/useInscripciones';
+import TarjetaConfig from '@/components/inscripciones/TarjetaConfig';
 
 /**
  * A dónde se transfiere el pago (pedido del cliente, 2026-10-05). Texto
@@ -26,12 +27,10 @@ const CuentaBancaria = () => {
   if (!config.data) return null;
 
   return (
-    <section className="space-y-3 border-t pt-6">
-      <h2 className="text-lg font-semibold">Cuenta bancaria</h2>
-      <p className="text-sm text-muted-foreground">
-        La cuenta a la que los representantes transfieren el pago. Sale en el paso Pago del formulario, tal
-        cual la escribas aquí.
-      </p>
+    <TarjetaConfig
+      titulo="Cuenta bancaria"
+      descripcion="La cuenta a la que los representantes transfieren el pago. Sale en el paso Pago del formulario, tal cual la escribas aquí."
+    >
       {hasPermission('inscripciones', 'editar') ? (
         <div className="max-w-xl space-y-1.5">
           <Label htmlFor="cuenta-bancaria">Datos de la cuenta</Label>
@@ -57,7 +56,7 @@ const CuentaBancaria = () => {
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
       </ConditionalAction>
-    </section>
+    </TarjetaConfig>
   );
 };
 

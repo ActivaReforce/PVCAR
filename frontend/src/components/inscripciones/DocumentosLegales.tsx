@@ -185,10 +185,8 @@ const DocumentosLegales = () => {
         <TabsContent value="colegio" className="pt-3">
           <PorColegio datos={documentos.data} />
         </TabsContent>
-        <TabsContent value="configuracion" className="space-y-6 pt-3">
-          <Membrete />
+        <TabsContent value="configuracion" className="space-y-3 pt-3">
           <CuentaBancaria />
-          <MaxDisciplinas />
           <ConfigCorreo
             tipo="inscripciones_aviso"
             titulo="Correo: aviso de inscripción nueva"
@@ -200,6 +198,8 @@ const DocumentosLegales = () => {
             titulo="Correo: inscripción aprobada"
             descripcion="Sale al aprobar. Llega al representante con sus documentos aprobados."
           />
+          <MaxDisciplinas />
+          <Membrete />
         </TabsContent>
       </Tabs>
     </div>

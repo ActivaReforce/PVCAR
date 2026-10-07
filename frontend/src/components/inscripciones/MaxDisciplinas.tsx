@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useConfigInscripciones, useGuardarMaxDisciplinas } from '@/hooks/useInscripciones';
+import TarjetaConfig from '@/components/inscripciones/TarjetaConfig';
 
 /**
  * Cuántas disciplinas puede elegir cada alumno en el formulario público
@@ -29,11 +30,10 @@ const MaxDisciplinas = () => {
   const valido = Number.isInteger(numero) && numero >= 1 && numero <= 10;
 
   return (
-    <section className="space-y-3 border-t pt-6">
-      <h2 className="text-lg font-semibold">Disciplinas por alumno</h2>
-      <p className="text-sm text-muted-foreground">
-        Cuántas puede elegir cada alumno en el formulario. Desde Estudiantes se le pueden dar más.
-      </p>
+    <TarjetaConfig
+      titulo="Disciplinas por alumno"
+      descripcion="Cuántas puede elegir cada alumno en el formulario. Desde Estudiantes se le pueden dar más."
+    >
       {hasPermission('inscripciones', 'editar') ? (
         <div className="max-w-[10rem] space-y-1.5">
           <Label htmlFor="max-disciplinas">Máximo</Label>
@@ -62,7 +62,7 @@ const MaxDisciplinas = () => {
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
       </ConditionalAction>
-    </section>
+    </TarjetaConfig>
   );
 };
 

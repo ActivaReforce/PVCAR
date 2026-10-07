@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ROL } from '@/hooks/useUserForm';
 import { useConfigCorreo, useGuardarConfigCorreo } from '@/hooks/useCorreos';
 import type { TipoCorreo } from '@/api/correos';
+import TarjetaConfig from '@/components/inscripciones/TarjetaConfig';
 
 interface Props {
   tipo: TipoCorreo;
@@ -83,9 +84,7 @@ const ConfigCorreo = ({ tipo, titulo, descripcion, conPara = false }: Props) => 
     responder !== (datos.responder_a ?? '');
 
   return (
-    <section className="space-y-3 border-t pt-6">
-      <h2 className="text-lg font-semibold">{titulo}</h2>
-      <p className="text-sm text-muted-foreground">{descripcion}</p>
+    <TarjetaConfig titulo={titulo} descripcion={descripcion}>
 
       {!datos.dominio && (
         <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
@@ -188,7 +187,7 @@ const ConfigCorreo = ({ tipo, titulo, descripcion, conPara = false }: Props) => 
         <Save className="mr-2 h-4 w-4" />
         {guardar.isPending ? 'Guardando…' : 'Guardar'}
       </Button>
-    </section>
+    </TarjetaConfig>
   );
 };
 
