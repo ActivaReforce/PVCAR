@@ -105,7 +105,7 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 - Ve a sus hijos. Puede **añadir disciplinas** a uno (sus datos salen llenos y editables) o **inscribir otro hijo**. Así no se duplica ningún alumno.
 - Las disciplinas que el hijo ya tiene activas salen como **"ya inscrito"**: no se eligen ni se cobran, pero cuentan para el máximo (2) y para los cruces. Si el admin lo sacó de una, vuelve a poder elegirla.
 - Si el hijo tiene disciplinas activas, su colegio no se cambia desde aquí.
-- **Descuento de hermano:** cuenta también a un hermano que ya tiene disciplinas activas. La regla de siempre: lidera el que más disciplinas tiene; en empate lidera el que ya estaba (ya paga completo).
+- **Descuento de hermano:** si hay un hermano con disciplinas activas, él es quien paga completo (ya lo hace) y todos los nuevos llevan el descuento en hasta tantas disciplinas como tenga ese hermano (el que más tenga). La familia paga lo mismo que si los hubiera inscrito juntos. Corregido el 2026-10-07: antes podía liderar el nuevo si tenía más disciplinas y la familia se quedaba sin descuento. Entre hijos nuevos de un mismo envío, la regla de siempre: lidera el que más tiene y los demás llevan descuento en hasta tantas como él.
 
 **Al aprobar:**
 - La cuenta es la que envió (o la dada de baja por cédula, que se reactiva). Se actualizan sus datos; el admin ve qué cambia.

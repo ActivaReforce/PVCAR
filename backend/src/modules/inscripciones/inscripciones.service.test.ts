@@ -401,9 +401,17 @@ describe('calcularCobro', () => {
       expect(c.total).toBe(40);
     });
 
-    it('si el nuevo tiene mas disciplinas, lidera el nuevo y paga completo', () => {
+    it('aunque el nuevo tenga mas disciplinas, lleva descuento en tantas como el ya inscrito', () => {
+      // Ana ya va a 1; Luis a 2: 40 + 20 = 60. Juntos habrían pagado lo mismo de más.
       const c = calcularCobro([{ colId: 2, disciplinas: 2 }], precios, 0, [1]);
-      expect(c.alumnos[0]!.paga_completo).toBe(true);
+      expect(c.alumnos[0]!.paga_completo).toBe(false);
+      expect(c.alumnos[0]!.disciplinas_con_descuento).toBe(1);
+      expect(c.total).toBe(60);
+    });
+
+    it('con el ya inscrito en 2 y el nuevo en 3, descuento en 2', () => {
+      const c = calcularCobro([{ colId: 2, disciplinas: 3 }], precios, 0, [2]);
+      expect(c.alumnos[0]!.disciplinas_con_descuento).toBe(2);
       expect(c.total).toBe(80);
     });
 

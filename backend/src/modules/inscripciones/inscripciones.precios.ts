@@ -14,9 +14,13 @@
  * empate, el primero. Así el orden en que se escriben los hijos no cambia
  * el total salvo cuando de verdad da igual.
  *
- * Hermanos ya inscritos (2026-10-06): un hermano que ya tiene disciplinas
- * activas cuenta para decidir quién lidera, pero no se cobra (ya paga). En
- * empate de disciplinas lidera él, porque ya está pagando completo.
+ * Hermanos ya inscritos (2026-10-07): si hay un hermano con disciplinas
+ * activas, él es quien lidera —ya está pagando completo— y no se cobra aquí.
+ * Todos los alumnos del envío llevan descuento, en hasta tantas disciplinas
+ * como tenga el hermano ya inscrito que más tenga. Así la familia paga lo
+ * mismo que si los hubiera inscrito juntos. (Al principio podía liderar el
+ * nuevo si tenía más disciplinas, y entonces el descuento le tocaba al que ya
+ * estaba y no se cobra: la familia se quedaba sin descuento.)
  *
  * IVA (decisión del 2026-10-05): se suma y se muestra. Se calcula sobre lo
  * que paga cada alumno, ya con su descuento, y el total es la suma.
@@ -80,17 +84,15 @@ export function calcularCobro(
     return { p, precio, n: a.disciplinas, subtotal: precio * a.disciplinas };
   });
 
-  // -1 = lidera un hermano de fuera; si no, el índice del alumno del envío.
+  // -1 = lidera un hermano ya inscrito; si no, el índice del alumno del envío.
   const mejorExterno = externos.filter((n) => n > 0).reduce((m, n) => Math.max(m, n), 0);
   let lider = mejorExterno > 0 ? -1 : 0;
-  base.forEach((b, i) => {
-    if (lider === -1) {
-      if (b.n > mejorExterno) lider = i;
-      return;
-    }
-    const l = base[lider]!;
-    if (b.n > l.n || (b.n === l.n && b.subtotal > l.subtotal)) lider = i;
-  });
+  if (lider !== -1) {
+    base.forEach((b, i) => {
+      const l = base[lider]!;
+      if (b.n > l.n || (b.n === l.n && b.subtotal > l.subtotal)) lider = i;
+    });
+  }
   const hayHermanos = base.length + (mejorExterno > 0 ? 1 : 0) > 1;
   const cupo = lider === -1 ? mejorExterno : (base[lider]?.n ?? 0);
 
