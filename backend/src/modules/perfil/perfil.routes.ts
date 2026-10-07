@@ -6,7 +6,11 @@ import { ApiError } from '../../middleware/error.js';
 import { borrarFoto, firmarFoto, firmarSubidaFoto } from '../../lib/storage.js';
 import { enTransaccion } from '../../lib/tx.js';
 import { auditar } from '../../lib/auditoria.js';
+import { titularesDe } from '../../lib/alcance.js';
 import * as usuariosRepo from '../usuarios/usuarios.repository.js';
+import { hijosDe } from '../inscripciones/inscripciones.repository.js';
+import { horarioLargo } from '../../lib/horarios.js';
+import * as repo from './perfil.repository.js';
 
 /**
  * Perfil propio.
@@ -15,9 +19,11 @@ import * as usuariosRepo from '../usuarios/usuarios.repository.js';
  * nunca un id de la URL. Asi no hay forma de editar a otro por esta puerta,
  * que es la que tiene el permiso mas repartido (los 7 roles tienen perfil.ver).
  *
- * El nombre y el correo NO se editan aqui: son datos administrativos y
- * cambiarlos afecta al acceso. Van por /usuarios, con permiso usuarios.editar.
- * La contrasena vive en /auth/change-password, que exige la actual.
+ * Aqui se editan el nombre, el telefono y la foto (el nombre, desde el
+ * 2026-10-07, a peticion del cliente). El correo y la cedula NO: el correo es
+ * el acceso y la cedula la identidad (y la contrasena inicial de los
+ * representantes); los cambia la administracion por /usuarios. La contrasena
+ * vive en /auth/change-password, que exige la actual.
  */
 export const perfilRouter = Router();
 
@@ -25,6 +31,7 @@ perfilRouter.use(requireAuth);
 
 const actualizarPerfilSchema = z
   .object({
+    usu_nombre: z.string().trim().min(3, 'El nombre debe tener al menos 3 caracteres').max(160).optional(),
     usu_telefono: z
       .string()
       .trim()
@@ -82,6 +89,7 @@ perfilRouter.patch(
 
       await enTransaccion(async (client) => {
         await usuariosRepo.actualizarUsuario(client, yo, {
+          nombre: input.usu_nombre,
           telefono: input.usu_telefono?.trim() || null,
           tocarTelefono: input.usu_telefono !== undefined,
           foto: input.usu_foto ?? null,
@@ -107,6 +115,44 @@ perfilRouter.patch(
       const despues = await usuariosRepo.obtenerUsuario(yo);
       res.json({
         data: { ...despues!, usu_foto_url: await firmarFoto(despues!.usu_foto) },
+        error: null,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/perfil/resumen — lo que tiene a cargo: colegios que coordina,
+ * disciplinas que da, entrenadores a los que respalda y sus hijos. Cada lista
+ * sale vacía si no le toca por sus roles.
+ */
+perfilRouter.get(
+  '/resumen',
+  requirePermission('perfil', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const quien = actor(req);
+      const yo = quien.usuario.usu_id;
+      const [colegios, disciplinas, titulares, hijos] = await Promise.all([
+        repo.colegiosQueCoordina(yo),
+        repo.disciplinasQueDa(yo),
+        titularesDe(quien.usuario),
+        hijosDe(yo),
+      ]);
+      res.json({
+        data: {
+          colegios,
+          disciplinas,
+          titulares,
+          hijos: hijos.map((h) => ({
+            nino_id: h.nino_id,
+            nombre: h.nombre,
+            col_nombre: h.col_nombre,
+            disciplinas: h.activas.map((a) => ({ actividad: a.actividad, horario: horarioLargo(a.horarios) })),
+          })),
+        },
         error: null,
       });
     } catch (err) {
