@@ -41,6 +41,8 @@ export interface Disciplina {
   entrenadores: EntrenadorDeDisciplina[];
   alumnos: number;
   evaluaciones: number;
+  /** Solo para un representante: cuáles de sus hijos van a esta disciplina. */
+  hijos?: Array<{ nino_id: number; nino_nombre: string }>;
 }
 
 export interface ConteosDisciplinas {

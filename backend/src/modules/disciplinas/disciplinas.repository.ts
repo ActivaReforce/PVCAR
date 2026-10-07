@@ -33,6 +33,11 @@ export interface DisciplinaListada {
   alumnos: number;
   /** Evaluaciones asignadas a esta disciplina. */
   evaluaciones: number;
+  /**
+   * Solo para un representante: cuáles de SUS hijos van a esta disciplina
+   * (2026-10-07). Vacío para el personal: nunca lleva alumnos ajenos.
+   */
+  hijos?: Array<{ nino_id: number; nino_nombre: string }>;
 }
 
 /**
@@ -143,14 +148,24 @@ export async function listarDisciplinas(
 
   const { rows } = await getPool().query<DisciplinaListada & { total: string; primer_horario: unknown }>(
     `
-    SELECT ${COLUMNAS}, ${primerHorario('d')} AS primer_horario, count(*) OVER() AS total
+    SELECT ${COLUMNAS}, ${primerHorario('d')} AS primer_horario, count(*) OVER() AS total,
+           COALESCE((
+               SELECT json_agg(json_build_object('nino_id', n.nino_id, 'nino_nombre', n.nino_nombre)
+                               ORDER BY n.nino_nombre)
+                 FROM public.nino_asignacion na
+                 JOIN public.nino n ON n.nino_id = na.nino_id
+                WHERE na.colacthor_id = d.colacthor_id
+                  AND na.est_id = ${ESTADO.ACTIVO}
+                  AND na.nino_id = ANY($11::int[])
+           ), '[]'::json) AS hijos
     ${DESDE}
     WHERE ${F_ALCANCE} AND ${F_BUSCAR} AND ${F_COLEGIO} AND ${F_ACTIVIDAD}
       AND ${F_DIA} AND ${F_ESTADO} AND ${F_SIN_ENTRENADOR}
     ORDER BY ${columna} ${direccion}, primer_horario ASC, col.col_nombre ASC, d.colacthor_id ASC
     LIMIT $9 OFFSET $10
     `,
-    [...params(query, alcance), paginacion.limit, offsetDe(paginacion)],
+    // $11: los hijos del representante (alcance.ninos); vacío para el personal.
+    [...params(query, alcance), paginacion.limit, offsetDe(paginacion), alcance.ninos],
   );
 
   const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
