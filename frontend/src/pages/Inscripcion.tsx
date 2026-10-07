@@ -717,6 +717,7 @@ const Inscripcion = () => {
                   alumnos={alumnos}
                   cobro={cotizacion.data}
                   cargandoCobro={cotizacion.isFetching}
+                  cuenta={conSesion}
                 />
               )}
             </section>
@@ -1531,6 +1532,7 @@ const PasoPago = ({
   alumnos,
   cobro,
   cargandoCobro,
+  cuenta,
 }: {
   cuentaBancaria: string | null;
   vista: string | null;
@@ -1539,6 +1541,8 @@ const PasoPago = ({
   alumnos: Alumno[];
   cobro: Cobro | undefined;
   cargandoCobro: boolean;
+  /** Entró con su cuenta: ya está activa, solo lo nuevo espera la aprobación. */
+  cuenta: boolean;
 }) => (
   <>
     <div>
@@ -1628,7 +1632,9 @@ const PasoPago = ({
     />
 
     <p className="text-xs text-muted-foreground">
-      Al enviar, tu inscripción queda en revisión. No se crea tu cuenta hasta que la aprobemos.
+      {cuenta
+        ? 'Al enviar, la inscripción queda en revisión. Tu cuenta y lo que tus hijos ya tienen siguen igual: las disciplinas nuevas (y el hijo nuevo, si inscribes a otro) se suman cuando la aprobemos.'
+        : 'Al enviar, tu inscripción queda en revisión. No se crea tu cuenta hasta que la aprobemos.'}
     </p>
   </>
 );
