@@ -108,7 +108,7 @@ Esto **vacía la Fase 16**: se caen el dump fresco, los 19 chequeos de compatibi
 13. **Siembra de prod:** quitar de `PVCAR` lo de prueba que dejó la `0004` (Colegio de Pruebas Dev, su actividad y sus disciplinas) y dejar el primer Propietario real. `.sql` por escribir.
 14. **Fase 15 — Endurecimiento y QA:** auditoría de fugas con un token por rol, pruebas e2e y repaso de accesibilidad.
 15. **Fase 16 — Lanzamiento:** dominio propio, PR final a `main`, comprobar `/api/v1/health` en producción y arrancar con la plataforma vacía (arranque de cero: no se migran datos; lo viejo está en el esquema `archivo`).
-16. **Fase 17 — Apagar lo viejo:** borrar la base vieja (`wfyytrdhqtspapxaikoh`) y retirar `activa-forge-login/`, rotar los PAT de Supabase de `.mcp.json` y pasar el repo a privado.
+16. **Fase 17 — Apagar lo viejo:** borrar la base vieja (`wfyytrdhqtspapxaikoh`) y retirar `activa-forge-login/`, rotar los PAT de Supabase de `.mcp.json`, **borrar `CLAUDE.md` y `Roadmap.md` del repo** (están solo para trabajar desde otro equipo) y pasar el repo a privado.
 
 Pendiente del cliente: borrar `CORREO_REMITENTE` de Railway.
 
