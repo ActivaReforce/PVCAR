@@ -24,6 +24,21 @@ export function haceDiasEc(dias: number): string {
 }
 
 /**
+ * `HH:MM` de ahora mismo en Ecuador. Se usa al pulsar "Tarde": la hora del
+ * alumno que acaba de llegar es la de **este** momento, no la del `GET` que
+ * cargó la lista hace diez minutos. El reloj es el del teléfono porque los
+ * móviles están sincronizados; si uno no lo está, el entrenador puede editar.
+ */
+export function horaEcAhora(): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: ZONA,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date());
+}
+
+/**
  * Día legible (dd/mm/aaaa) de una columna `date` ("2026-10-07") o de una
  * marca con hora ("2026-10-08T02:30:00Z", que en Ecuador fue el 7).
  */

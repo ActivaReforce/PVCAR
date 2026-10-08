@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, History } from 'lucide-react';
+import { ArrowLeft, CalendarClock, History, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import BarraGuardar from '@/components/asistencias/BarraGuardar';
+import MiDiaAlumnos from '@/components/asistencias/MiDiaAlumnos';
 import { usePermissions } from '@/hooks/usePermissions';
 import FilaAsistencia from '@/components/asistencias/FilaAsistencia';
 import HistorialDisciplina from '@/components/asistencias/HistorialDisciplina';
@@ -26,6 +27,7 @@ import {
 import { useBorradorAsistencia, type FilaOriginal } from '@/hooks/useBorradorAsistencia';
 import type { MarcaAlumno } from '@/api/asistencias';
 import { ESTADO_ASISTENCIA } from '@/api/asistencias';
+import type { Disciplina, HorarioDisciplina } from '@/api/disciplinas';
 
 const TODOS = 'todos';
 
@@ -57,33 +59,39 @@ const enLetras = (iso: string) =>
     year: 'numeric',
   });
 
+const sinTildes = (texto: string) =>
+  texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+
 /**
  * Asistencia de alumnos.
  *
- * Cascada colegio → día → disciplina → fecha, igual que antes, pero con tres
- * diferencias que salen del Roadmap:
+ * Entrada en dos modos: **Mi día** (tarjetas por clase de hoy en el alcance,
+ * un tap para entrar) y **Selects** (colegio → día → disciplina → fecha, el
+ * flujo largo para fechas pasadas y disciplinas ajenas al día). La elección es
+ * del usuario: en cuanto hay disciplinas de hoy se le enseña Mi día y queda a
+ * un botón de los selects.
  *
- * - **El día arranca en el de hoy.** El entrenador que abre la aplicación un
- *   martes ve las disciplinas del martes sin tocar nada.
- * - **La fecha se propone hacia atrás**, no hacia delante.
- * - **Se guarda todo de una vez.** El botón vive fijo abajo y el backend
- *   escribe la sesión entera en una transacción.
- *
- * Lo que ya no hay que hacer aquí: decidir quién ve qué. El backend solo
- * devuelve colegios y disciplinas dentro del alcance, y rechaza con 403 la
- * disciplina ajena aunque se le pase el id a mano.
+ * Dentro de la lista: buscador siempre arriba, barra de acción arriba y abajo,
+ * y las reglas de siempre —fecha propuesta hacia atrás, lote en transacción,
+ * alcance decidido en el servidor—.
  */
 const AsistenciasAlumnos = () => {
   const { hasPermission } = usePermissions();
   const puedePasarLista = hasPermission('asistencias_estudiantes', 'editar');
   const contexto = useContextoAsistencias();
   const hoy = contexto.data?.hoy ?? '';
+  const horaServidor = contexto.data?.hora ?? '';
 
   const [colegio, setColegio] = useState('');
   const [dia, setDia] = useState(TODOS);
   const [disciplina, setDisciplina] = useState('');
   const [fecha, setFecha] = useState('');
   const [verHistorial, setVerHistorial] = useState(false);
+  const [vistaInicio, setVistaInicio] = useState<'mi-dia' | 'selects'>('mi-dia');
+  const [buscar, setBuscar] = useState('');
 
   const colegios = useColegiosVisibles();
   const dias = useDias();
@@ -95,6 +103,13 @@ const AsistenciasAlumnos = () => {
     colegio: colegio ? [Number(colegio)] : undefined,
     dia: dia === TODOS ? undefined : Number(dia),
   });
+
+  /** Disciplinas del día de hoy en el alcance, para Mi día. */
+  const diaHoy = hoy ? diaDe(hoy) : null;
+  const clasesHoy = useDisciplinas(
+    { limit: 200, orden: 'horario', estado: 1, dia: diaHoy ?? undefined },
+    diaHoy !== null,
+  );
 
   /** Con un solo colegio en el alcance —el caso del entrenador— se elige solo. */
   const items = colegios.data?.items;
@@ -127,6 +142,22 @@ const AsistenciasAlumnos = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elegida, hoy]);
 
+  /** Toque en una tarjeta de Mi día: elige colegio, día, disciplina y fecha. */
+  const elegirDeMiDia = (d: Disciplina, horario: HorarioDisciplina) => {
+    setColegio(String(d.col_id));
+    setDia(String(horario.dia_id));
+    setDisciplina(String(d.colacthor_id));
+    setFecha(hoy);
+    setBuscar('');
+  };
+
+  const volverAMiDia = () => {
+    setDisciplina('');
+    setFecha('');
+    setBuscar('');
+    setVistaInicio('mi-dia');
+  };
+
   /** El horario de la clase de esa fecha, si cae en uno de sus días. */
   const deEseDia =
     elegida && fecha !== '' ? elegida.horarios.find((h) => h.dia_id === diaDe(fecha)) : undefined;
@@ -156,26 +187,37 @@ const AsistenciasAlumnos = () => {
   const borrador = useBorradorAsistencia(filas, `${disciplina}|${fecha}`);
   const guardar = useGuardarAsistenciaAlumnos();
 
-  const enviar = () => {
+  const alumnosFiltrados = useMemo(() => {
+    const q = sinTildes(buscar.trim());
+    if (q === '') return alumnos;
+    return alumnos.filter((a) => {
+      const n = sinTildes(a.nino_nombre);
+      const g = sinTildes(a.catninograd_nombre ?? '');
+      return n.includes(q) || g.includes(q);
+    });
+  }, [alumnos, buscar]);
+
+  const enviar = (marcarRestantes: boolean) => {
     if (!elegida) return;
 
-    const marcas: MarcaAlumno[] = borrador.sucias.flatMap((clave) => {
-      const marca = borrador.marcas[clave];
-      if (!marca || marca.asisest_id === null) return [];
-      return [
-        {
-          nino_id: Number(clave),
-          asisest_id: marca.asisest_id,
-          hora_tarde: marca.asisest_id === ESTADO_ASISTENCIA.TARDE ? marca.hora : null,
-          razon:
-            marca.asisest_id === ESTADO_ASISTENCIA.JUSTIFICADO ? marca.razon.trim() : null,
-        },
-      ];
-    });
+    const marcas: MarcaAlumno[] = borrador.envio(marcarRestantes).map(({ clave, marca }) => ({
+      nino_id: Number(clave),
+      asisest_id: marca.asisest_id as number,
+      hora_tarde: marca.asisest_id === ESTADO_ASISTENCIA.TARDE ? marca.hora : null,
+      razon:
+        marca.asisest_id === ESTADO_ASISTENCIA.JUSTIFICADO ? marca.razon.trim() : null,
+    }));
 
     if (marcas.length === 0) return;
+    if (marcarRestantes) borrador.presenteALosQueFaltan();
     guardar.mutate({ colacthorId: elegida.colacthor_id, fecha, marcas });
   };
+
+  const mostrarMiDia =
+    !elegida &&
+    vistaInicio === 'mi-dia' &&
+    (clasesHoy.isLoading || (clasesHoy.data?.items?.length ?? 0) > 0);
+  const mostrarSelects = !mostrarMiDia;
 
   return (
     <div className="container mx-auto min-w-0 space-y-6 p-4 lg:p-6">
@@ -186,81 +228,108 @@ const AsistenciasAlumnos = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="space-y-1">
-          <Label htmlFor="colegio">Colegio</Label>
-          <Select
-            value={colegio}
-            onValueChange={(v) => {
-              setColegio(v);
-              setDisciplina('');
-            }}
+      {mostrarMiDia && (
+        <MiDiaAlumnos
+          disciplinas={clasesHoy.data?.items ?? []}
+          ahora={horaServidor}
+          cargando={clasesHoy.isLoading}
+          onElegir={elegirDeMiDia}
+          onOtraClase={() => setVistaInicio('selects')}
+        />
+      )}
+
+      {mostrarSelects && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-1">
+            <Label htmlFor="colegio">Colegio</Label>
+            <Select
+              value={colegio}
+              onValueChange={(v) => {
+                setColegio(v);
+                setDisciplina('');
+              }}
+            >
+              <SelectTrigger id="colegio" className="h-11 sm:h-10">
+                <SelectValue placeholder="Seleccionar colegio" />
+              </SelectTrigger>
+              <SelectContent>
+                {(colegios.data?.items ?? []).map((c) => (
+                  <SelectItem key={c.col_id} value={String(c.col_id)}>
+                    {c.col_nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="dia">Día</Label>
+            <Select
+              value={dia}
+              onValueChange={(v) => {
+                setDia(v);
+                setDisciplina('');
+              }}
+            >
+              <SelectTrigger id="dia" className="h-11 sm:h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos los días</SelectItem>
+                {(dias.data ?? []).map((d) => (
+                  <SelectItem key={d.dia_id} value={String(d.dia_id)}>
+                    {d.dia_nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="disciplina">Disciplina</Label>
+            <Select value={disciplina} onValueChange={setDisciplina} disabled={!colegio}>
+              <SelectTrigger id="disciplina" className="h-11 sm:h-10">
+                <SelectValue placeholder={colegio ? 'Seleccionar disciplina' : 'Elige un colegio'} />
+              </SelectTrigger>
+              <SelectContent>
+                {(disciplinas.data?.items ?? []).map((d) => (
+                  <SelectItem key={d.colacthor_id} value={String(d.colacthor_id)}>
+                    {d.act_nombre} · {d.horario_texto ?? ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="fecha">Fecha</Label>
+            <Input
+              id="fecha"
+              type="date"
+              value={fecha}
+              max={hoy || undefined}
+              disabled={!elegida}
+              onChange={(evento) => setFecha(evento.target.value)}
+              className="h-11 sm:h-10"
+            />
+          </div>
+        </div>
+      )}
+
+      {mostrarSelects && (clasesHoy.data?.items?.length ?? 0) > 0 && !elegida && (
+        <div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setVistaInicio('mi-dia')}
+            className="h-9 px-2 text-muted-foreground"
           >
-            <SelectTrigger id="colegio" className="h-11 sm:h-10">
-              <SelectValue placeholder="Seleccionar colegio" />
-            </SelectTrigger>
-            <SelectContent>
-              {(colegios.data?.items ?? []).map((c) => (
-                <SelectItem key={c.col_id} value={String(c.col_id)}>
-                  {c.col_nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Volver a mis clases de hoy
+          </Button>
         </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="dia">Día</Label>
-          <Select
-            value={dia}
-            onValueChange={(v) => {
-              setDia(v);
-              setDisciplina('');
-            }}
-          >
-            <SelectTrigger id="dia" className="h-11 sm:h-10">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODOS}>Todos los días</SelectItem>
-              {(dias.data ?? []).map((d) => (
-                <SelectItem key={d.dia_id} value={String(d.dia_id)}>
-                  {d.dia_nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="disciplina">Disciplina</Label>
-          <Select value={disciplina} onValueChange={setDisciplina} disabled={!colegio}>
-            <SelectTrigger id="disciplina" className="h-11 sm:h-10">
-              <SelectValue placeholder={colegio ? 'Seleccionar disciplina' : 'Elige un colegio'} />
-            </SelectTrigger>
-            <SelectContent>
-              {(disciplinas.data?.items ?? []).map((d) => (
-                <SelectItem key={d.colacthor_id} value={String(d.colacthor_id)}>
-                  {d.act_nombre} · {d.horario_texto ?? ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="fecha">Fecha</Label>
-          <Input
-            id="fecha"
-            type="date"
-            value={fecha}
-            max={hoy || undefined}
-            disabled={!elegida}
-            onChange={(evento) => setFecha(evento.target.value)}
-            className="h-11 sm:h-10"
-          />
-        </div>
-      </div>
+      )}
 
       {elegida && fecha !== '' && !fechaCuadra && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
@@ -269,7 +338,7 @@ const AsistenciasAlumnos = () => {
         </p>
       )}
 
-      {!elegida && (
+      {mostrarSelects && !elegida && (
         <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
           <CalendarClock className="mx-auto mb-3 h-10 w-10 opacity-50" />
           <p className="text-lg">Elige una disciplina para pasar lista</p>
@@ -294,15 +363,30 @@ const AsistenciasAlumnos = () => {
               </p>
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 sm:h-10"
-              onClick={() => setVerHistorial(true)}
-            >
-              <History className="mr-2 h-4 w-4" />
-              Historial
-            </Button>
+            <div className="flex gap-2">
+              {(clasesHoy.data?.items?.length ?? 0) > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-11 sm:h-10"
+                  onClick={volverAMiDia}
+                  title="Volver a mis clases de hoy"
+                >
+                  <ArrowLeft className="mr-1 h-4 w-4" />
+                  Hoy
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 sm:h-10"
+                onClick={() => setVerHistorial(true)}
+              >
+                <History className="mr-2 h-4 w-4" />
+                Historial
+              </Button>
+            </div>
           </div>
 
           {lista.isLoading && (
@@ -324,54 +408,88 @@ const AsistenciasAlumnos = () => {
                   <p className="text-lg">No hay alumnos inscritos en esa fecha</p>
                 </div>
               ) : (
-                <fieldset disabled={!puedePasarLista} className="min-w-0">
-                {!puedePasarLista && (
-                  <p className="mb-2 text-sm text-muted-foreground">
-                    Solo consulta: no tienes permiso para pasar lista.
-                  </p>
-                )}
-                <ul className="divide-y overflow-hidden rounded-lg border">
-                  {alumnos.map((alumno) => {
-                    const clave = String(alumno.nino_id);
-                    const marca = borrador.marcas[clave];
-                    if (!marca) return null;
+                <>
+                  {puedePasarLista && (
+                    <BarraGuardar
+                      posicion="arriba"
+                      sinMarcar={
+                        Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length
+                      }
+                      cambios={borrador.sucias.length}
+                      incompletas={borrador.incompletas.length}
+                      guardando={guardar.isPending}
+                      onDeshacer={borrador.deshacer}
+                      onGuardar={enviar}
+                    />
+                  )}
 
-                    return (
-                      <FilaAsistencia
-                        key={clave}
-                        clave={clave}
-                        nombre={alumno.nino_nombre}
-                        fotoUrl={alumno.nino_foto_url}
-                        detalle={alumno.catninograd_nombre}
-                        aviso={
-                          alumno.inscrito
-                            ? null
-                            : 'Ya no está inscrito en esta disciplina; sale porque tiene asistencia registrada ese día'
-                        }
-                        marca={marca}
-                        sucia={borrador.sucias.includes(clave)}
-                        incompleta={borrador.incompletas.includes(clave)}
-                        registro={{ por: alumno.registrado_por, en: alumno.registrado_en }}
-                        horaServidor={lista.data.hora_servidor}
-                        onEstado={borrador.elegirEstado}
-                        onHora={borrador.escribirHora}
-                        onRazon={borrador.escribirRazon}
-                      />
-                    );
-                  })}
-                </ul>
-                </fieldset>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="search"
+                      value={buscar}
+                      onChange={(evento) => setBuscar(evento.target.value)}
+                      placeholder="Buscar por nombre o grado"
+                      aria-label="Buscar alumno"
+                      className="h-11 pl-9 sm:h-10"
+                    />
+                  </div>
+
+                  <fieldset disabled={!puedePasarLista} className="min-w-0">
+                    {!puedePasarLista && (
+                      <p className="mb-2 text-sm text-muted-foreground">
+                        Solo consulta: no tienes permiso para pasar lista.
+                      </p>
+                    )}
+                    <ul className="divide-y overflow-hidden rounded-lg border">
+                      {alumnosFiltrados.length === 0 ? (
+                        <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                          Nadie coincide con «{buscar}».
+                        </li>
+                      ) : (
+                        alumnosFiltrados.map((alumno) => {
+                          const clave = String(alumno.nino_id);
+                          const marca = borrador.marcas[clave];
+                          if (!marca) return null;
+
+                          return (
+                            <FilaAsistencia
+                              key={clave}
+                              clave={clave}
+                              nombre={alumno.nino_nombre}
+                              fotoUrl={alumno.nino_foto_url}
+                              detalle={alumno.catninograd_nombre}
+                              aviso={
+                                alumno.inscrito
+                                  ? null
+                                  : 'Ya no está inscrito en esta disciplina; sale porque tiene asistencia registrada ese día'
+                              }
+                              marca={marca}
+                              sucia={borrador.sucias.includes(clave)}
+                              incompleta={borrador.incompletas.includes(clave)}
+                              registro={{ por: alumno.registrado_por, en: alumno.registrado_en }}
+                              horaServidor={lista.data.hora_servidor}
+                              onEstado={borrador.elegirEstado}
+                              onHora={borrador.escribirHora}
+                              onRazon={borrador.escribirRazon}
+                            />
+                          );
+                        })
+                      )}
+                    </ul>
+                  </fieldset>
+                </>
               )}
 
               {puedePasarLista && alumnos.length > 0 && (
                 <BarraGuardar
+                  posicion="abajo"
                   sinMarcar={
                     Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length
                   }
                   cambios={borrador.sucias.length}
                   incompletas={borrador.incompletas.length}
                   guardando={guardar.isPending}
-                  onPresenteATodos={borrador.presenteALosQueFaltan}
                   onDeshacer={borrador.deshacer}
                   onGuardar={enviar}
                 />
