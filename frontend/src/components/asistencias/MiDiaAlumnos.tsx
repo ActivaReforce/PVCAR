@@ -4,6 +4,8 @@ import type { Disciplina, HorarioDisciplina } from '@/api/disciplinas';
 
 interface Props {
   disciplinas: Disciplina[];
+  /** `dia_id` de hoy: solo se pintan los horarios de ese día. */
+  diaHoy: number;
   /** La hora del servidor en Ecuador, para marcar la clase que está pasando ahora. */
   ahora: string;
   cargando: boolean;
@@ -20,14 +22,16 @@ const minutos = (hora: string) => {
 /**
  * Las clases de hoy del usuario, con un tap para entrar a pasar lista.
  *
- * Cada tarjeta es una **franja horaria**, no una disciplina: una disciplina
- * con lunes y miércoles 15–16 que caiga hoy aparece una vez. Si cae en dos
- * horarios distintos (raro, pero posible con la v2 de disciplinas), aparece
- * dos veces, para que el entrenador no tenga que decidir cuál es cuál.
+ * Cada tarjeta es una **franja horaria de hoy**: una disciplina Lun+Mié
+ * que caiga en lunes sale una sola vez (la del lunes), aunque el backend
+ * devuelva la disciplina con sus dos horarios. Si el día tuviera dos
+ * franjas distintas (raro con la v2 de disciplinas), aparece dos veces.
  */
-const MiDiaAlumnos = ({ disciplinas, ahora, cargando, onElegir, onOtraClase }: Props) => {
+const MiDiaAlumnos = ({ disciplinas, diaHoy, ahora, cargando, onElegir, onOtraClase }: Props) => {
   const franjas = disciplinas.flatMap((d) =>
-    d.horarios.map((h) => ({ disciplina: d, horario: h })),
+    d.horarios
+      .filter((h) => h.dia_id === diaHoy)
+      .map((h) => ({ disciplina: d, horario: h })),
   );
   const ordenadas = [...franjas].sort(
     (a, b) => minutos(a.horario.inicio) - minutos(b.horario.inicio),

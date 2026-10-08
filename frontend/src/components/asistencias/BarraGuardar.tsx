@@ -28,9 +28,11 @@ interface Props {
  * explicación, que es el peor estado de una interfaz.
  *
  * El botón cambia de nombre según lo que falte:
- * - "Guardar N" cuando ya hay cambios manuales.
- * - "Presentes a los N y guardar" cuando no se ha marcado nada todavía: un
- *   solo gesto para el caso normal (todos han venido).
+ * - **"Presentes a los N y guardar"** mientras quede alguien sin marcar:
+ *   un solo gesto para el caso normal. Si ya marcaste a algunos Ausente,
+ *   no se pisan — solo se marcan Presente los que no tienen estado todavía.
+ * - **"Guardar N"** cuando ya no hay sin marcar y solo quedan cambios por
+ *   guardar.
  */
 const BarraGuardar = ({
   sinMarcar,
@@ -41,8 +43,9 @@ const BarraGuardar = ({
   onGuardar,
   posicion = 'abajo',
 }: Props) => {
-  const soloPresenteATodos = cambios === 0 && sinMarcar > 0 && incompletas === 0;
-  const bloqueado = incompletas > 0 || (cambios === 0 && sinMarcar === 0) || guardando;
+  const marcarRestantes = sinMarcar > 0 && incompletas === 0;
+  const bloqueado =
+    incompletas > 0 || (!marcarRestantes && cambios === 0) || guardando;
 
   const base = posicion === 'arriba' ? 'top-0 border-b' : 'bottom-0 border-t mt-2';
 
@@ -87,17 +90,17 @@ const BarraGuardar = ({
             type="button"
             variant="brand"
             className="h-11 flex-1 sm:h-10 sm:flex-none"
-            onClick={() => onGuardar(soloPresenteATodos)}
+            onClick={() => onGuardar(marcarRestantes)}
             disabled={bloqueado}
           >
             {guardando ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : soloPresenteATodos ? (
+            ) : marcarRestantes ? (
               <UserCheck className="mr-2 h-4 w-4" />
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            {soloPresenteATodos
+            {marcarRestantes
               ? `Presentes a los ${sinMarcar} y guardar`
               : `Guardar${cambios > 0 ? ` ${cambios}` : ''}`}
           </Button>

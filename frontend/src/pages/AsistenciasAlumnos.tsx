@@ -228,9 +228,10 @@ const AsistenciasAlumnos = () => {
         </p>
       </div>
 
-      {mostrarMiDia && (
+      {mostrarMiDia && diaHoy !== null && (
         <MiDiaAlumnos
           disciplinas={clasesHoy.data?.items ?? []}
+          diaHoy={diaHoy}
           ahora={horaServidor}
           cargando={clasesHoy.isLoading}
           onElegir={elegirDeMiDia}
