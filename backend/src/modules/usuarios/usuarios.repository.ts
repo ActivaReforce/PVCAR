@@ -83,7 +83,7 @@ export interface ConteosUsuarios {
  * En el sistema viejo esta pantalla no filtraba nada: cualquiera con la anon
  * key se traia la tabla usuario entera.
  */
-const CTE_VISIBLES = `
+export const CTE_VISIBLES = `
   visibles AS (
       SELECT cc.usu_id
       FROM public.colegio_coordinador cc

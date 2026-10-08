@@ -1,4 +1,5 @@
 import { ESTADO } from '../../lib/constants.js';
+import { CTE_VISIBLES } from '../usuarios/usuarios.repository.js';
 import type { ConsultaReporte, ContextoReporte, FiltrosReporte } from './reportes.definiciones.js';
 
 /**
@@ -94,18 +95,7 @@ const usuariosPorRol: DefinicionGrafica = {
   nota: 'Los usuarios sin ningún rol no aparecen: por eso la suma puede no dar el total.',
   construir: (f, ctx) => ({
     sql: `
-      WITH visibles AS (
-          SELECT cc.usu_id FROM public.colegio_coordinador cc WHERE cc.col_id = ANY($2::int[])
-          UNION
-          SELECT ea.ent_id FROM public.entrenador_asignacion ea
-            JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
-           WHERE cah.col_id = ANY($2::int[])
-          UNION
-          SELECT aux.usu_id FROM public.entrenador_auxiliar aux
-            JOIN public.entrenador_asignacion ea ON ea.ent_id = aux.ent_id
-            JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
-           WHERE cah.col_id = ANY($2::int[])
-      )
+      WITH ${CTE_VISIBLES}
       SELECT r.rol_titulo AS rol, count(*)::int AS usuarios
         FROM public.usuario u
         JOIN public.usuario_rol ur ON ur.usu_id = u.usu_id
@@ -126,17 +116,34 @@ const alumnosPorColegio: DefinicionGrafica = {
   etiqueta: 'colegio',
   series: [{ clave: 'alumnos', nombre: 'Alumnos' }],
   formato: 'entero',
+  /**
+   * Con el mismo alcance que el reporte de Alumnos: el coordinador ve sus
+   * colegios enteros; el entrenador, solo a los alumnos de sus disciplinas.
+   * Hasta el 2026-10-07 solo miraba los colegios, y al entrenador le salía
+   * vacía.
+   */
   construir: (f, ctx) => ({
     sql: `
       SELECT c.col_nombre AS colegio,
-             count(n.nino_id) FILTER (WHERE n.est_id = ${ESTADO.ACTIVO})::int AS alumnos
+             count(n.nino_id)::int AS alumnos
         FROM public.colegio c
-        LEFT JOIN public.nino n ON n.col_id = c.col_id
-       WHERE ($1::boolean OR c.col_id = ANY($2::int[]))
-         AND ($3::int[] IS NULL OR c.col_id = ANY($3::int[]))
+        LEFT JOIN public.nino n
+               ON n.col_id = c.col_id
+              AND n.est_id = ${ESTADO.ACTIVO}
+              AND ($1::boolean
+                   OR n.col_id = ANY($3::int[])
+                   OR EXISTS (SELECT 1 FROM public.nino_asignacion na
+                               WHERE na.nino_id = n.nino_id
+                                 AND na.est_id = ${ESTADO.ACTIVO}
+                                 AND na.colacthor_id = ANY($2::int[])))
+       WHERE ($1::boolean
+              OR c.col_id = ANY($3::int[])
+              OR EXISTS (SELECT 1 FROM public.colegio_actividad_horario x
+                          WHERE x.col_id = c.col_id AND x.colacthor_id = ANY($2::int[])))
+         AND ($4::int[] IS NULL OR c.col_id = ANY($4::int[]))
        GROUP BY c.col_id, c.col_nombre
        ORDER BY alumnos DESC`,
-    params: [ctx.global, ctx.colegios, oNulo(f.colegio)],
+    params: [ctx.global, ctx.disciplinas, ctx.colegios, oNulo(f.colegio)],
   }),
 };
 

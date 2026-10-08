@@ -18,6 +18,7 @@ import Grafica from '@/components/graficas/Grafica';
 import { DataPagination } from '@/components/ui/data-pagination';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { useColegiosVisibles } from '@/hooks/useColegios';
+import { useDisciplinas } from '@/hooks/useDisciplinas';
 import {
   useAnalisisReporte,
   useCatalogoReportes,
@@ -46,6 +47,7 @@ const ReporteDetalle = () => {
 
   const [busqueda, setBusqueda] = useState('');
   const [colegio, setColegio] = useState(TODOS);
+  const [disciplina, setDisciplina] = useState(TODOS);
   const [estado, setEstado] = useState(TODOS);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
@@ -54,15 +56,26 @@ const ReporteDetalle = () => {
 
   const catalogo = useCatalogoReportes();
   const definicion = catalogo.data?.find((r) => r.id === modulo);
+  const disponibles = definicion?.filtros;
   const colegios = useColegiosVisibles();
+  const disciplinas = useDisciplinas(
+    {
+      limit: 200,
+      orden: 'colegio',
+      colegio: colegio === TODOS ? undefined : [Number(colegio)],
+    },
+    Boolean(disponibles?.disciplina),
+  );
   const exportar = useExportarReporte();
 
+  // Solo viajan los filtros que el reporte usa: lo que no se ve no filtra.
   const filtros: FiltrosReporte = {
     buscar: busqueda || undefined,
-    colegio: colegio === TODOS ? undefined : [Number(colegio)],
-    estado: estado === TODOS ? undefined : Number(estado),
-    desde: desde || undefined,
-    hasta: hasta || undefined,
+    colegio: disponibles?.colegio && colegio !== TODOS ? [Number(colegio)] : undefined,
+    disciplina: disponibles?.disciplina && disciplina !== TODOS ? Number(disciplina) : undefined,
+    estado: disponibles?.estado && estado !== TODOS ? Number(estado) : undefined,
+    desde: disponibles?.fechas ? desde || undefined : undefined,
+    hasta: disponibles?.fechas ? hasta || undefined : undefined,
     incluirSensibles: conSensibles || undefined,
   };
 
@@ -139,9 +152,12 @@ const ReporteDetalle = () => {
         </ConditionalAction>
       </div>
 
-      {/* Cinco filtros con la misma forma (etiqueta y campo), alineados abajo. */}
-      <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+      {/*
+        Solo los filtros que este reporte usa (los declara el backend), con la
+        misma forma —etiqueta y campo— y alineados abajo.
+      */}
+      <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="space-y-1 sm:col-span-2">
           <Label className="text-xs">Buscar</Label>
           <DebouncedSearchInput
             placeholder="Buscar…"
@@ -151,64 +167,104 @@ const ReporteDetalle = () => {
           />
         </div>
 
-        <div className="space-y-1">
-          <Label className="text-xs">Colegio</Label>
-          <Select value={colegio} onValueChange={(v) => cambiarFiltro(() => setColegio(v))}>
-            <SelectTrigger className="h-11 sm:h-10" aria-label="Colegio">
-              <SelectValue placeholder="Todos los colegios" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODOS}>Todos los colegios</SelectItem>
-              {(colegios.data?.items ?? []).map((c) => (
-                <SelectItem key={c.col_id} value={String(c.col_id)}>
-                  {c.col_nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {definicion.filtros.colegio && (
+          <div className="space-y-1">
+            <Label className="text-xs">Colegio</Label>
+            <Select
+              value={colegio}
+              onValueChange={(v) =>
+                cambiarFiltro(() => {
+                  setColegio(v);
+                  setDisciplina(TODOS);
+                })
+              }
+            >
+              <SelectTrigger className="h-11 sm:h-10" aria-label="Colegio">
+                <SelectValue placeholder="Todos los colegios" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos los colegios</SelectItem>
+                {(colegios.data?.items ?? []).map((c) => (
+                  <SelectItem key={c.col_id} value={String(c.col_id)}>
+                    {c.col_nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-        <div className="space-y-1">
-          <Label className="text-xs">Estado</Label>
-          <Select value={estado} onValueChange={(v) => cambiarFiltro(() => setEstado(v))}>
-            <SelectTrigger className="h-11 sm:h-10" aria-label="Estado">
-              <SelectValue placeholder="Todos los estados" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODOS}>Todos los estados</SelectItem>
-              <SelectItem value="1">Activo</SelectItem>
-              <SelectItem value="2">Inactivo</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {definicion.filtros.disciplina && (
+          <div className="space-y-1">
+            <Label className="text-xs">Disciplina</Label>
+            <Select value={disciplina} onValueChange={(v) => cambiarFiltro(() => setDisciplina(v))}>
+              <SelectTrigger className="h-11 sm:h-10" aria-label="Disciplina">
+                <SelectValue placeholder="Todas las disciplinas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todas las disciplinas</SelectItem>
+                {(disciplinas.data?.items ?? []).map((d) => (
+                  <SelectItem key={d.colacthor_id} value={String(d.colacthor_id)}>
+                    {colegio === TODOS ? `${d.col_nombre} · ` : ''}
+                    {d.act_nombre}
+                    {d.horario_texto ? ` (${d.horario_texto})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-        <div className="space-y-1">
-          <Label htmlFor="desde" className="text-xs">
-            Desde {definicion.exigeRango && <span className="text-destructive">*</span>}
-          </Label>
-          <Input
-            id="desde"
-            type="date"
-            value={desde}
-            max={hasta || undefined}
-            onChange={(e) => cambiarFiltro(() => setDesde(e.target.value))}
-            className="h-11 sm:h-10"
-          />
-        </div>
+        {definicion.filtros.estado && (
+          <div className="space-y-1">
+            <Label className="text-xs">{definicion.filtros.estado.etiqueta}</Label>
+            <Select value={estado} onValueChange={(v) => cambiarFiltro(() => setEstado(v))}>
+              <SelectTrigger className="h-11 sm:h-10" aria-label={definicion.filtros.estado.etiqueta}>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos</SelectItem>
+                {definicion.filtros.estado.opciones.map((o) => (
+                  <SelectItem key={o.id} value={String(o.id)}>
+                    {o.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-        <div className="space-y-1">
-          <Label htmlFor="hasta" className="text-xs">
-            Hasta {definicion.exigeRango && <span className="text-destructive">*</span>}
-          </Label>
-          <Input
-            id="hasta"
-            type="date"
-            value={hasta}
-            min={desde || undefined}
-            onChange={(e) => cambiarFiltro(() => setHasta(e.target.value))}
-            className="h-11 sm:h-10"
-          />
-        </div>
+        {definicion.filtros.fechas && (
+          <>
+            <div className="space-y-1">
+              <Label htmlFor="desde" className="text-xs">
+                Desde {definicion.exigeRango && <span className="text-destructive">*</span>}
+              </Label>
+              <Input
+                id="desde"
+                type="date"
+                value={desde}
+                max={hasta || undefined}
+                onChange={(e) => cambiarFiltro(() => setDesde(e.target.value))}
+                className="h-11 sm:h-10"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="hasta" className="text-xs">
+                Hasta {definicion.exigeRango && <span className="text-destructive">*</span>}
+              </Label>
+              <Input
+                id="hasta"
+                type="date"
+                value={hasta}
+                min={desde || undefined}
+                onChange={(e) => cambiarFiltro(() => setHasta(e.target.value))}
+                className="h-11 sm:h-10"
+              />
+            </div>
+          </>
+        )}
       </div>
 
       {/*

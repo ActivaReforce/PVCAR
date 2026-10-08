@@ -77,6 +77,26 @@ describe('el catalogo', () => {
   });
 
   /**
+   * Hasta el 2026-10-07 la pantalla ofrecía Activo/Inactivo en los nueve: en
+   * asistencias eso filtraba Presente/Ausente, y en evaluaciones nada.
+   */
+  it('cada reporte dice sus filtros, con las opciones de estado que le tocan', () => {
+    const de = (id: string) => service.catalogo(TODO).find((r) => r.id === id)!.filtros;
+    expect(de('asistencias-alumnos').estado?.opciones.map((o) => o.nombre)).toEqual([
+      'Presente',
+      'Tarde',
+      'Justificado',
+      'Ausente',
+    ]);
+    expect(de('evaluaciones').estado?.opciones.map((o) => o.id)).toEqual([ESTADO.PENDIENTE, ESTADO.EVALUADO]);
+    expect(de('actividades')).toEqual({ colegio: false, disciplina: false, estado: null, fechas: false });
+    for (const r of service.catalogo(TODO)) {
+      // Un reporte que exige fechas tiene que enseñarlas.
+      if (r.exigeRango) expect(r.filtros.fechas, r.id).toBe(true);
+    }
+  });
+
+  /**
    * Un entrenador tiene `reportes:ver` pero no `usuarios:ver`: el reporte de
    * personas no debe ni aparecerle.
    */

@@ -15,12 +15,26 @@ export interface ColumnaReporte {
   ancho: number;
 }
 
+export interface OpcionFiltro {
+  id: number;
+  nombre: string;
+}
+
+/** Qué filtros usa cada reporte: la pantalla enseña solo esos. */
+export interface FiltrosDisponibles {
+  colegio: boolean;
+  disciplina: boolean;
+  estado: { etiqueta: string; opciones: OpcionFiltro[] } | null;
+  fechas: boolean;
+}
+
 export interface ReporteDisponible {
   id: string;
   titulo: string;
   descripcion: string;
   /** Sin rango de fechas no se puede consultar. */
   exigeRango: boolean;
+  filtros: FiltrosDisponibles;
   columnas: ColumnaReporte[];
   /** Cuántas gráficas tiene su pestaña de análisis. 0 = no tiene. */
   graficas: number;

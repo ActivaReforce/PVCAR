@@ -2,6 +2,7 @@ import { ESTADO } from '../../lib/constants.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import { HOY_EC, textoEc } from '../../lib/fecha.js';
+import { CTE_VISIBLES } from '../usuarios/usuarios.repository.js';
 
 /**
  * El catálogo de reportes.
@@ -60,6 +61,47 @@ export interface FiltrosReporte {
   hasta?: string;
 }
 
+/** Una opción de un desplegable de filtro. */
+export interface OpcionFiltro {
+  id: number;
+  nombre: string;
+}
+
+/**
+ * Qué filtros tiene sentido enseñar en cada reporte.
+ *
+ * Hasta el 2026-10-07 la pantalla enseñaba los cinco en los nueve: el colegio
+ * y las fechas en reportes que no los usaban, y un "Estado" Activo/Inactivo
+ * que en asistencias filtraba Presente/Ausente y en evaluaciones no casaba
+ * con nada. Ahora cada definición dice los suyos y el desplegable de estado
+ * trae sus propias opciones.
+ */
+export interface FiltrosDisponibles {
+  colegio: boolean;
+  disciplina: boolean;
+  estado: { etiqueta: string; opciones: OpcionFiltro[] } | null;
+  /** Rango de fechas. Si el reporte lo exige, lo usa; nunca al revés. */
+  fechas: boolean;
+}
+
+const ACTIVO_INACTIVO = (etiqueta = 'Estado') => ({
+  etiqueta,
+  opciones: [
+    { id: ESTADO.ACTIVO, nombre: 'Activo' },
+    { id: ESTADO.INACTIVO, nombre: 'Inactivo' },
+  ],
+});
+
+const ASISTENCIA = {
+  etiqueta: 'Asistencia',
+  opciones: [
+    { id: 1, nombre: 'Presente' },
+    { id: 3, nombre: 'Tarde' },
+    { id: 4, nombre: 'Justificado' },
+    { id: 2, nombre: 'Ausente' },
+  ],
+};
+
 export interface ConsultaReporte {
   sql: string;
   params: unknown[];
@@ -73,6 +115,7 @@ export interface Definicion {
   modulo: string;
   /** Sin rango de fechas el reporte no significa nada: se exige. */
   exigeRango: boolean;
+  filtros: FiltrosDisponibles;
   columnas: Columna[];
   /**
    * Columnas que **no salen si no se piden**.
@@ -98,6 +141,7 @@ const usuarios: Definicion = {
   descripcion: 'Personas con acceso al sistema, con sus roles y su estado.',
   modulo: 'usuarios',
   exigeRango: false,
+  filtros: { colegio: false, disciplina: false, estado: ACTIVO_INACTIVO(), fechas: false },
   columnas: [
     { clave: 'usu_id', cabecera: 'ID', ancho: 8 },
     { clave: 'usu_nombre', cabecera: 'Nombre', ancho: 34 },
@@ -114,18 +158,7 @@ const usuarios: Definicion = {
      * asignación allí, sus auxiliares— y a sí mismo.
      */
     sql: `
-      WITH visibles AS (
-          SELECT cc.usu_id FROM public.colegio_coordinador cc WHERE cc.col_id = ANY($2::int[])
-          UNION
-          SELECT ea.ent_id FROM public.entrenador_asignacion ea
-            JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
-           WHERE cah.col_id = ANY($2::int[])
-          UNION
-          SELECT aux.usu_id FROM public.entrenador_auxiliar aux
-            JOIN public.entrenador_asignacion ea ON ea.ent_id = aux.ent_id
-            JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
-           WHERE cah.col_id = ANY($2::int[])
-      )
+      WITH ${CTE_VISIBLES}
       SELECT u.usu_id,
              u.usu_nombre,
              u.usu_correo,
@@ -157,6 +190,7 @@ const colegios: Definicion = {
   descripcion: 'Los colegios con sus coordinadores y cuánto se imparte en cada uno.',
   modulo: 'colegios',
   exigeRango: false,
+  filtros: { colegio: true, disciplina: false, estado: null, fechas: false },
   columnas: [
     { clave: 'col_id', cabecera: 'ID', ancho: 8 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 34 },
@@ -197,6 +231,7 @@ const actividades: Definicion = {
   descripcion: 'El catálogo de actividades, con sus espacios y materiales.',
   modulo: 'actividades',
   exigeRango: false,
+  filtros: { colegio: false, disciplina: false, estado: null, fechas: false },
   columnas: [
     { clave: 'act_id', cabecera: 'ID', ancho: 8 },
     { clave: 'act_nombre', cabecera: 'Actividad', ancho: 26 },
@@ -237,6 +272,7 @@ const disciplinas: Definicion = {
   descripcion: 'Colegio, actividad, días y horas, con su entrenador y sus alumnos.',
   modulo: 'disciplinas',
   exigeRango: false,
+  filtros: { colegio: true, disciplina: false, estado: ACTIVO_INACTIVO(), fechas: false },
   columnas: [
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
     { clave: 'act_nombre', cabecera: 'Actividad', ancho: 24 },
@@ -286,6 +322,7 @@ const entrenadores: Definicion = {
   descripcion: 'Quién imparte qué, en qué colegios y a cuántos alumnos.',
   modulo: 'entrenadores',
   exigeRango: false,
+  filtros: { colegio: true, disciplina: false, estado: ACTIVO_INACTIVO('Estado de la ficha'), fechas: false },
   columnas: [
     { clave: 'usu_nombre', cabecera: 'Entrenador', ancho: 34 },
     { clave: 'usu_cedula', cabecera: 'Cédula', ancho: 14 },
@@ -329,8 +366,17 @@ const entrenadores: Definicion = {
                             AND (s.colacthor_id = ANY($2::int[]) OR s.col_id = ANY($3::int[]))))
          AND ($4::text IS NULL OR ${contieneSinTildes('u.usu_nombre', '$4')})
          AND ($5::int IS NULL OR en.est_id = $5)
+         AND ($6::int[] IS NULL
+              OR EXISTS (SELECT 1 FROM suyas s WHERE s.ent_id = en.ent_id AND s.col_id = ANY($6::int[])))
        ORDER BY u.usu_nombre`,
-    params: [ctx.global, ctx.disciplinas, ctx.colegios, textoONulo(f.buscar), oNulo(f.estado)],
+    params: [
+      ctx.global,
+      ctx.disciplinas,
+      ctx.colegios,
+      textoONulo(f.buscar),
+      oNulo(f.estado),
+      oNulo(f.colegio),
+    ],
   }),
 };
 
@@ -340,6 +386,7 @@ const estudiantes: Definicion = {
   descripcion: 'Los alumnos con su colegio, su grado y sus disciplinas.',
   modulo: 'estudiantes',
   exigeRango: false,
+  filtros: { colegio: true, disciplina: true, estado: ACTIVO_INACTIVO(), fechas: false },
   /** Dato médico de un menor: se incluye a propósito, no por defecto. */
   columnasSensibles: ['nino_info_salud'],
   columnas: [
@@ -427,6 +474,7 @@ const asistenciasAlumnos: Definicion = {
   descripcion: 'Una fila por marca. Exige un rango de fechas.',
   modulo: 'asistencias_estudiantes',
   exigeRango: true,
+  filtros: { colegio: true, disciplina: true, estado: ASISTENCIA, fechas: true },
   columnas: [
     { clave: 'fecha', cabecera: 'Fecha', ancho: 12 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
@@ -494,6 +542,7 @@ const asistenciasEntrenadores: Definicion = {
   descripcion: 'Titulares y auxiliares en una sola lista. Exige un rango de fechas.',
   modulo: 'asistencias_entrenadores',
   exigeRango: true,
+  filtros: { colegio: true, disciplina: false, estado: ASISTENCIA, fechas: true },
   columnas: [
     { clave: 'fecha', cabecera: 'Fecha', ancho: 12 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
@@ -579,6 +628,18 @@ const evaluaciones: Definicion = {
   descripcion: 'Una fila por alumno y evaluación, con su puntaje.',
   modulo: 'evaluaciones',
   exigeRango: false,
+  filtros: {
+    colegio: true,
+    disciplina: true,
+    estado: {
+      etiqueta: 'Estado',
+      opciones: [
+        { id: ESTADO.PENDIENTE, nombre: 'Pendiente' },
+        { id: ESTADO.EVALUADO, nombre: 'Evaluado' },
+      ],
+    },
+    fechas: false,
+  },
   columnas: [
     { clave: 'eva_titulo', cabecera: 'Evaluación', ancho: 30 },
     { clave: 'eva_categoria', cabecera: 'Categoría', ancho: 20 },

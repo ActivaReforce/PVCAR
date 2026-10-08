@@ -11,6 +11,7 @@ import {
   type Columna,
   type ContextoReporte,
   type Definicion,
+  type FiltrosDisponibles,
   type FiltrosReporte,
 } from './reportes.definiciones.js';
 import { GRAFICAS, type DefinicionGrafica, type FormaGrafica, type SerieGrafica } from './reportes.analisis.js';
@@ -38,6 +39,7 @@ export interface ReporteDisponible {
   titulo: string;
   descripcion: string;
   exigeRango: boolean;
+  filtros: FiltrosDisponibles;
   columnas: Columna[];
   /** Cuántas gráficas tiene su pestaña de análisis. 0 = no tiene. */
   graficas: number;
@@ -62,6 +64,7 @@ export function catalogo(actor: AuthUser): ReporteDisponible[] {
     titulo: d.titulo,
     descripcion: d.descripcion,
     exigeRango: d.exigeRango,
+    filtros: d.filtros,
     columnas: columnasVisibles(d, false),
     graficas: (GRAFICAS[d.id] ?? []).length,
     columnasSensibles: d.columnas.filter((c) => (d.columnasSensibles ?? []).includes(c.clave)),
