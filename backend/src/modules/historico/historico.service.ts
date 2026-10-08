@@ -287,6 +287,9 @@ async function escribirHoja(
   hoja.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: conjunto.columnas.length } };
 
   for (const fila of rows) hoja.addRow(proyectar(fila, conjunto.columnas)).commit();
+  if (rows.length === TOPE_EXPORTACION) {
+    hoja.addRow([`Cortado en el tope de ${TOPE_EXPORTACION} filas. Acota los filtros.`]).commit();
+  }
   hoja.commit();
   return rows.length;
 }
@@ -314,32 +317,12 @@ function nuevoLibro(destino: Writable): ExcelJS.stream.xlsx.WorkbookWriter {
 
 const generado = () => `${ahoraEc()} (hora de Ecuador)`;
 
-/** Los filtros escritos en palabras, con los nombres y no los ids. */
-async function describirFiltros(conjunto: Conjunto, f: FiltrosHistorico): Promise<Array<[string, string]>> {
-  const op = await opciones();
-  const nombre = (lista: Opcion[], id?: number) =>
-    id === undefined ? 'Todos' : (lista.find((o) => o.id === id)?.nombre ?? `#${id}`);
-  const admite = new Set(filtrosDe(conjunto));
-  const lineas: Array<[string, string]> = [];
-  if (admite.has('buscar')) lineas.push(['Texto buscado', f.buscar?.trim() || '—']);
-  if (admite.has('colegio')) lineas.push(['Colegio', nombre(op.colegios, f.colegio)]);
-  if (admite.has('actividad')) lineas.push(['Actividad', nombre(op.actividades, f.actividad)]);
-  if (admite.has('entrenador')) lineas.push(['Entrenador / registrador', nombre(op.entrenadores, f.entrenador)]);
-  if (admite.has('rol')) lineas.push(['Rol', nombre(op.roles, f.rol)]);
-  if (admite.has('estado')) lineas.push(['Estado', nombre(conjunto.estados ?? [], f.estado)]);
-  if (admite.has('asistencia')) lineas.push(['Asistencia', nombre(op.asistencia, f.asistencia)]);
-  if (admite.has('desde')) {
-    lineas.push([`Desde (${conjunto.rangoSobre ?? 'fecha'})`, f.desde ?? '—']);
-    lineas.push([`Hasta (${conjunto.rangoSobre ?? 'fecha'})`, f.hasta ?? '—']);
-  }
-  return lineas;
-}
-
 /**
  * Un conjunto, con los filtros de pantalla, en xlsx y en streaming.
  *
  * Lo que se ve es lo que se baja: mismos filtros y mismo orden que la tabla,
- * pero sin paginar. La hoja "Información" deja escritos los filtros.
+ * pero sin paginar. Una sola hoja: la de "Información" (campo/valor con los
+ * filtros) se quitó el 2026-10-07 a pedido del cliente, que no la usaba.
  */
 export async function exportar(
   actor: AuthUser,
@@ -348,23 +331,8 @@ export async function exportar(
   destino: Writable,
 ): Promise<number> {
   const conjunto = exigirConjunto(id);
-  const descripcion = await describirFiltros(conjunto, body);
-
   const libro = nuevoLibro(destino);
   const filas = await escribirHoja(libro, conjunto.titulo, conjunto, body, ordenDe(conjunto, body.orden, body.dir));
-
-  const lineas: Array<[string, string]> = [
-    ['Origen', ORIGEN],
-    ['Conjunto', conjunto.titulo],
-    ['Generado', generado()],
-    ['Generado por', actor.usuario.usu_nombre],
-    ['Filas', String(filas)],
-    ...descripcion,
-  ];
-  if (filas === TOPE_EXPORTACION) {
-    lineas.push(['Aviso', `Cortado en el tope de ${TOPE_EXPORTACION} filas. Acota los filtros.`]);
-  }
-  hojaDeInformacion(libro, lineas);
   await libro.commit();
 
   await auditar({

@@ -89,7 +89,7 @@ Y el **tablero** lleva la de asistencia en el tiempo, que es la que responde lo 
 | Abrir Reportes | Salen **solo los que puedes ver**. Un entrenador no debe ver el de Usuarios |
 | Abrir uno | Tabla con sus columnas, paginada de 50 en 50, con el total arriba |
 | Asistencias sin fechas | Aviso en ámbar y no consulta nada. Con fechas, funciona |
-| Filtrar y exportar | El Excel trae **lo mismo que la pantalla**, abre con una hoja "Resumen" ya agrupada y contada (2026-10-07), y cierra con la hoja "Filtros": qué se usó, quién lo generó y cuándo |
+| Filtrar y exportar | El Excel trae **lo mismo que la pantalla**, abre con una hoja "Resumen" ya agrupada y contada, con bordes y colores suaves, que dice periodo, quién lo generó y cuándo (2026-10-07). La hoja "Filtros" se quitó a pedido del cliente; en Data anterior, la de "Información" de cada conjunto también (se queda solo en "Exportar todo", donde hace de índice) |
 | Abrir el .xlsx | Cabeceras en negrita, fila fija, anchos razonables |
 | Exportar como coordinador | Solo sus colegios. **Cuadrar el número de filas** contra la pantalla |
 | Exportar sin `reportes:crear` | El botón no sale; por API, 403 |

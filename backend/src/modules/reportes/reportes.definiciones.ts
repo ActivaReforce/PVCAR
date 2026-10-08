@@ -438,6 +438,7 @@ const asistenciasAlumnos: Definicion = {
     { clave: 'hora_tarde', cabecera: 'Hora de llegada', ancho: 14 },
     { clave: 'razon', cabecera: 'Justificación', ancho: 40 },
     { clave: 'registrado_por', cabecera: 'Registrado por', ancho: 30 },
+    { clave: 'registrado_el', cabecera: 'Hora de registro', ancho: 17 },
   ],
   construir: (f, ctx) => ({
     sql: `
@@ -452,6 +453,7 @@ const asistenciasAlumnos: Definicion = {
              COALESCE(to_char(an.asisnino_hora_tarde, 'HH24:MI'), '')    AS hora_tarde,
              COALESCE(an.asisnino_razon_justificado, '')         AS razon,
              COALESCE(u.usu_nombre, '')                          AS registrado_por,
+             COALESCE(${textoEc('an.asisnino_fecha_registrado', 'DD/MM/YYYY HH24:MI')}, '') AS registrado_el,
              an.asisest_id                                       AS _asisest,
              COALESCE(${horarioTexto('cah')}, '')                AS _disc_horario
         FROM public.asistencia_nino an
@@ -501,6 +503,7 @@ const asistenciasEntrenadores: Definicion = {
     { clave: 'hora_tarde', cabecera: 'Hora de llegada', ancho: 14 },
     { clave: 'razon', cabecera: 'Justificación', ancho: 40 },
     { clave: 'registrado_por', cabecera: 'Registrado por', ancho: 30 },
+    { clave: 'registrado_el', cabecera: 'Hora de registro', ancho: 17 },
   ],
   /**
    * Las dos tablas en una sola lista. El sistema viejo tenía la de auxiliares
@@ -517,6 +520,7 @@ const asistenciasEntrenadores: Definicion = {
              COALESCE(to_char(ae.asisent_hora_tarde, 'HH24:MI'), '')  AS hora_tarde,
              COALESCE(ae.asisent_razon_justificado, '')     AS razon,
              COALESCE(reg.usu_nombre, '')                   AS registrado_por,
+             COALESCE(${textoEc('ae.asisent_fecha_registrado', 'DD/MM/YYYY HH24:MI')}, '') AS registrado_el,
              ae.asisent_fecha                               AS _orden,
              ae.ent_id                                      AS _persona,
              ae.asisest_id                                  AS _asisest
@@ -541,6 +545,7 @@ const asistenciasEntrenadores: Definicion = {
              COALESCE(to_char(aa.asisaux_hora_tarde, 'HH24:MI'), ''),
              COALESCE(aa.asisaux_razon_justificado, ''),
              COALESCE(reg.usu_nombre, ''),
+             COALESCE(${textoEc('aa.asisaux_fecha_registrado', 'DD/MM/YYYY HH24:MI')}, ''),
              aa.asisaux_fecha,
              aa.usu_id,
              aa.asisest_id
@@ -555,7 +560,7 @@ const asistenciasEntrenadores: Definicion = {
          AND ($6::int[] IS NULL OR aa.col_id = ANY($6::int[]))
          AND ($7::int IS NULL OR aa.asisest_id = $7)
 
-       ORDER BY 9 DESC, 2, 4`,
+       ORDER BY 10 DESC, 2, 4`,
     params: [
       ctx.global,
       ctx.colegios,

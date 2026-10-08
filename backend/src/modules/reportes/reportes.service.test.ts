@@ -356,7 +356,7 @@ describe('el xlsx', () => {
    * streaming eso lanza un TypeError: la descarga se cortaba siempre. Ninguna
    * prueba generaba el archivo, así que no se vio.
    */
-  it('sale entero: Resumen primero, detalle con cabecera fija y hoja de filtros', async () => {
+  it('sale entero: Resumen con formato primero, detalle con cabecera fija, sin hoja de filtros', async () => {
     const { PassThrough } = await import('node:stream');
     const ExcelJS = (await import('exceljs')).default;
     const salida = new PassThrough();
@@ -367,8 +367,15 @@ describe('el xlsx', () => {
 
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(Buffer.concat(trozos) as never);
-    expect(libro.worksheets.map((h) => h.name)).toEqual(['Resumen', 'Usuarios', 'Filtros']);
-    expect(libro.worksheets[0]!.getRow(1).getCell(1).value).toBe('Resumen — Usuarios');
+    expect(libro.worksheets.map((h) => h.name)).toEqual(['Resumen', 'Usuarios']);
+    const resumen = libro.worksheets[0]!;
+    expect(resumen.getRow(1).getCell(1).value).toBe('Resumen — Usuarios');
+    expect(String(resumen.getRow(2).getCell(1).value)).toContain('por Ana Karina');
+    // La cabecera de cada tabla lleva fondo y bordes.
+    const cabecera = resumen.getColumn(1).values.findIndex((v) => v === 'Estado');
+    const celda = resumen.getRow(cabecera).getCell(1);
+    expect(celda.fill).toMatchObject({ type: 'pattern', pattern: 'solid' });
+    expect(celda.border?.bottom?.style).toBe('thin');
     expect(libro.worksheets[1]!.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
     expect(libro.worksheets[1]!.getRow(2).getCell(2).value).toBe('Ana');
   });
