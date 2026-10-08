@@ -23,6 +23,13 @@ Vigente desde la migración `0026_permisos_crud.sql` (2026-10-07). Sale de las r
 | Perfil | Ver y editar el propio perfil | — | — | — |
 | Permisos | Ver la matriz | — | Guardar la matriz | — |
 
+## Combinaciones que no se pueden guardar
+
+- **Crear, Editar o Eliminar sin Ver** en el mismo módulo. En la pantalla, marcar una de ellas marca Ver; desmarcar Ver quita las demás.
+- **Calificar evaluaciones sin Ver en Evaluaciones**: la pestaña de calificar vive dentro de Evaluaciones.
+
+El backend las rechaza con 400 aunque lleguen por otro lado (`permisos.service.ts`). En la pantalla, el icono **!** junto a cada módulo explica en una línea qué hace cada casilla; el texto vive en `AYUDA` de `pages/Permisos.tsx`.
+
 ## Reglas que van por encima de la casilla
 
 - **Plantilla de evaluación compartida:** quien no es Propietario ni Admin solo la cambia si **todas** las disciplinas que la usan están en su alcance (`exigirEditable` en `evaluaciones.service.ts`). Si no, 409.
