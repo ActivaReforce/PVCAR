@@ -84,11 +84,11 @@ Esto **vacía la Fase 16**: se caen el dump fresco, los 19 chequeos de compatibi
 
 ### Corte de sesión — 2026-10-07 (cierre)
 
-**Hecho en esta sesión (todo en `dev`; `main` sigue en el PR #11, `d90198b`):**
+**Hecho en esta sesión — en `main` desde el PR #12 (`bcb5454`, 2026-10-07); `dev` y `main` iguales:**
 
 - **Reportes (punto 5):** hoja **Resumen** primera en los 9 Excel (`de595e8`), con bordes y colores suaves —estilo aprobado por el cliente, mantenerlo en todo Excel nuevo—; sin hoja "Filtros" (`60e60d9`); columna **Hora de registro** en las dos asistencias; cada reporte enseña solo sus filtros, con estado propio (Presente/Tarde/Justificado/Ausente, Pendiente/Evaluado) y filtro de disciplina (`d6422da`); **auxiliares** en el reporte de Entrenadores con Tipo y "Acompaña a" (`fed7fb5`).
 - **Permisos (punto 6):** casillas con sentido CRUD (`eb08f3f`, migración `0026`): Asistencias Editar = pasar lista; **Calificar evaluaciones** separado de la plantilla; plantilla compartida solo la cambia quien tiene todas sus disciplinas; Encuestas Ver/Crear/Editar/Eliminar con resultados por alcance; Permisos Editar = guardar; fuera "Reporte del Estudiante". Icono **!** con la explicación de cada casilla y combinaciones sin sentido bloqueadas en pantalla y backend (`dc017c0`). Tabla vigente en `PVCAR/docs/permisos.md`.
-- **`0026` corrida en `PVCAR_Dev`** y verificada por MCP el 2026-10-07: cuadra rol por rol, ningún rol con combinaciones sin sentido. **En prod se corre el mismo día del PR a `main`, no antes** (el código viejo de prod califica con `evaluaciones:editar`, que la `0026` le quita al Entrenador).
+- **`0026` corrida en `PVCAR_Dev`** y verificada por MCP el 2026-10-07: cuadra rol por rol, ningún rol con combinaciones sin sentido. **`0026` corrida también en `PVCAR` (prod)** y verificada por MCP el 2026-10-07: idéntica a dev, 0 combinaciones sin sentido. No queda SQL pendiente.
 - 605 pruebas automáticas en verde; lint y build limpios.
 
 **Puntos 5 y 6 cerrados en código.** Les falta solo la prueba en pantalla del cliente:
@@ -108,7 +108,7 @@ Esto **vacía la Fase 16**: se caen el dump fresco, los 19 chequeos de compatibi
 13. **Siembra de prod:** quitar de `PVCAR` lo de prueba que dejó la `0004` (Colegio de Pruebas Dev, su actividad y sus disciplinas) y dejar el primer Propietario real. `.sql` por escribir.
 14. **Fase 15 — Endurecimiento y QA:** auditoría de fugas con un token por rol, pruebas e2e y repaso de accesibilidad.
 15. **Fase 16 — Lanzamiento:** dominio propio, PR final a `main`, comprobar `/api/v1/health` en producción y arrancar con la plataforma vacía (arranque de cero: no se migran datos; lo viejo está en el esquema `archivo`).
-16. **Fase 17 — Apagar lo viejo:** borrar la base vieja (`wfyytrdhqtspapxaikoh`) y retirar `activa-forge-login/`, rotar los PAT de Supabase de `.mcp.json` y pasar el repo a privado.
+16. **Fase 17 — Apagar lo viejo:** borrar la base vieja (`wfyytrdhqtspapxaikoh`) y retirar `activa-forge-login/`, rotar los PAT de Supabase de `.mcp.json`, **borrar `CLAUDE.md` y `Roadmap.md` del repo** (están solo para trabajar desde otro equipo) y pasar el repo a privado.
 
 Pendiente del cliente: borrar `CORREO_REMITENTE` de Railway.
 
