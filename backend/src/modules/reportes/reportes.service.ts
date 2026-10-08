@@ -16,6 +16,7 @@ import {
 import { GRAFICAS, type DefinicionGrafica, type FormaGrafica, type SerieGrafica } from './reportes.analisis.js';
 import type { ConsultaQuery, FiltrosQuery } from './reportes.schemas.js';
 import { ahoraEc, hoyEc } from '../../lib/fecha.js';
+import { resumenDe, type Bloque } from './reportes.resumen.js';
 
 /**
  * Reportes.
@@ -184,8 +185,8 @@ export interface Exportacion {
  * así que el servidor nunca tiene el archivo entero en memoria. Es lo que
  * permite exportar decenas de miles de filas desde un contenedor pequeño.
  *
- * La primera hoja lleva los datos; **la segunda, los filtros con los que se
- * sacó**. Sin eso, dos Excel del mismo reporte son indistinguibles y nadie
+ * Tres hojas: **el Resumen** —ya agrupado y contado, para que nadie trabaje
+ * el Excel a mano—, **el detalle** y **los filtros con los que se sacó**. Sin eso, dos Excel del mismo reporte son indistinguibles y nadie
  * sabe cuál mirar tres semanas después — que es justo lo que pasa hoy.
  */
 export async function exportar(
@@ -209,6 +210,17 @@ export async function exportar(
   const columnas = columnasVisibles(definicion, conSensibles);
 
   /*
+   * Las filas se traen antes de abrir ninguna hoja: el Resumen va primero y
+   * se calcula sobre ellas. Ya se tenían enteras en memoria igualmente.
+   */
+  const { rows } = await getPool().query<Record<string, unknown>>(
+    `SELECT * FROM (${sql}) r LIMIT $${params.length + 1}`,
+    [...params, TOPE_EXPORTACION],
+  );
+
+  escribirResumen(libro, definicion.titulo, filtros, resumenDe(definicion.id, rows, filtros));
+
+  /*
    * La fila de cabecera fija va en las opciones de `addWorksheet`: en el
    * escritor en streaming `views` solo tiene getter, y asignarlo después lanza
    * un TypeError con las cabeceras ya enviadas — la descarga se cortaba siempre.
@@ -222,11 +234,6 @@ export async function exportar(
     width: c.ancho,
   }));
   hoja.getRow(1).font = { bold: true };
-
-  const { rows } = await getPool().query<Record<string, unknown>>(
-    `SELECT * FROM (${sql}) r LIMIT $${params.length + 1}`,
-    [...params, TOPE_EXPORTACION],
-  );
 
   for (const fila of rows) {
     hoja.addRow(proyectar(fila, columnas)).commit();
@@ -290,6 +297,63 @@ export async function exportar(
 
   const sello = hoyEc();
   return { nombreArchivo: `${definicion.id}-${sello}.xlsx`, filas: rows.length };
+}
+
+/**
+ * Escribe los bloques del Resumen uno debajo de otro: título, nota, cabecera,
+ * filas y un renglón en blanco. El ancho de cada columna es el del texto más
+ * largo que cae en ella, con un tope para que una lista de nombres no la
+ * estire de más.
+ */
+function escribirResumen(
+  libro: ExcelJS.stream.xlsx.WorkbookWriter,
+  titulo: string,
+  filtros: FiltrosReporte,
+  bloques: Bloque[],
+): void {
+  const hoja = libro.addWorksheet('Resumen');
+
+  const anchos: number[] = [];
+  for (const b of bloques) {
+    for (const fila of [b.cabeceras, ...b.filas]) {
+      fila.forEach((celda, i) => {
+        anchos[i] = Math.min(Math.max(anchos[i] ?? 10, String(celda).length + 2), 50);
+      });
+    }
+  }
+  anchos[0] = Math.max(anchos[0] ?? 10, 28);
+  hoja.columns = anchos.map((width) => ({ width }));
+
+  const negrita = (valores: unknown[], extra: Partial<ExcelJS.Font> = {}) => {
+    const fila = hoja.addRow(valores);
+    fila.font = { bold: true, ...extra };
+    fila.commit();
+  };
+
+  negrita([`Resumen — ${titulo}`], { size: 14 });
+  const periodo = filtros.desde && filtros.hasta ? `Del ${filtros.desde} al ${filtros.hasta}. ` : '';
+  hoja.addRow([`${periodo}Los filtros completos están en la hoja "Filtros"; el detalle, en la siguiente.`]).commit();
+  hoja.addRow([]).commit();
+
+  if (bloques.length === 0) {
+    hoja.addRow(['Sin datos con estos filtros.']).commit();
+  }
+  for (const b of bloques) {
+    negrita([b.titulo], { size: 12 });
+    if (b.nota) {
+      const nota = hoja.addRow([b.nota]);
+      nota.font = { italic: true };
+      nota.commit();
+    }
+    negrita(b.cabeceras);
+    const destacadas = new Set(b.destacadas);
+    b.filas.forEach((valores, i) => {
+      if (destacadas.has(i)) negrita(valores);
+      else hoja.addRow(valores).commit();
+    });
+    hoja.addRow([]).commit();
+  }
+  hoja.commit();
 }
 
 // ---------------------------------------------------------------------------

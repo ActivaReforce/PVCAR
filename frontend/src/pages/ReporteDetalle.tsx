@@ -37,7 +37,7 @@ const TODOS = 'todos';
  * aquí. El sistema viejo tenía nueve páginas y dieciocho componentes.
  *
  * **Lo que se ve es lo que se exporta.** Los mismos filtros van a la consulta
- * y al Excel, y el archivo lleva una segunda hoja que los deja escritos. Antes
+ * y al Excel, y el archivo lleva una hoja "Filtros" que los deja escritos (y abre con una hoja "Resumen"). Antes
  * la pestaña de análisis y la de exportar tenían filtros distintos y nadie
  * podía saber con qué criterios se había sacado una hoja.
  */

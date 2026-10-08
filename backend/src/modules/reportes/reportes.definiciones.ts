@@ -134,6 +134,10 @@ const usuarios: Definicion = {
                          FROM public.usuario_rol ur
                          JOIN public.rol r ON r.rol_id = ur.rol_id
                         WHERE ur.usu_id = u.usu_id), 'Sin rol') AS roles,
+             ARRAY(SELECT r.rol_titulo
+                     FROM public.usuario_rol ur
+                     JOIN public.rol r ON r.rol_id = ur.rol_id
+                    WHERE ur.usu_id = u.usu_id ORDER BY r.rol_id) AS _roles,
              e.est_nombre                                       AS estado,
              ${textoEc('u.usu_fecha_creacion', 'DD/MM/YYYY')}        AS usu_fecha_creacion
         FROM public.usuario u
@@ -308,6 +312,9 @@ const entrenadores: Definicion = {
              COALESCE((SELECT string_agg(DISTINCT c.col_nombre, ', ')
                          FROM suyas s JOIN public.colegio c ON c.col_id = s.col_id
                         WHERE s.ent_id = en.ent_id), '') AS colegios,
+             ARRAY(SELECT DISTINCT c.col_nombre
+                     FROM suyas s JOIN public.colegio c ON c.col_id = s.col_id
+                    WHERE s.ent_id = en.ent_id)  AS _colegios,
              (SELECT count(*) FROM suyas s WHERE s.ent_id = en.ent_id)::int AS disciplinas,
              (SELECT count(DISTINCT na.nino_id)
                 FROM suyas s
@@ -367,6 +374,16 @@ const estudiantes: Definicion = {
                          JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = na.colacthor_id
                          JOIN public.actividad a ON a.act_id = cah.act_id
                         WHERE na.nino_id = n.nino_id AND na.est_id = ${ESTADO.ACTIVO}), '') AS disciplinas,
+             (SELECT COALESCE(json_agg(json_build_object(
+                         'id', cah.colacthor_id,
+                         'colegio', cc.col_nombre,
+                         'actividad', a.act_nombre,
+                         'horario', COALESCE(${horarioTexto('cah')}, ''))), '[]'::json)
+                FROM public.nino_asignacion na
+                JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = na.colacthor_id
+                JOIN public.colegio cc  ON cc.col_id = cah.col_id
+                JOIN public.actividad a ON a.act_id = cah.act_id
+               WHERE na.nino_id = n.nino_id AND na.est_id = ${ESTADO.ACTIVO}) AS _disciplinas,
              COALESCE((SELECT string_agg(u.usu_nombre, ', ' ORDER BY u.usu_nombre)
                          FROM public.nino_padre np
                          JOIN public.padre p ON p.padre_id = np.padre_id
@@ -434,7 +451,9 @@ const asistenciasAlumnos: Definicion = {
              ae.asisest_nombre                                   AS estado,
              COALESCE(to_char(an.asisnino_hora_tarde, 'HH24:MI'), '')    AS hora_tarde,
              COALESCE(an.asisnino_razon_justificado, '')         AS razon,
-             COALESCE(u.usu_nombre, '')                          AS registrado_por
+             COALESCE(u.usu_nombre, '')                          AS registrado_por,
+             an.asisest_id                                       AS _asisest,
+             COALESCE(${horarioTexto('cah')}, '')                AS _disc_horario
         FROM public.asistencia_nino an
         JOIN public.nino n ON n.nino_id = an.nino_id
         JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = an.colacthor_id
@@ -498,7 +517,9 @@ const asistenciasEntrenadores: Definicion = {
              COALESCE(to_char(ae.asisent_hora_tarde, 'HH24:MI'), '')  AS hora_tarde,
              COALESCE(ae.asisent_razon_justificado, '')     AS razon,
              COALESCE(reg.usu_nombre, '')                   AS registrado_por,
-             ae.asisent_fecha                               AS _orden
+             ae.asisent_fecha                               AS _orden,
+             ae.ent_id                                      AS _persona,
+             ae.asisest_id                                  AS _asisest
         FROM public.asistencia_entrenador ae
         JOIN public.colegio c ON c.col_id = ae.col_id
         JOIN public.usuario u ON u.usu_id = ae.ent_id
@@ -520,7 +541,9 @@ const asistenciasEntrenadores: Definicion = {
              COALESCE(to_char(aa.asisaux_hora_tarde, 'HH24:MI'), ''),
              COALESCE(aa.asisaux_razon_justificado, ''),
              COALESCE(reg.usu_nombre, ''),
-             aa.asisaux_fecha
+             aa.asisaux_fecha,
+             aa.usu_id,
+             aa.asisest_id
         FROM public.asistencia_auxiliar aa
         JOIN public.colegio c ON c.col_id = aa.col_id
         JOIN public.usuario u ON u.usu_id = aa.usu_id
@@ -578,7 +601,8 @@ const evaluaciones: Definicion = {
                   THEN round(COALESCE(p.puntaje, 0) * 100 / e.eva_puntaje_total)::int
                   ELSE 0 END                          AS porcentaje,
              COALESCE(${textoEc('np.evaninopen_fecha_finalizacion', 'DD/MM/YYYY')}, '') AS finalizacion,
-             COALESCE(reg.usu_nombre, '')             AS evaluado_por
+             COALESCE(reg.usu_nombre, '')             AS evaluado_por,
+             np.est_id                                AS _est
         FROM public.evaluacion_nino_pendiente np
         JOIN public.evaluacion e ON e.eva_id = np.eva_id
         JOIN public.nino_asignacion na ON na.ninoasig_id = np.ninoasig_id
