@@ -10,7 +10,7 @@ Este documento sustituye a `Plan.md`. El historial de sesiones anteriores quedó
 
 > **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/`, `Backup_bd/`, `Bitacora.md`, `activa-forge-login/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben: llevan datos de menores, respaldos o claves.
 
-**Corte de este documento: 2026-10-07, cierre (Reportes y Permisos hechos; siguiente: punto 7, asistencia más fluida).**
+**Corte de este documento: 2026-10-08 (punto 7 hecho — asistencia más fluida; siguiente: punto 8, Novedades, preguntar antes de construir).**
 
 ---
 
@@ -81,6 +81,33 @@ La empresa está **en pausa un mes**. Decisión del cliente, aprobada por la emp
 5. **Libertad para cambiar el modelo:** sin datos viejos en `public`, cualquier cambio de schema deja de tener que respetarlos.
 
 Esto **vacía la Fase 16**: se caen el dump fresco, los 19 chequeos de compatibilidad, el backfill de Auth, la carga con los triggers apagados, la copia del bucket y la corrección del correo de Bernard.
+
+### Corte de sesión — 2026-10-08
+
+**Hecho hoy (todo en `dev`, pendiente PR a `main`):**
+
+- **Punto 7 — tomar asistencia más fluido** (`58ce2e8`, `dbb5b7e`, `9d7d215`). Entrada **"Mi día"** con tarjetas de las clases u colegios de hoy en el alcance (propietario y coordinador de varios colegios ven las tarjetas agrupadas por colegio con cabecera; con un solo colegio no hay cabecera). Un tap entra con fecha = hoy; botón "Otra clase o fecha" cae al flujo con selects. La tarjeta de la clase que está pasando ahora se pinta en verde.
+- **Botón único "Presentes a los N y guardar"**, arriba y abajo de la lista: marca a los que no tienen estado como Presente **y** guarda todo (los Ausente/Tarde/Justificado ya puestos no se tocan). Mientras quede alguien sin marcar sigue siendo ese botón; en cuanto todos tienen estado, pasa a "Guardar N". Resuelve el bug reportado por el cliente de que al marcar un ausente manual el botón se bloqueaba en "Guardar".
+- **Hora de "Tarde" autorrellenada con hora de Ecuador** del momento (nuevo `horaEcAhora` en `lib/fecha.ts`): el caso real es un ausente al que llega el alumno y el entrenador lo pasa a Tarde; la hora útil es ahora. Si se vuelve a tocar Tarde, se refresca. Editable a mano.
+- **Buscador siempre visible** sobre la lista (nombre + grado en alumnos, nombre + disciplina + titular en entrenadores).
+- **Fila más compacta en móvil** (padding py-2, avatar 36 px, tipografía más apretada) manteniendo los 44 px táctiles de los 4 botones de estado.
+- **`envio(incluyeRestantes)`** en `useBorradorAsistencia`: calcula el lote de forma síncrona para que "Presentes a los N y guardar" no sufra del stale state al chainear `setState` + `mutate`.
+- 7/7 tests de frontend, 605/605 de backend, lint sin errores y build limpio.
+
+**Al retomar — lista de trabajo, uno por uno:**
+
+1–7. ~~Fechas · Cambio de entrenador · Correos · Correo de aprobación · Reportes · Permisos · Asistencia más fluida~~ — hechos.
+8. **Módulo Novedades** — **preguntar antes de construir.** Cualquier rol escribe una novedad o incidencia. Tipos: general (la ven los Propietarios; correo a gerencia), sobre un alumno (correo a gerencia y al representante) y sobre un entrenador (correo al entrenador y a gerencia). Se ve quién la escribió. Remitente y destinatarios en `correo_config`, con el mismo componente de Configuración que Inscripciones.
+9. **Aviso automático de ausencia:** correo al representante cuando su hijo queda ausente; cada envío queda registrado en Novedades. Depende del 8.
+10. **Pagos mensuales** — módulo nuevo o parte de Inscripciones. **Espera a que el cliente lo cuente;** no empezar sin eso.
+11. **Pruebas en pantalla del cliente** de lo que está en `dev` sin probar: Reportes (hoja Resumen, filtros, auxiliares en Entrenadores), Permisos (icono **!**, casillas nuevas, entrenador que califica pero no cambia plantillas), **asistencia nueva** (Mi día agrupada, botón único, hora autorrellenada, buscador, filas compactas en móvil) y las Fases 9–14 que falten (`docs/checklist-modulos.md`).
+12. **Decisiones pendientes del cliente:** fechas futuras en asistencia (Fase 11 §4; el sistema viejo las permitía), Mobak escalado al puntaje del parámetro (Fase 12 §4), información de salud en el reporte de Alumnos (Fase 13 §4) y flujo de invitación por correo en vez de contraseña puesta por el admin.
+13. **Siembra de prod:** quitar de `PVCAR` lo de prueba que dejó la `0004` (Colegio de Pruebas Dev, su actividad y sus disciplinas) y dejar el primer Propietario real. `.sql` por escribir.
+14. **Fase 15 — Endurecimiento y QA:** auditoría de fugas con un token por rol, pruebas e2e y repaso de accesibilidad.
+15. **Fase 16 — Lanzamiento:** dominio propio, PR final a `main`, comprobar `/api/v1/health` en producción y arrancar con la plataforma vacía.
+16. **Fase 17 — Apagar lo viejo:** borrar la base vieja, retirar `activa-forge-login/`, rotar PAT, borrar `CLAUDE.md` y `Roadmap.md` del repo y pasar el repo a privado.
+
+No hay SQL pendiente. Pendiente del cliente: borrar `CORREO_REMITENTE` de Railway.
 
 ### Corte de sesión — 2026-10-07 (cierre)
 
