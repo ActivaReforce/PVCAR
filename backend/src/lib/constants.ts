@@ -49,8 +49,9 @@ export type EstadoId = (typeof ESTADO)[keyof typeof ESTADO];
 
 /**
  * Modulos de rol_permiso. Mismo listado que el frontend, que lo usa para
- * pintar la matriz de permisos. `reporte_estudiante` existe en los datos
- * reales aunque el frontend viejo no lo declaraba en constants/modules.ts.
+ * pintar la matriz de permisos. `calificaciones` (calificar a los alumnos)
+ * se separó de `evaluaciones` (la plantilla) en la 0026; `reporte_estudiante`
+ * se quitó ahí mismo: no abría ninguna pantalla.
  */
 export const MODULOS = [
   'dashboard',
@@ -61,11 +62,11 @@ export const MODULOS = [
   'entrenadores',
   'estudiantes',
   'evaluaciones',
+  'calificaciones',
   'asistencias_estudiantes',
   'asistencias_entrenadores',
   'encuestas',
   'reportes',
-  'reporte_estudiante',
   'perfil',
   'permisos',
   'inscripciones',

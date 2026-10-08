@@ -46,17 +46,21 @@ const MODULE_ACTIONS: Record<string, string[]> = {
   entrenadores: ['ver', 'editar'],
   estudiantes: ['ver', 'crear', 'editar', 'eliminar'],
   evaluaciones: ['ver', 'crear', 'editar', 'eliminar'],
-  asistencias_estudiantes: ['ver'],
-  asistencias_entrenadores: ['ver'],
-  encuestas: ['ver'],
+  // Ver = notas y pendientes; Editar = calificar o quitar la pendiente.
+  calificaciones: ['ver', 'editar'],
+  // Ver = consultar; Editar = pasar lista.
+  asistencias_estudiantes: ['ver', 'editar'],
+  asistencias_entrenadores: ['ver', 'editar'],
+  // Ver = lista y resultados de su alcance; Editar = preguntas, publicar, cerrar.
+  encuestas: ['ver', 'crear', 'editar', 'eliminar'],
   // Ver = la lista (un representante solo ve las suyas); Editar = aprobar,
   // documentos y valores; Eliminar = rechazar. Editar y Eliminar solo
   // funcionan para Propietario y Admin, se marquen a quien se marquen.
   inscripciones: ['ver', 'editar', 'eliminar'],
   reportes: ['ver', 'crear'],
-  reporte_estudiante: ['ver'],
   perfil: ['ver'],
-  permisos: ['ver'],
+  // Ver = la matriz; Editar = guardarla (solo Propietario y Admin).
+  permisos: ['ver', 'editar'],
 };
 
 const ROL_PROPIETARIO = 1;
@@ -66,7 +70,7 @@ const clave = (modulo: string, accion: string) => `${modulo}:${accion}`;
 const Permisos: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { reloadPermissions, user } = useAuth();
+  const { reloadPermissions, user, hasPermission } = useAuth();
   const [selectedRole, setSelectedRole] = React.useState<string>('');
   const [marcados, setMarcados] = React.useState<Set<string>>(new Set());
 
@@ -112,8 +116,8 @@ const Permisos: React.FC = () => {
     },
   });
 
-  const bloqueado = (modulo: string, accion: string) =>
-    selectedRole === String(ROL_PROPIETARIO) && modulo === 'permisos' && accion === 'ver';
+  const bloqueado = (modulo: string, _accion: string) =>
+    selectedRole === String(ROL_PROPIETARIO) && modulo === 'permisos';
 
   const activo = (modulo: string, accion: string) =>
     bloqueado(modulo, accion) || marcados.has(clave(modulo, accion));
@@ -211,7 +215,10 @@ const Permisos: React.FC = () => {
             </table>
 
             <div className="mt-4 flex justify-end">
-              <Button onClick={() => guardar.mutate()} disabled={guardar.isPending}>
+              <Button
+                onClick={() => guardar.mutate()}
+                disabled={guardar.isPending || !hasPermission('permisos', 'editar')}
+              >
                 {guardar.isPending ? 'Guardando...' : 'Guardar'}
               </Button>
             </div>

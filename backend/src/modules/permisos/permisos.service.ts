@@ -62,8 +62,9 @@ export async function matriz(): Promise<MatrizPermisos> {
  *
  * Dos guardas que el sistema viejo no tenia:
  *   - solo un rol global (Propietario o Admin) puede tocar la matriz;
- *   - al Propietario no se le puede quitar `permisos.ver`. Es la llave de esta
- *     misma pantalla: sin ella nadie podria volver a repartir permisos y el
+ *   - al Propietario no se le puede quitar `permisos.ver` ni `permisos.editar`
+ *     (esta desde la 0026: guardar la matriz). Son la llave de esta misma
+ *     pantalla: sin ellas nadie podria volver a repartir permisos y el
  *     sistema se cierra por dentro sin forma de abrirlo desde la aplicacion.
  */
 export async function reemplazarPermisosDeRol(
@@ -92,7 +93,9 @@ export async function reemplazarPermisosDeRol(
 
   if (
     rolId === ROL.PROPIETARIO &&
-    !permisos.some((p) => p.modulo === 'permisos' && p.accion === 'ver')
+    !['ver', 'editar'].every((accion) =>
+      permisos.some((p) => p.modulo === 'permisos' && p.accion === accion),
+    )
   ) {
     throw new ApiError(
       409,

@@ -183,7 +183,7 @@ describe('el ciclo de estados', () => {
 
   it('una encuesta inexistente da 404', async () => {
     encuesta = null;
-    await expect(service.ficha(7)).rejects.toMatchObject({ statusCode: 404 });
+    await expect(service.ficha(gestor, 7)).rejects.toMatchObject({ statusCode: 404 });
   });
 });
 

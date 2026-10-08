@@ -1,4 +1,5 @@
 import { auditar } from '../../lib/auditoria.js';
+import { alcanceDe } from '../../lib/alcance.js';
 import { ESTADO } from '../../lib/constants.js';
 import { enTransaccion } from '../../lib/tx.js';
 import type { AuthUser } from '../../middleware/auth.js';
@@ -49,11 +50,16 @@ export async function tipos() {
   return repo.listarTipos();
 }
 
+async function alcanceEncuestas(actor: AuthUser): Promise<repo.AlcanceEncuestas> {
+  const { global, colegios, disciplinas } = await alcanceDe(actor.usuario);
+  return { global, colegios, disciplinas };
+}
+
 export async function listar(actor: AuthUser, query: z.infer<typeof listarEncuestasSchema>) {
-  void actor;
   return repo.listarEncuestas(
     query.buscar && query.buscar.length > 0 ? query.buscar : null,
     query.estado ?? null,
+    await alcanceEncuestas(actor),
   );
 }
 
@@ -62,14 +68,17 @@ export interface FichaEncuesta {
   preguntas: repo.PreguntaDetalle[];
 }
 
-async function exigirEncuesta(encuId: number): Promise<repo.EncuestaListada> {
-  const encuesta = await repo.obtenerEncuesta(encuId);
+async function exigirEncuesta(
+  encuId: number,
+  alcance: repo.AlcanceEncuestas = repo.TODO,
+): Promise<repo.EncuestaListada> {
+  const encuesta = await repo.obtenerEncuesta(encuId, alcance);
   if (!encuesta) throw new ApiError(404, 'Esa encuesta no existe');
   return encuesta;
 }
 
-export async function ficha(encuId: number): Promise<FichaEncuesta> {
-  const encuesta = await exigirEncuesta(encuId);
+export async function ficha(actor: AuthUser, encuId: number): Promise<FichaEncuesta> {
+  const encuesta = await exigirEncuesta(encuId, await alcanceEncuestas(actor));
   return { encuesta, preguntas: await repo.listarPreguntas(encuId) };
 }
 
@@ -120,7 +129,7 @@ export async function crear(
     return nuevoId;
   });
 
-  return ficha(encuId);
+  return ficha(actor, encuId);
 }
 
 export async function actualizar(
@@ -140,7 +149,7 @@ export async function actualizar(
     );
   });
 
-  return ficha(encuId);
+  return ficha(actor, encuId);
 }
 
 export async function guardarPreguntas(
@@ -164,7 +173,7 @@ export async function guardarPreguntas(
     );
   });
 
-  return ficha(encuId);
+  return ficha(actor, encuId);
 }
 
 /**
@@ -195,7 +204,7 @@ export async function finalizar(actor: AuthUser, encuId: number): Promise<FichaE
     );
   });
 
-  return ficha(encuId);
+  return ficha(actor, encuId);
 }
 
 /**
@@ -231,7 +240,7 @@ export async function volverABorrador(actor: AuthUser, encuId: number): Promise<
     );
   });
 
-  return ficha(encuId);
+  return ficha(actor, encuId);
 }
 
 /**
@@ -268,7 +277,7 @@ export async function publicar(actor: AuthUser, encuId: number): Promise<FichaEn
     );
   });
 
-  return ficha(encuId);
+  return ficha(actor, encuId);
 }
 
 export async function impacto(encuId: number): Promise<repo.ImpactoEncuesta> {
@@ -311,9 +320,10 @@ export interface Resultados {
   preguntas: repo.ResultadoPregunta[];
 }
 
-export async function resultados(encuId: number): Promise<Resultados> {
-  const encuesta = await exigirEncuesta(encuId);
-  return { encuesta, preguntas: await repo.resultados(encuId) };
+export async function resultados(actor: AuthUser, encuId: number): Promise<Resultados> {
+  const alcance = await alcanceEncuestas(actor);
+  const encuesta = await exigirEncuesta(encuId, alcance);
+  return { encuesta, preguntas: await repo.resultados(encuId, alcance) };
 }
 
 // ---------------------------------------------------------------------------

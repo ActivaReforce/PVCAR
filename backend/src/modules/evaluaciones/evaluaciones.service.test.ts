@@ -429,6 +429,28 @@ describe('borrado permanente de la plantilla', () => {
   });
 });
 
+/**
+ * 2026-10-07: cambiar una plantilla que usan disciplinas fuera de tu alcance
+ * cambiaba cómo se califica en colegios que no son tuyos.
+ */
+describe('una plantilla compartida', () => {
+  it('la coordinadora no la cambia si la usa otra disciplina que no es suya', async () => {
+    await expect(service.darDeBaja(coordinadora, 43)).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      service.guardarParametros(coordinadora, 43, [comoInput(PARAMETRO)]),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('sí la cambia si todas las que la usan son suyas', async () => {
+    vinculadas = [{ evaasig_id: 1, colacthor_id: 60, est_id: ESTADO.ACTIVO }];
+    await expect(service.darDeBaja(coordinadora, 43)).resolves.toBeTruthy();
+  });
+
+  it('el propietario la cambia siempre', async () => {
+    await expect(service.darDeBaja(propietario, 43)).resolves.toBeTruthy();
+  });
+});
+
 describe('baja y reactivacion', () => {
   it('no se puede dar de baja dos veces', async () => {
     evaluacion = { ...EVALUACION, est_id: ESTADO.INACTIVO };

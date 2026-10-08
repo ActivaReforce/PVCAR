@@ -655,7 +655,7 @@ const evaluaciones: Definicion = {
   id: 'evaluaciones',
   titulo: 'Evaluaciones',
   descripcion: 'Una fila por alumno y evaluación, con su puntaje.',
-  modulo: 'evaluaciones',
+  modulo: 'calificaciones',
   exigeRango: false,
   filtros: {
     colegio: true,

@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import BarraGuardar from '@/components/asistencias/BarraGuardar';
+import { usePermissions } from '@/hooks/usePermissions';
 import FilaAsistencia from '@/components/asistencias/FilaAsistencia';
 import HistorialDisciplina from '@/components/asistencias/HistorialDisciplina';
 import ResumenAsistencia from '@/components/asistencias/ResumenAsistencia';
@@ -73,6 +74,8 @@ const enLetras = (iso: string) =>
  * disciplina ajena aunque se le pase el id a mano.
  */
 const AsistenciasAlumnos = () => {
+  const { hasPermission } = usePermissions();
+  const puedePasarLista = hasPermission('asistencias_estudiantes', 'editar');
   const contexto = useContextoAsistencias();
   const hoy = contexto.data?.hoy ?? '';
 
@@ -321,6 +324,12 @@ const AsistenciasAlumnos = () => {
                   <p className="text-lg">No hay alumnos inscritos en esa fecha</p>
                 </div>
               ) : (
+                <fieldset disabled={!puedePasarLista} className="min-w-0">
+                {!puedePasarLista && (
+                  <p className="mb-2 text-sm text-muted-foreground">
+                    Solo consulta: no tienes permiso para pasar lista.
+                  </p>
+                )}
                 <ul className="divide-y overflow-hidden rounded-lg border">
                   {alumnos.map((alumno) => {
                     const clave = String(alumno.nino_id);
@@ -351,9 +360,10 @@ const AsistenciasAlumnos = () => {
                     );
                   })}
                 </ul>
+                </fieldset>
               )}
 
-              {alumnos.length > 0 && (
+              {puedePasarLista && alumnos.length > 0 && (
                 <BarraGuardar
                   sinMarcar={
                     Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length

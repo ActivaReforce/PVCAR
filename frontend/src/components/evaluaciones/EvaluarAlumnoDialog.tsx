@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
@@ -75,6 +76,8 @@ function aSegundos(texto: string): number | null {
  * el valor tal cual; la nota aparece al guardar.
  */
 const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
+  // Sin `calificaciones:editar` se ve lo registrado, pero no se guarda ni se borra.
+  const puedeCalificar = usePermissions().hasPermission('calificaciones', 'editar');
   const ficha = useFichaDeAlumno(evaninopenId);
   const guardar = useGuardarIntentos();
   const borrar = useBorrarEvaluacionDeAlumno();
@@ -394,6 +397,7 @@ const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
                   </Button>
                 </div>
 
+                {puedeCalificar && (
                 <div className="flex gap-2">
                   {yaEvaluado && (
                     <Button
@@ -418,6 +422,7 @@ const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
                     {guardar.isPending ? 'Guardando…' : 'Guardar'}
                   </Button>
                 </div>
+                )}
               </div>
 
               {hechos > 0 && hechos < totalIntentos && (
