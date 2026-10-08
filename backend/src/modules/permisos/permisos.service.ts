@@ -62,8 +62,9 @@ export async function matriz(): Promise<MatrizPermisos> {
  *
  * Dos guardas que el sistema viejo no tenia:
  *   - solo un rol global (Propietario o Admin) puede tocar la matriz;
- *   - al Propietario no se le puede quitar `permisos.ver`. Es la llave de esta
- *     misma pantalla: sin ella nadie podria volver a repartir permisos y el
+ *   - al Propietario no se le puede quitar `permisos.ver` ni `permisos.editar`
+ *     (esta desde la 0026: guardar la matriz). Son la llave de esta misma
+ *     pantalla: sin ellas nadie podria volver a repartir permisos y el
  *     sistema se cierra por dentro sin forma de abrirlo desde la aplicacion.
  */
 export async function reemplazarPermisosDeRol(
@@ -90,9 +91,26 @@ export async function reemplazarPermisosDeRol(
     throw new ApiError(400, `Permiso desconocido: ${desconocido.modulo}:${desconocido.accion}`);
   }
 
+  /*
+   * Combinaciones sin sentido (2026-10-07): crear, editar o eliminar sin ver
+   * el módulo, y calificar sin ver las evaluaciones, donde vive la pestaña.
+   * La pantalla ya las evita al marcar; esto es por si llega otra cosa.
+   */
+  const tiene = (modulo: string, accion: string) =>
+    permisos.some((p) => p.modulo === modulo && p.accion === accion);
+  const sinVer = permisos.find((p) => p.accion !== 'ver' && !tiene(p.modulo, 'ver'));
+  if (sinVer) {
+    throw new ApiError(400, `${sinVer.modulo}:${sinVer.accion} necesita también ${sinVer.modulo}:ver`);
+  }
+  if (permisos.some((p) => p.modulo === 'calificaciones') && !tiene('evaluaciones', 'ver')) {
+    throw new ApiError(400, 'Calificar evaluaciones necesita también evaluaciones:ver');
+  }
+
   if (
     rolId === ROL.PROPIETARIO &&
-    !permisos.some((p) => p.modulo === 'permisos' && p.accion === 'ver')
+    !['ver', 'editar'].every((accion) =>
+      permisos.some((p) => p.modulo === 'permisos' && p.accion === accion),
+    )
   ) {
     throw new ApiError(
       409,

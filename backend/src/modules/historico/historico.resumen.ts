@@ -1,5 +1,6 @@
 import type { FormaGrafica, SerieGrafica } from '../reportes/reportes.analisis.js';
 import { paramsUsados } from '../../lib/sql.js';
+import { diaEc } from '../../lib/fecha.js';
 
 /**
  * El resumen de Data anterior: los indicadores y las gráficas.
@@ -78,7 +79,7 @@ SELECT
   (SELECT count(*)
      FROM archivo.nino_asignacion na
      JOIN archivo.colegio_actividad_horario d ON d.colacthor_id = na.colacthor_id
-    WHERE ${COLEGIO('d.col_id')} AND ${RANGO('na.ninoasig_fecha_inscripcion::date')})::int AS inscripciones,
+    WHERE ${COLEGIO('d.col_id')} AND ${RANGO(diaEc('na.ninoasig_fecha_inscripcion'))})::int AS inscripciones,
   a.asistencias,
   a.pct_presencia,
   a.primera,
@@ -200,7 +201,7 @@ SELECT a.act_nombre AS actividad, count(*)::int AS inscripciones
   FROM archivo.nino_asignacion na
   JOIN archivo.colegio_actividad_horario d ON d.colacthor_id = na.colacthor_id
   JOIN archivo.actividad a ON a.act_id = d.act_id
- WHERE ${COLEGIO('d.col_id')} AND ${RANGO('na.ninoasig_fecha_inscripcion::date')}
+ WHERE ${COLEGIO('d.col_id')} AND ${RANGO(diaEc('na.ninoasig_fecha_inscripcion'))}
  GROUP BY a.act_id, a.act_nombre
  ORDER BY inscripciones DESC
  LIMIT 15`,

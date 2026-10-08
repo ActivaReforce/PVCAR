@@ -85,9 +85,11 @@ encuestasRouter.post(
 // ---------------------------------------------------------------------------
 // Gestion
 
-// De aquí abajo, solo el personal: estas rutas no filtran por alcance y el
-// permiso "ver" basta para crear, publicar, borrar y ver las respuestas de
-// todos los padres.
+// De aquí abajo, solo el personal. Desde la 0026 (2026-10-07) cada acción
+// pide su casilla: ver (lista y resultados), crear, editar (preguntas,
+// publicar, cerrar, volver a borrador) y eliminar. Antes "ver" lo hacía
+// todo. Los resultados se cuentan solo con los padres del alcance de quien
+// mira: un coordinador ve lo que respondieron las familias de sus colegios.
 encuestasRouter.use(requirePersonal);
 
 encuestasRouter.get(
@@ -117,7 +119,7 @@ encuestasRouter.get(
 
 encuestasRouter.post(
   '/',
-  requirePermission('encuestas', 'ver'),
+  requirePermission('encuestas', 'crear'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const input = crearEncuestaSchema.parse(req.body);
@@ -134,7 +136,7 @@ encuestasRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
-      res.json({ data: await service.ficha(id), error: null });
+      res.json({ data: await service.ficha(actor(req), id), error: null });
     } catch (err) {
       next(err);
     }
@@ -147,7 +149,7 @@ encuestasRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
-      res.json({ data: await service.resultados(id), error: null });
+      res.json({ data: await service.resultados(actor(req), id), error: null });
     } catch (err) {
       next(err);
     }
@@ -156,7 +158,7 @@ encuestasRouter.get(
 
 encuestasRouter.get(
   '/:id/impacto',
-  requirePermission('encuestas', 'ver'),
+  requirePermission('encuestas', 'eliminar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
@@ -169,7 +171,7 @@ encuestasRouter.get(
 
 encuestasRouter.patch(
   '/:id',
-  requirePermission('encuestas', 'ver'),
+  requirePermission('encuestas', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
@@ -184,7 +186,7 @@ encuestasRouter.patch(
 /** La lista completa de preguntas. El orden es la posicion en el array. */
 encuestasRouter.put(
   '/:id/preguntas',
-  requirePermission('encuestas', 'ver'),
+  requirePermission('encuestas', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
@@ -198,7 +200,7 @@ encuestasRouter.put(
 
 encuestasRouter.post(
   '/:id/finalizar',
-  requirePermission('encuestas', 'ver'),
+  requirePermission('encuestas', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
@@ -211,7 +213,7 @@ encuestasRouter.post(
 
 encuestasRouter.post(
   '/:id/borrador',
-  requirePermission('encuestas', 'ver'),
+  requirePermission('encuestas', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
@@ -224,7 +226,7 @@ encuestasRouter.post(
 
 encuestasRouter.post(
   '/:id/publicar',
-  requirePermission('encuestas', 'ver'),
+  requirePermission('encuestas', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
@@ -238,7 +240,7 @@ encuestasRouter.post(
 /** Borrado permanente y en cascada. Exige escribir el titulo. */
 encuestasRouter.delete(
   '/:id',
-  requirePermission('encuestas', 'ver'),
+  requirePermission('encuestas', 'eliminar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);

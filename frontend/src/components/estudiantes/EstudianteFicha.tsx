@@ -21,12 +21,13 @@ import {
   useSoltarRepresentante,
 } from '@/hooks/useEstudiantes';
 import { primerCruce } from '@/lib/horarios';
+import { fechaDia } from '@/lib/fecha';
 
 interface Props {
   ninoId: number;
 }
 
-const fecha = (f: string | null) => (f ? new Date(f).toLocaleDateString() : '—');
+const fecha = fechaDia;
 
 /**
  * Ficha del estudiante: datos sensibles, inscripciones y representantes.

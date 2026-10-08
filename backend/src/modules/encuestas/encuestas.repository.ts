@@ -3,6 +3,7 @@ import { getPool } from '../../config/db.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import type { PreguntaInput } from './encuestas.schemas.js';
+import { textoEc } from '../../lib/fecha.js';
 
 /**
  * Consultas de Encuestas.
@@ -56,18 +57,48 @@ export interface PreguntaDetalle {
   respuestas: number;
 }
 
-const DESDE = `
+/**
+ * Qué familias cuentan para quien mira (2026-10-07): Propietario y Admin,
+ * todas; el resto, las que tienen algún hijo en sus colegios o en sus
+ * disciplinas. Las encuestas van a todos los padres, pero un coordinador
+ * solo ve lo que respondieron las familias de lo suyo.
+ */
+export interface AlcanceEncuestas {
+  global: boolean;
+  colegios: number[];
+  disciplinas: number[];
+}
+
+export const TODO: AlcanceEncuestas = { global: true, colegios: [], disciplinas: [] };
+
+const paramsAlcance = (a: AlcanceEncuestas) => [a.global, a.colegios, a.disciplinas];
+
+/** `padre` (expresión SQL) es visible con el alcance en los parámetros `g`, `c` y `d`. */
+const padreVisible = (padre: string, g: string, c: string, d: string) => `
+    (${g}::boolean OR EXISTS (
+        SELECT 1 FROM public.nino_padre npv
+          JOIN public.nino nv ON nv.nino_id = npv.nino_id
+         WHERE npv.padre_id = ${padre}
+           AND (nv.col_id = ANY(${c}::int[])
+                OR EXISTS (SELECT 1 FROM public.nino_asignacion nav
+                            WHERE nav.nino_id = nv.nino_id
+                              AND nav.est_id = ${ESTADO.ACTIVO}
+                              AND nav.colacthor_id = ANY(${d}::int[])))))`;
+
+/** El FROM de la lista, con el alcance en los parámetros `g`, `c` y `d`. */
+const desde = (g: string, c: string, d: string) => `
     FROM public.encuesta e
     JOIN public.usuario u ON u.usu_id = e.encu_creador
     LEFT JOIN LATERAL (
         SELECT count(*) AS n FROM public.encuesta_pregunta p WHERE p.encu_id = e.encu_id
     ) preg ON TRUE
     LEFT JOIN LATERAL (
-        SELECT count(*) AS n FROM public.encuesta_respondida r WHERE r.encu_id = e.encu_id
+        SELECT count(*) AS n FROM public.encuesta_respondida r
+         WHERE r.encu_id = e.encu_id AND ${padreVisible('r.padre_id', g, c, d)}
     ) resp ON TRUE
 `;
 
-const COLUMNAS = `
+const columnas = (g: string, c: string, d: string) => `
         e.encu_id,
         e.encu_titulo,
         e.encu_descripcion,
@@ -79,7 +110,8 @@ const COLUMNAS = `
         COALESCE(resp.n, 0)::int    AS respondidas,
         (SELECT count(*) FROM public.padre p
           JOIN public.usuario pu ON pu.usu_id = p.usu_id
-         WHERE pu.est_id = ${ESTADO.ACTIVO})::int AS representantes
+         WHERE pu.est_id = ${ESTADO.ACTIVO}
+           AND ${padreVisible('p.padre_id', g, c, d)})::int AS representantes
 `;
 
 export async function listarTipos(): Promise<
@@ -95,22 +127,26 @@ export async function listarTipos(): Promise<
 export async function listarEncuestas(
   buscar: string | null,
   estado: number | null,
+  alcance: AlcanceEncuestas,
 ): Promise<EncuestaListada[]> {
   const { rows } = await getPool().query<EncuestaListada>(
-    `SELECT ${COLUMNAS}
-     ${DESDE}
+    `SELECT ${columnas('$3', '$4', '$5')}
+     ${desde('$3', '$4', '$5')}
      WHERE ($1::text IS NULL OR ${contieneSinTildes('e.encu_titulo', '$1')})
        AND ($2::int IS NULL OR e.est_id = $2)
      ORDER BY e.encu_fecha_creacion DESC`,
-    [buscar, estado],
+    [buscar, estado, ...paramsAlcance(alcance)],
   );
   return rows;
 }
 
-export async function obtenerEncuesta(encuId: number): Promise<EncuestaListada | null> {
+export async function obtenerEncuesta(
+  encuId: number,
+  alcance: AlcanceEncuestas = TODO,
+): Promise<EncuestaListada | null> {
   const { rows } = await getPool().query<EncuestaListada>(
-    `SELECT ${COLUMNAS} ${DESDE} WHERE e.encu_id = $1`,
-    [encuId],
+    `SELECT ${columnas('$2', '$3', '$4')} ${desde('$2', '$3', '$4')} WHERE e.encu_id = $1`,
+    [encuId, ...paramsAlcance(alcance)],
   );
   return rows[0] ?? null;
 }
@@ -284,9 +320,16 @@ export interface ResultadoPregunta {
  * mas franqueza cuando la respuesta no lleva nombre, y quien lee un informe
  * agregado no necesita saberlo.
  */
-export async function resultados(encuId: number): Promise<ResultadoPregunta[]> {
+export async function resultados(
+  encuId: number,
+  alcance: AlcanceEncuestas,
+): Promise<ResultadoPregunta[]> {
   const { rows } = await getPool().query<ResultadoPregunta>(
-    `SELECT p.encupreg_id,
+    `WITH resp AS (
+         SELECT ro.encurespo_id FROM public.encuesta_respondida ro
+          WHERE ro.encu_id = $1 AND ${padreVisible('ro.padre_id', '$2', '$3', '$4')}
+     )
+     SELECT p.encupreg_id,
             p.encupreg_orden,
             p.encupreg_pregunta,
             p.encutiporesp_id,
@@ -307,6 +350,7 @@ export async function resultados(encuId: number): Promise<ResultadoPregunta[]> {
                            FROM (SELECT r2.encurespu_num AS valor, count(*)::int AS n
                                    FROM public.encuesta_respuesta r2
                                   WHERE r2.encupreg_id = p.encupreg_id
+                                    AND r2.encurespo_id IN (SELECT encurespo_id FROM resp)
                                     AND r2.encurespu_num IS NOT NULL
                                   GROUP BY r2.encurespu_num) v)
                        WHEN p.encutiporesp_id = 6 THEN (
@@ -315,6 +359,7 @@ export async function resultados(encuId: number): Promise<ResultadoPregunta[]> {
                                         count(*)::int AS n
                                    FROM public.encuesta_respuesta r2
                                   WHERE r2.encupreg_id = p.encupreg_id
+                                    AND r2.encurespo_id IN (SELECT encurespo_id FROM resp)
                                     AND r2.encurespu_sino IS NOT NULL
                                   GROUP BY 1) v)
                   END AS conteos,
@@ -322,21 +367,23 @@ export async function resultados(encuId: number): Promise<ResultadoPregunta[]> {
                            SELECT json_agg(x.texto)
                            FROM (SELECT COALESCE(
                                             r3.encurespu_texto,
-                                            to_char(r3.encurespu_fecha, 'DD/MM/YYYY'),
+                                            ${textoEc('r3.encurespu_fecha', 'DD/MM/YYYY')},
                                             to_char(r3.encurespu_hora::time, 'HH24:MI')
                                         ) AS texto
                                    FROM public.encuesta_respuesta r3
                                   WHERE r3.encupreg_id = p.encupreg_id
+                                    AND r3.encurespo_id IN (SELECT encurespo_id FROM resp)
                                   ORDER BY r3.encurespu_id
                                   LIMIT 200) x
                            WHERE x.texto IS NOT NULL)
                   END AS textos
              FROM public.encuesta_respuesta r
             WHERE r.encupreg_id = p.encupreg_id
+              AND r.encurespo_id IN (SELECT encurespo_id FROM resp)
        ) a ON TRUE
       WHERE p.encu_id = $1
       ORDER BY p.encupreg_orden`,
-    [encuId],
+    [encuId, ...paramsAlcance(alcance)],
   );
   return rows;
 }

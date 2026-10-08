@@ -20,7 +20,9 @@ const envSchema = z.object({
   // Correo propio de la aplicacion (Resend). Opcionales: sin ellas, lo que
   // manda correo sigue funcionando y avisa de que no salio.
   RESEND_API_KEY: z.string().optional(),
-  CORREO_REMITENTE: z.string().optional(),
+  // Dominio verificado en Resend. El remitente de cada tipo (nombre y parte
+  // local) lo configura el Propietario en la tabla correo_config.
+  CORREO_DOMINIO: z.string().trim().toLowerCase().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

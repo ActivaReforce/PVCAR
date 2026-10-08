@@ -65,9 +65,11 @@ import DatosColegio from './DatosColegio';
 import Membrete from './Membrete';
 import CuentaBancaria from './CuentaBancaria';
 import MaxDisciplinas from './MaxDisciplinas';
+import ConfigCorreo from '@/components/correos/ConfigCorreo';
 import { EstadoDelColegio } from './EstadoInscripciones';
 import { REGLAS, porcentaje, problemasDePlantilla, tarifa, type DatosDocumento } from './documento';
 import { fechaCorta } from './formato';
+import { ZONA } from '@/lib/fecha';
 
 /** Iguales para cualquier colegio: se leen y se aceptan. */
 const GENERALES: TipoDocumento[] = ['autorizacion_datos', 'datos_medicos', 'imagen', 'politica'];
@@ -183,10 +185,21 @@ const DocumentosLegales = () => {
         <TabsContent value="colegio" className="pt-3">
           <PorColegio datos={documentos.data} />
         </TabsContent>
-        <TabsContent value="configuracion" className="space-y-6 pt-3">
-          <Membrete />
+        <TabsContent value="configuracion" className="space-y-3 pt-3">
           <CuentaBancaria />
+          <ConfigCorreo
+            tipo="inscripciones_aviso"
+            titulo="Correo: aviso de inscripción nueva"
+            descripcion="Sale cuando un representante envía la inscripción. Va al equipo, con el resumen y los documentos de cada alumno."
+            conPara
+          />
+          <ConfigCorreo
+            tipo="inscripciones"
+            titulo="Correo: inscripción aprobada"
+            descripcion="Sale al aprobar. Llega al representante con sus documentos aprobados."
+          />
           <MaxDisciplinas />
+          <Membrete />
         </TabsContent>
       </Tabs>
     </div>
@@ -199,7 +212,7 @@ const DocumentosLegales = () => {
  */
 const EJEMPLO: DatosDocumento = {
   valores: {
-    fecha: new Intl.DateTimeFormat('es-EC', { dateStyle: 'long' }).format(new Date()),
+    fecha: new Intl.DateTimeFormat('es-EC', { dateStyle: 'long', timeZone: ZONA }).format(new Date()),
     representante_nombre: 'Nombre del representante',
     representante_cedula: '0000000000',
     alumno_nombre: 'Nombre del alumno',

@@ -10,6 +10,7 @@ import {
 import VistaPreviaEncuesta from '@/components/encuestas/VistaPreviaEncuesta';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,6 +66,14 @@ const TODOS = 'todos';
  * estado donde significa algo, en vez de salir siempre y fallar al pulsarlo.
  */
 const Encuestas = () => {
+  // Cada botón pide su casilla (0026): crear, editar (preguntas, finalizar,
+  // publicar, volver a borrador) y eliminar. Ver basta para la lista,
+  // la vista previa y los resultados.
+  const { hasPermission } = usePermissions();
+  const puedeCrear = hasPermission('encuestas', 'crear');
+  const puedeEditar = hasPermission('encuestas', 'editar');
+  const puedeEliminar = hasPermission('encuestas', 'eliminar');
+
   const [busqueda, setBusqueda] = useState('');
   const [estado, setEstado] = useState(TODOS);
 
@@ -131,10 +140,12 @@ const Encuestas = () => {
           </p>
         </div>
 
-        <Button variant="brand" className="w-full sm:w-auto" onClick={() => setCreando(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva encuesta
-        </Button>
+        {puedeCrear && (
+          <Button variant="brand" className="w-full sm:w-auto" onClick={() => setCreando(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva encuesta
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -208,7 +219,7 @@ const Encuestas = () => {
                     <Eye className="h-4 w-4" />
                   </Button>
 
-                  {borrador && (
+                  {puedeEditar && borrador && (
                     <Button
                       variant="outline"
                       className="h-11 sm:h-9"
@@ -220,7 +231,7 @@ const Encuestas = () => {
                     </Button>
                   )}
 
-                  {finalizada && (
+                  {puedeEditar && finalizada && (
                     <>
                       <Button
                         variant="ghost"
@@ -254,6 +265,7 @@ const Encuestas = () => {
                     </Button>
                   )}
 
+                  {((puedeEditar && borrador) || puedeEliminar) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -268,27 +280,30 @@ const Encuestas = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       {/* Solo un borrador se edita: lo publicado no se toca. */}
-                      {borrador && (
+                      {puedeEditar && borrador && (
                         <>
                           <DropdownMenuItem onSelect={() => setEditandoId(e.encu_id)}>
                             <Pencil className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
+                          {puedeEliminar && <DropdownMenuSeparator />}
                         </>
                       )}
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onSelect={() => {
-                          setAEliminar(e);
-                          setConfirmacion('');
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Eliminar
-                      </DropdownMenuItem>
+                      {puedeEliminar && (
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() => {
+                            setAEliminar(e);
+                            setConfirmacion('');
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  )}
                 </div>
               </div>
             </li>

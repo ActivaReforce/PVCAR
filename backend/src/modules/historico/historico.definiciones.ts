@@ -1,4 +1,5 @@
 import { contieneSinTildes } from '../../lib/sql.js';
+import { diaEc, textoEc } from '../../lib/fecha.js';
 
 /**
  * Data anterior: lo que se puede consultar del esquema `archivo`.
@@ -158,10 +159,12 @@ export function construir(conjunto: Conjunto, f: FiltrosHistorico): ConsultaHist
 // ---------------------------------------------------------------------------
 // Trozos repetidos
 
+/** Para columnas `date`, que no tienen zona. */
 const fecha = (expr: string) => `to_char(${expr}, 'YYYY-MM-DD')`;
+/** Para marcas `timestamptz`, que están en UTC: el día que fue en Ecuador. */
+const diaDeMarca = (expr: string) => textoEc(expr, 'YYYY-MM-DD');
 /** Las marcas de registro están en UTC; se enseñan en hora de Ecuador. */
-const momento = (expr: string) =>
-  `to_char(${expr} AT TIME ZONE 'America/Guayaquil', 'YYYY-MM-DD HH24:MI')`;
+const momento = (expr: string) => textoEc(expr, 'YYYY-MM-DD HH24:MI');
 const horario = (d: string) =>
   `to_char(${d}.colacthor_hora_inicio, 'HH24:MI') || ' - ' || to_char(${d}.colacthor_hora_fin, 'HH24:MI')`;
 const siNo = (expr: string) => `CASE WHEN ${expr} THEN 'Sí' WHEN NOT ${expr} THEN 'No' ELSE '' END`;
@@ -217,7 +220,7 @@ SELECT n.nino_id,
        s.asistencias,
        s.presentes,
        s.pct_presencia,
-       ${fecha('n.nino_fecha_creacion')}  AS fecha_creacion
+       ${diaDeMarca('n.nino_fecha_creacion')}  AS fecha_creacion
   FROM archivo.nino n
   LEFT JOIN archivo.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id
   LEFT JOIN archivo.colegio c              ON c.col_id = n.col_id
@@ -268,7 +271,7 @@ SELECT u.usu_id,
                    JOIN archivo.rol ro ON ro.rol_id = ur.rol_id
                   WHERE ur.usu_id = u.usu_id), 'Sin rol') AS roles,
        COALESCE(e.est_nombre, '')   AS estado,
-       ${fecha('u.usu_fecha_creacion')} AS fecha_creacion
+       ${diaDeMarca('u.usu_fecha_creacion')} AS fecha_creacion
   FROM archivo.usuario u
   LEFT JOIN archivo.entrenador en ON en.ent_id = u.usu_id
   LEFT JOIN archivo.estado e      ON e.est_id = u.est_id`,
@@ -569,8 +572,8 @@ SELECT na.ninoasig_id,
        a.act_nombre  AS actividad,
        di.dia_nombre AS dia,
        ${horario('d')} AS horario,
-       COALESCE(${fecha('na.ninoasig_fecha_inscripcion')}, '') AS fecha_inscripcion,
-       COALESCE(${fecha('na.ninoasig_fecha_baja')}, '')        AS fecha_baja,
+       COALESCE(${diaDeMarca('na.ninoasig_fecha_inscripcion')}, '') AS fecha_inscripcion,
+       COALESCE(${diaDeMarca('na.ninoasig_fecha_baja')}, '')        AS fecha_baja,
        COALESCE(e.est_nombre, '') AS estado
   FROM archivo.nino_asignacion na
   JOIN archivo.nino n ON n.nino_id = na.nino_id${disciplina('na.colacthor_id')}
@@ -580,8 +583,8 @@ SELECT na.ninoasig_id,
     colegio: 'd.col_id',
     actividad: 'd.act_id',
     estado: 'na.est_id',
-    desde: 'na.ninoasig_fecha_inscripcion',
-    hasta: 'na.ninoasig_fecha_inscripcion',
+    desde: diaEc('na.ninoasig_fecha_inscripcion'),
+    hasta: diaEc('na.ninoasig_fecha_inscripcion'),
   },
   ordenDefecto: 'r.fecha_inscripcion DESC, r.alumno',
   estados: ESTADOS_ACTIVO,
@@ -800,7 +803,7 @@ SELECT ev.eva_id,
        (SELECT count(*) FROM archivo.evaluacion_asignacion x WHERE x.eva_id = ev.eva_id)::int AS disciplinas,
        (SELECT count(*) FROM archivo.evaluacion_nino_pendiente p WHERE p.eva_id = ev.eva_id AND p.est_id = 6)::int AS pendientes,
        (SELECT count(*) FROM archivo.evaluacion_nino_pendiente p WHERE p.eva_id = ev.eva_id AND p.est_id = 7)::int AS evaluados,
-       ${fecha('ev.eva_fecha_creacion')} AS fecha_creacion
+       ${diaDeMarca('ev.eva_fecha_creacion')} AS fecha_creacion
   FROM archivo.evaluacion ev
   LEFT JOIN archivo.usuario u ON u.usu_id = ev.eva_creador
   LEFT JOIN archivo.estado e  ON e.est_id = ev.est_id`,
@@ -876,7 +879,7 @@ SELECT p.evaninopen_id,
        (SELECT round(sum(i.evaint_puntaje_obtenido)::numeric, 2)::float8
           FROM archivo.evaluacion_intento i WHERE i.evaninopen_id = p.evaninopen_id) AS puntaje,
        ev.eva_puntaje_total::float8 AS puntaje_total,
-       COALESCE(${fecha('p.evaninopen_fecha_finalizacion')}, '') AS fecha,
+       COALESCE(${diaDeMarca('p.evaninopen_fecha_finalizacion')}, '') AS fecha,
        COALESCE(ur.usu_nombre, '') AS evaluado_por
   FROM archivo.evaluacion_nino_pendiente p
   JOIN archivo.evaluacion ev      ON ev.eva_id = p.eva_id

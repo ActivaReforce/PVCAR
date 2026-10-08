@@ -4,6 +4,7 @@ import { requirePermission } from '../../middleware/requirePermission.js';
 import { ApiError } from '../../middleware/error.js';
 import { consultaSchema, exportacionSchema, idParamSchema, resumenSchema } from './historico.schemas.js';
 import * as service from './historico.service.js';
+import { hoyEc } from '../../lib/fecha.js';
 
 /**
  * Rutas de Data anterior (esquema `archivo`).
@@ -101,7 +102,7 @@ historicoRouter.post(
       const quien = actor(req);
       const { id } = idParamSchema.parse(req.params);
       const body = exportacionSchema.parse(req.body ?? {});
-      const sello = new Date().toISOString().slice(0, 10);
+      const sello = hoyEc();
 
       res.setHeader('Content-Type', XLSX);
       res.setHeader('Content-Disposition', `attachment; filename="data-anterior-${id}-${sello}.xlsx"`);
@@ -119,7 +120,7 @@ historicoRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const quien = actor(req);
-      const sello = new Date().toISOString().slice(0, 10);
+      const sello = hoyEc();
 
       res.setHeader('Content-Type', XLSX);
       res.setHeader('Content-Disposition', `attachment; filename="data-anterior-completa-${sello}.xlsx"`);

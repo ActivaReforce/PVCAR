@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import BarraGuardar from '@/components/asistencias/BarraGuardar';
+import { usePermissions } from '@/hooks/usePermissions';
 import FilaAsistencia from '@/components/asistencias/FilaAsistencia';
 import ResumenAsistencia from '@/components/asistencias/ResumenAsistencia';
 import { useColegios } from '@/hooks/useColegios';
@@ -46,6 +47,8 @@ const enLetras = (iso: string) =>
  * lleva juntos en una sola transacción.
  */
 const AsistenciasEntrenadores = () => {
+  const { hasPermission } = usePermissions();
+  const puedePasarLista = hasPermission('asistencias_entrenadores', 'editar');
   const contexto = useContextoAsistencias();
   const hoy = contexto.data?.hoy ?? '';
 
@@ -185,6 +188,12 @@ const AsistenciasEntrenadores = () => {
                   </p>
                 </div>
               ) : (
+                <fieldset disabled={!puedePasarLista} className="min-w-0">
+                {!puedePasarLista && (
+                  <p className="mb-2 text-sm text-muted-foreground">
+                    Solo consulta: no tienes permiso para pasar lista.
+                  </p>
+                )}
                 <ul className="divide-y overflow-hidden rounded-lg border">
                   {personas.map((persona) => {
                     const clave = `${persona.tipo}:${persona.id}`;
@@ -220,9 +229,10 @@ const AsistenciasEntrenadores = () => {
                     );
                   })}
                 </ul>
+                </fieldset>
               )}
 
-              {personas.length > 0 && (
+              {puedePasarLista && personas.length > 0 && (
                 <BarraGuardar
                   sinMarcar={
                     Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length

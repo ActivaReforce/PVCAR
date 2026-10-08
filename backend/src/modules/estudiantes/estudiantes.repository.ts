@@ -6,6 +6,7 @@ import { horarioTexto, horariosJson, primerHorario, type HorarioDisciplina } fro
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import type { ListarEstudiantesQuery } from './estudiantes.schemas.js';
+import { HOY_EC } from '../../lib/fecha.js';
 
 export interface EstudianteListado {
   nino_id: number;
@@ -135,7 +136,7 @@ const COLUMNAS_ORDEN: Record<string, string> = {
   nombre: 'n.nino_nombre',
   colegio: 'col.col_nombre',
   grado: 'n.catninograd_id',
-  edad: 'age(CURRENT_DATE, n.nino_fecha_nacimiento)',
+  edad: `age(${HOY_EC}, n.nino_fecha_nacimiento)`,
   creacion: 'n.nino_fecha_creacion',
 };
 
@@ -156,7 +157,7 @@ const COLUMNAS = `
         n.nino_id,
         n.nino_nombre,
         to_char(n.nino_fecha_nacimiento, 'YYYY-MM-DD') AS nino_fecha_nacimiento,
-        date_part('year', age(CURRENT_DATE, n.nino_fecha_nacimiento))::int AS nino_edad,
+        date_part('year', age(${HOY_EC}, n.nino_fecha_nacimiento))::int AS nino_edad,
         n.nino_foto,
         n.col_id,
         col.col_nombre,

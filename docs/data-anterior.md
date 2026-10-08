@@ -19,7 +19,7 @@ La plataforma vieja, de solo lectura, en **Reportes → Data anterior**. Lee el 
 | 7 | Buscar sin tildes | "calderon" encuentra "Calderón"; "futbol", "Fútbol" |
 | 8 | Filtros con buscador | En Asistencia de alumnos, "Registrado por" deja escribir para encontrar a la persona |
 | 9 | Ordenar | Clic en una cabecera: ascendente; otro: descendente; otro: vuelve al orden de serie |
-| 10 | Exportar un conjunto filtrado | El Excel trae las mismas filas que dice la pantalla, en el mismo orden, con cabecera fija y autofiltro, y una hoja **Información** con los filtros escritos con nombres |
+| 10 | Exportar un conjunto filtrado | El Excel trae las mismas filas que dice la pantalla, en el mismo orden, con cabecera fija y autofiltro, en una sola hoja (la de **Información** se quitó el 2026-10-07) |
 | 11 | **Descargar todo en Excel** | Un libro con 15 hojas + Información (≈ 20 600 filas) |
 | 12 | Auditoría | Cada exportación deja una fila `historico_exportacion` en `auditoria` |
 | 13 | Volver atrás | La pestaña y el conjunto elegidos van en la URL: "atrás" vuelve a donde estabas |

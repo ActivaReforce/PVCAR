@@ -1,3 +1,4 @@
+import type { AuxiliarDesvinculado } from '@/api/entrenadores';
 import { api } from '@/lib/api';
 
 /**
@@ -141,7 +142,8 @@ export const disciplinasApi = {
 
   previoBaja: (id: number) => api.get<PrevioBaja>(`/disciplinas/${id}/previo-baja`),
 
-  darDeBaja: (id: number) => api.post<Disciplina>(`/disciplinas/${id}/baja`),
+  darDeBaja: (id: number) =>
+    api.post<Disciplina & { auxiliares_desvinculados: AuxiliarDesvinculado[] }>(`/disciplinas/${id}/baja`),
 
   reactivar: (id: number) => api.post<Disciplina>(`/disciplinas/${id}/reactivar`),
 

@@ -15,6 +15,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { permisosApi, type Permiso } from '@/api/permisos';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CircleAlert } from 'lucide-react';
 
 /**
  * Matriz de permisos.
@@ -36,27 +38,141 @@ const ACTION_LABELS: Record<string, string> = {
   eliminar: 'Eliminar',
 };
 
-/** Que acciones tienen sentido en cada modulo. Lo demas se pinta como raya. */
-const MODULE_ACTIONS: Record<string, string[]> = {
-  dashboard: ['ver'],
-  usuarios: ['ver', 'crear', 'editar', 'eliminar'],
-  colegios: ['ver', 'crear', 'editar', 'eliminar'],
-  actividades: ['ver', 'crear', 'editar', 'eliminar'],
-  disciplinas: ['ver', 'crear', 'editar', 'eliminar'],
-  entrenadores: ['ver', 'editar'],
-  estudiantes: ['ver', 'crear', 'editar', 'eliminar'],
-  evaluaciones: ['ver', 'crear', 'editar', 'eliminar'],
-  asistencias_estudiantes: ['ver'],
-  asistencias_entrenadores: ['ver'],
-  encuestas: ['ver'],
-  // Ver = la lista (un representante solo ve las suyas); Editar = aprobar,
-  // documentos y valores; Eliminar = rechazar. Editar y Eliminar solo
-  // funcionan para Propietario y Admin, se marquen a quien se marquen.
-  inscripciones: ['ver', 'editar', 'eliminar'],
-  reportes: ['ver', 'crear'],
-  reporte_estudiante: ['ver'],
-  perfil: ['ver'],
-  permisos: ['ver'],
+type Accion = 'ver' | 'crear' | 'editar' | 'eliminar';
+
+/**
+ * Qué hace cada casilla, módulo por módulo. Es la fuente de las dos cosas: qué
+ * casillas se pintan (las que no están salen como raya) y lo que explica el
+ * icono junto al nombre. La tabla larga está en docs/permisos.md.
+ */
+const AYUDA: Record<string, { acciones: Partial<Record<Accion, string>>; nota?: string }> = {
+  dashboard: { acciones: { ver: 'abrir el inicio.' } },
+  usuarios: {
+    acciones: {
+      ver: 'lista y fichas.',
+      crear: 'dar de alta.',
+      editar: 'datos, roles, baja y reactivar.',
+      eliminar: 'borrar del todo.',
+    },
+  },
+  colegios: {
+    acciones: {
+      ver: 'lista y fichas.',
+      crear: 'nuevo colegio.',
+      editar: 'datos, foto y coordinadores.',
+      eliminar: 'borrarlo.',
+    },
+  },
+  actividades: {
+    acciones: { ver: 'el catálogo.', crear: 'nueva.', editar: 'modificarla.', eliminar: 'borrarla.' },
+  },
+  disciplinas: {
+    acciones: {
+      ver: 'lista y horarios.',
+      crear: 'nueva.',
+      editar: 'horario, baja y reactivar.',
+      eliminar: 'borrarla.',
+    },
+  },
+  entrenadores: {
+    acciones: { ver: 'lista y fichas.', editar: 'asignar disciplinas y auxiliares.' },
+    nota: 'Se crean en Usuarios.',
+  },
+  estudiantes: {
+    acciones: {
+      ver: 'lista y fichas.',
+      crear: 'nuevo alumno.',
+      editar: 'datos, disciplinas, representantes y baja.',
+      eliminar: 'borrarlo.',
+    },
+  },
+  evaluaciones: {
+    acciones: {
+      ver: 'las plantillas.',
+      crear: 'nueva plantilla.',
+      editar: 'parámetros, disciplinas y baja.',
+      eliminar: 'borrarla.',
+    },
+    nota: 'Una plantilla que usan otros colegios solo la cambian Propietario y Admin.',
+  },
+  calificaciones: {
+    acciones: { ver: 'notas y pendientes.', editar: 'calificar o quitar la pendiente.' },
+    nota: 'Necesita Ver en Evaluaciones.',
+  },
+  asistencias_estudiantes: {
+    acciones: { ver: 'consultar listas e historial.', editar: 'pasar lista.' },
+  },
+  asistencias_entrenadores: {
+    acciones: { ver: 'consultar listas.', editar: 'pasar lista.' },
+  },
+  encuestas: {
+    acciones: {
+      ver: 'lista y resultados de sus familias.',
+      crear: 'nueva.',
+      editar: 'preguntas, publicar y cerrar.',
+      eliminar: 'borrarla.',
+    },
+  },
+  inscripciones: {
+    acciones: {
+      ver: 'la lista (el representante, solo las suyas).',
+      editar: 'aprobar, documentos y precios.',
+      eliminar: 'rechazar.',
+    },
+    nota: 'Editar y Eliminar solo valen para Propietario y Admin.',
+  },
+  reportes: {
+    acciones: { ver: 'reportes, gráficas y Data anterior.', crear: 'exportar a Excel.' },
+  },
+  perfil: { acciones: { ver: 'ver y editar el propio perfil.' } },
+  permisos: {
+    acciones: { ver: 'la matriz.', editar: 'guardarla.' },
+    nota: 'Guardar exige además ser Propietario o Admin.',
+  },
+};
+
+const disponiblesDe = (modulo: string): string[] =>
+  Object.keys(AYUDA[modulo]?.acciones ?? { ver: '' });
+
+/**
+ * Reglas para que no se guarde algo sin sentido (las repite el backend):
+ * crear, editar o eliminar arrastran el Ver del módulo, y quitar el Ver se
+ * lleva el resto; calificar necesita ver las evaluaciones.
+ */
+const DEPENDE_DE: Record<string, string> = { calificaciones: 'evaluaciones' };
+
+/** El "!" junto al nombre: se abre al pasar el ratón y, en el móvil, al tocar. */
+const AyudaModulo = ({ modulo, nombre }: { modulo: string; nombre: string }) => {
+  const [abierta, setAbierta] = React.useState(false);
+  const ayuda = AYUDA[modulo];
+  if (!ayuda) return null;
+  return (
+    <Popover open={abierta} onOpenChange={setAbierta}>
+      <PopoverTrigger
+        asChild
+        // Solo el ratón: en el móvil el toque también "entra", y abriría y
+        // cerraría a la vez. Allí lo abre el toque, como un botón.
+        onPointerEnter={(e) => e.pointerType === 'mouse' && setAbierta(true)}
+        onPointerLeave={(e) => e.pointerType === 'mouse' && setAbierta(false)}
+      >
+        <button
+          type="button"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`Qué permite cada casilla en ${nombre}`}
+        >
+          <CircleAlert className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="right" align="start" className="w-72 space-y-1 p-3 text-xs">
+        {(Object.entries(ayuda.acciones) as Array<[Accion, string]>).map(([accion, texto]) => (
+          <p key={accion}>
+            <span className="font-semibold">{ACTION_LABELS[accion]}:</span> {texto}
+          </p>
+        ))}
+        {ayuda.nota && <p className="pt-1 text-muted-foreground">{ayuda.nota}</p>}
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 const ROL_PROPIETARIO = 1;
@@ -66,7 +182,7 @@ const clave = (modulo: string, accion: string) => `${modulo}:${accion}`;
 const Permisos: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { reloadPermissions, user } = useAuth();
+  const { reloadPermissions, user, hasPermission } = useAuth();
   const [selectedRole, setSelectedRole] = React.useState<string>('');
   const [marcados, setMarcados] = React.useState<Set<string>>(new Set());
 
@@ -112,8 +228,8 @@ const Permisos: React.FC = () => {
     },
   });
 
-  const bloqueado = (modulo: string, accion: string) =>
-    selectedRole === String(ROL_PROPIETARIO) && modulo === 'permisos' && accion === 'ver';
+  const bloqueado = (modulo: string, _accion: string) =>
+    selectedRole === String(ROL_PROPIETARIO) && modulo === 'permisos';
 
   const activo = (modulo: string, accion: string) =>
     bloqueado(modulo, accion) || marcados.has(clave(modulo, accion));
@@ -122,9 +238,22 @@ const Permisos: React.FC = () => {
     if (bloqueado(modulo, accion)) return;
     setMarcados((prev) => {
       const siguiente = new Set(prev);
-      const k = clave(modulo, accion);
-      if (siguiente.has(k)) siguiente.delete(k);
-      else siguiente.add(k);
+      const quitar = (m: string) => disponiblesDe(m).forEach((a) => siguiente.delete(clave(m, a)));
+      if (siguiente.has(clave(modulo, accion))) {
+        siguiente.delete(clave(modulo, accion));
+        if (accion === 'ver') {
+          quitar(modulo);
+          // Sin ver la base, lo que depende de ella tampoco sirve.
+          Object.entries(DEPENDE_DE)
+            .filter(([, base]) => base === modulo)
+            .forEach(([dependiente]) => quitar(dependiente));
+        }
+      } else {
+        siguiente.add(clave(modulo, accion));
+        siguiente.add(clave(modulo, 'ver'));
+        const base = DEPENDE_DE[modulo];
+        if (base) siguiente.add(clave(base, 'ver'));
+      }
       return siguiente;
     });
   };
@@ -181,11 +310,15 @@ const Permisos: React.FC = () => {
               </thead>
               <tbody>
                 {modulos.map((modulo) => {
-                  const disponibles = MODULE_ACTIONS[modulo] ?? ['ver'];
+                  const disponibles = disponiblesDe(modulo);
+                  const nombre = MODULE_LABELS[modulo as Module] ?? modulo;
                   return (
                     <tr key={modulo} className="border-t">
                       <td className="py-2 px-2">
-                        {MODULE_LABELS[modulo as Module] ?? modulo}
+                        <span className="inline-flex items-center gap-1">
+                          {nombre}
+                          <AyudaModulo modulo={modulo} nombre={nombre} />
+                        </span>
                       </td>
                       {acciones.map((accion) => (
                         <td key={accion} className="py-2 px-2 text-center">
@@ -211,7 +344,10 @@ const Permisos: React.FC = () => {
             </table>
 
             <div className="mt-4 flex justify-end">
-              <Button onClick={() => guardar.mutate()} disabled={guardar.isPending}>
+              <Button
+                onClick={() => guardar.mutate()}
+                disabled={guardar.isPending || !hasPermission('permisos', 'editar')}
+              >
                 {guardar.isPending ? 'Guardando...' : 'Guardar'}
               </Button>
             </div>

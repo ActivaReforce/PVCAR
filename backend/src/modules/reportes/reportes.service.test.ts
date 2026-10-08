@@ -77,6 +77,26 @@ describe('el catalogo', () => {
   });
 
   /**
+   * Hasta el 2026-10-07 la pantalla ofrecía Activo/Inactivo en los nueve: en
+   * asistencias eso filtraba Presente/Ausente, y en evaluaciones nada.
+   */
+  it('cada reporte dice sus filtros, con las opciones de estado que le tocan', () => {
+    const de = (id: string) => service.catalogo(TODO).find((r) => r.id === id)!.filtros;
+    expect(de('asistencias-alumnos').estado?.opciones.map((o) => o.nombre)).toEqual([
+      'Presente',
+      'Tarde',
+      'Justificado',
+      'Ausente',
+    ]);
+    expect(de('evaluaciones').estado?.opciones.map((o) => o.id)).toEqual([ESTADO.PENDIENTE, ESTADO.EVALUADO]);
+    expect(de('actividades')).toEqual({ colegio: false, disciplina: false, estado: null, fechas: false });
+    for (const r of service.catalogo(TODO)) {
+      // Un reporte que exige fechas tiene que enseñarlas.
+      if (r.exigeRango) expect(r.filtros.fechas, r.id).toBe(true);
+    }
+  });
+
+  /**
    * Un entrenador tiene `reportes:ver` pero no `usuarios:ver`: el reporte de
    * personas no debe ni aparecerle.
    */
@@ -356,7 +376,7 @@ describe('el xlsx', () => {
    * streaming eso lanza un TypeError: la descarga se cortaba siempre. Ninguna
    * prueba generaba el archivo, así que no se vio.
    */
-  it('sale entero, con la cabecera fija y la hoja de filtros', async () => {
+  it('sale entero: Resumen con formato primero, detalle con cabecera fija, sin hoja de filtros', async () => {
     const { PassThrough } = await import('node:stream');
     const ExcelJS = (await import('exceljs')).default;
     const salida = new PassThrough();
@@ -367,8 +387,16 @@ describe('el xlsx', () => {
 
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(Buffer.concat(trozos) as never);
-    expect(libro.worksheets.map((h) => h.name)).toEqual(['Usuarios', 'Filtros']);
-    expect(libro.worksheets[0]!.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
-    expect(libro.worksheets[0]!.getRow(2).getCell(2).value).toBe('Ana');
+    expect(libro.worksheets.map((h) => h.name)).toEqual(['Resumen', 'Usuarios']);
+    const resumen = libro.worksheets[0]!;
+    expect(resumen.getRow(1).getCell(1).value).toBe('Resumen — Usuarios');
+    expect(String(resumen.getRow(2).getCell(1).value)).toContain('por Ana Karina');
+    // La cabecera de cada tabla lleva fondo y bordes.
+    const cabecera = resumen.getColumn(1).values.findIndex((v) => v === 'Estado');
+    const celda = resumen.getRow(cabecera).getCell(1);
+    expect(celda.fill).toMatchObject({ type: 'pattern', pattern: 'solid' });
+    expect(celda.border?.bottom?.style).toBe('thin');
+    expect(libro.worksheets[1]!.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
+    expect(libro.worksheets[1]!.getRow(2).getCell(2).value).toBe('Ana');
   });
 });

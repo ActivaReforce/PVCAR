@@ -11,6 +11,7 @@ import { enTransaccion } from '../../lib/tx.js';
 import { getPool } from '../../config/db.js';
 import * as repo from './usuarios.repository.js';
 import { revisarCambioDeRoles } from './usuarios.reglas.js';
+import type { AuxiliarDesvinculado } from '../../lib/auxiliares.js';
 import type {
   ActualizarUsuarioInput,
   CrearUsuarioInput,
@@ -496,7 +497,10 @@ async function exigirQueNoSeQuedeSinPropietario(
 }
 
 /** Baja logica. Arrastra la ficha de entrenador y cierra sus asignaciones. */
-export async function darDeBaja(actor: AuthUser, usuId: number): Promise<UsuarioDetalleConFoto> {
+export async function darDeBaja(
+  actor: AuthUser,
+  usuId: number,
+): Promise<UsuarioDetalleConFoto & { auxiliares_desvinculados: AuxiliarDesvinculado[] }> {
   if (usuId === actor.usuario.usu_id) {
     throw new ApiError(409, 'No puedes darte de baja a ti mismo');
   }
@@ -510,25 +514,32 @@ export async function darDeBaja(actor: AuthUser, usuId: number): Promise<Usuario
   await exigirAlcance(actor, usuId);
   await exigirQueNoSeQuedeSinPropietario(usuId);
 
-  await enTransaccion(async (client) => {
+  const auxiliares_desvinculados = await enTransaccion(async (client) => {
     await repo.cambiarEstado(client, usuId, ESTADO.INACTIVO);
     const roles = await repo.rolesDe(usuId, client);
     if (roles.includes(ROL.ENTRENADOR)) {
       await repo.desactivarEntrenador(client, usuId);
     }
     // Dado de baja no es titular ni asistente de nadie. Reactivar no los reabre.
-    await repo.soltarVinculosAuxiliares(client, usuId, 'ambos');
+    const sueltos = await repo.soltarVinculosAuxiliares(client, usuId, 'ambos');
     await auditar(
-      { actor, accion: 'baja', entidad: 'usuario', entidadId: usuId, detalle: { correo: antes.usu_correo } },
+      {
+        actor,
+        accion: 'baja',
+        entidad: 'usuario',
+        entidadId: usuId,
+        detalle: { correo: antes.usu_correo, auxiliares_desvinculados: sueltos },
+      },
       client,
     );
+    return sueltos;
   });
 
   // La sesion viva del usuario no se revoca: requireAuth ya responde 403 a los
   // inactivos en la siguiente peticion, y banear en Auth se olvida de deshacer
   // al reactivar.
   const despues = await repo.obtenerUsuario(usuId);
-  return conFotoFirmada(despues!);
+  return { ...(await conFotoFirmada(despues!)), auxiliares_desvinculados };
 }
 
 export async function reactivar(

@@ -6,6 +6,7 @@ import { horarioTexto, horariosJson, primerHorario, type HorarioDisciplina } fro
 import { offsetDe, ordenSeguro, type Paginacion } from '../../lib/paginacion.js';
 import { contieneSinTildes, paramsUsados } from '../../lib/sql.js';
 import type { ListarEntrenadoresQuery } from './entrenadores.schemas.js';
+import { HOY_EC } from '../../lib/fecha.js';
 
 export interface ColegioResumen {
   col_id: number;
@@ -334,7 +335,7 @@ export async function abrirAsignacion(
   const { rows } = await client.query<{ entasig_id: number }>(
     `INSERT INTO public.entrenador_asignacion
          (ent_id, colacthor_id, entasig_fecha_inicio, entasig_fecha_fin, est_id)
-     VALUES ($1, $2, COALESCE($3::date, CURRENT_DATE), NULL, $4)
+     VALUES ($1, $2, COALESCE($3::date, ${HOY_EC}), NULL, $4)
      RETURNING entasig_id`,
     [entId, colacthorId, desde, ESTADO.ACTIVO],
   );
@@ -353,7 +354,7 @@ export async function cerrarAsignacion(
 ): Promise<boolean> {
   const { rowCount } = await client.query(
     `UPDATE public.entrenador_asignacion
-        SET entasig_fecha_fin = CURRENT_DATE, est_id = $2
+        SET entasig_fecha_fin = ${HOY_EC}, est_id = $2
       WHERE entasig_id = $1 AND entasig_fecha_fin IS NULL`,
     [entasigId, ESTADO.INACTIVO],
   );

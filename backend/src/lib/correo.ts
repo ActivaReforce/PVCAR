@@ -12,17 +12,22 @@ import { env } from '../config/env.js';
  * se lo cuenta al usuario.
  */
 export interface Correo {
-  para: string;
+  para: string | string[];
   asunto: string;
   html: string;
   texto: string;
+  /** "Nombre <usuario@dominio>". Lo arma modules/correos con la configuracion del tipo. */
+  de: string;
+  /** Copias visibles: el destinatario ve a quien mas le llego. */
+  cc?: string[];
+  responderA?: string | null;
   /** Resend acepta adjuntos en base64; el total no debe pasar de 40 MB. */
   adjuntos?: Array<{ nombre: string; contenido: Buffer }>;
 }
 
 export async function enviarCorreo(correo: Correo): Promise<boolean> {
-  if (!env.RESEND_API_KEY || !env.CORREO_REMITENTE) {
-    console.error('Correo no enviado: faltan RESEND_API_KEY o CORREO_REMITENTE.');
+  if (!env.RESEND_API_KEY) {
+    console.error('Correo no enviado: falta RESEND_API_KEY.');
     return false;
   }
 
@@ -34,8 +39,10 @@ export async function enviarCorreo(correo: Correo): Promise<boolean> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: env.CORREO_REMITENTE,
-        to: [correo.para],
+        from: correo.de,
+        to: Array.isArray(correo.para) ? correo.para : [correo.para],
+        ...(correo.cc?.length ? { cc: correo.cc } : {}),
+        ...(correo.responderA ? { reply_to: correo.responderA } : {}),
         subject: correo.asunto,
         html: correo.html,
         text: correo.texto,

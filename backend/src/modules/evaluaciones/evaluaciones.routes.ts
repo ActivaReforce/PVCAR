@@ -18,16 +18,16 @@ import * as service from './evaluaciones.service.js';
 /**
  * Rutas de Evaluaciones.
  *
- * El reparto de permisos sale del catalogo real de `rol_permiso`:
+ * Dos módulos de permisos desde la 0026 (2026-10-07):
  *
- *   ver      -> los seis roles que entran al modulo
- *   crear    -> Propietario y Coordinador: dar de alta una plantilla
- *   editar   -> los anteriores **y el Entrenador**, porque editar es lo que
- *               hace falta para poner notas a sus alumnos
- *   eliminar -> solo Propietario
+ *   evaluaciones   -> la plantilla: ver, crear, editar (datos, parámetros,
+ *                     disciplinas, baja) y eliminar.
+ *   calificaciones -> los alumnos: ver sus pendientes y notas, y editar =
+ *                     calificar o quitar la pendiente de un alumno.
  *
- * Por eso **evaluar a un alumno pide `editar`, no `crear`**: si pidiera `crear`,
- * ningun entrenador podria evaluar, que es justo su trabajo.
+ * Antes calificar pedía `evaluaciones:editar`, y por eso el Entrenador tenía
+ * esa casilla; con ella también podía cambiar los parámetros de una
+ * plantilla que usan otros colegios.
  */
 
 export const evaluacionesRouter = Router();
@@ -84,7 +84,7 @@ evaluacionesRouter.get(
 
 evaluacionesRouter.get(
   '/pendientes',
-  requirePermission('evaluaciones', 'ver'),
+  requirePermission('calificaciones', 'ver'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const query = listarPendientesSchema.parse(req.query);
@@ -97,7 +97,7 @@ evaluacionesRouter.get(
 
 evaluacionesRouter.get(
   '/pendientes/:id',
-  requirePermission('evaluaciones', 'ver'),
+  requirePermission('calificaciones', 'ver'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
@@ -111,7 +111,7 @@ evaluacionesRouter.get(
 /** Los intentos completos de un alumno. El puntaje lo calcula el servidor. */
 evaluacionesRouter.put(
   '/pendientes/:id/intentos',
-  requirePermission('evaluaciones', 'editar'),
+  requirePermission('calificaciones', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
@@ -126,7 +126,7 @@ evaluacionesRouter.put(
 /** Borra la evaluacion de un alumno y lo devuelve a pendiente. */
 evaluacionesRouter.delete(
   '/pendientes/:id',
-  requirePermission('evaluaciones', 'editar'),
+  requirePermission('calificaciones', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);

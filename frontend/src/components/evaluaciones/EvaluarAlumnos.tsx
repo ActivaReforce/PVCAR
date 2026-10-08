@@ -3,6 +3,7 @@ import { ClipboardList } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -39,6 +40,7 @@ const EVALUADO = 7;
  * El contador de **cuántos faltan** es nuevo: antes no existía en ningún sitio.
  */
 const EvaluarAlumnos = ({ evaluaciones }: Props) => {
+  const puedeCalificar = usePermissions().hasPermission('calificaciones', 'editar');
   const [evaluacionId, setEvaluacionId] = useState<string>('');
   const [disciplinaId, setDisciplinaId] = useState<string>('');
   const [estado, setEstado] = useState(TODOS);
@@ -219,7 +221,7 @@ const EvaluarAlumnos = ({ evaluaciones }: Props) => {
                         className="h-11 flex-1 sm:h-10 sm:flex-none"
                         onClick={() => setEvaluando(a.evaninopen_id)}
                       >
-                        {evaluado ? 'Ver o corregir' : 'Evaluar'}
+                        {!puedeCalificar ? 'Ver' : evaluado ? 'Ver o corregir' : 'Evaluar'}
                       </Button>
                     </div>
                   </li>

@@ -17,7 +17,9 @@ import {
   useMisEncuestas,
   useResponderEncuesta,
 } from '@/hooks/useEncuestas';
-import { usePermissions } from '@/hooks/usePermissions';
+import { useAuth } from '@/contexts/AuthContext';
+
+const ROL_REPRESENTANTE = 4;
 
 type Valor = ValorRespuesta;
 const vacio = valorVacio;
@@ -48,13 +50,13 @@ const vacio = valorVacio;
  * contestar para poder usar el sistema no es una encuesta, es un peaje.
  */
 const EncuestaPendiente = () => {
-  const { hasPermission } = usePermissions();
+  const { user } = useAuth();
 
   /**
-   * Solo los representantes. `reporte_estudiante:ver` es el permiso que solo
-   * tiene ese rol, y es la forma de saberlo sin pedir nada al servidor.
+   * Solo los representantes, por su rol. Hasta el 2026-10-07 se deducía de
+   * la casilla "Reporte del Estudiante", que no abría nada y se quitó.
    */
-  const esRepresentante = hasPermission('reporte_estudiante', 'ver');
+  const esRepresentante = (user?.roles ?? []).some((r) => r.rol_id === ROL_REPRESENTANTE);
 
   const mias = useMisEncuestas(esRepresentante);
   const pendiente = useMemo(

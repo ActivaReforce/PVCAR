@@ -10,6 +10,15 @@ import type { AuthUser } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
 import * as repo from './entrenadores.repository.js';
 import type { AsignarInput, ListarEntrenadoresQuery } from './entrenadores.schemas.js';
+import { hoyEc } from '../../lib/fecha.js';
+import { soltarAuxiliaresSinClases, type AuxiliarDesvinculado } from '../../lib/auxiliares.js';
+
+/** Lo que devuelven asignar y cerrar: la ficha al dia y el recordatorio. */
+export interface CambioDeAsignacion {
+  asignaciones: repo.AsignacionListada[];
+  /** Auxiliares que se quedaron sin titular: la pantalla los recuerda. */
+  auxiliares_desvinculados: AuxiliarDesvinculado[];
+}
 
 /**
  * Entrenadores: quien imparte cada disciplina y quien lo respalda.
@@ -136,7 +145,7 @@ export async function asignar(
   actor: AuthUser,
   entId: number,
   input: AsignarInput,
-): Promise<repo.AsignacionListada[]> {
+): Promise<CambioDeAsignacion> {
   const entrenador = await repo.obtenerEntrenador(entId);
   if (!entrenador) throw new ApiError(404, 'Entrenador no encontrado');
   await exigirAlcance(actor, entrenador);
@@ -150,13 +159,13 @@ export async function asignar(
   if (entrenador.est_id !== ESTADO.ACTIVO || entrenador.usuario_est_id !== ESTADO.ACTIVO) {
     throw new ApiError(409, 'El entrenador esta dado de baja: reactivalo antes de asignarle nada');
   }
-  if (input.desde && input.desde > new Date().toISOString().slice(0, 10)) {
+  if (input.desde && input.desde > hoyEc()) {
     throw new ApiError(400, 'La fecha de inicio no puede ser futura');
   }
 
   const alcance = await alcanceDe(actor.usuario);
 
-  await enTransaccion(async (client) => {
+  const auxiliares_desvinculados = await enTransaccion(async (client) => {
     const disciplina = await repo.disciplinaActiva(client, input.colacthor_id);
     if (!disciplina) throw new ApiError(400, 'La disciplina no existe');
     if (disciplina.est_id !== ESTADO.ACTIVO) {
@@ -177,8 +186,10 @@ export async function asignar(
         `Esa disciplina ya la da ${ocupada.usu_nombre}. Vuelve a intentarlo marcando "reemplazar" si quieres cambiarlo.`,
       );
     }
+    let sueltos: AuxiliarDesvinculado[] = [];
     if (ocupada && input.reemplazar) {
       await repo.cerrarAsignacion(client, ocupada.entasig_id);
+      sueltos = await soltarAuxiliaresSinClases(client, [ocupada.ent_id]);
     }
 
     const entasigId = await repo.abrirAsignacion(
@@ -206,13 +217,15 @@ export async function asignar(
           ent_id: entId,
           colacthor_id: input.colacthor_id,
           reemplazo_a: ocupada?.ent_id ?? null,
+          auxiliares_desvinculados: sueltos,
         },
       },
       client,
     );
+    return sueltos;
   });
 
-  return repo.listarAsignaciones(entId, false);
+  return { asignaciones: await repo.listarAsignaciones(entId, false), auxiliares_desvinculados };
 }
 
 /** Cerrar una asignacion: fecha de fin, no DELETE. */
@@ -220,14 +233,14 @@ export async function cerrar(
   actor: AuthUser,
   entId: number,
   entasigId: number,
-): Promise<repo.AsignacionListada[]> {
+): Promise<CambioDeAsignacion> {
   const entrenador = await repo.obtenerEntrenador(entId);
   if (!entrenador) throw new ApiError(404, 'Entrenador no encontrado');
   await exigirAlcance(actor, entrenador);
 
   const alcance = await alcanceDe(actor.usuario);
 
-  await enTransaccion(async (client) => {
+  const auxiliares_desvinculados = await enTransaccion(async (client) => {
     const asignacion = await repo.obtenerAsignacion(client, entasigId);
     if (!asignacion) throw new ApiError(404, 'Esa asignacion no existe');
     if (asignacion.ent_id !== entId) {
@@ -239,6 +252,7 @@ export async function cerrar(
 
     const cerrada = await repo.cerrarAsignacion(client, entasigId);
     if (!cerrada) throw new ApiError(409, 'Esa asignacion ya estaba cerrada');
+    const sueltos = await soltarAuxiliaresSinClases(client, [entId]);
 
     await auditar(
       {
@@ -246,13 +260,19 @@ export async function cerrar(
         accion: 'editar',
         entidad: 'entrenador_asignacion',
         entidadId: entasigId,
-        detalle: { ent_id: entId, colacthor_id: asignacion.colacthor_id, cerrada: true },
+        detalle: {
+          ent_id: entId,
+          colacthor_id: asignacion.colacthor_id,
+          cerrada: true,
+          auxiliares_desvinculados: sueltos,
+        },
       },
       client,
     );
+    return sueltos;
   });
 
-  return repo.listarAsignaciones(entId, false);
+  return { asignaciones: await repo.listarAsignaciones(entId, false), auxiliares_desvinculados };
 }
 
 // ---------------------------------------------------------------------------

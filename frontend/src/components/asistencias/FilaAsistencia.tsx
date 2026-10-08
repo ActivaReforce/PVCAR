@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ESTADO_ASISTENCIA } from '@/api/asistencias';
 import type { Borrador } from '@/hooks/useBorradorAsistencia';
 import { ORDEN_ESTADOS, PINTA, iniciales } from './estados';
+import { ZONA } from '@/lib/fecha';
 
 interface Props {
   clave: string;
@@ -33,6 +34,7 @@ const fechaCorta = (iso: string) =>
     month: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: ZONA,
   });
 
 /**

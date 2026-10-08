@@ -188,7 +188,7 @@ describe('asignar', () => {
     await service.asignar(coordinadora, 76, { colacthor_id: 60, reemplazar: true });
 
     const sqls = query.mock.calls.map((c) => String(c[0]));
-    expect(sqls.some((s) => s.includes('SET entasig_fecha_fin = CURRENT_DATE'))).toBe(true);
+    expect(sqls.some((s) => s.includes("SET entasig_fecha_fin = (now() AT TIME ZONE 'America/Guayaquil')::date"))).toBe(true);
     expect(sqls.some((s) => s.includes('RETURNING entasig_id'))).toBe(true);
   });
 

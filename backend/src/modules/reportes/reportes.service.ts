@@ -11,10 +11,13 @@ import {
   type Columna,
   type ContextoReporte,
   type Definicion,
+  type FiltrosDisponibles,
   type FiltrosReporte,
 } from './reportes.definiciones.js';
 import { GRAFICAS, type DefinicionGrafica, type FormaGrafica, type SerieGrafica } from './reportes.analisis.js';
 import type { ConsultaQuery, FiltrosQuery } from './reportes.schemas.js';
+import { ahoraEc, hoyEc } from '../../lib/fecha.js';
+import { resumenDe, type Bloque } from './reportes.resumen.js';
 
 /**
  * Reportes.
@@ -36,6 +39,7 @@ export interface ReporteDisponible {
   titulo: string;
   descripcion: string;
   exigeRango: boolean;
+  filtros: FiltrosDisponibles;
   columnas: Columna[];
   /** Cuántas gráficas tiene su pestaña de análisis. 0 = no tiene. */
   graficas: number;
@@ -60,6 +64,7 @@ export function catalogo(actor: AuthUser): ReporteDisponible[] {
     titulo: d.titulo,
     descripcion: d.descripcion,
     exigeRango: d.exigeRango,
+    filtros: d.filtros,
     columnas: columnasVisibles(d, false),
     graficas: (GRAFICAS[d.id] ?? []).length,
     columnasSensibles: d.columnas.filter((c) => (d.columnasSensibles ?? []).includes(c.clave)),
@@ -183,9 +188,11 @@ export interface Exportacion {
  * así que el servidor nunca tiene el archivo entero en memoria. Es lo que
  * permite exportar decenas de miles de filas desde un contenedor pequeño.
  *
- * La primera hoja lleva los datos; **la segunda, los filtros con los que se
- * sacó**. Sin eso, dos Excel del mismo reporte son indistinguibles y nadie
- * sabe cuál mirar tres semanas después — que es justo lo que pasa hoy.
+ * Dos hojas: **el Resumen** —ya agrupado y contado, para que nadie trabaje
+ * el Excel a mano— y **el detalle**. La cabecera del Resumen dice cuándo y
+ * quién lo sacó y el periodo. Hasta el 2026-10-07 había una tercera hoja,
+ * "Filtros", en formato campo/valor; el cliente pidió quitarla porque no le
+ * decía nada.
  */
 export async function exportar(
   actor: AuthUser,
@@ -208,6 +215,25 @@ export async function exportar(
   const columnas = columnasVisibles(definicion, conSensibles);
 
   /*
+   * Las filas se traen antes de abrir ninguna hoja: el Resumen va primero y
+   * se calcula sobre ellas. Ya se tenían enteras en memoria igualmente.
+   */
+  const { rows } = await getPool().query<Record<string, unknown>>(
+    `SELECT * FROM (${sql}) r LIMIT $${params.length + 1}`,
+    [...params, TOPE_EXPORTACION],
+  );
+
+  const cortado = rows.length === TOPE_EXPORTACION;
+  const avisos = [`Generado el ${ahoraEc()} (hora de Ecuador) por ${actor.usuario.usu_nombre}.`];
+  if (filtros.desde && filtros.hasta) avisos.unshift(`Del ${diaTexto(filtros.desde)} al ${diaTexto(filtros.hasta)}.`);
+  if (conSensibles && (definicion.columnasSensibles ?? []).length > 0) {
+    avisos.push('Incluye información de salud: dato médico de menores, no reenviar.');
+  }
+  if (cortado) avisos.push(`Cortado en el tope de ${TOPE_EXPORTACION} filas: acota el rango.`);
+
+  escribirResumen(libro, definicion.titulo, avisos, resumenDe(definicion.id, rows, filtros));
+
+  /*
    * La fila de cabecera fija va en las opciones de `addWorksheet`: en el
    * escritor en streaming `views` solo tiene getter, y asignarlo después lanza
    * un TypeError con las cabeceras ya enviadas — la descarga se cortaba siempre.
@@ -220,50 +246,13 @@ export async function exportar(
     key: c.clave,
     width: c.ancho,
   }));
-  hoja.getRow(1).font = { bold: true };
-
-  const { rows } = await getPool().query<Record<string, unknown>>(
-    `SELECT * FROM (${sql}) r LIMIT $${params.length + 1}`,
-    [...params, TOPE_EXPORTACION],
-  );
+  estiloCabecera(hoja.getRow(1), columnas.length);
+  hoja.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columnas.length } };
 
   for (const fila of rows) {
     hoja.addRow(proyectar(fila, columnas)).commit();
   }
   hoja.commit();
-
-  const portada = libro.addWorksheet('Filtros');
-  portada.columns = [
-    { header: 'Campo', key: 'campo', width: 24 },
-    { header: 'Valor', key: 'valor', width: 50 },
-  ];
-  portada.getRow(1).font = { bold: true };
-
-  const lineas: Array<[string, string]> = [
-    ['Reporte', definicion.titulo],
-    ['Generado', new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'],
-    ['Generado por', actor.usuario.usu_nombre],
-    ['Filas', String(rows.length)],
-    ['Texto buscado', filtros.buscar ?? '—'],
-    ['Colegios', filtros.colegio?.join(', ') ?? 'Todos los de tu alcance'],
-    ['Disciplina', filtros.disciplina ? String(filtros.disciplina) : 'Todas'],
-    ['Estado', filtros.estado ? String(filtros.estado) : 'Todos'],
-    ['Desde', filtros.desde ?? '—'],
-    ['Hasta', filtros.hasta ?? '—'],
-    [
-      'Columnas sensibles',
-      (definicion.columnasSensibles ?? []).length === 0
-        ? 'El reporte no tiene'
-        : conSensibles
-          ? 'INCLUIDAS'
-          : 'Excluidas',
-    ],
-  ];
-  if (rows.length === TOPE_EXPORTACION) {
-    lineas.push(['Aviso', `Cortado en el tope de ${TOPE_EXPORTACION} filas. Acota el rango.`]);
-  }
-  for (const [campo, valor] of lineas) portada.addRow({ campo, valor }).commit();
-  portada.commit();
 
   await libro.commit();
 
@@ -287,8 +276,106 @@ export async function exportar(
     });
   }
 
-  const sello = new Date().toISOString().slice(0, 10);
+  const sello = hoyEc();
   return { nombreArchivo: `${definicion.id}-${sello}.xlsx`, filas: rows.length };
+}
+
+/** `2026-10-07` → `07/10/2026`. */
+const diaTexto = (iso: string) => iso.split('-').reverse().join('/');
+
+/*
+ * Colores del Excel. Sutiles a propósito: separan sin competir con los datos.
+ * Excel no tiene modo oscuro, así que van fijos.
+ */
+const COLOR = {
+  titulo: 'FF1F3864',
+  nota: 'FF595959',
+  cabecera: 'FFDCE6F1',
+  destacada: 'FFF2F2F2',
+  borde: 'FFBFBFBF',
+} as const;
+
+const relleno = (argb: string): ExcelJS.Fill => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+const linea: Partial<ExcelJS.Border> = { style: 'thin', color: { argb: COLOR.borde } };
+const BORDES: Partial<ExcelJS.Borders> = { top: linea, left: linea, bottom: linea, right: linea };
+
+/** Cabecera de tabla: negrita, fondo azul pálido y bordes en sus `ancho` celdas. */
+function estiloCabecera(fila: ExcelJS.Row, ancho: number): void {
+  fila.font = { bold: true };
+  for (let i = 1; i <= ancho; i++) {
+    const celda = fila.getCell(i);
+    celda.fill = relleno(COLOR.cabecera);
+    celda.border = BORDES;
+    celda.alignment = { vertical: 'middle', wrapText: true };
+  }
+}
+
+/**
+ * Escribe los bloques del Resumen uno debajo de otro: título, nota, tabla con
+ * bordes y un renglón en blanco. Las filas destacadas (totales, el nombre de
+ * cada persona en ej1, el título de cada disciplina en ej2) van en negrita y
+ * sombreadas. El ancho de cada columna es el del texto más largo que cae en
+ * ella, con tope para que una lista de nombres no la estire de más.
+ */
+function escribirResumen(
+  libro: ExcelJS.stream.xlsx.WorkbookWriter,
+  titulo: string,
+  avisos: string[],
+  bloques: Bloque[],
+): void {
+  const hoja = libro.addWorksheet('Resumen', { views: [{ showGridLines: false }] });
+
+  const anchos: number[] = [];
+  for (const b of bloques) {
+    for (const fila of [b.cabeceras, ...b.filas.filter((f) => f.length > 1)]) {
+      fila.forEach((celda, i) => {
+        anchos[i] = Math.min(Math.max(anchos[i] ?? 10, String(celda).length + 2), 45);
+      });
+    }
+  }
+  anchos[0] = Math.max(anchos[0] ?? 10, 30);
+  hoja.columns = anchos.map((width) => ({ width }));
+
+  const texto = (valor: string, font: Partial<ExcelJS.Font>) => {
+    const fila = hoja.addRow([valor]);
+    fila.font = font;
+    fila.commit();
+  };
+
+  texto(`Resumen — ${titulo}`, { bold: true, size: 14, color: { argb: COLOR.titulo } });
+  for (const aviso of avisos) texto(aviso, { color: { argb: COLOR.nota } });
+  texto('El detalle fila por fila está en la hoja siguiente.', { color: { argb: COLOR.nota } });
+  hoja.addRow([]).commit();
+
+  if (bloques.length === 0) texto('Sin datos con estos filtros.', { italic: true });
+
+  for (const b of bloques) {
+    const ancho = b.cabeceras.length;
+    texto(b.titulo, { bold: true, size: 12, color: { argb: COLOR.titulo } });
+    if (b.nota) texto(b.nota, { italic: true, color: { argb: COLOR.nota } });
+
+    const cabecera = hoja.addRow(b.cabeceras);
+    estiloCabecera(cabecera, ancho);
+    cabecera.commit();
+
+    const destacadas = new Set(b.destacadas);
+    b.filas.forEach((valores, i) => {
+      const fila = hoja.addRow(valores);
+      // Un renglón vacío dentro de la tabla separa grupos: sin bordes.
+      if (valores.length > 0) {
+        const marcada = destacadas.has(i);
+        if (marcada) fila.font = { bold: true };
+        for (let c = 1; c <= ancho; c++) {
+          const celda = fila.getCell(c);
+          celda.border = BORDES;
+          if (marcada) celda.fill = relleno(COLOR.destacada);
+        }
+      }
+      fila.commit();
+    });
+    hoja.addRow([]).commit();
+  }
+  hoja.commit();
 }
 
 // ---------------------------------------------------------------------------

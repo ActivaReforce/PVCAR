@@ -164,11 +164,11 @@ describe('el xlsx', () => {
     return libro;
   }
 
-  it('un conjunto: su hoja con cabecera fija y autofiltro, y la de información', async () => {
+  it('un conjunto: su hoja con cabecera fija y autofiltro, sin hoja de información', async () => {
     const libro = await generar((s) =>
       service.exportar(actor([ROL.PROPIETARIO]), 'usuarios', { dir: 'asc' } as never, s as never),
     );
-    expect(libro.worksheets.map((h) => h.name)).toEqual(['Usuarios', 'Información']);
+    expect(libro.worksheets.map((h) => h.name)).toEqual(['Usuarios']);
     const hoja = libro.worksheets[0]!;
     expect(hoja.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
     expect(hoja.autoFilter).toBeTruthy();

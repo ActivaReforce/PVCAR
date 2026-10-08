@@ -64,6 +64,7 @@ import {
   type DatosDocumento,
 } from '@/components/inscripciones/documento';
 import { fechaNacimiento } from '@/components/inscripciones/formato';
+import { hoyEc } from '@/lib/fecha';
 
 /**
  * Formulario público de inscripción (Fase 14B).
@@ -1042,7 +1043,7 @@ const FichaAlumno = ({
           <Input
             id={id('nacimiento')}
             type="date"
-            max={new Date().toISOString().slice(0, 10)}
+            max={hoyEc()}
             value={alumno.fecha_nacimiento}
             onChange={(e) => onChange({ fecha_nacimiento: e.target.value })}
             className="h-11"

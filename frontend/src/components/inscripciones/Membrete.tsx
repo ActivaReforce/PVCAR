@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useConfigInscripciones, useRestaurarMembrete, useSubirMembrete } from '@/hooks/useInscripciones';
+import TarjetaConfig from '@/components/inscripciones/TarjetaConfig';
 
 /** Hasta 700 KB: lo mismo que acepta el backend. */
 const BYTES_MAX = 700 * 1024;
@@ -55,50 +56,44 @@ const Membrete = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Membrete</h2>
-        <p className="text-sm text-muted-foreground">
-          Sale arriba de cada página de los documentos, de borde a borde. Usa una imagen apaisada de unos
-          1240 × 280 píxeles, PNG o JPEG, de hasta 700 KB. El cambio vale para los PDF que se generen desde
-          ahora; los ya enviados no cambian.
-        </p>
-        {config.data.membrete_data_url && (
-          <div className="overflow-hidden rounded-md border bg-white">
-            <img src={config.data.membrete_data_url} alt="Membrete actual" className="w-full" />
-          </div>
-        )}
-        <ConditionalAction module="inscripciones" action="editar">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button className="h-11 sm:h-10" onClick={() => archivo.current?.click()} disabled={subir.isPending}>
-              <ImageUp className="mr-2 h-4 w-4" />
-              {subir.isPending ? 'Subiendo…' : 'Cambiar membrete'}
+    <TarjetaConfig
+      titulo="Membrete"
+      descripcion="Sale arriba de cada página de los documentos, de borde a borde. Usa una imagen apaisada de unos 1240 × 280 píxeles, PNG o JPEG, de hasta 700 KB. El cambio vale para los PDF que se generen desde ahora; los ya enviados no cambian."
+    >
+      {config.data.membrete_data_url && (
+        <div className="overflow-hidden rounded-md border bg-white">
+          <img src={config.data.membrete_data_url} alt="Membrete actual" className="w-full" />
+        </div>
+      )}
+      <ConditionalAction module="inscripciones" action="editar">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button className="h-11 sm:h-10" onClick={() => archivo.current?.click()} disabled={subir.isPending}>
+            <ImageUp className="mr-2 h-4 w-4" />
+            {subir.isPending ? 'Subiendo…' : 'Cambiar membrete'}
+          </Button>
+          {config.data.membrete_propio && (
+            <Button
+              variant="outline"
+              className="h-11 sm:h-10"
+              onClick={() => restaurar.mutate(undefined)}
+              disabled={restaurar.isPending}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" /> Volver al original
             </Button>
-            {config.data.membrete_propio && (
-              <Button
-                variant="outline"
-                className="h-11 sm:h-10"
-                onClick={() => restaurar.mutate(undefined)}
-                disabled={restaurar.isPending}
-              >
-                <RotateCcw className="mr-2 h-4 w-4" /> Volver al original
-              </Button>
-            )}
-          </div>
-          <input
-            ref={archivo}
-            type="file"
-            accept="image/png,image/jpeg"
-            className="sr-only"
-            onChange={(e) => {
-              void elegir(e.target.files?.[0]);
-              e.target.value = '';
-            }}
-          />
-        </ConditionalAction>
-      </section>
-
-    </div>
+          )}
+        </div>
+        <input
+          ref={archivo}
+          type="file"
+          accept="image/png,image/jpeg"
+          className="sr-only"
+          onChange={(e) => {
+            void elegir(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+      </ConditionalAction>
+    </TarjetaConfig>
   );
 };
 

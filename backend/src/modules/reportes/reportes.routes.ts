@@ -4,6 +4,7 @@ import { requirePermission } from '../../middleware/requirePermission.js';
 import { ApiError } from '../../middleware/error.js';
 import { consultaSchema, filtrosSchema, idParamSchema } from './reportes.schemas.js';
 import * as service from './reportes.service.js';
+import { hoyEc } from '../../lib/fecha.js';
 
 /**
  * Rutas de Reportes.
@@ -84,7 +85,7 @@ reportesRouter.post(
     try {
       const { modulo } = idParamSchema.parse(req.params);
       const filtros = filtrosSchema.parse(req.body ?? {});
-      const sello = new Date().toISOString().slice(0, 10);
+      const sello = hoyEc();
 
       res.setHeader(
         'Content-Type',

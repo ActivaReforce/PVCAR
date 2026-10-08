@@ -17,13 +17,14 @@ import {
   useFichaEntrenador,
   useSoltarAuxiliar,
 } from '@/hooks/useEntrenadores';
+import { fechaDia } from '@/lib/fecha';
 
 interface Props {
   entId: number;
   onAsignar: () => void;
 }
 
-const fecha = (f: string | null) => (f ? new Date(f).toLocaleDateString() : '—');
+const fecha = fechaDia;
 
 /**
  * Ficha del entrenador: sus disciplinas y sus auxiliares.

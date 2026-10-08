@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AvisoAuxiliaresProvider } from "@/contexts/AvisoAuxiliaresContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
 import Login from "@/pages/Login";
@@ -96,38 +97,40 @@ const App = () => {
                     path="/*"
                     element={
                       <ProtectedRoute>
-                        <AppLayout>
-                          {/* Suspense propio: el de fuera ya se resolvió al
-                              montar el layout, así que sin este el salto entre
-                              pantallas desmontaría la barra lateral. */}
-                          <Suspense fallback={<Cargando />}>
-                            <Routes>
-                              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                              <Route path="/dashboard" element={<Dashboard />} />
-                              <Route path="/usuarios" element={<Usuarios />} />
-                              <Route path="/colegios" element={<Colegios />} />
-                              <Route path="/actividades" element={<Actividades />} />
-                              <Route path="/disciplinas" element={<Disciplinas />} />
-                              <Route path="/entrenadores" element={<Entrenadores />} />
-                              <Route path="/estudiantes" element={<Estudiantes />} />
-                              <Route path="/evaluaciones" element={<Evaluaciones />} />
-                              <Route path="/asistencias" element={<AsistenciasAlumnos />} />
-                              <Route
-                                path="/asistencias/entrenadores"
-                                element={<AsistenciasEntrenadores />}
-                              />
-                              <Route path="/reportes" element={<Reportes />} />
-                              <Route path="/reportes/data-anterior" element={<DataAnterior />} />
-                              <Route path="/reportes/:modulo" element={<ReporteDetalle />} />
-                              <Route path="/encuestas" element={<Encuestas />} />
-                              <Route path="/representantes" element={<Representantes />} />
-                              <Route path="/perfil" element={<Perfil />} />
-                              <Route path="/permisos" element={<Permisos />} />
-                              <Route path="/inscripciones" element={<Inscripciones />} />
-                              <Route path="*" element={<NotFound />} />
-                            </Routes>
-                          </Suspense>
-                        </AppLayout>
+                        <AvisoAuxiliaresProvider>
+                          <AppLayout>
+                            {/* Suspense propio: el de fuera ya se resolvió al
+                                montar el layout, así que sin este el salto entre
+                                pantallas desmontaría la barra lateral. */}
+                            <Suspense fallback={<Cargando />}>
+                              <Routes>
+                                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                                <Route path="/dashboard" element={<Dashboard />} />
+                                <Route path="/usuarios" element={<Usuarios />} />
+                                <Route path="/colegios" element={<Colegios />} />
+                                <Route path="/actividades" element={<Actividades />} />
+                                <Route path="/disciplinas" element={<Disciplinas />} />
+                                <Route path="/entrenadores" element={<Entrenadores />} />
+                                <Route path="/estudiantes" element={<Estudiantes />} />
+                                <Route path="/evaluaciones" element={<Evaluaciones />} />
+                                <Route path="/asistencias" element={<AsistenciasAlumnos />} />
+                                <Route
+                                  path="/asistencias/entrenadores"
+                                  element={<AsistenciasEntrenadores />}
+                                />
+                                <Route path="/reportes" element={<Reportes />} />
+                                <Route path="/reportes/data-anterior" element={<DataAnterior />} />
+                                <Route path="/reportes/:modulo" element={<ReporteDetalle />} />
+                                <Route path="/encuestas" element={<Encuestas />} />
+                                <Route path="/representantes" element={<Representantes />} />
+                                <Route path="/perfil" element={<Perfil />} />
+                                <Route path="/permisos" element={<Permisos />} />
+                                <Route path="/inscripciones" element={<Inscripciones />} />
+                                <Route path="*" element={<NotFound />} />
+                              </Routes>
+                            </Suspense>
+                          </AppLayout>
+                        </AvisoAuxiliaresProvider>
                       </ProtectedRoute>
                     }
                   />

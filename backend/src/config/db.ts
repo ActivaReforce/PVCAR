@@ -1,7 +1,16 @@
 import pg from 'pg';
 import { env } from './env.js';
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+/**
+ * Las columnas `date` salen como texto `YYYY-MM-DD`, no como `Date`.
+ *
+ * Por defecto pg las convierte a medianoche en la zona del contenedor (UTC en
+ * Railway) y el JSON lleva `2026-10-07T00:00:00.000Z`; un navegador en Ecuador
+ * lo enseña como el 6. Una fecha sin hora no tiene zona y no se convierte.
+ */
+types.setTypeParser(types.builtins.DATE, (valor) => valor);
 
 /**
  * Pool Postgres contra el pooler de Supabase.

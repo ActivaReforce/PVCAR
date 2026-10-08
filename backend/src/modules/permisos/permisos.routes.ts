@@ -45,7 +45,7 @@ permisosRouter.get(
  */
 permisosRouter.put(
   '/rol/:rolId',
-  requirePermission('permisos', 'ver'),
+  requirePermission('permisos', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) throw new ApiError(401, 'No autenticado');

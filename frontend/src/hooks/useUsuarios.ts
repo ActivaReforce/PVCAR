@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAvisoAuxiliares } from '@/contexts/AvisoAuxiliaresContext';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
@@ -139,7 +140,12 @@ export function useActualizarUsuario() {
 }
 
 export function useDarDeBaja() {
-  return useMutacionDeUsuario((id: number) => usuariosApi.darDeBaja(id), 'Usuario dado de baja');
+  const avisar = useAvisoAuxiliares();
+  return useMutacionDeUsuario(async (id: number) => {
+    const r = await usuariosApi.darDeBaja(id);
+    avisar(r.auxiliares_desvinculados);
+    return r;
+  }, 'Usuario dado de baja');
 }
 
 export function useReactivarUsuario() {

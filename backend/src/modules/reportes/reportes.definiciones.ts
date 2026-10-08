@@ -1,6 +1,8 @@
 import { ESTADO } from '../../lib/constants.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
+import { HOY_EC, textoEc } from '../../lib/fecha.js';
+import { CTE_VISIBLES } from '../usuarios/usuarios.repository.js';
 
 /**
  * El catálogo de reportes.
@@ -59,6 +61,47 @@ export interface FiltrosReporte {
   hasta?: string;
 }
 
+/** Una opción de un desplegable de filtro. */
+export interface OpcionFiltro {
+  id: number;
+  nombre: string;
+}
+
+/**
+ * Qué filtros tiene sentido enseñar en cada reporte.
+ *
+ * Hasta el 2026-10-07 la pantalla enseñaba los cinco en los nueve: el colegio
+ * y las fechas en reportes que no los usaban, y un "Estado" Activo/Inactivo
+ * que en asistencias filtraba Presente/Ausente y en evaluaciones no casaba
+ * con nada. Ahora cada definición dice los suyos y el desplegable de estado
+ * trae sus propias opciones.
+ */
+export interface FiltrosDisponibles {
+  colegio: boolean;
+  disciplina: boolean;
+  estado: { etiqueta: string; opciones: OpcionFiltro[] } | null;
+  /** Rango de fechas. Si el reporte lo exige, lo usa; nunca al revés. */
+  fechas: boolean;
+}
+
+const ACTIVO_INACTIVO = (etiqueta = 'Estado') => ({
+  etiqueta,
+  opciones: [
+    { id: ESTADO.ACTIVO, nombre: 'Activo' },
+    { id: ESTADO.INACTIVO, nombre: 'Inactivo' },
+  ],
+});
+
+const ASISTENCIA = {
+  etiqueta: 'Asistencia',
+  opciones: [
+    { id: 1, nombre: 'Presente' },
+    { id: 3, nombre: 'Tarde' },
+    { id: 4, nombre: 'Justificado' },
+    { id: 2, nombre: 'Ausente' },
+  ],
+};
+
 export interface ConsultaReporte {
   sql: string;
   params: unknown[];
@@ -72,6 +115,7 @@ export interface Definicion {
   modulo: string;
   /** Sin rango de fechas el reporte no significa nada: se exige. */
   exigeRango: boolean;
+  filtros: FiltrosDisponibles;
   columnas: Columna[];
   /**
    * Columnas que **no salen si no se piden**.
@@ -97,6 +141,7 @@ const usuarios: Definicion = {
   descripcion: 'Personas con acceso al sistema, con sus roles y su estado.',
   modulo: 'usuarios',
   exigeRango: false,
+  filtros: { colegio: false, disciplina: false, estado: ACTIVO_INACTIVO(), fechas: false },
   columnas: [
     { clave: 'usu_id', cabecera: 'ID', ancho: 8 },
     { clave: 'usu_nombre', cabecera: 'Nombre', ancho: 34 },
@@ -113,18 +158,7 @@ const usuarios: Definicion = {
      * asignación allí, sus auxiliares— y a sí mismo.
      */
     sql: `
-      WITH visibles AS (
-          SELECT cc.usu_id FROM public.colegio_coordinador cc WHERE cc.col_id = ANY($2::int[])
-          UNION
-          SELECT ea.ent_id FROM public.entrenador_asignacion ea
-            JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
-           WHERE cah.col_id = ANY($2::int[])
-          UNION
-          SELECT aux.usu_id FROM public.entrenador_auxiliar aux
-            JOIN public.entrenador_asignacion ea ON ea.ent_id = aux.ent_id
-            JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
-           WHERE cah.col_id = ANY($2::int[])
-      )
+      WITH ${CTE_VISIBLES}
       SELECT u.usu_id,
              u.usu_nombre,
              u.usu_correo,
@@ -133,8 +167,12 @@ const usuarios: Definicion = {
                          FROM public.usuario_rol ur
                          JOIN public.rol r ON r.rol_id = ur.rol_id
                         WHERE ur.usu_id = u.usu_id), 'Sin rol') AS roles,
+             ARRAY(SELECT r.rol_titulo
+                     FROM public.usuario_rol ur
+                     JOIN public.rol r ON r.rol_id = ur.rol_id
+                    WHERE ur.usu_id = u.usu_id ORDER BY r.rol_id) AS _roles,
              e.est_nombre                                       AS estado,
-             to_char(u.usu_fecha_creacion, 'DD/MM/YYYY')        AS usu_fecha_creacion
+             ${textoEc('u.usu_fecha_creacion', 'DD/MM/YYYY')}        AS usu_fecha_creacion
         FROM public.usuario u
         JOIN public.estado e ON e.est_id = u.est_id
        WHERE ($1::boolean OR u.usu_id IN (SELECT usu_id FROM visibles) OR u.usu_id = $3)
@@ -152,6 +190,7 @@ const colegios: Definicion = {
   descripcion: 'Los colegios con sus coordinadores y cuánto se imparte en cada uno.',
   modulo: 'colegios',
   exigeRango: false,
+  filtros: { colegio: true, disciplina: false, estado: null, fechas: false },
   columnas: [
     { clave: 'col_id', cabecera: 'ID', ancho: 8 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 34 },
@@ -192,6 +231,7 @@ const actividades: Definicion = {
   descripcion: 'El catálogo de actividades, con sus espacios y materiales.',
   modulo: 'actividades',
   exigeRango: false,
+  filtros: { colegio: false, disciplina: false, estado: null, fechas: false },
   columnas: [
     { clave: 'act_id', cabecera: 'ID', ancho: 8 },
     { clave: 'act_nombre', cabecera: 'Actividad', ancho: 26 },
@@ -232,6 +272,7 @@ const disciplinas: Definicion = {
   descripcion: 'Colegio, actividad, días y horas, con su entrenador y sus alumnos.',
   modulo: 'disciplinas',
   exigeRango: false,
+  filtros: { colegio: true, disciplina: false, estado: ACTIVO_INACTIVO(), fechas: false },
   columnas: [
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
     { clave: 'act_nombre', cabecera: 'Actividad', ancho: 24 },
@@ -278,19 +319,31 @@ const disciplinas: Definicion = {
 const entrenadores: Definicion = {
   id: 'entrenadores',
   titulo: 'Entrenadores',
-  descripcion: 'Quién imparte qué, en qué colegios y a cuántos alumnos.',
+  descripcion: 'Titulares y auxiliares: qué imparten, en qué colegios y a cuántos alumnos.',
   modulo: 'entrenadores',
   exigeRango: false,
+  filtros: { colegio: true, disciplina: false, estado: ACTIVO_INACTIVO(), fechas: false },
   columnas: [
-    { clave: 'usu_nombre', cabecera: 'Entrenador', ancho: 34 },
+    { clave: 'tipo', cabecera: 'Tipo', ancho: 12 },
+    { clave: 'usu_nombre', cabecera: 'Nombre', ancho: 34 },
+    { clave: 'acompana_a', cabecera: 'Acompaña a', ancho: 34 },
     { clave: 'usu_cedula', cabecera: 'Cédula', ancho: 14 },
     { clave: 'usu_correo', cabecera: 'Correo', ancho: 30 },
     { clave: 'usu_telefono', cabecera: 'Teléfono', ancho: 14 },
-    { clave: 'estado', cabecera: 'Estado de la ficha', ancho: 16 },
+    { clave: 'estado', cabecera: 'Estado', ancho: 12 },
     { clave: 'colegios', cabecera: 'Colegios', ancho: 34 },
     { clave: 'disciplinas', cabecera: 'Disciplinas activas', ancho: 18 },
     { clave: 'alumnos', cabecera: 'Alumnos', ancho: 12 },
   ],
+  /**
+   * Titulares y auxiliares en una sola lista (pedido del cliente, 2026-10-07).
+   *
+   * El auxiliar no tiene disciplinas propias: trabaja en las de sus titulares,
+   * así que sus colegios, disciplinas y alumnos son los de ellos, sin repetir.
+   * Su estado es el de su usuario (no tiene ficha de entrenador). Quien es
+   * titular y además auxiliar de otro sale dos veces, una por papel, igual
+   * que en la asistencia del personal.
+   */
   construir: (f, ctx) => ({
     sql: `
       WITH suyas AS (
@@ -298,31 +351,61 @@ const entrenadores: Definicion = {
             FROM public.entrenador_asignacion ea
             JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
            WHERE ea.entasig_fecha_fin IS NULL AND ea.est_id = ${ESTADO.ACTIVO}
+      ),
+      personas AS (
+          SELECT 'Entrenador'::text AS tipo, en.ent_id AS usu_id, en.est_id,
+                 ARRAY[en.ent_id] AS titulares, NULL::text AS acompana_a
+            FROM public.entrenador en
+          UNION ALL
+          SELECT 'Auxiliar', aux.usu_id, u.est_id,
+                 array_agg(aux.ent_id),
+                 string_agg(t.usu_nombre, ', ' ORDER BY t.usu_nombre)
+            FROM public.entrenador_auxiliar aux
+            JOIN public.usuario u ON u.usu_id = aux.usu_id
+            JOIN public.usuario t ON t.usu_id = aux.ent_id
+           WHERE aux.est_id = ${ESTADO.ACTIVO}
+           GROUP BY aux.usu_id, u.est_id
       )
-      SELECT u.usu_nombre,
+      SELECT p.tipo,
+             u.usu_nombre,
+             COALESCE(p.acompana_a, '')     AS acompana_a,
              COALESCE(u.usu_cedula, '')     AS usu_cedula,
              u.usu_correo,
              COALESCE(u.usu_telefono, '')   AS usu_telefono,
              e.est_nombre                   AS estado,
              COALESCE((SELECT string_agg(DISTINCT c.col_nombre, ', ')
                          FROM suyas s JOIN public.colegio c ON c.col_id = s.col_id
-                        WHERE s.ent_id = en.ent_id), '') AS colegios,
-             (SELECT count(*) FROM suyas s WHERE s.ent_id = en.ent_id)::int AS disciplinas,
+                        WHERE s.ent_id = ANY(p.titulares)), '') AS colegios,
+             ARRAY(SELECT DISTINCT c.col_nombre
+                     FROM suyas s JOIN public.colegio c ON c.col_id = s.col_id
+                    WHERE s.ent_id = ANY(p.titulares))  AS _colegios,
+             (SELECT count(DISTINCT s.colacthor_id) FROM suyas s
+               WHERE s.ent_id = ANY(p.titulares))::int AS disciplinas,
              (SELECT count(DISTINCT na.nino_id)
                 FROM suyas s
                 JOIN public.nino_asignacion na ON na.colacthor_id = s.colacthor_id
-               WHERE s.ent_id = en.ent_id AND na.est_id = ${ESTADO.ACTIVO})::int AS alumnos
-        FROM public.entrenador en
-        JOIN public.usuario u ON u.usu_id = en.ent_id
-        JOIN public.estado e  ON e.est_id = en.est_id
+               WHERE s.ent_id = ANY(p.titulares) AND na.est_id = ${ESTADO.ACTIVO})::int AS alumnos
+        FROM personas p
+        JOIN public.usuario u ON u.usu_id = p.usu_id
+        JOIN public.estado e  ON e.est_id = p.est_id
        WHERE ($1::boolean
               OR EXISTS (SELECT 1 FROM suyas s
-                          WHERE s.ent_id = en.ent_id
+                          WHERE s.ent_id = ANY(p.titulares)
                             AND (s.colacthor_id = ANY($2::int[]) OR s.col_id = ANY($3::int[]))))
          AND ($4::text IS NULL OR ${contieneSinTildes('u.usu_nombre', '$4')})
-         AND ($5::int IS NULL OR en.est_id = $5)
-       ORDER BY u.usu_nombre`,
-    params: [ctx.global, ctx.disciplinas, ctx.colegios, textoONulo(f.buscar), oNulo(f.estado)],
+         AND ($5::int IS NULL OR p.est_id = $5)
+         AND ($6::int[] IS NULL
+              OR EXISTS (SELECT 1 FROM suyas s
+                          WHERE s.ent_id = ANY(p.titulares) AND s.col_id = ANY($6::int[])))
+       ORDER BY u.usu_nombre, p.tipo DESC`,
+    params: [
+      ctx.global,
+      ctx.disciplinas,
+      ctx.colegios,
+      textoONulo(f.buscar),
+      oNulo(f.estado),
+      oNulo(f.colegio),
+    ],
   }),
 };
 
@@ -332,6 +415,7 @@ const estudiantes: Definicion = {
   descripcion: 'Los alumnos con su colegio, su grado y sus disciplinas.',
   modulo: 'estudiantes',
   exigeRango: false,
+  filtros: { colegio: true, disciplina: true, estado: ACTIVO_INACTIVO(), fechas: false },
   /** Dato médico de un menor: se incluye a propósito, no por defecto. */
   columnasSensibles: ['nino_info_salud'],
   columnas: [
@@ -353,7 +437,7 @@ const estudiantes: Definicion = {
       SELECT n.nino_id,
              n.nino_nombre,
              COALESCE(to_char(n.nino_fecha_nacimiento, 'YYYY-MM-DD'), '') AS nino_fecha_nacimiento,
-             date_part('year', age(CURRENT_DATE, n.nino_fecha_nacimiento))::int AS nino_edad,
+             date_part('year', age(${HOY_EC}, n.nino_fecha_nacimiento))::int AS nino_edad,
              c.col_nombre,
              COALESCE(g.catninograd_nombre, '')                    AS catninograd_nombre,
              CASE n.nino_modalidad_salida WHEN 'escolar' THEN 'Transporte escolar'
@@ -366,13 +450,23 @@ const estudiantes: Definicion = {
                          JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = na.colacthor_id
                          JOIN public.actividad a ON a.act_id = cah.act_id
                         WHERE na.nino_id = n.nino_id AND na.est_id = ${ESTADO.ACTIVO}), '') AS disciplinas,
+             (SELECT COALESCE(json_agg(json_build_object(
+                         'id', cah.colacthor_id,
+                         'colegio', cc.col_nombre,
+                         'actividad', a.act_nombre,
+                         'horario', COALESCE(${horarioTexto('cah')}, ''))), '[]'::json)
+                FROM public.nino_asignacion na
+                JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = na.colacthor_id
+                JOIN public.colegio cc  ON cc.col_id = cah.col_id
+                JOIN public.actividad a ON a.act_id = cah.act_id
+               WHERE na.nino_id = n.nino_id AND na.est_id = ${ESTADO.ACTIVO}) AS _disciplinas,
              COALESCE((SELECT string_agg(u.usu_nombre, ', ' ORDER BY u.usu_nombre)
                          FROM public.nino_padre np
                          JOIN public.padre p ON p.padre_id = np.padre_id
                          JOIN public.usuario u ON u.usu_id = p.usu_id
                         WHERE np.nino_id = n.nino_id), '')          AS representantes,
              COALESCE(n.nino_info_salud, '')                        AS nino_info_salud,
-             to_char(n.nino_fecha_creacion, 'DD/MM/YYYY')           AS nino_fecha_creacion
+             ${textoEc('n.nino_fecha_creacion', 'DD/MM/YYYY')}           AS nino_fecha_creacion
         FROM public.nino n
         JOIN public.colegio c ON c.col_id = n.col_id
         JOIN public.estado e  ON e.est_id = n.est_id
@@ -409,6 +503,7 @@ const asistenciasAlumnos: Definicion = {
   descripcion: 'Una fila por marca. Exige un rango de fechas.',
   modulo: 'asistencias_estudiantes',
   exigeRango: true,
+  filtros: { colegio: true, disciplina: true, estado: ASISTENCIA, fechas: true },
   columnas: [
     { clave: 'fecha', cabecera: 'Fecha', ancho: 12 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
@@ -420,6 +515,7 @@ const asistenciasAlumnos: Definicion = {
     { clave: 'hora_tarde', cabecera: 'Hora de llegada', ancho: 14 },
     { clave: 'razon', cabecera: 'Justificación', ancho: 40 },
     { clave: 'registrado_por', cabecera: 'Registrado por', ancho: 30 },
+    { clave: 'registrado_el', cabecera: 'Hora de registro', ancho: 17 },
   ],
   construir: (f, ctx) => ({
     sql: `
@@ -433,7 +529,10 @@ const asistenciasAlumnos: Definicion = {
              ae.asisest_nombre                                   AS estado,
              COALESCE(to_char(an.asisnino_hora_tarde, 'HH24:MI'), '')    AS hora_tarde,
              COALESCE(an.asisnino_razon_justificado, '')         AS razon,
-             COALESCE(u.usu_nombre, '')                          AS registrado_por
+             COALESCE(u.usu_nombre, '')                          AS registrado_por,
+             COALESCE(${textoEc('an.asisnino_fecha_registrado', 'DD/MM/YYYY HH24:MI')}, '') AS registrado_el,
+             an.asisest_id                                       AS _asisest,
+             COALESCE(${horarioTexto('cah')}, '')                AS _disc_horario
         FROM public.asistencia_nino an
         JOIN public.nino n ON n.nino_id = an.nino_id
         JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = an.colacthor_id
@@ -472,6 +571,7 @@ const asistenciasEntrenadores: Definicion = {
   descripcion: 'Titulares y auxiliares en una sola lista. Exige un rango de fechas.',
   modulo: 'asistencias_entrenadores',
   exigeRango: true,
+  filtros: { colegio: true, disciplina: false, estado: ASISTENCIA, fechas: true },
   columnas: [
     { clave: 'fecha', cabecera: 'Fecha', ancho: 12 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
@@ -481,6 +581,7 @@ const asistenciasEntrenadores: Definicion = {
     { clave: 'hora_tarde', cabecera: 'Hora de llegada', ancho: 14 },
     { clave: 'razon', cabecera: 'Justificación', ancho: 40 },
     { clave: 'registrado_por', cabecera: 'Registrado por', ancho: 30 },
+    { clave: 'registrado_el', cabecera: 'Hora de registro', ancho: 17 },
   ],
   /**
    * Las dos tablas en una sola lista. El sistema viejo tenía la de auxiliares
@@ -497,7 +598,10 @@ const asistenciasEntrenadores: Definicion = {
              COALESCE(to_char(ae.asisent_hora_tarde, 'HH24:MI'), '')  AS hora_tarde,
              COALESCE(ae.asisent_razon_justificado, '')     AS razon,
              COALESCE(reg.usu_nombre, '')                   AS registrado_por,
-             ae.asisent_fecha                               AS _orden
+             COALESCE(${textoEc('ae.asisent_fecha_registrado', 'DD/MM/YYYY HH24:MI')}, '') AS registrado_el,
+             ae.asisent_fecha                               AS _orden,
+             ae.ent_id                                      AS _persona,
+             ae.asisest_id                                  AS _asisest
         FROM public.asistencia_entrenador ae
         JOIN public.colegio c ON c.col_id = ae.col_id
         JOIN public.usuario u ON u.usu_id = ae.ent_id
@@ -519,7 +623,10 @@ const asistenciasEntrenadores: Definicion = {
              COALESCE(to_char(aa.asisaux_hora_tarde, 'HH24:MI'), ''),
              COALESCE(aa.asisaux_razon_justificado, ''),
              COALESCE(reg.usu_nombre, ''),
-             aa.asisaux_fecha
+             COALESCE(${textoEc('aa.asisaux_fecha_registrado', 'DD/MM/YYYY HH24:MI')}, ''),
+             aa.asisaux_fecha,
+             aa.usu_id,
+             aa.asisest_id
         FROM public.asistencia_auxiliar aa
         JOIN public.colegio c ON c.col_id = aa.col_id
         JOIN public.usuario u ON u.usu_id = aa.usu_id
@@ -531,7 +638,7 @@ const asistenciasEntrenadores: Definicion = {
          AND ($6::int[] IS NULL OR aa.col_id = ANY($6::int[]))
          AND ($7::int IS NULL OR aa.asisest_id = $7)
 
-       ORDER BY 9 DESC, 2, 4`,
+       ORDER BY 10 DESC, 2, 4`,
     params: [
       ctx.global,
       ctx.colegios,
@@ -548,8 +655,20 @@ const evaluaciones: Definicion = {
   id: 'evaluaciones',
   titulo: 'Evaluaciones',
   descripcion: 'Una fila por alumno y evaluación, con su puntaje.',
-  modulo: 'evaluaciones',
+  modulo: 'calificaciones',
   exigeRango: false,
+  filtros: {
+    colegio: true,
+    disciplina: true,
+    estado: {
+      etiqueta: 'Estado',
+      opciones: [
+        { id: ESTADO.PENDIENTE, nombre: 'Pendiente' },
+        { id: ESTADO.EVALUADO, nombre: 'Evaluado' },
+      ],
+    },
+    fechas: false,
+  },
   columnas: [
     { clave: 'eva_titulo', cabecera: 'Evaluación', ancho: 30 },
     { clave: 'eva_categoria', cabecera: 'Categoría', ancho: 20 },
@@ -576,8 +695,9 @@ const evaluaciones: Definicion = {
              CASE WHEN e.eva_puntaje_total > 0
                   THEN round(COALESCE(p.puntaje, 0) * 100 / e.eva_puntaje_total)::int
                   ELSE 0 END                          AS porcentaje,
-             COALESCE(to_char(np.evaninopen_fecha_finalizacion, 'DD/MM/YYYY'), '') AS finalizacion,
-             COALESCE(reg.usu_nombre, '')             AS evaluado_por
+             COALESCE(${textoEc('np.evaninopen_fecha_finalizacion', 'DD/MM/YYYY')}, '') AS finalizacion,
+             COALESCE(reg.usu_nombre, '')             AS evaluado_por,
+             np.est_id                                AS _est
         FROM public.evaluacion_nino_pendiente np
         JOIN public.evaluacion e ON e.eva_id = np.eva_id
         JOIN public.nino_asignacion na ON na.ninoasig_id = np.ninoasig_id

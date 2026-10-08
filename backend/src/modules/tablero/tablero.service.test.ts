@@ -13,7 +13,7 @@ const query = vi.fn(async (sql: string, _parametros?: unknown[]) => {
   if (sql.includes('WITH col_coordinador')) {
     return { rows: [{ colegios: [12, 16], disciplinas: [60, 74] }] };
   }
-  if (sql.includes("'YYYY-MM-DD'") && sql.includes('America/Guayaquil')) {
+  if (sql.includes('AS hoy') && sql.includes('now() AT TIME ZONE')) {
     return { rows: [{ hoy: '2026-09-17' }] };
   }
   return { rows: [{ colegios: [], disciplinas: [], hijos: [] }] };

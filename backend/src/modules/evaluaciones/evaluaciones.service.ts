@@ -93,6 +93,33 @@ async function exigirVisible(
   throw new ApiError(403, 'Esa evaluacion esta fuera de tu alcance');
 }
 
+/**
+ * Para cambiar la plantilla (datos, parámetros, baja, reactivar, borrar) no
+ * basta con verla: **todas** las disciplinas que la usan tienen que estar en
+ * el alcance de quien la cambia. Una plantilla compartida por varios colegios
+ * solo la cambian Propietario y Admin; si no, un coordinador cambiaba los
+ * parámetros con los que se califica en colegios que no son suyos.
+ */
+async function exigirEditable(
+  actor: AuthUser,
+  evaId: number,
+): Promise<{ evaluacion: repo.EvaluacionListada; alcance: Alcance }> {
+  const visible = await exigirVisible(actor, evaId);
+  if (visible.alcance.global) return visible;
+
+  const vinculadas = await repo.listarVinculadas(evaId);
+  const ajena = vinculadas.some(
+    (v) => v.est_id === ESTADO.ACTIVO && !alcanzaDisciplina(visible.alcance, v.colacthor_id),
+  );
+  if (ajena) {
+    throw new ApiError(
+      409,
+      'Esta evaluación la usan disciplinas de otros colegios: solo Propietario o Admin pueden cambiarla.',
+    );
+  }
+  return visible;
+}
+
 // ---------------------------------------------------------------------------
 // Lista y ficha
 
@@ -166,7 +193,7 @@ export async function actualizar(
   evaId: number,
   input: ActualizarEvaluacionInput,
 ): Promise<FichaEvaluacion> {
-  await exigirVisible(actor, evaId);
+  await exigirEditable(actor, evaId);
 
   await enTransaccion(async (client) => {
     await repo.actualizarEvaluacion(client, evaId, {
@@ -213,7 +240,7 @@ export async function guardarParametros(
   evaId: number,
   parametros: ParametroInput[],
 ): Promise<FichaEvaluacion> {
-  await exigirVisible(actor, evaId);
+  await exigirEditable(actor, evaId);
 
   const actuales = await repo.listarParametros(evaId);
   const porId = new Map(actuales.map((p) => [p.evaparam_id, p]));
@@ -281,7 +308,7 @@ export async function guardarParametros(
 }
 
 export async function darDeBaja(actor: AuthUser, evaId: number): Promise<FichaEvaluacion> {
-  const { evaluacion } = await exigirVisible(actor, evaId);
+  const { evaluacion } = await exigirEditable(actor, evaId);
   if (evaluacion.est_id === ESTADO.INACTIVO) {
     throw new ApiError(409, 'Esa evaluacion ya estaba dada de baja');
   }
@@ -304,7 +331,7 @@ export async function darDeBaja(actor: AuthUser, evaId: number): Promise<FichaEv
 }
 
 export async function reactivar(actor: AuthUser, evaId: number): Promise<FichaEvaluacion> {
-  const { evaluacion } = await exigirVisible(actor, evaId);
+  const { evaluacion } = await exigirEditable(actor, evaId);
   if (evaluacion.est_id === ESTADO.ACTIVO) {
     throw new ApiError(409, 'Esa evaluacion ya estaba activa');
   }
@@ -343,7 +370,7 @@ export async function eliminar(
   evaId: number,
   confirmacion: string,
 ): Promise<repo.ImpactoEvaluacion> {
-  const { evaluacion } = await exigirVisible(actor, evaId);
+  const { evaluacion } = await exigirEditable(actor, evaId);
 
   if (confirmacion.trim().toLowerCase() !== evaluacion.eva_titulo.trim().toLowerCase()) {
     throw new ApiError(400, 'El titulo escrito no coincide con el de la evaluacion');

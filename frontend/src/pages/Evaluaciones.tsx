@@ -54,7 +54,9 @@ const TODOS = 'todos';
  * disciplina crea las pendientes en una sola transacción.
  */
 const Evaluaciones = () => {
-  const { canCreate } = usePermissions();
+  const { canCreate, hasPermission } = usePermissions();
+  // Calificar es su propio módulo desde la 0026: ver notas y pendientes.
+  const veCalificaciones = hasPermission('calificaciones', 'ver');
 
   const [page, setPage] = useState(1);
   const [busqueda, setBusqueda] = useState('');
@@ -147,7 +149,7 @@ const Evaluaciones = () => {
       <Tabs defaultValue="gestion">
         <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-flex">
           <TabsTrigger value="gestion">Gestión</TabsTrigger>
-          <TabsTrigger value="evaluar">Evaluar alumnos</TabsTrigger>
+          {veCalificaciones && <TabsTrigger value="evaluar">Evaluar alumnos</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="gestion" className="mt-4 space-y-4">

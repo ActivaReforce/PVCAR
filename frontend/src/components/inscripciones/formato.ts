@@ -1,6 +1,6 @@
 /** Formatos de fecha y contacto que comparten las pantallas de Inscripciones. */
 
-const ZONA = 'America/Guayaquil';
+import { ZONA } from '@/lib/fecha';
 
 export function fechaHora(iso: string): string {
   return new Intl.DateTimeFormat('es-EC', {

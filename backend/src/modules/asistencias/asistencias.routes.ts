@@ -14,17 +14,10 @@ import * as service from './asistencias.service.js';
 /**
  * Rutas de Asistencias.
  *
- * **Sobre los permisos.** En `rol_permiso` los dos modulos de asistencia solo
- * tienen la accion `ver`: nadie, en ningun rol, tiene `crear` ni `editar`
- * sobre ellos. Exigir `editar` para guardar dejaria el modulo inservible para
- * todo el mundo hasta que el cliente lo concediera desde Permisos.
- *
- * Asi que aqui `ver` habilita tambien el pase de lista, que es lo que la
- * pantalla siempre ha hecho, y lo que de verdad limita quien puede marcar a
- * quien es el **alcance** (lib/alcance.ts), que se comprueba en el servicio.
- * Queda anotado en `docs/fase11-asistencias.md` como decision a confirmar: si
- * el cliente quiere separar "consultar" de "pasar lista", se conceden las
- * acciones y se cambian estas dos lineas.
+ * **Sobre los permisos** (desde la 0026, 2026-10-07): `ver` deja consultar
+ * listas e historial; `editar` deja pasar lista. Hasta entonces solo existía
+ * `ver` y habilitaba también escribir. Quién puede marcar a quién lo sigue
+ * limitando el **alcance** (lib/alcance.ts), que se comprueba en el servicio.
  */
 
 export const asistenciasRouter = Router();
@@ -33,6 +26,8 @@ asistenciasRouter.use(requireAuth);
 
 const VER_ALUMNOS: [string, string] = ['asistencias_estudiantes', 'ver'];
 const VER_ENTRENADORES: [string, string] = ['asistencias_entrenadores', 'ver'];
+const PASAR_LISTA_ALUMNOS: [string, string] = ['asistencias_estudiantes', 'editar'];
+const PASAR_LISTA_ENTRENADORES: [string, string] = ['asistencias_entrenadores', 'editar'];
 
 function actor(req: Request) {
   if (!req.user) throw new ApiError(401, 'No autenticado');
@@ -89,7 +84,7 @@ asistenciasRouter.get(
 /** PUT y no POST: el lote es el estado completo de esa sesion ese dia. */
 asistenciasRouter.put(
   '/alumnos',
-  requirePermission(...VER_ALUMNOS),
+  requirePermission(...PASAR_LISTA_ALUMNOS),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const input = guardarAlumnosSchema.parse(req.body);
@@ -131,7 +126,7 @@ asistenciasRouter.get(
 
 asistenciasRouter.put(
   '/entrenadores',
-  requirePermission(...VER_ENTRENADORES),
+  requirePermission(...PASAR_LISTA_ENTRENADORES),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const input = guardarEntrenadoresSchema.parse(req.body);
