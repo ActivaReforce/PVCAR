@@ -254,19 +254,38 @@ const disciplinas: Constructor = (filas) => {
   return bloques;
 };
 
+/** Titulares y auxiliares van juntos en el reporte; aquí se cuentan por separado. */
 const entrenadores: Constructor = (filas) => {
-  const sinClases = filas.filter((f) => numero(f.disciplinas) === 0).map((f) => texto(f.usu_nombre));
+  const porTipo = (): Medida[] => [
+    cuantos('Entrenadores', (f) => texto(f.tipo) === 'Entrenador'),
+    cuantos('Auxiliares', (f) => texto(f.tipo) === 'Auxiliar'),
+    cuenta('Total'),
+  ];
+  const sinClases = filas.filter((f) => numero(f.disciplinas) === 0);
   const bloques = [
-    agrupar('Por estado de la ficha', filas, [{ cabecera: 'Estado', de: campo('estado') }], [cuenta('Entrenadores')]),
+    agrupar('Por estado', filas, [{ cabecera: 'Estado', de: campo('estado') }], porTipo()),
     agrupar(
       'Por colegio',
       expandir(filas, '_colegios', 'Sin colegio'),
       [{ cabecera: 'Colegio', de: campo('_k') }],
-      [cuenta('Entrenadores')],
+      porTipo(),
       { nota: 'Quien trabaja en varios colegios cuenta en cada uno.', total: false },
     ),
   ];
-  if (sinClases.length > 0) bloques.push(lista('Entrenadores sin disciplinas activas', 'Entrenador', sinClases));
+  if (sinClases.length > 0) {
+    bloques.push(
+      agrupar(
+        'Sin disciplinas activas',
+        sinClases,
+        [
+          { cabecera: 'Nombre', de: campo('usu_nombre') },
+          { cabecera: 'Tipo', de: campo('tipo') },
+        ],
+        [],
+        { total: false },
+      ),
+    );
+  }
   return bloques;
 };
 

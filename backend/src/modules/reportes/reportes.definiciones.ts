@@ -319,20 +319,31 @@ const disciplinas: Definicion = {
 const entrenadores: Definicion = {
   id: 'entrenadores',
   titulo: 'Entrenadores',
-  descripcion: 'Quién imparte qué, en qué colegios y a cuántos alumnos.',
+  descripcion: 'Titulares y auxiliares: qué imparten, en qué colegios y a cuántos alumnos.',
   modulo: 'entrenadores',
   exigeRango: false,
-  filtros: { colegio: true, disciplina: false, estado: ACTIVO_INACTIVO('Estado de la ficha'), fechas: false },
+  filtros: { colegio: true, disciplina: false, estado: ACTIVO_INACTIVO(), fechas: false },
   columnas: [
-    { clave: 'usu_nombre', cabecera: 'Entrenador', ancho: 34 },
+    { clave: 'tipo', cabecera: 'Tipo', ancho: 12 },
+    { clave: 'usu_nombre', cabecera: 'Nombre', ancho: 34 },
+    { clave: 'acompana_a', cabecera: 'Acompaña a', ancho: 34 },
     { clave: 'usu_cedula', cabecera: 'Cédula', ancho: 14 },
     { clave: 'usu_correo', cabecera: 'Correo', ancho: 30 },
     { clave: 'usu_telefono', cabecera: 'Teléfono', ancho: 14 },
-    { clave: 'estado', cabecera: 'Estado de la ficha', ancho: 16 },
+    { clave: 'estado', cabecera: 'Estado', ancho: 12 },
     { clave: 'colegios', cabecera: 'Colegios', ancho: 34 },
     { clave: 'disciplinas', cabecera: 'Disciplinas activas', ancho: 18 },
     { clave: 'alumnos', cabecera: 'Alumnos', ancho: 12 },
   ],
+  /**
+   * Titulares y auxiliares en una sola lista (pedido del cliente, 2026-10-07).
+   *
+   * El auxiliar no tiene disciplinas propias: trabaja en las de sus titulares,
+   * así que sus colegios, disciplinas y alumnos son los de ellos, sin repetir.
+   * Su estado es el de su usuario (no tiene ficha de entrenador). Quien es
+   * titular y además auxiliar de otro sale dos veces, una por papel, igual
+   * que en la asistencia del personal.
+   */
   construir: (f, ctx) => ({
     sql: `
       WITH suyas AS (
@@ -340,35 +351,53 @@ const entrenadores: Definicion = {
             FROM public.entrenador_asignacion ea
             JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = ea.colacthor_id
            WHERE ea.entasig_fecha_fin IS NULL AND ea.est_id = ${ESTADO.ACTIVO}
+      ),
+      personas AS (
+          SELECT 'Entrenador'::text AS tipo, en.ent_id AS usu_id, en.est_id,
+                 ARRAY[en.ent_id] AS titulares, NULL::text AS acompana_a
+            FROM public.entrenador en
+          UNION ALL
+          SELECT 'Auxiliar', aux.usu_id, u.est_id,
+                 array_agg(aux.ent_id),
+                 string_agg(t.usu_nombre, ', ' ORDER BY t.usu_nombre)
+            FROM public.entrenador_auxiliar aux
+            JOIN public.usuario u ON u.usu_id = aux.usu_id
+            JOIN public.usuario t ON t.usu_id = aux.ent_id
+           WHERE aux.est_id = ${ESTADO.ACTIVO}
+           GROUP BY aux.usu_id, u.est_id
       )
-      SELECT u.usu_nombre,
+      SELECT p.tipo,
+             u.usu_nombre,
+             COALESCE(p.acompana_a, '')     AS acompana_a,
              COALESCE(u.usu_cedula, '')     AS usu_cedula,
              u.usu_correo,
              COALESCE(u.usu_telefono, '')   AS usu_telefono,
              e.est_nombre                   AS estado,
              COALESCE((SELECT string_agg(DISTINCT c.col_nombre, ', ')
                          FROM suyas s JOIN public.colegio c ON c.col_id = s.col_id
-                        WHERE s.ent_id = en.ent_id), '') AS colegios,
+                        WHERE s.ent_id = ANY(p.titulares)), '') AS colegios,
              ARRAY(SELECT DISTINCT c.col_nombre
                      FROM suyas s JOIN public.colegio c ON c.col_id = s.col_id
-                    WHERE s.ent_id = en.ent_id)  AS _colegios,
-             (SELECT count(*) FROM suyas s WHERE s.ent_id = en.ent_id)::int AS disciplinas,
+                    WHERE s.ent_id = ANY(p.titulares))  AS _colegios,
+             (SELECT count(DISTINCT s.colacthor_id) FROM suyas s
+               WHERE s.ent_id = ANY(p.titulares))::int AS disciplinas,
              (SELECT count(DISTINCT na.nino_id)
                 FROM suyas s
                 JOIN public.nino_asignacion na ON na.colacthor_id = s.colacthor_id
-               WHERE s.ent_id = en.ent_id AND na.est_id = ${ESTADO.ACTIVO})::int AS alumnos
-        FROM public.entrenador en
-        JOIN public.usuario u ON u.usu_id = en.ent_id
-        JOIN public.estado e  ON e.est_id = en.est_id
+               WHERE s.ent_id = ANY(p.titulares) AND na.est_id = ${ESTADO.ACTIVO})::int AS alumnos
+        FROM personas p
+        JOIN public.usuario u ON u.usu_id = p.usu_id
+        JOIN public.estado e  ON e.est_id = p.est_id
        WHERE ($1::boolean
               OR EXISTS (SELECT 1 FROM suyas s
-                          WHERE s.ent_id = en.ent_id
+                          WHERE s.ent_id = ANY(p.titulares)
                             AND (s.colacthor_id = ANY($2::int[]) OR s.col_id = ANY($3::int[]))))
          AND ($4::text IS NULL OR ${contieneSinTildes('u.usu_nombre', '$4')})
-         AND ($5::int IS NULL OR en.est_id = $5)
+         AND ($5::int IS NULL OR p.est_id = $5)
          AND ($6::int[] IS NULL
-              OR EXISTS (SELECT 1 FROM suyas s WHERE s.ent_id = en.ent_id AND s.col_id = ANY($6::int[])))
-       ORDER BY u.usu_nombre`,
+              OR EXISTS (SELECT 1 FROM suyas s
+                          WHERE s.ent_id = ANY(p.titulares) AND s.col_id = ANY($6::int[])))
+       ORDER BY u.usu_nombre, p.tipo DESC`,
     params: [
       ctx.global,
       ctx.disciplinas,

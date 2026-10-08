@@ -121,6 +121,26 @@ describe('los demás reportes', () => {
     expect(b.filas[0]).toEqual(['Mobak', '', 3, 2, 1, 70]);
   });
 
+  it('entrenadores: titulares y auxiliares se cuentan por separado', () => {
+    const filas: Fila[] = [
+      { tipo: 'Entrenador', usu_nombre: 'Beto', estado: 'Activo', _colegios: ['A', 'B'], disciplinas: 2 },
+      { tipo: 'Auxiliar', usu_nombre: 'Caro', estado: 'Activo', _colegios: ['A'], disciplinas: 1 },
+      { tipo: 'Auxiliar', usu_nombre: 'Dani', estado: 'Inactivo', _colegios: [], disciplinas: 0 },
+    ];
+    const bloques = resumenDe('entrenadores', filas, {});
+    expect(bloque(bloques, 'Por estado').filas).toEqual([
+      ['Activo', 1, 1, 2],
+      ['Inactivo', 0, 1, 1],
+      ['Total', 1, 2, 3],
+    ]);
+    expect(bloque(bloques, 'Por colegio').filas).toEqual([
+      ['A', 1, 1, 2],
+      ['B', 1, 0, 1],
+      ['Sin colegio', 0, 1, 1],
+    ]);
+    expect(bloque(bloques, 'Sin disciplinas activas').filas).toEqual([['Dani', 'Auxiliar']]);
+  });
+
   it('usuarios: quien tiene dos roles cuenta en los dos', () => {
     const filas: Fila[] = [
       { estado: 'Activo', _roles: ['Coordinador', 'Entrenador'] },
