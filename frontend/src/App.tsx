@@ -44,6 +44,7 @@ const Perfil = lazy(() => import("@/pages/Perfil"));
 const Permisos = lazy(() => import("@/pages/Permisos"));
 const Inscripciones = lazy(() => import("@/pages/Inscripciones"));
 const Inscripcion = lazy(() => import("@/pages/Inscripcion"));
+const Novedades = lazy(() => import("@/pages/Novedades"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 /**
@@ -126,6 +127,7 @@ const App = () => {
                                 <Route path="/perfil" element={<Perfil />} />
                                 <Route path="/permisos" element={<Permisos />} />
                                 <Route path="/inscripciones" element={<Inscripciones />} />
+                                <Route path="/novedades" element={<Novedades />} />
                                 <Route path="*" element={<NotFound />} />
                               </Routes>
                             </Suspense>

@@ -70,6 +70,7 @@ export const MODULOS = [
   'perfil',
   'permisos',
   'inscripciones',
+  'novedades',
 ] as const;
 
 export type Modulo = (typeof MODULOS)[number];

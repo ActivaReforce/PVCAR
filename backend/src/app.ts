@@ -22,6 +22,7 @@ import { encuestasRouter } from './modules/encuestas/encuestas.routes.js';
 import { permisosRouter } from './modules/permisos/permisos.routes.js';
 import { perfilRouter } from './modules/perfil/perfil.routes.js';
 import { correosRouter } from './modules/correos/correos.routes.js';
+import { novedadesRouter } from './modules/novedades/novedades.routes.js';
 import {
   inscripcionPublicaRouter,
   inscripcionesRouter,
@@ -95,6 +96,7 @@ export function createApp(): Application {
   api.use('/inscripcion', inscripcionPublicaRouter);
   api.use('/inscripciones', inscripcionesRouter);
   api.use('/correos', correosRouter);
+  api.use('/novedades', novedadesRouter);
 
   app.use('/api/v1', api);
 
