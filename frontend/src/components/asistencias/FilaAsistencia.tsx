@@ -69,23 +69,26 @@ const FilaAsistencia = ({
 
   return (
     <li
-      className={`px-3 py-3 sm:px-4 ${sucia ? 'bg-muted/40' : ''} ${
+      className={`px-3 py-2 sm:px-4 sm:py-3 ${sucia ? 'bg-muted/40' : ''} ${
         incompleta ? 'border-l-4 border-l-amber-500' : ''
       }`}
     >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Avatar className="h-10 w-10 flex-shrink-0">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+          <Avatar className="h-9 w-9 flex-shrink-0 sm:h-10 sm:w-10">
             <AvatarImage src={fotoUrl ?? undefined} alt="" />
             <AvatarFallback>{iniciales(nombre)}</AvatarFallback>
           </Avatar>
 
-          <div className="min-w-0">
-            <div className="truncate font-medium" title={nombre}>
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-sm font-medium sm:text-base" title={nombre}>
               {nombre}
             </div>
             {detalle && (
-              <div className="truncate text-sm text-muted-foreground" title={detalle}>
+              <div
+                className="truncate text-xs text-muted-foreground sm:text-sm"
+                title={detalle}
+              >
                 {detalle}
               </div>
             )}

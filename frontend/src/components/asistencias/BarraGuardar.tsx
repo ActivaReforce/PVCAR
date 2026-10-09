@@ -1,4 +1,4 @@
-import { Loader2, Save, Undo2, UserCheck } from 'lucide-react';
+import { Loader2, Save, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -6,34 +6,53 @@ interface Props {
   cambios: number;
   incompletas: number;
   guardando: boolean;
-  onPresenteATodos: () => void;
   onDeshacer: () => void;
-  onGuardar: () => void;
+  /**
+   * `marcarRestantes` dice si antes de guardar hay que poner Presente a los
+   * que no tienen estado. El padre tiene las marcas en su cierre al momento
+   * del clic; el barra solo elige la variante.
+   */
+  onGuardar: (marcarRestantes: boolean) => void;
+  /**
+   * Barra arriba o abajo. Las dos acciones son las mismas: el entrenador que
+   * acaba de marcar al último no sube a buscar el botón, y el coordinador que
+   * abre la pantalla ve de un vistazo lo que queda sin cerrar.
+   */
+  posicion?: 'arriba' | 'abajo';
 }
 
 /**
- * La barra de acción, fija abajo.
- *
- * Fija y no al final de la lista porque con 42 alumnos el botón de guardar
- * quedaba a un scroll de distancia del último que marcaste: el sistema viejo
- * guardaba fila a fila justamente para no tener que llegar hasta él.
+ * La barra de acción.
  *
  * Dice **por qué** no se puede guardar en vez de dejar el botón apagado sin
  * explicación, que es el peor estado de una interfaz.
+ *
+ * El botón cambia de nombre según lo que falte:
+ * - **"Presentes a los N y guardar"** mientras quede alguien sin marcar:
+ *   un solo gesto para el caso normal. Si ya marcaste a algunos Ausente,
+ *   no se pisan — solo se marcan Presente los que no tienen estado todavía.
+ * - **"Guardar N"** cuando ya no hay sin marcar y solo quedan cambios por
+ *   guardar.
  */
 const BarraGuardar = ({
   sinMarcar,
   cambios,
   incompletas,
   guardando,
-  onPresenteATodos,
   onDeshacer,
   onGuardar,
+  posicion = 'abajo',
 }: Props) => {
-  const bloqueado = incompletas > 0 || cambios === 0 || guardando;
+  const marcarRestantes = sinMarcar > 0 && incompletas === 0;
+  const bloqueado =
+    incompletas > 0 || (!marcarRestantes && cambios === 0) || guardando;
+
+  const base = posicion === 'arriba' ? 'top-0 border-b' : 'bottom-0 border-t mt-2';
 
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 mt-2 border-t bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:-mx-6 lg:px-6">
+    <div
+      className={`sticky z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:-mx-6 lg:px-6 ${base}`}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 text-sm text-muted-foreground">
           {incompletas > 0 ? (
@@ -53,18 +72,6 @@ const BarraGuardar = ({
         </div>
 
         <div className="flex gap-2">
-          {sinMarcar > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 flex-1 sm:h-10 sm:flex-none"
-              onClick={onPresenteATodos}
-            >
-              <UserCheck className="mr-2 h-4 w-4" />
-              Presente a los {sinMarcar}
-            </Button>
-          )}
-
           {cambios > 0 && (
             <Button
               type="button"
@@ -75,7 +82,7 @@ const BarraGuardar = ({
               title="Descartar los cambios sin guardar"
               aria-label="Descartar los cambios sin guardar"
             >
-              <Undo2 className="h-4 w-4" />
+              Deshacer
             </Button>
           )}
 
@@ -83,15 +90,19 @@ const BarraGuardar = ({
             type="button"
             variant="brand"
             className="h-11 flex-1 sm:h-10 sm:flex-none"
-            onClick={onGuardar}
+            onClick={() => onGuardar(marcarRestantes)}
             disabled={bloqueado}
           >
             {guardando ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : marcarRestantes ? (
+              <UserCheck className="mr-2 h-4 w-4" />
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            Guardar {cambios > 0 ? cambios : ''}
+            {marcarRestantes
+              ? `Presentes a los ${sinMarcar} y guardar`
+              : `Guardar${cambios > 0 ? ` ${cambios}` : ''}`}
           </Button>
         </div>
       </div>
