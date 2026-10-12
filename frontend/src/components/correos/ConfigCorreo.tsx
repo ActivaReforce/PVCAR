@@ -17,6 +17,13 @@ interface Props {
   descripcion: string;
   /** Aviso interno: va a una lista fija de destinatarios ("Para"). */
   conPara?: boolean;
+  /**
+   * Enseña el switch "notificar también al mencionado y al representante".
+   * Solo tiene sentido para 'novedades'.
+   */
+  conNotificarMencionado?: boolean;
+  /** Texto corto que explica qué hace el switch. */
+  textoNotificarMencionado?: string;
 }
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,7 +42,14 @@ const lineas = (texto: string) =>
  * no se escribe: un dominio distinto haría que los correos dejaran de salir
  * sin avisar. Las copias son visibles: el destinatario ve a quién más llegó.
  */
-const ConfigCorreo = ({ tipo, titulo, descripcion, conPara = false }: Props) => {
+const ConfigCorreo = ({
+  tipo,
+  titulo,
+  descripcion,
+  conPara = false,
+  conNotificarMencionado = false,
+  textoNotificarMencionado,
+}: Props) => {
   const { user } = useAuth();
   const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
   const config = useConfigCorreo(tipo, esPropietario);
@@ -46,6 +60,7 @@ const ConfigCorreo = ({ tipo, titulo, descripcion, conPara = false }: Props) => 
   const [destinatarios, setDestinatarios] = useState('');
   const [copias, setCopias] = useState('');
   const [responderA, setResponderA] = useState('');
+  const [notificar, setNotificar] = useState(false);
 
   const datos = config.data;
   useEffect(() => {
@@ -55,6 +70,7 @@ const ConfigCorreo = ({ tipo, titulo, descripcion, conPara = false }: Props) => 
     setDestinatarios(datos.para.join('\n'));
     setCopias(datos.cc.join('\n'));
     setResponderA(datos.responder_a ?? '');
+    setNotificar(datos.notificar_mencionado);
   }, [datos]);
 
   if (!esPropietario || !datos) return null;
@@ -81,7 +97,8 @@ const ConfigCorreo = ({ tipo, titulo, descripcion, conPara = false }: Props) => 
     usuarioLimpio !== datos.usuario ||
     para.join('\n') !== datos.para.join('\n') ||
     cc.join('\n') !== datos.cc.join('\n') ||
-    responder !== (datos.responder_a ?? '');
+    responder !== (datos.responder_a ?? '') ||
+    (conNotificarMencionado && notificar !== datos.notificar_mencionado);
 
   return (
     <TarjetaConfig titulo={titulo} descripcion={descripcion}>
@@ -167,6 +184,28 @@ const ConfigCorreo = ({ tipo, titulo, descripcion, conPara = false }: Props) => 
             Vacío: las respuestas van a la dirección de envío, que no tiene buzón.
           </p>
         </div>
+
+        {conNotificarMencionado && (
+          <div className="flex items-start justify-between gap-3 rounded-md border p-3">
+            <div className="min-w-0 flex-1">
+              <Label htmlFor={`correo-notificar-${tipo}`} className="cursor-pointer">
+                Notificar también al mencionado y al representante
+              </Label>
+              {textoNotificarMencionado && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {textoNotificarMencionado}
+                </p>
+              )}
+            </div>
+            <input
+              id={`correo-notificar-${tipo}`}
+              type="checkbox"
+              checked={notificar}
+              onChange={(e) => setNotificar(e.target.checked)}
+              className="mt-1 h-5 w-5 flex-shrink-0 accent-primary"
+            />
+          </div>
+        )}
       </div>
 
       {errores.length > 0 && cambiado && (
@@ -181,7 +220,14 @@ const ConfigCorreo = ({ tipo, titulo, descripcion, conPara = false }: Props) => 
         className="h-11 sm:h-10"
         disabled={!cambiado || errores.length > 0 || guardar.isPending}
         onClick={() =>
-          guardar.mutate({ nombre: nombre.trim(), usuario: usuarioLimpio, para, cc, responder_a: responder || null })
+          guardar.mutate({
+            nombre: nombre.trim(),
+            usuario: usuarioLimpio,
+            para,
+            cc,
+            responder_a: responder || null,
+            notificar_mencionado: conNotificarMencionado ? notificar : false,
+          })
         }
       >
         <Save className="mr-2 h-4 w-4" />

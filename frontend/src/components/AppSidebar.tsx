@@ -32,7 +32,8 @@ import {
   Users2,
   UserRound,
   ShieldCheck,
-  FileSignature
+  FileSignature,
+  Megaphone
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -91,6 +92,7 @@ export function AppSidebar() {
     { title: "Representantes", path: "/representantes", icon: UserRound, module: "usuarios" },
     { title: "Inscripciones", path: "/inscripciones", icon: FileSignature, module: "inscripciones" },
     { title: "Encuestas", path: "/encuestas", icon: MessageSquare, module: "encuestas" },
+    { title: "Novedades", path: "/novedades", icon: Megaphone, module: "novedades" },
     { title: "Reportes", path: "/reportes", icon: BarChart3, module: "reportes" },
     { title: "Perfil", path: "/perfil", icon: User, module: "perfil" },
     { title: "Permisos", path: "/permisos", icon: ShieldCheck, module: "permisos" },

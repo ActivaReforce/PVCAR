@@ -44,6 +44,12 @@ const Perfil = lazy(() => import("@/pages/Perfil"));
 const Permisos = lazy(() => import("@/pages/Permisos"));
 const Inscripciones = lazy(() => import("@/pages/Inscripciones"));
 const Inscripcion = lazy(() => import("@/pages/Inscripcion"));
+// Temporal: en producción Novedades enseña "En desarrollo" hasta que se
+// apruebe en dev. Se decide por el backend al que apunta el build.
+const esProduccion = (import.meta.env.VITE_API_URL ?? "").includes("pvcarbackend-production");
+const Novedades = lazy(() =>
+  esProduccion ? import("@/pages/NovedadesEnDesarrollo") : import("@/pages/Novedades"),
+);
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 /**
@@ -126,6 +132,7 @@ const App = () => {
                                 <Route path="/perfil" element={<Perfil />} />
                                 <Route path="/permisos" element={<Permisos />} />
                                 <Route path="/inscripciones" element={<Inscripciones />} />
+                                <Route path="/novedades" element={<Novedades />} />
                                 <Route path="*" element={<NotFound />} />
                               </Routes>
                             </Suspense>

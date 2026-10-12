@@ -10,7 +10,7 @@ Este documento sustituye a `Plan.md`. El historial de sesiones anteriores quedó
 
 > **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/`, `Backup_bd/`, `Bitacora.md`, `activa-forge-login/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben: llevan datos de menores, respaldos o claves.
 
-**Corte de este documento: 2026-10-08 (punto 7 hecho — asistencia más fluida; siguiente: punto 8, Novedades, preguntar antes de construir).**
+**Corte de este documento: 2026-10-09 (punto 8 — módulo Novedades construido, en `dev`; siguiente: punto 9, aviso automático de ausencia, construye sobre Novedades).**
 
 ---
 
@@ -81,6 +81,32 @@ La empresa está **en pausa un mes**. Decisión del cliente, aprobada por la emp
 5. **Libertad para cambiar el modelo:** sin datos viejos en `public`, cualquier cambio de schema deja de tener que respetarlos.
 
 Esto **vacía la Fase 16**: se caen el dump fresco, los 19 chequeos de compatibilidad, el backfill de Auth, la carga con los triggers apagados, la copia del bucket y la corrección del correo de Bernard.
+
+### Corte de sesión — 2026-10-09
+
+**Hecho hoy (todo en `dev`; `0027_novedades.sql` por correr antes de probar):**
+
+- **Punto 8 — módulo Novedades.** Cualquier rol escribe una novedad con uno de tres alcances: **General** (texto suelto), **Personal de Activa Reforce** (menciona 1..N usuarios activos) y **Alumnos** (menciona 1..N alumnos del alcance). Al enviar sale correo al Para + CC configurados; si el switch "notificar también al mencionado y al representante" está activo, se añaden al Para los mencionados (personal) o los representantes (alumno).
+- **Visibilidad del listado:** Propietario y Admin ven todas; el resto ve las suyas; con el switch activo, los mencionados ven las que les tocan y los representantes las de sus hijos. Las generales solo las ven autor y globales.
+- **Eliminar:** autor o Propietario/Admin. No se edita (el correo ya salió).
+- **Permisos** `novedades` (`ver`, `crear`, `eliminar`) añadidos a `rol_permiso` por la propia `0027`: todos los roles ven y crean; eliminar solo Propietario y Admin. Si el cliente quiere restringir, se reparte desde la pantalla de Permisos.
+- **Nuevo tipo `novedades` en `correo_config`** y columna `corcfg_notificar_mencionado`.
+- **Infra añadida:** `backend/src/modules/novedades/*`, `frontend/src/pages/Novedades.tsx`, `components/novedades/{SelectorMenciones,CrearNovedadDialog}`, `api/novedades.ts`, `hooks/useNovedades.ts`. Montado en `app.ts` y en el sidebar con icono Megaphone.
+- **Correos** reutilizan `enviarComo` con un `paraExtra` nuevo que suma los mencionados al Para configurado.
+- 7/7 tests de frontend, 605/605 de backend, lint sin errores y build limpio.
+
+**Pendiente conocido:** card Novedades en Reportes con Excel de hoja Resumen; se entrega en la siguiente iteración si el cliente lo pide. El módulo ya se puede usar en pantalla sin él.
+
+**SQL por correr (dev):** `db/migrations/0027_novedades.sql`. Prod lo recibe cuando el cliente apruebe el PR a `main`, como siempre.
+
+**Al retomar — lista de trabajo, uno por uno:**
+
+1–8. ~~Fechas · Cambio de entrenador · Correos · Correo de aprobación · Reportes · Permisos · Asistencia más fluida · Novedades~~ — hechos.
+9. **Aviso automático de ausencia:** cuando un alumno queda ausente, se crea una novedad del tipo alumno automáticamente y se dispara el correo al representante (si el switch está activo) y a Para/CC. Depende del 8 (ya montado).
+10. **Pagos mensuales** — esperar al cliente.
+11. **Pruebas en pantalla del cliente** incluidas las de Novedades.
+12. **Decisiones pendientes.**
+13. **Siembra de prod** + Fases 15/16/17.
 
 ### Corte de sesión — 2026-10-08
 

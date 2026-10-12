@@ -16,7 +16,10 @@ import type { ConfigCorreoInput } from './correos.schemas.js';
  * sin Propietario, y se comprueba aqui aunque la pantalla ya la esconda.
  */
 /** Tipos que van a una lista fija de destinatarios (avisos internos). */
-export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = ['inscripciones_aviso'];
+export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = ['inscripciones_aviso', 'novedades'];
+
+/** Tipos que usan el switch `notificar_mencionado`. */
+export const TIPOS_CON_MENCIONADO: readonly repo.TipoCorreo[] = ['novedades'];
 
 function exigirPropietario(actor: AuthUser): void {
   if (!actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO)) {
@@ -48,7 +51,10 @@ export async function guardar(
     // Solo el aviso interno tiene destinatarios fijos: en el resto el
     // destinatario es la persona del caso (el representante).
     const para = TIPOS_CON_PARA.includes(tipo) ? input.para : [];
-    await repo.guardarConfig(client, { tipo, ...input, para });
+    const notificar_mencionado = TIPOS_CON_MENCIONADO.includes(tipo)
+      ? input.notificar_mencionado
+      : false;
+    await repo.guardarConfig(client, { tipo, ...input, para, notificar_mencionado });
     await auditar(
       {
         actor,
@@ -71,7 +77,12 @@ export async function guardar(
  */
 export async function enviarComo(
   tipo: repo.TipoCorreo,
-  correo: Omit<Correo, 'de' | 'cc' | 'responderA' | 'para'> & { para?: string },
+  correo: Omit<Correo, 'de' | 'cc' | 'responderA' | 'para'> & {
+    /** Si se pasa, sustituye al Para fijo de la configuración. */
+    para?: string | string[];
+    /** Correos extra a sumar al Para configurado. */
+    paraExtra?: string[];
+  },
 ): Promise<boolean> {
   if (!env.CORREO_DOMINIO) {
     console.error('Correo no enviado: falta CORREO_DOMINIO.');
@@ -88,17 +99,29 @@ export async function enviarComo(
     console.error(`Correo no enviado: "${tipo}" no tiene fila en correo_config.`);
     return false;
   }
-  // Con destinatario propio (el representante) va a el; si no, a la lista fija.
-  const para = correo.para ? [correo.para] : config.para;
+  // Con destinatario propio (el representante) va a él; si no, a la lista fija.
+  const base = correo.para
+    ? Array.isArray(correo.para)
+      ? correo.para
+      : [correo.para]
+    : config.para;
+  const para = [...new Set([...base, ...(correo.paraExtra ?? [])])].filter(Boolean);
   if (para.length === 0) {
     console.error(`Correo "${tipo}" no enviado: no tiene destinatarios.`);
     return false;
   }
+  const { paraExtra: _ignorado, ...resto } = correo;
   return enviarCorreo({
-    ...correo,
+    ...resto,
     para,
     de: `${config.nombre} <${config.usuario}@${env.CORREO_DOMINIO}>`,
     cc: config.cc,
     responderA: config.responder_a,
   });
+}
+
+export async function configuracion(
+  tipo: repo.TipoCorreo,
+): Promise<repo.ConfigCorreo | null> {
+  return repo.obtenerConfig(tipo);
 }

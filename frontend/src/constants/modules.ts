@@ -16,6 +16,7 @@ export const MODULES = [
   'perfil',
   'permisos',
   'inscripciones',
+  'novedades',
 ] as const;
 
 export type Module = typeof MODULES[number];
@@ -37,6 +38,7 @@ export const MODULE_LABELS: Record<Module, string> = {
   perfil: 'Perfil',
   permisos: 'Permisos',
   inscripciones: 'Inscripciones',
+  novedades: 'Novedades',
 };
 
 // Helper to map a pathname to a module key
@@ -57,5 +59,6 @@ export const pathToModule = (pathname: string): Module | null => {
   if (pathname.startsWith('/perfil')) return 'perfil';
   if (pathname.startsWith('/permisos')) return 'permisos';
   if (pathname.startsWith('/inscripciones')) return 'inscripciones';
+  if (pathname.startsWith('/novedades')) return 'novedades';
   return null;
 };

@@ -8,8 +8,10 @@ let fila: Record<string, unknown> | null = {
   tipo: 'inscripciones',
   nombre: 'Inscripcion Activa Reforce',
   usuario: 'inscripciones',
+  para: [] as string[],
   cc: ['gerencia@activareforce.com'],
   responder_a: 'info@activareforce.com',
+  notificar_mencionado: false,
 };
 const actualizaciones: unknown[][] = [];
 
@@ -47,6 +49,7 @@ const entrada = {
   para: [] as string[],
   cc: ['gerencia@activareforce.com'],
   responder_a: null,
+  notificar_mencionado: false,
 };
 
 beforeEach(() => {
