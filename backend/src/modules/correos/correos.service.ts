@@ -11,9 +11,9 @@ import type { ConfigCorreoInput } from './correos.schemas.js';
 /**
  * Configuracion de correos: quien envia cada tipo y a quien va en copia.
  *
- * Solo el Propietario (decidido por el cliente el 2026-10-07). No es un
- * permiso del modal de Permisos: es una regla fija, como la de no quedarse
- * sin Propietario, y se comprueba aqui aunque la pantalla ya la esconda.
+ * Los de Inscripciones, solo el Propietario (decidido por el cliente el
+ * 2026-10-07): regla fija, sin casilla. El de Novedades lo abre la casilla
+ * Editar de Novedades (2026-10-12), que es su pestaña Configuración.
  */
 /** Tipos que van a una lista fija de destinatarios (avisos internos). */
 export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = ['inscripciones_aviso', 'novedades'];
@@ -21,7 +21,12 @@ export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = ['inscripciones_aviso'
 /** Tipos que usan los switches `notificar_mencionado` y `notificar_representante`. */
 export const TIPOS_CON_MENCIONADO: readonly repo.TipoCorreo[] = ['novedades'];
 
-function exigirPropietario(actor: AuthUser): void {
+function exigirPuedeConfigurar(actor: AuthUser, tipo: repo.TipoCorreo): void {
+  if (tipo === 'novedades') {
+    const ok = actor.permisos.some((p) => p.modulo === 'novedades' && p.accion === 'editar');
+    if (!ok) throw new ApiError(403, 'Sin permiso: novedades:editar');
+    return;
+  }
   if (!actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO)) {
     throw new ApiError(403, 'Solo el Propietario configura los correos');
   }
@@ -33,7 +38,7 @@ export interface ConfigCorreoConDominio extends repo.ConfigCorreo {
 }
 
 export async function obtener(actor: AuthUser, tipo: repo.TipoCorreo): Promise<ConfigCorreoConDominio> {
-  exigirPropietario(actor);
+  exigirPuedeConfigurar(actor, tipo);
   const config = await repo.obtenerConfig(tipo);
   if (!config) throw new ApiError(404, 'Ese tipo de correo no tiene configuracion');
   return { ...config, dominio: env.CORREO_DOMINIO ?? null };
@@ -44,7 +49,7 @@ export async function guardar(
   tipo: repo.TipoCorreo,
   input: ConfigCorreoInput,
 ): Promise<ConfigCorreoConDominio> {
-  exigirPropietario(actor);
+  exigirPuedeConfigurar(actor, tipo);
   await enTransaccion(async (client) => {
     const antes = await repo.obtenerConfig(tipo, client);
     if (!antes) throw new ApiError(404, 'Ese tipo de correo no tiene configuracion');

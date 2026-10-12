@@ -49,7 +49,7 @@ const lineas = (texto: string) =>
 /**
  * Quién envía un tipo de correo y a quién va en copia (2026-10-07).
  *
- * Solo la ve el Propietario. El dominio es fijo (el verificado en Resend) y
+ * La ve el Propietario; la de Novedades, quien tenga Editar en Novedades. El dominio es fijo (el verificado en Resend) y
  * no se escribe: un dominio distinto haría que los correos dejaran de salir
  * sin avisar. Las copias son visibles: el destinatario ve a quién más llegó.
  */
@@ -60,9 +60,13 @@ const ConfigCorreo = ({
   conPara = false,
   conAvisos = false,
 }: Props) => {
-  const { user } = useAuth();
-  const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
-  const config = useConfigCorreo(tipo, esPropietario);
+  const { user, hasPermission } = useAuth();
+  // Misma regla que el backend: Novedades, la casilla Editar; el resto, Propietario.
+  const puede =
+    tipo === 'novedades'
+      ? hasPermission('novedades', 'editar')
+      : (user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false);
+  const config = useConfigCorreo(tipo, puede);
   const guardar = useGuardarConfigCorreo(tipo);
 
   const [nombre, setNombre] = useState('');
@@ -89,7 +93,7 @@ const ConfigCorreo = ({
     });
   }, [datos]);
 
-  if (!esPropietario || !datos) return null;
+  if (!puede || !datos) return null;
 
   const para = conPara ? lineas(destinatarios) : [];
   const paraMalos = para.filter((c) => !CORREO.test(c));

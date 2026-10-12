@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   GraduationCap,
   Loader2,
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -65,11 +66,44 @@ const fechaCorta = (iso: string) =>
     timeZone: ZONA,
   });
 
+/**
+ * Con la casilla Editar, dos pestañas como en Inscripciones; sin ella, la
+ * lista a secas (una sola pestaña no aporta nada).
+ */
+const Pestanas = ({
+  conConfig,
+  config,
+  children,
+}: {
+  conConfig: boolean;
+  config: ReactNode;
+  children: ReactNode;
+}) =>
+  conConfig ? (
+    <Tabs defaultValue="novedades">
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <TabsList className="w-max">
+          <TabsTrigger value="novedades">Novedades</TabsTrigger>
+          <TabsTrigger value="configuracion">Configuración</TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent value="novedades" className="space-y-6 pt-2">
+        {children}
+      </TabsContent>
+      <TabsContent value="configuracion" className="pt-2">
+        {config}
+      </TabsContent>
+    </Tabs>
+  ) : (
+    <div className="space-y-6">{children}</div>
+  );
+
 const Novedades = () => {
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
   const puedeCrear = hasPermission('novedades', 'crear');
   const puedeEliminar = hasPermission('novedades', 'eliminar');
+  const puedeConfigurar = hasPermission('novedades', 'editar');
 
   const [tipo, setTipo] = useState<TipoNovedad | typeof TODOS>(TODOS);
   const [buscar, setBuscar] = useState('');
@@ -113,116 +147,121 @@ const Novedades = () => {
         )}
       </div>
 
-      <ConfigCorreo
-        tipo="novedades"
-        titulo="Correo de Novedades"
-        descripcion="Quién recibe el aviso cuando se escribe una novedad."
-        conPara
-        conAvisos
-      />
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_200px]">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            value={buscar}
-            onChange={(e) => setBuscar(e.target.value)}
-            placeholder="Buscar en el texto…"
-            className="h-11 pl-9 sm:h-10"
+      <Pestanas
+        conConfig={puedeConfigurar}
+        config={
+          <ConfigCorreo
+            tipo="novedades"
+            titulo="Correo de Novedades"
+            descripcion="Quién recibe el aviso cuando se escribe una novedad."
+            conPara
+            conAvisos
           />
+        }
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_200px]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              value={buscar}
+              onChange={(e) => setBuscar(e.target.value)}
+              placeholder="Buscar en el texto…"
+              className="h-11 pl-9 sm:h-10"
+            />
+          </div>
+          <Select value={tipo} onValueChange={(v) => setTipo(v as TipoNovedad | typeof TODOS)}>
+            <SelectTrigger className="h-11 sm:h-10">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todos los tipos</SelectItem>
+              <SelectItem value="general">Generales</SelectItem>
+              <SelectItem value="personal">Sobre personal</SelectItem>
+              <SelectItem value="alumno">Sobre alumnos</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={tipo} onValueChange={(v) => setTipo(v as TipoNovedad | typeof TODOS)}>
-          <SelectTrigger className="h-11 sm:h-10">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TODOS}>Todos los tipos</SelectItem>
-            <SelectItem value="general">Generales</SelectItem>
-            <SelectItem value="personal">Sobre personal</SelectItem>
-            <SelectItem value="alumno">Sobre alumnos</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
 
-      {novedades.isLoading && (
-        <div className="flex items-center justify-center py-10 text-muted-foreground">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          Cargando…
-        </div>
-      )}
+        {novedades.isLoading && (
+          <div className="flex items-center justify-center py-10 text-muted-foreground">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            Cargando…
+          </div>
+        )}
 
-      {!novedades.isLoading && lista.length === 0 && (
-        <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-          <Megaphone className="mx-auto mb-3 h-10 w-10 opacity-50" />
-          <p className="text-lg">No hay novedades que mostrar.</p>
-          {puedeCrear && (
-            <p className="mt-1 text-sm">Escribe la primera con el botón de arriba.</p>
-          )}
-        </div>
-      )}
+        {!novedades.isLoading && lista.length === 0 && (
+          <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
+            <Megaphone className="mx-auto mb-3 h-10 w-10 opacity-50" />
+            <p className="text-lg">No hay novedades que mostrar.</p>
+            {puedeCrear && (
+              <p className="mt-1 text-sm">Escribe la primera con el botón de arriba.</p>
+            )}
+          </div>
+        )}
 
-      <ul className="space-y-3">
-        {lista.map((n) => {
-          const Icono = ICONO_TIPO[n.nov_tipo];
-          const esAutor = user?.usu_id === n.autor.usu_id;
-          const puedeBorrarEsta = puedeEliminar || esAutor;
+        <ul className="space-y-3">
+          {lista.map((n) => {
+            const Icono = ICONO_TIPO[n.nov_tipo];
+            const esAutor = user?.usu_id === n.autor.usu_id;
+            const puedeBorrarEsta = puedeEliminar || esAutor;
 
-          return (
-            <li
-              key={n.nov_id}
-              className="rounded-lg border bg-card p-4"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                        COLOR_TIPO[n.nov_tipo]
-                      }`}
-                    >
-                      <Icono className="h-3 w-3" />
-                      {ETIQUETA_TIPO[n.nov_tipo]}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {fechaCorta(n.nov_fecha_creacion)}
-                    </span>
+            return (
+              <li
+                key={n.nov_id}
+                className="rounded-lg border bg-card p-4"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                          COLOR_TIPO[n.nov_tipo]
+                        }`}
+                      >
+                        <Icono className="h-3 w-3" />
+                        {ETIQUETA_TIPO[n.nov_tipo]}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {fechaCorta(n.nov_fecha_creacion)}
+                      </span>
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm text-foreground">{n.nov_texto}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Por <strong className="font-medium text-foreground">{n.autor.usu_nombre}</strong>
+                    </p>
+                    {n.nov_tipo === 'personal' && n.personas.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-medium">Sobre:</span>{' '}
+                        {n.personas.map((p) => p.nombre).join(', ')}
+                      </p>
+                    )}
+                    {n.nov_tipo === 'alumno' && n.alumnos.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-medium">Alumnos:</span>{' '}
+                        {n.alumnos
+                          .map((a) => `${a.nombre}${a.col_nombre ? ` (${a.col_nombre})` : ''}`)
+                          .join(', ')}
+                      </p>
+                    )}
                   </div>
-                  <p className="whitespace-pre-wrap text-sm text-foreground">{n.nov_texto}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Por <strong className="font-medium text-foreground">{n.autor.usu_nombre}</strong>
-                  </p>
-                  {n.nov_tipo === 'personal' && n.personas.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      <span className="font-medium">Sobre:</span>{' '}
-                      {n.personas.map((p) => p.nombre).join(', ')}
-                    </p>
-                  )}
-                  {n.nov_tipo === 'alumno' && n.alumnos.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      <span className="font-medium">Alumnos:</span>{' '}
-                      {n.alumnos
-                        .map((a) => `${a.nombre}${a.col_nombre ? ` (${a.col_nombre})` : ''}`)
-                        .join(', ')}
-                    </p>
+                  {puedeBorrarEsta && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmarEliminar(n)}
+                      aria-label="Eliminar novedad"
+                      className="h-9 self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   )}
                 </div>
-                {puedeBorrarEsta && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setConfirmarEliminar(n)}
-                    aria-label="Eliminar novedad"
-                    className="h-9 self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+              </li>
+            );
+          })}
+        </ul>
+      </Pestanas>
 
       <CrearNovedadDialog abierto={crear} onCerrar={() => setCrear(false)} />
 

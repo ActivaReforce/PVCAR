@@ -121,6 +121,15 @@ const AYUDA: Record<string, { acciones: Partial<Record<Accion, string>>; nota?: 
     },
     nota: 'Editar y Eliminar solo valen para Propietario y Admin.',
   },
+  novedades: {
+    acciones: {
+      ver: 'las suyas y las que le tocan.',
+      crear: 'escribir una novedad.',
+      editar: 'pestaña Configuración (correo y avisos).',
+      eliminar: 'borrar novedades ajenas que ve.',
+    },
+    nota: 'El autor siempre puede borrar la suya. Propietario y Admin ven todas.',
+  },
   reportes: {
     acciones: { ver: 'reportes, gráficas y Data anterior.', crear: 'exportar a Excel.' },
   },

@@ -173,11 +173,14 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<repo.No
 }
 
 export async function eliminar(actor: AuthUser, id: number): Promise<{ eliminada: true }> {
-  const novedad = await repo.obtener(id);
-  if (!novedad) throw new ApiError(404, 'La novedad no existe');
-
-  if (novedad.autor.usu_id !== actor.usuario.usu_id && !esGlobal(actor)) {
-    throw new ApiError(403, 'Solo el autor o un administrador puede borrarla');
+  // obtener() ya exige poder verla: Eliminar no abre novedades ajenas.
+  const novedad = await obtener(actor, id);
+  const esAutor = novedad.autor.usu_id === actor.usuario.usu_id;
+  const conCasilla = actor.permisos.some(
+    (p) => p.modulo === 'novedades' && p.accion === 'eliminar',
+  );
+  if (!esAutor && !conCasilla) {
+    throw new ApiError(403, 'Solo el autor o quien tenga Eliminar en Novedades puede borrarla');
   }
 
   await enTransaccion(async (client) => {

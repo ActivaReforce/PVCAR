@@ -82,9 +82,11 @@ novedadesRouter.post(
   },
 );
 
+// Sin casilla obligatoria: el autor borra la suya siempre; la de otro pide
+// Eliminar. Lo decide el servicio.
 novedadesRouter.delete(
   '/:id',
-  requirePermission('novedades', 'eliminar'),
+  requirePermission('novedades', 'ver'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);

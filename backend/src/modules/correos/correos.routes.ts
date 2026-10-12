@@ -5,8 +5,8 @@ import * as service from './correos.service.js';
 import { configCorreoSchema, tipoParamSchema } from './correos.schemas.js';
 
 /**
- * Configuracion de correos (2026-10-07). Solo Propietario: la regla esta en
- * el servicio, no en el modal de Permisos.
+ * Configuracion de correos (2026-10-07). Quien puede: en el servicio
+ * (Inscripciones, solo Propietario; Novedades, la casilla Editar).
  */
 export const correosRouter = Router();
 
