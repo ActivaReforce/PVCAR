@@ -71,7 +71,7 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 | Configuración | `inscripcion_config` (interruptor general, membrete, cuenta bancaria), `colegio_precio` (valores e interruptor de cada colegio), `documento_legal` (las versiones) |
 | Archivos | Bucket privado `inscripciones`: comprobantes, PDF y membrete propio |
 
-**Sobre `padre`** (revisado con el cliente el 2026-10-05): es la ficha del rol Representante, nombre heredado del sistema viejo. Guarda también los datos de facturación, que pueden ser de otra persona (por ejemplo, la esposa). Se valoró moverlos a una tabla `facturacion` y renombrar `padre` a `representante`; **el cliente decidió dejarlo como está**. El inventario de columnas no encontró nada de más en la base.
+**Sobre `padre`** (revisado con el cliente el 2026-10-05): es la ficha del rol Representante, nombre heredado del sistema anterior. Guarda también los datos de facturación, que pueden ser de otra persona (por ejemplo, la esposa). Se valoró moverlos a una tabla `facturacion` y renombrar `padre` a `representante`; **el cliente decidió dejarlo como está**. El inventario de columnas no encontró nada de más en la base.
 
 ## 7. Borrado en la 0017 ("solo usamos lo nuevo")
 

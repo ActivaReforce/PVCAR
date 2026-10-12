@@ -1,16 +1,16 @@
 # PVCAR — Roadmap a producción
 
-> **Producto:** plataforma de gestión deportiva escolar de **Activa Reforce**. 14 módulos. La plataforma vieja tuvo 7 colegios, 808 alumnos menores de edad y 70 usuarios; la nueva arranca vacía (decisión del 2026-10-01).
+> **Producto:** plataforma de gestión deportiva escolar de **Activa Reforce**. 14 módulos. **En producción en `activareforce.com` desde el 2026-10-12.** Arrancó vacía (decisión del 2026-10-01) y el admin la está cargando con datos reales.
 >
-> **Objetivo:** el producto entero corriendo en la infraestructura de Activa Reforce (monorepo `PVCAR`, backend real, autenticación segura, RLS), **mejor de lo que está hoy**, sin perder un dato y sin que el usuario final note el cambio.
+> **Objetivo:** el producto entero corriendo en la infraestructura de Activa Reforce (monorepo `PVCAR`, backend real, autenticación segura, RLS).
 >
-> **Estrategia:** congelar y cortar. El sistema viejo sigue vivo e intacto hasta un cutover único. Rollback = re-apuntar el dominio.
+> **La plataforma anterior se dio de baja el 2026-10-12:** su base, su hosting, su repo y su respaldo local están borrados. De ella solo quedan los datos del esquema `archivo`, en solo lectura, en Reportes → Data anterior.
 
 Este documento sustituye a `Plan.md`. El historial de sesiones anteriores quedó en `Bitacora.md`.
 
-> **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/`, `Backup_bd/`, `Bitacora.md`, `activa-forge-login/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben: llevan datos de menores, respaldos o claves.
+> **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/`, `Bitacora.md` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
 
-**Corte de este documento: 2026-10-09 (punto 8 — módulo Novedades construido, en `dev`; siguiente: punto 9, aviso automático de ausencia, construye sobre Novedades).**
+**Corte de este documento: 2026-10-12 (lanzamiento hecho en `activareforce.com` y plataforma anterior borrada; siguiente: probar Novedades en `dev` y punto 9, aviso automático de ausencia).**
 
 ---
 
@@ -24,12 +24,11 @@ Este documento sustituye a `Plan.md`. El historial de sesiones anteriores quedó
 6. [Fases 0–5 — hechas](#6-fases-05--hechas)
 7. [Fases 6–14 — los módulos](#7-fases-614--los-módulos) (+ 14B Inscripciones)
 8. [Fase 15 — endurecimiento y QA](#8-fase-15--endurecimiento-y-qa)
-9. [Fase 16 — cutover](#9-fase-16--cutover)
-10. [Fase 17 — desmantelar Flowward](#10-fase-17--desmantelar-flowward)
-11. [Anexo A — migración de autenticación](#anexo-a--migración-de-autenticación)
-12. [Anexo B — RLS desde el día 1](#anexo-b--rls-desde-el-día-1)
-13. [Anexo C — trampas de infraestructura ya pagadas](#anexo-c--trampas-de-infraestructura-ya-pagadas)
-14. [Seguimiento](#seguimiento)
+9. [Fase 16 — lanzamiento](#9-fase-16--lanzamiento)
+10. [Fase 17 — cierre del proyecto](#10-fase-17--cierre-del-proyecto)
+11. [Anexo A — RLS desde el día 1](#anexo-a--rls-desde-el-día-1)
+12. [Anexo B — trampas de infraestructura ya pagadas](#anexo-b--trampas-de-infraestructura-ya-pagadas)
+13. [Seguimiento](#seguimiento)
 
 ---
 
@@ -37,7 +36,7 @@ Este documento sustituye a `Plan.md`. El historial de sesiones anteriores quedó
 
 | Fase | Estado |
 |---|---|
-| 0 — Cuentas, herramientas, respaldo | ✅ cerrada |
+| 0 — Cuentas y herramientas | ✅ cerrada |
 | 1 — Monorepo PVCAR | ✅ cerrada |
 | 2 — Base de datos nueva (schema, sin datos) | ✅ cerrada, dev y prod verificadas |
 | 3 — Backend base + Railway 2 ambientes | ✅ cerrada |
@@ -53,9 +52,9 @@ Este documento sustituye a `Plan.md`. El historial de sesiones anteriores quedó
 | **13 — Tablero y Reportes** | 🟡 construida el 2026-09-17, en `dev`. 4 tableros, 9 reportes y 14 gráficas. **+ Data anterior** (2026-10-02): 15 conjuntos, 8 gráficas y Excel de todo; pruebas en `docs/data-anterior.md`. **La exportación a Excel de Reportes fallaba siempre** — arreglada el 2026-10-02. Solo falta probarla |
 | **14 — Encuestas y Representantes** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
 | **14B — Inscripciones** (nuevo, 2026-10-01) | 🟡 **rehecha el 2026-10-05 y en `dev`** con los seis documentos del cliente (4 generales + ficha y contrato por colegio), constancia por documento, PDF por alumno con membrete, IVA fijo 15 %, apertura general y por colegio, cuenta bancaria. `0014`–`0019` aplicadas en dev y prod. **El cobro por disciplina quedó resuelto el 2026-10-06** con Disciplinas v2 (una disciplina = una tarifa, máximo configurable por alumno, sin cruces). **Representante con cuenta previa hecho y probado el 2026-10-07**, en `main` desde el PR #11. Estado vigente en `docs/fase14b-contratos.md`. Solo Propietario |
-| **15 — Endurecimiento y QA** | 🟡 en marcha desde el 2026-09-17. Hecho todo lo que no necesita la aplicación en marcha. SMTP de Resend puesto en prod y dev (2026-10-07). Falta la auditoría de fugas con token por rol, los e2e y el repaso de accesibilidad |
-| 16 — Lanzamiento | ⬜ **Reducida el 2026-10-01** por el arranque de cero: siembra de prod (catálogos ya están; quitar lo de prueba + primer Propietario), deploy de `main`, dominio, smoke tests |
-| 17 — Desmantelar Flowward | ⬜ |
+| **15 — Endurecimiento y QA** | 🟡 en marcha desde el 2026-09-17. Hecho todo lo que no necesita la aplicación en marcha. SMTP de Resend puesto en prod y dev (2026-10-07). Falta la auditoría de fugas con token por rol, los e2e, el repaso de accesibilidad y **el respaldo de prod** |
+| **16 — Lanzamiento** | ✅ **2026-10-12**: `activareforce.com` en producción. Prod limpia de lo de prueba y con datos reales cargados por el cliente |
+| **17 — Cierre del proyecto** | 🟡 plataforma anterior borrada el 2026-10-12; faltan los PAT, el repo privado y la limpieza final |
 
 ### Pedidos del cliente — 2026-10-01
 
@@ -72,15 +71,34 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 
 ### Decisión del 2026-10-01 — la plataforma nueva arranca de cero
 
-La empresa está **en pausa un mes**. Decisión del cliente, aprobada por la empresa:
+1. **Los datos anteriores no se migran a `public`.** Producción arrancó con los catálogos y un Propietario, y el admin crea todo. El 2026-10-12 el cliente creó el primer colegio real y sus actividades.
+2. **Lo anterior está en el esquema `archivo`** de la misma base, solo lectura, para consultarlo en **Reportes → "Data anterior"**. Migración `0013_archivo.sql`, verificada en dev y prod el 2026-10-02: 35 tablas, 20 620 filas, **sin** contraseñas, información de salud, cédula de alumnos ni fotos. Las cédulas, teléfonos, correos y direcciones de los usuarios **sí** se quedan, a petición del cliente.
+3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
+4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
 
-1. **Los datos viejos no se migran a `public`.** La plataforma nueva arranca vacía y el admin crea todo. En prod solo entran los catálogos del sistema y **un Propietario**. Los catálogos **ya están** en prod porque `0004_seed_dev.sql` se aplicó allí por error el 2026-09-17; falta quitar lo de prueba que trajo (Colegio de Pruebas Dev, 1 actividad, 2 disciplinas) y crear el Propietario.
-2. **Lo viejo se guarda en el esquema `archivo`** de la misma base, solo lectura, para consultarlo en **Reportes → "Data anterior"** (nuevo trabajo de la Fase 13). Migración `0013_archivo.sql` + `SQL/carga_archivo_2026-10-01.sql`, **aplicadas y verificadas en dev y prod el 2026-10-02**: 35 tablas, 20 620 filas, **sin** contraseñas, información de salud, `nino_otra_info`, cédula de alumnos ni URLs de fotos. Las cédulas, teléfonos, correos y direcciones de los usuarios **sí** se quedan, a petición del cliente.
-3. **Respaldo definitivo hecho el 2026-10-01**: `Backup_bd/prod_full_2026-10-01.dump` + `usufoto/` + `MANIFIESTO.txt`. Comprobado contra la base en vivo (70 tablas) y restaurado en un Postgres local (idéntico). Lo anterior de `Backup_bd/` se borró.
-4. **La base vieja se borra cuando la nueva esté en producción**, no antes.
-5. **Libertad para cambiar el modelo:** sin datos viejos en `public`, cualquier cambio de schema deja de tener que respetarlos.
+### Corte de sesión — 2026-10-12
 
-Esto **vacía la Fase 16**: se caen el dump fresco, los 19 chequeos de compatibilidad, el backfill de Auth, la carga con los triggers apagados, la copia del bucket y la corrección del correo de Bernard.
+**Hecho:**
+
+- **PR #14** (asistencia más fluida) y **PR #15** (Novedades) en `main`. `0027` aplicada en dev y prod. En producción, `/novedades` enseña **"En desarrollo"** hasta que el cliente apruebe el módulo en `dev`: `NovedadesEnDesarrollo.tsx`, elegida en `App.tsx` cuando el build apunta al backend de producción. Al aprobarlo se borran las dos cosas.
+- **Lanzamiento (Fase 16):** `activareforce.com` en Vercel Production, `www` redirige a la raíz (308), DNS en Cloudflare. `FRONTEND_ORIGIN=https://activareforce.com` en Railway `production` (es el origen canónico de los enlaces de correo). Site URL `https://activareforce.com` y Redirect URL `https://activareforce.com/reset-password` en Supabase `PVCAR`. Verificado: HTTPS, redirección, CORS y login. `pvcar.vercel.app` ya no responde.
+- **Plataforma anterior dada de baja:** el cliente borró su hosting, su Supabase (y la cuenta) y su repo. Claude borró la copia local del código, `_ref/`, el respaldo local y el servidor MCP que apuntaba a ella.
+
+**Al retomar — lista de trabajo, uno por uno:**
+
+1. **Probar Novedades** en `dev-pvcar.vercel.app`: crear una de cada tipo, ver que llegan los correos (con y sin el switch de mencionados) y entrar con un rol que no sea Propietario. Si pasa, quitar la pantalla temporal y mergear.
+2. **Punto 9 — aviso automático de ausencia** (construye sobre Novedades).
+3. **Pagos mensuales** — esperar a que el cliente lo cuente.
+4. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
+5. **Respaldo de prod:** ya hay datos reales y el plan gratuito de Supabase no hace copias automáticas. `pg_dump` programado o plan Pro.
+6. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
+
+**Pendientes de decidir:**
+
+- **Fase 13 §4:** si el reporte de Alumnos sigue sacando la información de salud.
+- **Fase 12 §4:** que Mobak escale su 0–2 al puntaje del parámetro.
+- **Fase 11 §4:** si se permiten fechas futuras en asistencia (en `archivo` hay marcas hasta el 2026-10-05).
+- **Flujo de invitación por correo** en vez de contraseña puesta por el admin. Resend ya funciona, así que se puede preguntar.
 
 ### Corte de sesión — 2026-10-09
 
@@ -107,228 +125,6 @@ Esto **vacía la Fase 16**: se caen el dump fresco, los 19 chequeos de compatibi
 11. **Pruebas en pantalla del cliente** incluidas las de Novedades.
 12. **Decisiones pendientes.**
 13. **Siembra de prod** + Fases 15/16/17.
-
-### Corte de sesión — 2026-10-08
-
-**Hecho hoy (todo en `dev`, pendiente PR a `main`):**
-
-- **Punto 7 — tomar asistencia más fluido** (`58ce2e8`, `dbb5b7e`, `9d7d215`). Entrada **"Mi día"** con tarjetas de las clases u colegios de hoy en el alcance (propietario y coordinador de varios colegios ven las tarjetas agrupadas por colegio con cabecera; con un solo colegio no hay cabecera). Un tap entra con fecha = hoy; botón "Otra clase o fecha" cae al flujo con selects. La tarjeta de la clase que está pasando ahora se pinta en verde.
-- **Botón único "Presentes a los N y guardar"**, arriba y abajo de la lista: marca a los que no tienen estado como Presente **y** guarda todo (los Ausente/Tarde/Justificado ya puestos no se tocan). Mientras quede alguien sin marcar sigue siendo ese botón; en cuanto todos tienen estado, pasa a "Guardar N". Resuelve el bug reportado por el cliente de que al marcar un ausente manual el botón se bloqueaba en "Guardar".
-- **Hora de "Tarde" autorrellenada con hora de Ecuador** del momento (nuevo `horaEcAhora` en `lib/fecha.ts`): el caso real es un ausente al que llega el alumno y el entrenador lo pasa a Tarde; la hora útil es ahora. Si se vuelve a tocar Tarde, se refresca. Editable a mano.
-- **Buscador siempre visible** sobre la lista (nombre + grado en alumnos, nombre + disciplina + titular en entrenadores).
-- **Fila más compacta en móvil** (padding py-2, avatar 36 px, tipografía más apretada) manteniendo los 44 px táctiles de los 4 botones de estado.
-- **`envio(incluyeRestantes)`** en `useBorradorAsistencia`: calcula el lote de forma síncrona para que "Presentes a los N y guardar" no sufra del stale state al chainear `setState` + `mutate`.
-- 7/7 tests de frontend, 605/605 de backend, lint sin errores y build limpio.
-
-**Al retomar — lista de trabajo, uno por uno:**
-
-1–7. ~~Fechas · Cambio de entrenador · Correos · Correo de aprobación · Reportes · Permisos · Asistencia más fluida~~ — hechos.
-8. **Módulo Novedades** — **preguntar antes de construir.** Cualquier rol escribe una novedad o incidencia. Tipos: general (la ven los Propietarios; correo a gerencia), sobre un alumno (correo a gerencia y al representante) y sobre un entrenador (correo al entrenador y a gerencia). Se ve quién la escribió. Remitente y destinatarios en `correo_config`, con el mismo componente de Configuración que Inscripciones.
-9. **Aviso automático de ausencia:** correo al representante cuando su hijo queda ausente; cada envío queda registrado en Novedades. Depende del 8.
-10. **Pagos mensuales** — módulo nuevo o parte de Inscripciones. **Espera a que el cliente lo cuente;** no empezar sin eso.
-11. **Pruebas en pantalla del cliente** de lo que está en `dev` sin probar: Reportes (hoja Resumen, filtros, auxiliares en Entrenadores), Permisos (icono **!**, casillas nuevas, entrenador que califica pero no cambia plantillas), **asistencia nueva** (Mi día agrupada, botón único, hora autorrellenada, buscador, filas compactas en móvil) y las Fases 9–14 que falten (`docs/checklist-modulos.md`).
-12. **Decisiones pendientes del cliente:** fechas futuras en asistencia (Fase 11 §4; el sistema viejo las permitía), Mobak escalado al puntaje del parámetro (Fase 12 §4), información de salud en el reporte de Alumnos (Fase 13 §4) y flujo de invitación por correo en vez de contraseña puesta por el admin.
-13. **Siembra de prod:** quitar de `PVCAR` lo de prueba que dejó la `0004` (Colegio de Pruebas Dev, su actividad y sus disciplinas) y dejar el primer Propietario real. `.sql` por escribir.
-14. **Fase 15 — Endurecimiento y QA:** auditoría de fugas con un token por rol, pruebas e2e y repaso de accesibilidad.
-15. **Fase 16 — Lanzamiento:** dominio propio, PR final a `main`, comprobar `/api/v1/health` en producción y arrancar con la plataforma vacía.
-16. **Fase 17 — Apagar lo viejo:** borrar la base vieja, retirar `activa-forge-login/`, rotar PAT, borrar `CLAUDE.md` y `Roadmap.md` del repo y pasar el repo a privado.
-
-No hay SQL pendiente. Pendiente del cliente: borrar `CORREO_REMITENTE` de Railway.
-
-### Corte de sesión — 2026-10-07 (cierre)
-
-**Hecho en esta sesión — en `main` desde el PR #12 (`bcb5454`, 2026-10-07); `dev` y `main` iguales:**
-
-- **Reportes (punto 5):** hoja **Resumen** primera en los 9 Excel (`de595e8`), con bordes y colores suaves —estilo aprobado por el cliente, mantenerlo en todo Excel nuevo—; sin hoja "Filtros" (`60e60d9`); columna **Hora de registro** en las dos asistencias; cada reporte enseña solo sus filtros, con estado propio (Presente/Tarde/Justificado/Ausente, Pendiente/Evaluado) y filtro de disciplina (`d6422da`); **auxiliares** en el reporte de Entrenadores con Tipo y "Acompaña a" (`fed7fb5`).
-- **Permisos (punto 6):** casillas con sentido CRUD (`eb08f3f`, migración `0026`): Asistencias Editar = pasar lista; **Calificar evaluaciones** separado de la plantilla; plantilla compartida solo la cambia quien tiene todas sus disciplinas; Encuestas Ver/Crear/Editar/Eliminar con resultados por alcance; Permisos Editar = guardar; fuera "Reporte del Estudiante". Icono **!** con la explicación de cada casilla y combinaciones sin sentido bloqueadas en pantalla y backend (`dc017c0`). Tabla vigente en `PVCAR/docs/permisos.md`.
-- **`0026` corrida en `PVCAR_Dev`** y verificada por MCP el 2026-10-07: cuadra rol por rol, ningún rol con combinaciones sin sentido. **`0026` corrida también en `PVCAR` (prod)** y verificada por MCP el 2026-10-07: idéntica a dev, 0 combinaciones sin sentido. No queda SQL pendiente.
-- 605 pruebas automáticas en verde; lint y build limpios.
-
-**Puntos 5 y 6 cerrados en código.** Les falta solo la prueba en pantalla del cliente:
-1. Descargar Asistencia de alumnos y de entrenadores, Alumnos y Entrenadores: Resumen legible y cuadra con el detalle.
-2. Permisos: el icono **!** se lee al pasar el ratón (y al tocar en el móvil); marcar "Editar" marca "Ver".
-3. Como entrenador: pasa lista y califica, pero no ve "Editar y parámetros" en Evaluaciones.
-
-**Al retomar — lista de trabajo, uno por uno:**
-
-1–6. ~~Fechas · Cambio de entrenador · Correos · Correo de aprobación · Reportes · Permisos~~ — hechos.
-7. **Tomar asistencia más fluido** (alumnos y entrenadores): analizar cómo se pasa lista hoy y proponer cómo hacerlo más rápido y fácil, sobre todo en el teléfono.
-8. **Módulo Novedades** — **preguntar antes de construir.** Cualquier rol escribe una novedad o incidencia. Tipos: general (la ven los Propietarios; correo a gerencia), sobre un alumno (correo a gerencia y al representante) y sobre un entrenador (correo al entrenador y a gerencia). Se ve quién la escribió. Remitente y destinatarios en `correo_config`, con el mismo componente de Configuración que Inscripciones.
-9. **Aviso automático de ausencia:** correo al representante cuando su hijo queda ausente; cada envío queda registrado en Novedades. Depende del 8.
-10. **Pagos mensuales** — módulo nuevo o parte de Inscripciones. **Espera a que el cliente lo cuente;** no empezar sin eso.
-11. **Pruebas en pantalla del cliente** de lo que está en `dev` sin probar: Reportes (hoja Resumen, filtros, auxiliares en Entrenadores), Permisos (icono **!**, casillas nuevas, entrenador que califica pero no cambia plantillas) y las Fases 9–14 que falten (`docs/checklist-modulos.md`).
-12. **Decisiones pendientes del cliente:** fechas futuras en asistencia (Fase 11 §4; el sistema viejo las permitía), Mobak escalado al puntaje del parámetro (Fase 12 §4), información de salud en el reporte de Alumnos (Fase 13 §4) y flujo de invitación por correo en vez de contraseña puesta por el admin.
-13. **Siembra de prod:** quitar de `PVCAR` lo de prueba que dejó la `0004` (Colegio de Pruebas Dev, su actividad y sus disciplinas) y dejar el primer Propietario real. `.sql` por escribir.
-14. **Fase 15 — Endurecimiento y QA:** auditoría de fugas con un token por rol, pruebas e2e y repaso de accesibilidad.
-15. **Fase 16 — Lanzamiento:** dominio propio, PR final a `main`, comprobar `/api/v1/health` en producción y arrancar con la plataforma vacía (arranque de cero: no se migran datos; lo viejo está en el esquema `archivo`).
-16. **Fase 17 — Apagar lo viejo:** borrar la base vieja (`wfyytrdhqtspapxaikoh`) y retirar `activa-forge-login/`, rotar los PAT de Supabase de `.mcp.json`, **borrar `CLAUDE.md` y `Roadmap.md` del repo** (están solo para trabajar desde otro equipo) y pasar el repo a privado.
-
-Pendiente del cliente: borrar `CORREO_REMITENTE` de Railway.
-
-### Corte de sesión — 2026-10-07 (noche)
-
-**Hecho hoy por la tarde y noche (en `dev`; `main` está en el PR #11, `d90198b`):**
-
-- **PR #11 `dev` → `main`** mergeado y desplegado (todo lo del corte de la tarde).
-- **Fechas en hora de Ecuador** (`1327375`): base y Railway en UTC; de 19:00 a 23:59 se tomaba "mañana". Arreglado en asignaciones de entrenador, alumnos vigentes en asistencia, fechas de Reportes/Data anterior/Encuestas, sello y nombre del Excel, edad y columnas `date` en el navegador. Regla nueva: CLAUDE.md regla 6 y T12b.
-- **Cambio de entrenador verificado**: 21/21 con el backend real contra Postgres local. Nada se borra ni cambia; el nuevo continúa; el que sale conserva su historial; eliminar con historial se rechaza.
-- **Auxiliares sin titular** (`0a29a87`): si el entrenador se queda sin ninguna disciplina, sus auxiliares se desvinculan y sale un modal recordatorio. 9/9 contra Postgres local.
-- **Correos configurables** (`c994985`, `deb05df`, `0024`, `0025`): tabla `correo_config` con dos tipos —aviso de inscripción nueva (Para + CC + responder a, con resumen y PDF) e inscripción aprobada (al representante + CC + responder a)—. Dominio fijo en `CORREO_DOMINIO` (Railway). Solo Propietario.
-- **Pestaña "Más" de Inscripciones** (`9efce93`): cinco tarjetas desplegables, cerradas por defecto, en el orden pedido.
-- Probado en pantalla por el cliente: correos y pestaña Más.
-
-**Al retomar — lista de trabajo, uno por uno:**
-
-1. ~~Fechas~~ · 2. ~~Cambio de entrenador~~ · 3. ~~Configuración de correos~~ · 4. ~~Correo de aprobación~~ — hechos.
-5. **Reportes con hoja "Resumen"** en todos los Excel (casos ej1: cuántas veces vino cada profe; ej2: estudiantes por disciplina) + revisión de todos los Reportes.
-   **Decidido por el cliente (2026-10-07, noche):** Resumen en **los 9** reportes y como **primera hoja**. ej1 = una fila por profe con su total (vino, faltó, %) y debajo el desglose por disciplina. ej2 = **dos cosas**: una tabla de conteos por disciplina y, aparte, la lista agrupada (bloque por disciplina con total y nombres).
-   **Hoja Resumen hecha el 2026-10-07 (noche)** (`de595e8`, en `dev`): 596 pruebas en verde, consultas comprobadas contra `PVCAR_Dev`. El desglose de ej1 va **por colegio**: la asistencia del personal se guarda por colegio y día, sin disciplina. Falta: verla en un Excel real y la revisión de todos los Reportes. **Tras la primera prueba del cliente** (`60e60d9`): columna "Hora de registro" en las dos asistencias; fuera la hoja "Filtros" (y la "Información" de cada conjunto de Data anterior, que solo queda en "Exportar todo"); Resumen con bordes y colores suaves. **Revisión de Reportes** (`d6422da`): filtros por reporte (el "Estado" Activo/Inactivo no servía en asistencias ni evaluaciones), filtro de disciplina, colegio en entrenadores, gráfica de alumnos por colegio con alcance de entrenador, representantes en el reporte de usuarios. Auxiliares en el reporte de Entrenadores (`fed7fb5`, decidido por el cliente): columnas Tipo y "Acompaña a"; heredan colegios, disciplinas y alumnos de sus titulares. **Punto 5 cerrado salvo su prueba en pantalla; siguiente: punto 6, Permisos.**
-6. **Permisos módulo por módulo** — **hecho el 2026-10-07 (noche)** (`eb08f3f`, en `dev`; migración `0026` en dev ya, en prod **el mismo día del PR**, no antes). Tabla vigente en `PVCAR/docs/permisos.md`. Asistencias Editar = pasar lista; Calificaciones separado de Evaluaciones; plantilla compartida solo la cambia quien tiene todas sus disciplinas; Encuestas CRUD con resultados por alcance; Permisos Editar = guardar; fuera "Reporte del Estudiante". Perfil y Tablero se quedan como están (decisión del cliente). Cierra también la decisión pendiente de "permisos de escritura de Asistencias, Evaluaciones y Encuestas".
-7. **Tomar asistencia más fluido** (alumnos y entrenadores): análisis y propuesta.
-8. **Novedades** — preguntar antes de construir.
-9. **Aviso automático de ausencia** al representante (registrado en Novedades).
-10. **Pagos mensuales** — espera a que el cliente lo cuente.
-11. Probar Fases 9–14 en pantalla.
-12. Lanzamiento: primer Propietario en prod, Fase 15, 16 y 17.
-
-Pendiente del cliente: borrar `CORREO_REMITENTE` de Railway (ya no se usa). PR `dev` → `main` cuando lo pida.
-
-### Corte de sesión — 2026-10-07
-
-**Lo que se hizo (todo en `dev`, probado en pantalla por el cliente):**
-
-- **Representante con cuenta previa** (`docs/fase14b-contratos.md` §9): "Ya inscribí antes" con cédula → inicio de sesión (con la cédula sola no se enseña nada), "Tus datos" comprueba la cédula al continuar, datos e hijos rellenos, disciplinas activas como "ya inscrito", cuenta dada de baja que se reactiva al aprobar, "mismo alumno" (nombre + nacimiento + colegio) que el admin decide al aprobar. El personal con sesión abierta puede inscribir a otra persona sin usar su cuenta. Sin migración.
-- **Descuento de hermano con hijos ya inscritos**, corregido dos veces: lidera el hijo ya inscrito con más disciplinas **en total** (activas + nuevas); los demás llevan descuento hasta ese total, ocupando primero sus activas. La familia paga lo mismo que inscribiéndolos juntos.
-- **Recuperar contraseña:** todo enlace salía "no válido" porque `/reset-password` se cargaba en diferido (Fase 15) y llegaba tarde al `#type=recovery`. Arreglado leyendo el hash en el arranque. Desde `/inscripcion` se vuelve a la inscripción, con aviso de mirar el spam. `/forgot-password` y `/reset-password` rehechas con el tema (fuera el fondo SVG de Lovable).
-- El paso Pago ya no dice "tu cuenta queda en revisión" a quien entra con su cuenta.
-- **Disciplinas para el representante:** una sección por hijo (sus hijos y nada más; el personal sigue viendo la vista por colegio).
-- **Aviso de inscripciones en el menú:** consulta ligera (`GET /inscripciones/aviso`), solo para quien aprueba, y se repite cada minuto solo con las inscripciones abiertas.
-- **Tanda del 2026-10-07 (tarde):** asistencia de entrenadores contaba de más (un auxiliar con dos titulares salía dos veces; arreglado, y DISTINCT en alumnos); botones de asistencia con la palabra completa en móvil; número rojo de pendientes en Inscripciones del menú; pestañas "Configuración" y "Más"; Encuestas: escala que deja borrar el 0, "Añadir pregunta" abajo, vista previa (constructor y lista) y menú de acciones; Reportes: lupa y filtros alineados (arreglado en el buscador común); Perfil rehecho con Configuración (foto, nombre, teléfono, contraseña) y lo que cada uno tiene a cargo; Permisos sin numerar los roles.
-
-**Al retomar:**
-
-1. `/api/v1/health` en los dos ambientes → `db:"ok"`.
-2. ~~PR `dev` → `main`~~ hecho el 2026-10-07: PR #11 mergeado (`d90198b`).
-3. ~~Plantillas de Supabase Auth y SMTP de Resend~~ en `PVCAR` y `PVCAR_Dev`, revisado por el cliente el 2026-10-07.
-4. **Revisar Reportes y Permisos** (§1, "Pendientes de revisar") y la **lista nueva del 2026-10-07** (abajo, "Pendientes nuevos").
-5. **Probar la Fase 9** (`docs/fase9-entrenadores.md`); luego 10–14, dándole solo lo que no se puede verificar sin pantalla.
-6. Antes de lanzar: primer Propietario en prod y el resto de la Fase 15.
-
-### Corte de sesión — 2026-10-06
-
-**Lo que se hizo:**
-
-- **Disciplinas v2** construida y en `dev`: una disciplina = colegio + actividad con varios días, cada uno con su hora (`0021`). Respuestas del cliente: hora propia por día; máximo 2 **solo** en el formulario público (configurable en Inscripciones → Configuración); tarifa del colegio; un entrenador por disciplina; sin nombre de grupo; contrato sin tocar. Cruces de horario bloqueados para alumnos, entrenadores y al editar horarios. El cliente probó en pantalla: bien.
-- **Auxiliar con varios titulares** (prerrequisito de la Fase 9), con selector "de quién ver" en la cabecera.
-- **`/inscripcion` con los días completos** ("Lunes y Miércoles 15:00–16:00"), también en la ficha y el contrato generados.
-- **Color por actividad:** 10 tonos sobrios (marino, acero, cielo, petróleo, bosque, oliva, piedra, grafito, índigo, vino) que tiñen las tarjetas de Actividades y Disciplinas; el borde ámbar de "sin entrenador" sigue encima. Medidos en ΔE2000 (mínimo 7) tras una primera versión con los azules indistinguibles (`0022`, `0023`).
-- **`0021`–`0023` aplicadas en dev y prod**, verificadas por MCP.
-- **Forma de trabajo nueva:** se empuja a `dev` en cuanto el código está listo, sin esperar al SQL; el cliente lo corre y lo ve al instante.
-
-**Producción al día desde el 2026-10-06 (noche):** PR #10 `dev` → `main` mergeado (`4294bcd`), Railway `production` y Vercel Production desplegados y comprobados. `dev` sincronizado con `main`.
-
-*(Histórico — el vigente es el corte del 2026-10-07, noche.)* **Al retomar:**
-
-1. `/api/v1/health` en los dos ambientes → `db:"ok"`.
-2. ~~PR `dev` → `main`~~ hecho (#10). Revisado además el alcance del auxiliar con dos titulares en dos colegios: ve solo lo de ellos en Disciplinas, Estudiantes, Asistencias, Evaluaciones y Tablero; un titular ajeno en `X-Titular` lo deja vacío.
-3. **Probar Inscripciones** de punta a punta en dev (`docs/fase14b-contratos.md` §8), incluido el **representante con cuenta previa** (§9: "Ya inscribí antes", hijos sin duplicar, descuento con hermano ya inscrito, cuenta dada de baja que se reactiva, "mismo alumno" desde el otro padre), construido el 2026-10-06.
-4. **Probar la Fase 9** (`docs/fase9-entrenadores.md`), ya sin prerrequisitos pendientes. Para el selector hace falta un Asistente atado a dos entrenadores.
-5. Luego 10, 11, 12, 13 (+ `docs/data-anterior.md`) y 14, siempre dándole solo lo que no se puede verificar sin pantalla.
-6. Antes de lanzar: **siembra de prod** (primer Propietario; lo de prueba ya se quitó el 2026-10-05) y Fase 15 (SMTP Resend, fugas por rol, e2e, accesibilidad).
-
-### Corte de sesión — 2026-10-02
-
-**Lo que pasó entre el 2026-10-01 y el 2026-10-02:**
-
-- **Arranque de cero decidido** (ver arriba) y **respaldo definitivo** de la prod vieja hecho, comprobado y restaurado.
-- **Esquema `archivo`** creado y cargado en dev y prod (`0013` + carga, verificados por MCP).
-- **Reportes → Data anterior** construida y en `dev`: resumen con 8 cifras y 8 gráficas, 15 conjuntos con buscador, filtros, orden y Excel, y Excel de todo el archivo. El cliente la vio: "perfecto". Tarjeta movida al final con borde ámbar.
-- **Fallo encontrado de paso:** la exportación a Excel de Reportes (Fase 13) **se cortaba siempre**. Arreglada, con prueba.
-- **Lovable fuera del proyecto:** `favicon.ico` era su corazón (de ahí el icono en Vercel), `placeholder.svg` y `robots.txt` eran de su plantilla. `robots.txt` ahora prohíbe indexar. Y fuera 8 portadas sin uso (21 MB).
-- **`production` de Railway responde otra vez** con `db:"ok"` (el 404 "Application not found" del 2026-09-17 ya no está).
-- **Prod tenía `0004_seed_dev` aplicado por error** (Colegio de Pruebas Dev + 1 actividad + 2 disciplinas). Los catálogos sirven; lo de prueba hay que quitarlo antes de lanzar.
-
-**Cola de pruebas** (el cliente prueba en pantalla contra `dev`, responde por número, Claude verifica por MCP).
-
-> **Regla desde el 2026-10-02:** al cliente se le da **solo** lo que Claude no pudo verificar —cómo se ve, si se entiende, uso real en pantalla, móvil, modo oscuro—. Lo verificado (SQL contra dev por MCP, reglas con tests, alcance, conteos, casos cruzados) se le **cuenta** en una lista aparte, no se le pide probar. La lista de 45 de la Fase 8 le costó horas.
-
-| Fase | Estado | Documento |
-|---|---|---|
-| 6 — Usuarios, Roles, Permisos, Perfil | ✅ cerrada, 17/17 | — |
-| 7 — Colegios | ✅ cerrada, 13/13 | — |
-| 8 — Actividades y Disciplinas | ✅ cerrada el 2026-10-02 · Disciplinas v2 y colores hechos y probados el 2026-10-06 | `docs/disciplinas-v2.md` |
-| 9 — Entrenadores | ⬜ prerrequisitos hechos el 2026-10-06; lista para probar | `docs/fase9-entrenadores.md` |
-| 10 — Estudiantes | ⬜ | `docs/fase10-estudiantes.md` |
-| 11 — Asistencias | ⬜ | `docs/fase11-asistencias.md` |
-| 12 — Evaluaciones | ⬜ | `docs/fase12-evaluaciones.md` |
-| 13 — Tablero y Reportes | ⬜ | `docs/fase13-tablero-reportes.md` |
-| 13 — Data anterior | ⬜ 15 pruebas (vista y aprobada a ojo) | `docs/data-anterior.md` |
-| 14 — Encuestas y Representantes | ⬜ | `docs/fase14-encuestas-representantes.md` |
-| 14B — Inscripciones | ⬜ construida; el cliente la está probando en dev vacío | `docs/fase14b-contratos.md` §8 |
-
-**Al retomar — "¿en qué nos quedamos?" (decidido por el cliente el 2026-10-02):**
-
-> *(Histórico — el vigente es el corte del 2026-10-06, más arriba.)* **Lo siguiente (corte del 2026-10-05, noche): Disciplinas v2.** Una disciplina pasa a ser un grupo con varios horarios (Fútbol G1 = lunes y miércoles), se cobra una vez, máximo 2 por niño sin cruces, todo configurable. Análisis completo en `PVCAR/docs/disciplinas-v2.md`. **Al retomar: hacerle una por una las 6 preguntas de su §7 (pedido explícito del cliente: quiere que se le pregunte para quedar conforme) y no construir hasta tener las respuestas.** Resuelve también el pendiente del cobro de la 14B.
->
-> Contexto: el cliente prueba en **dev vacío** (catálogos, 4 Propietarios, `archivo`; sin los 796 alumnos de prueba) con sus dos colegios reales. Prod limpia, con Flowward como único Propietario. Estado de Inscripciones en `docs/fase14b-contratos.md`.
-
-1. `/api/v1/health` en los dos ambientes → `db:"ok"`.
-2. **Disciplinas v2** (`docs/disciplinas-v2.md`): primero las 6 preguntas, después migración + Disciplinas, Inscripción, Estudiantes, Entrenadores, Asistencias, Evaluaciones, Reportes y Tablero. Después, las pruebas de Inscripciones (`docs/fase14b-contratos.md` §8). Migraciones `0001`–`0020` aplicadas en dev y prod.
-2b. **Más revisiones de alcance por rol**, como la del 2026-10-05 (§8): el cliente las pidió para más adelante.
-3. **Preparar la Fase 9** (`docs/fase9-entrenadores.md` §1b): auxiliar con varios titulares —migración de unicidad parcial, quitar el 409, selector "de quién ver" con la opción "Todos"— y aviso de choque de horario de un entrenador. Verificar todo lo verificable antes de darle la lista.
-4. En la Fase 9: quitar el rol de Entrenador con asignaciones activas → 409 (heredada de la 6), y devolverle sus 4 disciplinas a Alex (`usu_id` 60) en dev.
-5. **PR `dev` → `main`** cuando el cliente lo pida. Hasta entonces producción sigue con el favicon de Lovable y sin Data anterior.
-6. Antes de lanzar: **siembra de prod** — quitar el colegio, la actividad y las disciplinas de prueba, y crear el primer Propietario. Archivo `.sql` sin escribir.
-7. Fase 15 (SMTP con Resend, auditoría de fugas con un token por rol, e2e, accesibilidad).
-
-**Pendientes de construir** (anotados el 2026-10-02; **los dos hechos el 2026-10-06** con Disciplinas v2 — el choque de horario se **bloquea**, no solo se avisa):
-
-- **Asistente o respaldo con varios entrenadores**, con un **selector arriba para elegir de quién ver las clases, incluida la opción "Todos"**. Hoy el backend da 409 si ya respalda a alguien: migración de unicidad parcial `(usu_id, ent_id) WHERE est_id = 1`, quitar esa regla, y el selector en las pantallas del asistente.
-- **Aviso cuando un entrenador quede con dos clases a la misma hora** el mismo día, aunque sean de colegios distintos. Hoy nada lo impide.
-
-**Pendientes del cliente (correo, 2026-10-07):**
-
-- ~~**Plantillas de correo de Supabase Auth**~~ (pegadas el 2026-10-07) en `PVCAR_Dev` y `PVCAR`: pegar `PVCAR/docs/correos/recuperar-contrasena.html` en *Reset password* (usa `{{ .ConfirmationURL }}`). Resend ya está conectado como SMTP, pero los correos de recuperación de **dev** no aparecen en Resend: revisar que el SMTP esté puesto también en `PVCAR_Dev` (cada proyecto tiene el suyo).
-
-**Pendientes de revisar (pedidos del cliente, 2026-10-07):**
-
-- **Reportes, todo lo que sale:** repasar cada reporte (columnas, filtros, conteos, Excel y gráficas) contra lo que hay en la base, con datos de dev, y que cada uno tenga sentido con Disciplinas v2 (varios días por disciplina) y el alcance de cada rol.
-- **Permisos, módulo por módulo:** que las acciones de cada módulo (ver, crear, editar, eliminar) tengan sentido y hagan lo que dicen. Hoy hay módulos donde `ver` habilita escribir (Asistencias, Evaluaciones, Encuestas) y otros, como Encuestas e Inscripciones, que van por una guarda de personal además del permiso. Revisar el modal de Permisos y el backend juntos y dejar una tabla clara de qué habilita cada casilla.
-
-**Pendientes nuevos (pedidos del cliente, 2026-10-07, tarde):**
-
-0. **Configuración de correos en la plataforma** — **construida el 2026-10-07** (`c994985`, en `dev`; migración `0024` y variable `CORREO_DOMINIO` pendientes del cliente). Tipos: `inscripciones` (aprobada → representante + CC) e `inscripciones_aviso` (nueva → lista fija "Para" + CC, con resumen y PDF; `deb05df`, migración `0025`). Asunto fijo en el código. Decidido así:
-   - **Railway** guarda solo `RESEND_API_KEY` y el dominio verificado (`activareforce.com`).
-   - **Una tabla, una fila por tipo de envío** (inscripciones, novedades, ausencias): nombre del remitente, parte local de la dirección (el dominio es fijo y no se escribe), copias, destinatarios de gerencia y "responder a".
-   - **Las copias van visibles (CC, no CCO):** el representante debe ver a quién más le llegó.
-   - **Solo Propietario**, comprobado también en el backend. Se edita desde la pestaña Configuración de cada módulo, con un componente común.
-   - **Sin botón de correo de prueba:** lo prueban ellos.
-   - **`CORREO_REMITENTE` se borra de Railway** cuando la tabla lo sustituya; sin respaldo.
-
-1. **Tomar asistencia más fluido** — alumnos y entrenadores: analizar y proponer cómo hacerlo más rápido y fácil.
-2. ~~**Fechas que no cuadran**~~ — **hecho el 2026-10-07** (`1327375`, en `dev`): todo en hora de Ecuador vía `lib/fecha.ts` (back y front). De 19:00 a 23:59 se tomaba la fecha UTC (= mañana) al asignar/quitar entrenador, en la lista de alumnos vigentes, en fechas de creación de Reportes/Data anterior/Encuestas, en el sello del Excel y en la edad; y las columnas `date` llegaban al navegador como el día anterior. Las fechas de asistencia en sí ya estaban bien (las pone el servidor en hora de Ecuador).
-3. **Reportes con hoja "Resumen"** en todos los Excel: ya filtrado y agrupado, para que nadie tenga que trabajar el Excel a mano. Casos para verificar:
-   - **ej1:** cuántas veces vino cada profe (entrenador → nº de asistencias en el rango).
-   - **ej2:** lista de estudiantes por disciplina (agrupada por disciplina).
-4. ~~**Cambio de entrenador en una disciplina**~~ — **verificado el 2026-10-07**: 21/21 comprobaciones con las funciones reales del backend contra un Postgres local con `0001`–`0023`. Reemplazar, cerrar, mover, dar de baja y volver a asignar **no borran ni cambian** ninguna asistencia (huella md5 idéntica antes y después); la asignación se cierra con fecha; las listas de fechas pasadas siguen enseñando al que salió con sus marcas; el nuevo ve el historial y pasa lista; el que salió pierde el acceso (403); eliminarlo se rechaza (409) y la pantalla dice por qué; los reportes conservan su nombre. **Decidido por el cliente:** (a) cuando un entrenador se queda **sin ninguna** disciplina (reemplazo, quitarle la última, baja de disciplina o de la persona), sus auxiliares se desvinculan y un modal recuerda atarlos a mano al nuevo — hecho en `0a29a87`, verificado 9/9 contra Postgres local; (b) `entrenador_auxiliar` sigue sin fechas: lo dejamos simple.
-5. ~~**Correo de inscripción aprobada**~~ — hecho con el 0 (la fila arranca como "Inscripcion Activa Reforce"; las copias las pone el Propietario). Era: remitente con nombre "Inscripcion Activa Reforce" (hoy "inscripciones"), asunto "Tu inscripción fue aprobada"; enviarlo desde `CORREO_REMITENTE` y **con copia** a otro correo (nueva variable en Railway).
-6. **Módulo nuevo "Novedades":** cualquier rol escribe una novedad/incidencia. Tipos: general (la ven los Propietarios; correo a gerencia), sobre un alumno (correo a gerencia y al representante), sobre un entrenador (correo al entrenador y a gerencia). Remitente `novedades@dominio` y correo de gerencia en variables de Railway. En el modal se ve quién la escribió. **Hacerle preguntas antes de construir.**
-7. **Aviso automático de ausencia:** correo al representante cuando su hijo queda ausente; los envíos se ven en Novedades.
-8. **Pagos mensuales:** módulo nuevo o parte de Inscripciones — **el cliente lo va a contar**, no empezar sin eso.
-
-**Pendientes de decidir:**
-
-- ~~**Permisos de escritura** de Asistencias, Evaluaciones y Encuestas~~ — resuelto el 2026-10-07 con la `0026` (ver punto 6).
-- **Fase 13 §4:** si el reporte de Alumnos sigue sacando la información de salud.
-- **Fase 12 §4:** que Mobak escale su 0–2 al puntaje del parámetro.
-- **Fase 11 §4:** si se permiten fechas futuras en asistencia. Dato: el sistema viejo las permitía y en `archivo` hay marcas hasta el 2026-10-05.
-- **Flujo de invitación por correo** en vez de contraseña puesta por el admin: se pregunta cuando Resend funcione.
-
-**Ya no aplica por el arranque de cero:** el dump fresco del cutover, los 19 chequeos de compatibilidad, el backfill de Auth antes de la carga, los triggers apagados en la carga, la copia del bucket `usufoto` al proyecto nuevo, el correo inválido de Bernard (`usu_id` 119) y los 4 entrenadores con usuario de baja y ficha activa: eran problemas de los datos que iban a migrarse.
-
-**Lo verificado sin backend, que no hay que repetir:** las consultas de los módulos ejecutadas contra `PVCAR_Dev` por MCP, las de Data anterior contra una copia local de `archivo`, las FK revisadas una a una, y **474 pruebas automáticas** en el backend (eran 59 al empezar). `lint` sin errores y `build` verde en cada commit.
-
-**Datos:** `PVCAR_Dev` tiene en `public` los datos reales de la carga del 2026-08-06, solo para probar. `PVCAR` (prod) tiene en `public` los catálogos y lo de prueba por quitar, y en `archivo` la plataforma vieja entera.
 
 ---
 
@@ -358,7 +154,7 @@ Pendiente del cliente: borrar `CORREO_REMITENTE` de Railway (ya no se usa). PR `
 |---|---|---|---|
 | Railway `production` | `pvcarbackend-production.up.railway.app` | `main` | `PVCAR` |
 | Railway `development` | `pvcarbackend-development.up.railway.app` | `dev` | `PVCAR_Dev` |
-| Vercel Production | `pvcar.vercel.app` | `main` | `PVCAR` |
+| Vercel Production | `activareforce.com` | `main` | `PVCAR` |
 | Vercel Preview | `dev-pvcar.vercel.app` | `dev` | `PVCAR_Dev` |
 
 **Reglas de oro (no negociables):**
@@ -368,7 +164,6 @@ Pendiente del cliente: borrar `CORREO_REMITENTE` de Railway (ya no se usa). PR `
 3. Toda lógica de negocio —alcance, scoring, transiciones de estado, agregaciones— vive en el backend.
 4. Ningún endpoint sin validación `zod` y sin chequeo de permisos.
 5. Cada cambio de schema es una migración versionada en `PVCAR/db/migrations`, copiada a `SQL/` para que el cliente la ejecute. Nada a mano en el dashboard.
-6. `activa-forge-login/` es el sistema en producción: **no se toca hasta la Fase 17.** Solo referencia.
 
 **Flujo de trabajo:** commit a `dev` → CI (`check` + `secrets-scan`) → deploy automático a Railway `development` y preview de Vercel → pruebas → PR a `main`.
 
@@ -443,7 +238,7 @@ Un módulo está listo cuando, **en este orden**:
 
 ## 4. Catálogos del sistema
 
-Verificados en `PVCAR_Dev` el 2026-09-16. Son los mismos IDs que la prod vieja.
+Verificados en `PVCAR_Dev` el 2026-09-16. Son los mismos IDs que los del esquema `archivo`.
 
 **`rol`** — 1 Propietario PVCAR · 2 Coordinador de Colegio · 3 Entrenador · 4 Representante · 5 Administrador Activa Reforce · 6 Asistente · 7 Respaldo Entrenador
 
@@ -513,7 +308,7 @@ Todo lo que se ve en pantalla —listas de alumnos, asistencias, evaluaciones pe
 | Dar de baja a un **usuario** | Se desactiva su ficha de entrenador y **se cierran sus asignaciones abiertas** con fecha de hoy. Reactivarlo **no** las reabre: se reasignan en Entrenadores. |
 | Quitarle el rol de **entrenador** a alguien con asignaciones activas | Se rechaza (409) diciendo cuántas lo impiden. |
 | Quitarle el rol de **coordinador** a alguien con colegios a cargo | Se rechaza (409) con el número de colegios. |
-| Borrar una **disciplina** | Arrastra inscripciones, asignaciones de entrenador, evaluaciones asignadas y asistencias. Hoy el sistema viejo solo dice "revise que no tenga nada atado". |
+| Borrar una **disciplina** | Arrastra inscripciones, asignaciones de entrenador, evaluaciones asignadas y asistencias. |
 | Borrar un **colegio** | Bloqueado si tiene disciplinas. |
 | Borrar una **actividad** | Bloqueada si existe una disciplina con ella. |
 | **Inscribir a un alumno** en una disciplina | Un trigger crea automáticamente sus filas en `evaluacion_nino_pendiente` para las evaluaciones activas de esa disciplina. |
@@ -521,7 +316,7 @@ Todo lo que se ve en pantalla —listas de alumnos, asistencias, evaluaciones pe
 | Borrar un **alumno** permanentemente | Cascada: inscripciones → evaluaciones pendientes → intentos; asistencias; vínculos con representantes. Destruye el historial entero. |
 | Borrar un **usuario** permanentemente | Falla si registró asistencias (`asistencia_nino.usu_registrador`) o creó evaluaciones (`evaluacion.eva_creador`): esas FK **no** tienen cascada. |
 
-**Los dos triggers hay que apagarlos en cargas masivas** (`nino_asignacion` y `evaluacion_parametro`), o revienta con `duplicate key ... evaluacion_nino_pendiente_pkey`. Reaparece en el cutover.
+**Los dos triggers hay que apagarlos en cargas masivas** (`nino_asignacion` y `evaluacion_parametro`), o revienta con `duplicate key ... evaluacion_nino_pendiente_pkey`.
 
 ### 5.5 Orden de construcción y por qué
 
@@ -546,12 +341,12 @@ Cada flecha es una dependencia real: Estudiantes necesita disciplinas para inscr
 
 | Fase | Qué quedó |
 |---|---|
-| **0** | Cuentas GitHub/Supabase/Railway/Vercel de Activa Reforce con 2FA. Respaldo de prod del 2026-07-27 en `Backup_bd/` + manifiesto de conteos (referencia de verificación del cutover). Dominio `activareforce.com` en Cloudflare. |
+| **0** | Cuentas GitHub/Supabase/Railway/Vercel de Activa Reforce con 2FA. Dominio `activareforce.com` en Cloudflare. |
 | **1** | Monorepo `ActivaReforce/PVCAR`, `main` protegida (checks `check` y `secrets-scan`, sin revisión obligatoria), npm workspaces, CI con lint + typecheck + build + test + escaneo de secretos. |
 | **2** | 35 tablas, 63 FK, 107 índices, 6 funciones, 3 triggers en las dos bases. RLS `ENABLE` + `FORCE` en las 35 con **0 políticas**. Bucket `usufoto` privado. `anon`/`authenticated` sin ningún privilegio, ni sobre tablas ni sobre funciones. Correcciones de diseño imposibles de hacer en caliente: `auth_user_id` con CHECK, sin columna de contraseña, índice en todas las FK, unicidades que faltaban. |
 | **3** | Backend Express+TS en Railway, dos ambientes, `/api/v1/health` con `db:"ok"`, servicios en `us-east4` (Virginia) para no pagar 55 ms por consulta contra Ohio. |
 | **4** | Frontend en Vercel, Production←`main` y Preview fijo←`dev`, env vars por ambiente, `lib/api.ts` con JWT y logout en 401. |
-| **5** | Autenticación real: login por el backend (un viaje trae sesión + usuario + roles + permisos), logout global, reset por correo con pantalla `/reset-password`, cambio de contraseña desde Perfil, rate limit por IP+cuenta. 12/12 pruebas. `backfill-auth.ts` idempotente listo para el cutover. |
+| **5** | Autenticación real: login por el backend (un viaje trae sesión + usuario + roles + permisos), logout global, reset por correo con pantalla `/reset-password`, cambio de contraseña desde Perfil, rate limit por IP+cuenta. 12/12 pruebas. |
 
 Detalle histórico completo en `Bitacora.md`.
 
@@ -598,7 +393,7 @@ Detalle histórico completo en `Bitacora.md`.
 
 **Pantalla de Perfil:** ficha propia (foto por URL firmada, **todos** los roles, no solo uno), edición de teléfono, y cambio de contraseña exigiendo la actual. El sujeto sale del token, nunca de la URL.
 
-#### Qué se arregló del sistema viejo
+#### Malas prácticas corregidas
 
 - La autorización se decidía en el navegador → ahora sale del token, en el servidor, en una sola función.
 - Guardar un usuario eran hasta seis escrituras sueltas; si fallaba la cuarta el usuario quedaba **sin ningún rol** → una transacción.
@@ -722,8 +517,7 @@ Probada contra `dev`. Su documento se borró; lo que quedó vivo se mudó a las 
 
 **Respuestas a lo que preguntó el cliente durante la prueba:**
 
-- *¿Qué le pasa a un colegio si le quito su coordinador?* Nada se rompe: se queda sin nadie a cargo y la tarjeta lo dice. Ya ocurre con 3 colegios de los datos reales. Y esa persona pasa a ver **cero** colegios — `alcanceDe` devuelve lista vacía y eso significa "no ve nada", no "ve todo", que era justo el fallo del sistema viejo.
-- *No sé la contraseña de un coordinador real.* El backfill copió las contraseñas viejas tal cual, así que están en la base antigua, pero no hace falta sacar la credencial de nadie: **`dev` es una copia**, y desde Usuarios se le puede poner la que sea. Para las fases siguientes conviene asignar el usuario de prueba como coordinador de **Innova Schools Calderón** (184 alumnos, 22 disciplinas, 605 asistencias): da un coordinador con datos reales y contraseña conocida.
+- *¿Qué le pasa a un colegio si le quito su coordinador?* Nada se rompe: se queda sin nadie a cargo y la tarjeta lo dice. Ya ocurre con 3 colegios de los datos reales. Y esa persona pasa a ver **cero** colegios — `alcanceDe` devuelve lista vacía y eso significa "no ve nada", no "ve todo".
 
 ---
 
@@ -788,7 +582,7 @@ Probada contra `dev`: 45 pruebas y 9 de repaso. Su documento se borró.
 1. **Cambiar el colegio o la actividad de una disciplina con historia** reescribía toda su historia (las asistencias de Ajedrez en Quitumbe pasaban a ser de otra cosa). Ahora 409 y el formulario bloquea esos dos campos; día y hora se siguen pudiendo mover.
 2. **Nombre de actividad repetido con tildes distintas** ("Futbol G1" / "Fútbol G1") entraba como dos. Ahora ignora tildes.
 3. **Dar de baja a una persona no soltaba sus vínculos de asistente** (como titular ni como asistente), y quitar los roles tampoco. Ahora sí.
-4. **El botón Asignar se ofrecía a entrenadores de baja** (el backend lo rechazaba). Ya no se ofrece. Y los 4 entrenadores que el sistema viejo dio de baja sin cerrar nada (10 disciplinas abiertas) se corrigieron en dev con `SQL/limpieza_dev_entrenadores_2026-10-02.sql`. Decisión del cliente: no se programa nada para casos que en la plataforma nueva no pueden ocurrir.
+4. **El botón Asignar se ofrecía a entrenadores de baja** (el backend lo rechazaba). Ya no se ofrece.
 
 **Rediseño pedido por el cliente:** Actividades sin paginador y por categoría; Disciplinas por colegio con su semana de lunes a domingo; tarjetas compactas que despliegan el detalle al pasar el ratón y se fijan con un clic; borde ámbar fuerte en disciplinas sin entrenador, y asignarlo desde ahí; Entrenadores como lista paginada al estilo de Usuarios, con borde ámbar en los activos sin disciplinas; ficha y modal de asignar agrupados por colegio, con filtros de colegio, día y "sin entrenador".
 
@@ -1063,7 +857,7 @@ Los representantes la reciben como **modal obligatorio** al entrar, hasta respon
 
 Crear encuesta con los 6 tipos de pregunta · finalizar y comprobar que no se edita · publicar · entrar como representante y verla obligatoria · responder y comprobar que no vuelve a aparecer · ver resultados y exportar · borrar · 360 px: una pregunta por pantalla.
 
-**Confirmado el 2026-09-16, sobre los tres respaldos de producción** (2026-06-09, 2026-06-10 y 2026-07-27): `encuesta`, `encuesta_pregunta`, `encuesta_respondida`, `encuesta_respuesta`, `padre` y `nino_padre` tienen **0 filas en los tres**. No es que se borraran: nunca se usaron. La prod vieja por MCP no respondió (proyecto dormido), pero tres respaldos separados por siete semanas coinciden.
+**Confirmado el 2026-09-16:** en la plataforma anterior, `encuesta`, `encuesta_pregunta`, `encuesta_respondida`, `encuesta_respuesta`, `padre` y `nino_padre` tenían **0 filas**. Nunca se usaron, así que el módulo se estrenó vacío.
 
 **Decisión que se sigue de eso:** no hay nada que cargar. **El módulo se estrena vacío** y con él el de Representantes. Si el cliente quiere empezar a usarlo, los representantes se dan de alta como usuarios con rol 4 desde Usuarios y se atan a sus hijos desde Estudiantes.
 
@@ -1088,7 +882,7 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 - [x] **`zod` y rate limit en el 100% de los endpoints.** Inventariados los **119**: los 14 routers de negocio aplican `requireAuth` a nivel de router, y las 19 rutas sin `zod` son las que no reciben nada (catálogos como `/dias`, `/tipos`, `/metodos`, `/roles`, más `/health` y `/logout`). El rate limit general (120/min en producción) va montado sobre `/api/v1` **después** de `/health`, para no gastar cupo en los chequeos de Railway; login, forgot-password y change-password llevan uno propio de 10 cada 15 min con clave IP+correo.
 - [x] **CORS restringido y guardia de arranque.** `FRONTEND_ORIGIN` la escribe una persona en el dashboard de Railway, así que ahora se valida al arrancar en producción: nada de `*`, nada de `http://`, nada de `localhost`, nada de barra o ruta al final (con barra, el `includes()` del CORS no casa y **todo** el frontend daría 403), y los tres secretos —`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `DATABASE_URL`— pasan de fallar en la primera petición que los necesite a impedir el arranque. 10 pruebas en `config/env.test.ts`.
 - [x] **Las tres capas de Supabase, revisadas en dev y prod.** Idénticas en las dos: RLS `ENABLE`+`FORCE` en las 36 tablas con **0 políticas**; **0** privilegios de tabla para `anon`/`authenticated`/`PUBLIC`; las **6 funciones** con ACL explícita (solo `postgres` y `service_role`) y `search_path=public` fijo — incluidas las dos `SECURITY DEFINER`, que fueron el agujero real. Bucket `usufoto` privado, 0 políticas en `storage.objects`. El *advisor* de seguridad solo devuelve los 36 `rls_enabled_no_policy` de nivel INFO, que son el diseño buscado.
-- [x] **Cero secretos en el bundle.** Solo tres `VITE_*` (`VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`), las tres públicas por diseño. El JWT horneado en el bundle desplegado de `pvcar.vercel.app` se decodificó: `role: "anon"`, `ref: dahsgmpubbofrefvseir` — que de paso confirma que **Vercel Production apunta a `PVCAR`**, algo que hasta ahora solo se había mirado a ojo en el dashboard.
+- [x] **Cero secretos en el bundle.** Solo tres `VITE_*` (`VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`), las tres públicas por diseño. El JWT horneado en el bundle de producción se decodificó: `role: "anon"`, `ref: dahsgmpubbofrefvseir` — que de paso confirma que **Vercel Production apunta a `PVCAR`**, algo que hasta ahora solo se había mirado a ojo en el dashboard.
 - [x] **Code-splitting.** Cada pantalla es su propio trozo (`React.lazy`) y las librerías van aparte (`react`, `datos`, `graficas`, `supabase`). La primera carga baja de **1 428 kB a 627 kB** (398 → **187 kB** gzip, **53 % menos**): quien abre el login ya no se descarga Recharts, las 9 definiciones de reporte y el constructor de encuestas antes de poder escribir su contraseña.
 - [x] **`no-explicit-any` en `error`.** Llegó a 0. De paso salieron **cuatro archivos que no usaba nadie** (`SharedDataContext`, `useSorting`, `useDebounce`, `sortable-table-header`) y cinco declaraciones muertas: estaban escondidos porque `no-unused-vars` seguía en `off` desde el andamiaje original. Las dos reglas están ahora en `error`; quedan 9 avisos, todos de `react-refresh` en ficheros de shadcn.
 - [x] **Rendimiento: una cascada encontrada y cortada.** Entrar en frío a `/reportes/:modulo` costaba **tres viajes en serie** (`/me` → catálogo → datos), porque para saber si el reporte exige rango de fechas hacía falta su definición. El catálogo son 9 definiciones que el backend arma en memoria sin tocar la base: ahora se precarga desde el layout y no caduca en toda la sesión. El resto de pantallas ya estaban bien — ningún `enabled` depende de la respuesta de otra consulta, solo de lo que elige el usuario.
@@ -1096,12 +890,12 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 
 **Pendiente, y por qué:**
 
-- [ ] **SMTP con Resend en `PVCAR` (producción).** El cliente lo decidió el 2026-09-17: configura Resend y lo conecta al SMTP de Supabase. Hace falta porque el servidor de correo que trae Supabase de serie está limitado a unos pocos envíos por hora y no es para producción: con 70 usuarios, un día con varias recuperaciones de contraseña se queda corto y los correos no salen. **Dashboard del cliente. La Fase 15 no cierra sin esto.**
-- [ ] **Pegar solo `recuperar-contrasena.html`** y añadir `https://pvcar.vercel.app/reset-password` a *Redirect URLs*. Las otras dos plantillas **no se pegan**: ver abajo por qué.
+- [x] **SMTP con Resend en `PVCAR` (producción)** — puesto el 2026-10-07. El cliente lo decidió el 2026-09-17: configura Resend y lo conecta al SMTP de Supabase. Hace falta porque el servidor de correo que trae Supabase de serie está limitado a unos pocos envíos por hora y no es para producción: con 70 usuarios, un día con varias recuperaciones de contraseña se queda corto y los correos no salen.
+- [x] **Pegar solo `recuperar-contrasena.html`** (2026-10-07) y `https://activareforce.com/reset-password` en *Redirect URLs* (2026-10-12). Las otras dos plantillas **no se pegan**: ver abajo por qué.
 
-**Por qué solo hace falta una plantilla.** Verificado en `usuarios.service.ts` el 2026-09-17: crear un usuario llama a `admin.auth.admin.createUser` con la contraseña que **escribe el admin** y `email_confirm: true`, así que Supabase no manda nada — exactamente como el sistema viejo. Reactivar a un inactivo hace lo mismo. Ni *Confirm signup* ni *Invite user* se disparan nunca: la primera necesitaría registro público, que no existe, y la segunda necesitaría que el código llamara a `inviteUserByEmail()`, que no lo hace. Las dos plantillas quedan escritas en `docs/correos/` por si el flujo cambia, pero **no van al dashboard**.
+**Por qué solo hace falta una plantilla.** Verificado en `usuarios.service.ts` el 2026-09-17: crear un usuario llama a `admin.auth.admin.createUser` con la contraseña que **escribe el admin** y `email_confirm: true`, así que Supabase no manda nada. Reactivar a un inactivo hace lo mismo. Ni *Confirm signup* ni *Invite user* se disparan nunca: la primera necesitaría registro público, que no existe, y la segunda necesitaría que el código llamara a `inviteUserByEmail()`, que no lo hace. Las dos plantillas quedan escritas en `docs/correos/` por si el flujo cambia, pero **no van al dashboard**.
 
-- [ ] **Preguntarle a Activa Reforce si quieren cambiar el flujo de alta.** Hoy el admin crea al usuario **escribiendo él la contraseña**, así que **conoce la contraseña de todas las personas del sistema**. La alternativa es el flujo de invitación: el admin crea la cuenta sin contraseña, a la persona le llega un correo y la elige ella, sin que nadie más la sepa nunca. A favor: es mejor práctica y quita al admin de en medio. En contra: ata el alta al correo — si el SMTP falla o la dirección está mal, esa persona no puede entrar, mientras que hoy el admin le dice la contraseña y ya. **Es pregunta para ellos, no decisión técnica.** Va después de que Resend esté funcionando, porque sin correo fiable la respuesta es que no. Si dicen que sí, las plantillas `invitacion.html` y `confirmar-correo.html` ya están escritas.
+- [ ] **Preguntarle a Activa Reforce si quieren cambiar el flujo de alta.** Hoy el admin crea al usuario **escribiendo él la contraseña**, así que **conoce la contraseña de todas las personas del sistema**. La alternativa es el flujo de invitación: el admin crea la cuenta sin contraseña, a la persona le llega un correo y la elige ella, sin que nadie más la sepa nunca. A favor: es mejor práctica y quita al admin de en medio. En contra: ata el alta al correo — si el SMTP falla o la dirección está mal, esa persona no puede entrar, mientras que hoy el admin le dice la contraseña y ya. **Es pregunta para ellos, no decisión técnica.** Resend ya funciona, así que se le puede preguntar. Si dicen que sí, las plantillas `invitacion.html` y `confirmar-correo.html` ya están escritas.
 - [x] **Revisión de alcance rol por rol (2026-10-05, estática, con los datos reales del esquema `archivo` para medir).** Tres fugas del mismo tipo, cerradas en `dev` (`448baa9`, `0b0853d`):
   1. **Entrenador y auxiliares veían el colegio entero.** `alcanceDe` les sumaba los colegios de sus disciplinas, y Estudiantes, los reportes y la tendencia del tablero filtran "colegio O disciplina". Un entrenador con 4 disciplinas veía 176 alumnos (con su salud) en vez de sus 37. Ahora `colegios` = solo `colegio_coordinador`.
   2. **Representante.** Su camino aportaba colegios y disciplinas de sus hijos al alcance del personal: con "ver" en Estudiantes o Asistencias habría visto el colegio y la clase entera. Ahora trae solo `ninos` y `disciplinasDeHijos`.
@@ -1111,76 +905,36 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 - [ ] **Auditoría de fugas con un token de cada rol.** El repaso estático dice que el alcance se aplica en el **servicio**, no en el SQL del repositorio: cada módulo que toca datos de menores tiene su guarda (`exigirVisible`, `exigirPendienteVisible`, `exigirSesion`, `exigirAlcance`…) que resuelve el alcance y devuelve 403. Es el diseño correcto, pero eso no se da por bueno leyendo código: se prueba con un token por rol contra todos los endpoints, y eso necesita el API en marcha.
 - [ ] Tests e2e por módulo + prueba de carga en dev con el volumen real.
 - [ ] Repaso de accesibilidad y responsive de las 14 pantallas, en los dos temas, en los tres anchos.
+- [ ] **Respaldo de prod.** Ya tiene datos reales y el plan gratuito de Supabase no hace copias automáticas: `pg_dump` programado o plan Pro.
 
 ---
 
-## 9. Fase 16 — Cutover
+## 9. Fase 16 — Lanzamiento
 
-> ⚠️ **Superada el 2026-10-01** por el arranque de cero (ver §1). La lista de abajo era para migrar los datos y queda **solo como referencia**. El lanzamiento nuevo se reduce a: sembrar catálogos + un Propietario en `PVCAR`, deploy de `main`, dominio, smoke tests. Se reescribe cuando se llegue.
+✅ **Hecha el 2026-10-12.** Con el arranque de cero no hubo migración de datos: el lanzamiento se redujo a esto.
 
-Ventana única, en horario de bajo uso, con el runbook **ensayado entero en dev**. Vive en `PVCAR/docs/RUNBOOK-cutover.md`.
-
-1. [ ] Aviso a usuarios + ventana de mantenimiento. TTL del DNS bajado 24 h antes.
-2. [ ] **Campaña previa:** las 7 personas con contraseña de menos de 6 caracteres ya la cambiaron en el sistema viejo (Anexo A.4), y el correo con formato inválido está corregido.
-3. [ ] **Congelar escrituras** en el sistema viejo (página de mantenimiento en el Vercel viejo).
-4. [ ] Volver a correr los **19 chequeos de compatibilidad** contra la prod vieja (están en `SQL/ORDEN.md`): cubren el baseline y las migraciones `0007`–`0011`. Pasaron el 2026-09-17 con 0 desviaciones, pero la prod vieja sigue recibiendo datos.
-5. [ ] **`pg_dump` final, data-only, sacado esa misma noche.** ⚠️ **El respaldo de `Backup_bd/` (2026-07-27) NO sirve: está obsoleto.** Medido el 2026-09-17, producción ya tiene +878 asistencias de alumnos, +12 niños, +57 inscripciones y +2 usuarios respecto a él. Verificar conteos por tabla contra un manifiesto **nuevo**, no contra `conteos_prod_2026-07-27.txt`.
-6. [ ] **`backfill-auth.ts` ANTES de cargar los datos.** El `CHECK (est_id <> 1 OR auth_user_id IS NOT NULL)` impide insertar usuarios activos sin cuenta de Auth. El reporte debe cerrar en 50/50 antes de seguir.
-7. [ ] Cargar los datos en `PVCAR` en orden de dependencias, con `auth_user_id` ya poblado desde el mapeo y sin la columna de contraseña. **Desactivar los dos triggers durante la carga** (`trigger_nino_asignacion_evaluation` y `trigger_update_evaluacion_puntaje_total`) y volver a activarlos. `setval` de todas las secuencias. `VACUUM ANALYZE`.
-8. [ ] **Volver a bajar** el bucket `usufoto` de la prod vieja y copiarlo al proyecto nuevo (que es privado). Hay una copia verificada del 2026-09-17 en `Backup_bd/usufoto_2026-09-17/` (60 objetos + sha256), pero entre esa fecha y el corte pueden subirse fotos nuevas: **la copia sirve de red, no de fuente**. Además, las rutas guardadas como URL absoluta del proyecto viejo hay que reescribirlas.
-9. [ ] **Verificación:** conteo por tabla viejo vs nuevo + muestreo de evaluaciones y asistencias del último mes.
-10. [ ] Deploy final: Railway `production` + Vercel Production desde `main`.
-11. [ ] **Dominio:** quitarlo del Vercel viejo → añadirlo al nuevo → actualizar Cloudflare → esperar propagación → verificar HTTPS.
-12. [ ] Smoke tests con un usuario real de cada rol; monitoreo intensivo 48 h.
-13. [ ] **Rollback:** re-apuntar el dominio al proyecto viejo, que sigue intacto. Válido **mientras no haya escrituras nuevas** en la base nueva. Ese es el punto de no retorno y hay que comunicarlo.
+- [x] Prod limpia de lo de prueba y con un Propietario.
+- [x] `main` desplegado en Railway `production` y Vercel Production (PR #15).
+- [x] Dominio: quitado del hosting anterior, añadido a Vercel Production (`www` → raíz), DNS en Cloudflare, HTTPS verificado.
+- [x] `FRONTEND_ORIGIN`, Site URL y Redirect URLs al dominio nuevo; CORS y login verificados.
+- [ ] Smoke test con un usuario real de cada rol, según se vayan creando.
 
 ---
 
-## 10. Fase 17 — Desmantelar Flowward
+## 10. Fase 17 — Cierre del proyecto
 
-Solo tras N días estables y con los dumps archivados en frío.
-
-- [ ] Archivar copia final de la DB vieja y del bucket (externo, cifrado).
-- [ ] Borrar los repos de Flowward y el proyecto Vercel viejo.
-- [ ] Pausar y luego borrar los proyectos Supabase viejos.
-- [ ] **Rotar los dos PAT de Supabase** que hoy están en texto plano en `.mcp.json` (riesgo asumido por el cliente, con fecha de caducidad puesta aquí).
+- [x] Borrar la plataforma anterior: hosting, Supabase, cuenta de Supabase y repo (2026-10-12, el cliente).
+- [x] Borrar la copia local de su código, `_ref/` y el respaldo local (2026-10-12, decisión del cliente).
+- [ ] **Rotar los dos PAT de Supabase** que están en texto plano en `.mcp.json` (riesgo asumido por el cliente).
+- [ ] Borrar `CLAUDE.md` y `Roadmap.md` del repo (están solo para trabajar desde otro equipo).
 - [ ] Pasar el repo `PVCAR` a **privado**.
-- [ ] Limpiar el disco local; el workspace sale de la carpeta `Flowward`.
+- [ ] El workspace sale de la carpeta `Flowward`.
 
 ---
 
-## Anexo A — Migración de autenticación
+## Anexo A — RLS desde el día 1
 
-**El problema:** hoy el login compara `usu_contrasena` **en texto plano** y `auth.users` está vacío. Cualquiera con la anon key —que va embebida en el bundle— puede leer las 68 contraseñas.
-
-**Objetivo:** que el día del cutover cada persona entre con **el mismo correo y la misma contraseña de siempre**, sin correo de verificación, sin reset, sin aviso.
-
-**Por qué se puede:** precisamente porque están en texto plano se pueden sembrar en Supabase Auth, que las hashea con bcrypt al recibirlas. La clave está en `email_confirm: true`: la cuenta nace confirmada y nadie recibe nada en su bandeja. El texto plano muere ahí — la columna no existe en el schema nuevo.
-
-**Casos borde medidos en prod (no supuestos):**
-
-| Hallazgo | Cantidad | Qué se hace |
-|---|---|---|
-| Correos duplicados | 0 | nada |
-| Contraseñas ya hasheadas | 0 | todas se pueden sembrar |
-| **Contraseñas de menos de 6 caracteres** | **7** | Supabase las rechaza → campaña previa para que las cambien en el sistema viejo |
-| Correo con formato inválido | 1 | corregirlo antes del cutover, o esa persona no entra |
-| Contraseñas con tildes/ñ | 2 | funcionan; se prueban explícitamente |
-| Usuarios inactivos | 18 | **no** se crean en Auth hasta que se reactiven |
-
-**El script `backfill-auth.ts`** es idempotente, transaccional por usuario y con reporte: lee los activos sin `auth_user_id`, valida correo y longitud, crea la cuenta, escribe el `auth_user_id` y **borra la cuenta recién creada si esa escritura falla** (sin huérfanos). Al terminar imprime creados / reusados / omitidos con motivo.
-
-> En dev cierra con **exit 1** y "El reporte NO cierra limpio" por los 5 omitidos: es la guardia pensada para el cutover, no un fallo.
-
-**Verificación antes de mover el dominio:** `auth.users` = usuarios activos · `usuario where est_id=1 and auth_user_id is null` = 0 · login real con una cuenta de cada rol usando su contraseña de siempre · login con una contraseña con tildes · reset por correo funcionando con la plantilla en español · la columna `usu_contrasena` no existe.
-
----
-
-## Anexo B — RLS desde el día 1
-
-**Situación del sistema viejo:** de 35 tablas, 34 sin RLS. Con la anon key —pública por diseño, embebida en el JavaScript— se pueden leer y escribir los datos de 796 menores. El bucket `usufoto` es público con 61 fotos. **No se puede arreglar ahí**: la SPA depende de esa key sin restricciones.
-
-**En PVCAR sí, desde el primer día,** porque `service_role` tiene `BYPASSRLS = true` y el backend se conecta con ella, mientras el front usa la anon key solo para la sesión:
+**Desde el primer día,** porque `service_role` tiene `BYPASSRLS = true` y el backend se conecta con ella, mientras el front usa la anon key solo para la sesión:
 
 - `0002_rls.sql`: `ENABLE` + `FORCE` en las 35 tablas y **cero políticas**. Deny-by-default.
 - `0003_storage.sql`: bucket privado, acceso por URL firmada de corta vida.
@@ -1194,7 +948,7 @@ Solo tras N días estables y con los dumps archivados en frío.
 
 ---
 
-## Anexo C — Trampas de infraestructura ya pagadas
+## Anexo B — Trampas de infraestructura ya pagadas
 
 | Trampa | Realidad |
 |---|---|
@@ -1222,34 +976,23 @@ Solo tras N días estables y con los dumps archivados en frío.
 - [x] Fase 5 — Autenticación — 2026-08-06, en `main` el 2026-08-07
 - [x] Fase 6 — Usuarios, Roles, Permisos, Perfil — cerrada 2026-09-17, 17/17 pruebas contra dev
 - [x] Fase 7 — Colegios — cerrada 2026-09-18, 13/13 pruebas contra dev
-- [ ] Fase 8 — Actividades y Disciplinas — construida el 2026-09-16; **solo faltan las pruebas**
-- [ ] Fase 9 — Entrenadores — construida el 2026-09-16; **solo faltan las pruebas**
-- [ ] Fase 10 — Estudiantes — construida el 2026-09-17; **solo faltan las pruebas**
-- [ ] Fase 11 — Asistencias — construida el 2026-09-17; **solo faltan las pruebas**
-- [ ] Fase 12 — Evaluaciones — construida el 2026-09-17; **solo faltan las pruebas**
-- [ ] Fase 13 — Tablero y Reportes — construida el 2026-09-17; **solo faltan las pruebas**
-- [ ] Fase 14 — Encuestas y Representantes — construida el 2026-09-17; **solo faltan las pruebas**
-- [ ] Fase 15 — Endurecimiento y QA — en marcha desde 2026-09-17; falta el SMTP y lo que necesita la app en marcha
-- [ ] Fase 16 — Cutover
-- [ ] Fase 17 — Desmantelar Flowward
-
-**🔴 PENDIENTE URGENTE, ANOTADO EL 2026-09-18 — varios módulos dan 500.** El cliente lo vio en pantalla: **Disciplinas y Entrenadores devuelven "Error interno del servidor", y dice que hay más**. Ejemplo exacto de la consola:
-
-```
-GET /api/v1/disciplinas?limit=200&estado=1&orden=horario  ->  500
-```
-
-**Bloquea la Fase 8**, que es la siguiente de la cola de pruebas. Hay que resolverlo antes de abrirla.
-
-Lo único comprobado hasta ahora, antes de que el cliente pidiera dejarlo: **la consulta SQL de esa ruta, ejecutada tal cual contra `PVCAR_Dev` por MCP con esos mismos parámetros, devuelve las 94 filas sin error.** Así que el fallo **no está en el SQL** — hay que mirar la capa de encima (zod, `alcanceDe`, serialización de la respuesta) o el propio despliegue de Railway. Primer paso al retomar: los logs de `development` en Railway, que dan el stack real.
+- [x] Fase 8 — Actividades y Disciplinas — cerrada 2026-10-02; Disciplinas v2 probada el 2026-10-06
+- [ ] Fase 9 — Entrenadores — construida; **solo faltan las pruebas**
+- [ ] Fase 10 — Estudiantes — construida; **solo faltan las pruebas**
+- [ ] Fase 11 — Asistencias — construida; **solo faltan las pruebas**
+- [ ] Fase 12 — Evaluaciones — construida; **solo faltan las pruebas**
+- [ ] Fase 13 — Tablero y Reportes — construida; **solo faltan las pruebas**
+- [ ] Fase 14 — Encuestas y Representantes — construida; **solo faltan las pruebas**
+- [ ] Fase 14B — Inscripciones — construida; el cliente la va probando
+- [ ] Fase 15 — Endurecimiento y QA — en marcha; falta lo que necesita la app en marcha y el respaldo de prod
+- [x] Fase 16 — Lanzamiento — 2026-10-12, `activareforce.com`
+- [ ] Fase 17 — Cierre del proyecto — plataforma anterior borrada; faltan PAT, repo privado y limpieza
 
 **Riesgos vivos:**
 
 | Riesgo | Mitigación |
 |---|---|
-| Divergencia funcional viejo vs nuevo | La sección de cada módulo es el checklist de paridad; obligatorio para cerrar la fase |
 | Dar un módulo por listo sin probarlo | La sección 3.5. Ya costó trece arreglos en la Fase 6 |
-| Pérdida de datos en el cutover | Dump verificado antes; el sistema viejo y su base quedan intactos; conteos antes de mover el dominio |
-| Free tier de Supabase sin backups automáticos | `pg_dump` programado + evaluar Pro **antes** de que la base nueva tenga datos reales |
+| Free tier de Supabase sin backups automáticos | **Prod ya tiene datos reales desde el 2026-10-12.** `pg_dump` programado o plan Pro, cuanto antes |
 | PAT en texto plano en `.mcp.json` | Decisión cerrada del cliente; se rotan en la Fase 17 |
-| Repo público | Decisión cerrada; pasa a privado al final. Este documento y `Bitacora.md` **no** viven en el repo |
+| Repo público | Decisión cerrada; pasa a privado en la Fase 17. `Bitacora.md` no vive en el repo; este documento sí, hasta la Fase 17 |

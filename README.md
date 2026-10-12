@@ -2,7 +2,7 @@
 
 Plataforma de gestión deportiva escolar de **Activa Reforce**. Monorepo con backend, frontend y el schema de base de datos versionado.
 
-El plan maestro de construcción y migración **no se versiona aquí**: describe el estado y las debilidades del sistema anterior, que sigue en producción. Se mantiene fuera del repo y se comparte por canal privado. **Léelo antes de tocar nada.**
+En producción en **https://activareforce.com** desde el 2026-10-12. El documento maestro es [`Roadmap.md`](Roadmap.md): estado de cada fase y especificación de cada módulo. **Léelo antes de tocar nada.**
 
 ## Estructura
 
@@ -11,9 +11,9 @@ backend/    Express + TypeScript      → Railway (root dir: raíz del repo)
 frontend/   Vite + React + TypeScript → Vercel  (root dir: frontend)
 db/
   migrations/  SQL versionado — fuente de verdad del schema
-  seed/        datos mínimos sintéticos para desarrollo
-  scripts/     dump, restore, backfill de auth, copia de storage
-docs/       API.md, RUNBOOK-cutover.md (el plan maestro se mantiene fuera del repo)
+  checks/      consultas de verificación del schema
+  scripts/     utilidades de base de datos
+docs/       especificación y pruebas de cada módulo, permisos, plantillas de correo
 ```
 
 ## Ambientes
@@ -27,11 +27,9 @@ Un commit a `dev` dispara CI, el preview de Vercel y el deploy de Railway `devel
 
 ### Estado actual
 
-Los cuatro despliegues responden, pero el producto **todavía no funciona de punta a punta**:
-
-- Las dos bases tienen schema, RLS (deny-by-default, sin políticas) y privilegios cerrados. `PVCAR` está **vacía de datos** a propósito: los recibe en el cutover. `GET /api/v1/health` devuelve `db: "ok"` en los dos ambientes.
-- El backend expone `/api/v1/health`, `/api/v1/auth/*` y `/api/v1/me`. Todavía no hay endpoints de negocio.
-- El frontend es la SPA anterior tal cual: **97 archivos** consultan Supabase directo y **ninguno** usa `lib/api.ts`. Se migra módulo por módulo; hasta entonces las pantallas no sirven datos desde el API.
+- Producción en `activareforce.com` (`www` redirige a la raíz), con datos reales. Dev para probar antes de cada PR.
+- Las dos bases tienen schema, RLS (deny-by-default, sin políticas) y privilegios cerrados. Los datos de la plataforma anterior están en el esquema `archivo`, solo lectura, en Reportes → Data anterior.
+- Todos los módulos pasan por el API (`/api/v1/...`); el frontend usa Supabase solo para la sesión y la subida de fotos. `GET /api/v1/health` devuelve `db: "ok"` en los dos ambientes.
 
 ### Trampas de despliegue
 

@@ -150,7 +150,7 @@ Las consultas nuevas, ejecutadas contra `PVCAR_Dev` por MCP antes de subirlas.
 
 ---
 
-## 3. Lo que se arregló del sistema viejo
+## 3. Lo que se arregló del sistema anterior
 
 | Estaba mal | Ahora |
 |---|---|
@@ -174,6 +174,6 @@ Las consultas nuevas, ejecutadas contra `PVCAR_Dev` por MCP antes de subirlas.
 
 **La información de salud en el Excel de Alumnos.**
 
-El reporte lleva la columna *Información de salud*, igual que el del sistema viejo. Es dato médico de menores en un archivo que se manda por correo y se reenvía.
+El reporte lleva la columna *Información de salud*, igual que el del sistema anterior. Es dato médico de menores en un archivo que se manda por correo y se reenvía.
 
 No la he quitado porque quitarla cambiaría en silencio un informe que ya usas. Pero conviene decidirlo: **se puede sacar de la exportación, dejarla solo en la ficha del alumno, o restringir el reporte a ciertos roles.** Dime cuál y lo cambio.

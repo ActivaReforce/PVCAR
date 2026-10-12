@@ -94,7 +94,7 @@ Eso lo convierte en **el único sitio del sistema donde el esquema se puede corr
 
 ---
 
-## 3. Lo que se arregló del sistema viejo
+## 3. Lo que se arregló del sistema anterior
 
 | Estaba mal | Ahora |
 |---|---|
