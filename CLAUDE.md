@@ -1,6 +1,6 @@
 # Contexto del workspace — Activa Reforce / PVCAR
 
-> **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo. Se borra del repo al cerrar el proyecto (Fase 17). Las rutas `PVCAR/...` son la raíz de este repo; `SQL/`, `Backup_bd/`, `Bitacora.md`, `Cosas/`, `_ref/` y `.mcp.json` son de la carpeta de trabajo y no están aquí. En otro equipo hay que recrear `.mcp.json` (dos servidores Supabase `--read-only`) y los `.env`, que nunca se suben.
+> **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo. Se borra del repo al cerrar el proyecto (Fase 17). Las rutas `PVCAR/...` son la raíz de este repo; `SQL/`, `Backup_bd/`, `Bitacora.md`, `Cosas/` y `.mcp.json` son de la carpeta de trabajo y no están aquí. En otro equipo hay que recrear `.mcp.json` (dos servidores Supabase `--read-only`) y los `.env`, que nunca se suben.
 
 **Lee `PVCAR/Roadmap.md` antes de proponer o ejecutar cualquier cosa** (desde el 2026-10-07 vive en el repo; el `Roadmap.md` de la raíz es solo un aviso). Toda mención a `Roadmap.md` en este archivo se refiere a ese. Es el documento maestro (17 fases, reglas transversales, especificación funcional de cada módulo, anexos de autenticación, RLS e infraestructura). Sustituye a `Plan.md`, que quedó archivado entero en `Bitacora.md`.
 
@@ -28,7 +28,6 @@ Los dashboards de **Vercel, Railway y Supabase los opera el cliente**; Claude en
 | `PVCAR/Roadmap.md` | Documento maestro. Fuente de verdad. En el repo para seguir desde otro equipo. |
 | `Bitacora.md` | El `Plan.md` viejo, archivado: cómo se cerró cada fase 0–5 y el registro día a día. |
 | `Backup_bd/` | **Respaldo definitivo** de la prod vieja, 2026-10-01: `prod_full_2026-10-01.dump`, `usufoto/` y `MANIFIESTO.txt` (sha256 + conteos). Lleva datos de menores y contraseñas en texto plano: nunca al repo. |
-| `_ref/` | Material de arranque de la Fase 1, ya consumido. |
 | `Cosas/` | Contrato, RUC, assets de marca. |
 | `PVCAR/` | Clon de trabajo del monorepo (remoto `ActivaReforce/PVCAR`). Aquí se trabaja. |
 | `SQL/` | **Canal de entrega:** archivos que el cliente ejecuta a mano en el SQL Editor de Supabase, con `ORDEN.md`. Copia de `PVCAR/db/migrations/`, que es la fuente de verdad. Si se cambia la migración, hay que recopiarla. |
