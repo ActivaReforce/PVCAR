@@ -44,6 +44,19 @@ novedadesRouter.get(
 );
 
 novedadesRouter.get(
+  '/representantes-mencionables',
+  requirePermission('novedades', 'crear'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const opts = buscarSchema.parse(req.query);
+      res.json({ data: await service.representantesMencionables(actor(req), opts), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+novedadesRouter.get(
   '/alumnos-mencionables',
   requirePermission('novedades', 'crear'),
   async (req: Request, res: Response, next: NextFunction) => {

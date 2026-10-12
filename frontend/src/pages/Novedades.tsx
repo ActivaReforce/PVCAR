@@ -7,6 +7,7 @@ import {
   Search,
   Trash2,
   UserCog,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,18 +41,21 @@ const TODOS = 'todos';
 const ETIQUETA_TIPO: Record<TipoNovedad, string> = {
   general: 'General',
   personal: 'Personal',
+  representante: 'Representantes',
   alumno: 'Alumnos',
 };
 
 const COLOR_TIPO: Record<TipoNovedad, string> = {
   general: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
   personal: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200',
+  representante: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
   alumno: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
 };
 
 const ICONO_TIPO: Record<TipoNovedad, typeof Megaphone> = {
   general: Megaphone,
   personal: UserCog,
+  representante: Users,
   alumno: GraduationCap,
 };
 
@@ -176,6 +180,7 @@ const Novedades = () => {
               <SelectItem value={TODOS}>Todos los tipos</SelectItem>
               <SelectItem value="general">Generales</SelectItem>
               <SelectItem value="personal">Sobre personal</SelectItem>
+              <SelectItem value="representante">Sobre representantes</SelectItem>
               <SelectItem value="alumno">Sobre alumnos</SelectItem>
             </SelectContent>
           </Select>
@@ -229,7 +234,8 @@ const Novedades = () => {
                         Por <strong className="font-medium text-foreground">{n.autor.usu_nombre}</strong>
                       </p>
                     )}
-                    {n.nov_tipo === 'personal' && n.personas.length > 0 && (
+                    {(n.nov_tipo === 'personal' || n.nov_tipo === 'representante') &&
+                      n.personas.length > 0 && (
                       <p className="text-xs text-muted-foreground">
                         <span className="font-medium">Sobre:</span>{' '}
                         {n.personas.map((p) => p.nombre).join(', ')}

@@ -16,6 +16,7 @@ function mensajeDe(error: unknown): string {
 const CLAVE = {
   lista: (filtros: FiltrosListar) => ['novedades', 'lista', filtros] as const,
   personal: (buscar: string) => ['novedades', 'personal', buscar] as const,
+  representantes: (buscar: string) => ['novedades', 'representantes', buscar] as const,
   alumnos: (buscar: string) => ['novedades', 'alumnos', buscar] as const,
 };
 
@@ -68,6 +69,14 @@ export function usePersonalMencionable(buscar: string, habilitado: boolean) {
   return useQuery({
     queryKey: CLAVE.personal(buscar),
     queryFn: () => novedadesApi.personal({ buscar: buscar || undefined, limit: 50 }),
+    enabled: habilitado,
+  });
+}
+
+export function useRepresentantesMencionables(buscar: string, habilitado: boolean) {
+  return useQuery({
+    queryKey: CLAVE.representantes(buscar),
+    queryFn: () => novedadesApi.representantes({ buscar: buscar || undefined, limit: 50 }),
     enabled: habilitado,
   });
 }

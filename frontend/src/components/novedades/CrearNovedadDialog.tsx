@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { GraduationCap, Megaphone, Save, UserCog } from 'lucide-react';
+import { GraduationCap, Megaphone, Save, UserCog, Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ interface Props {
 const TIPOS: Array<{ id: TipoNovedad; etiqueta: string; icono: typeof Megaphone; descripcion: string }> = [
   { id: 'general', etiqueta: 'General', icono: Megaphone, descripcion: 'Avisa a Activa Reforce sin ligarlo a nadie.' },
   { id: 'personal', etiqueta: 'Personal de Activa Reforce', icono: UserCog, descripcion: 'Novedad sobre una o varias personas.' },
+  { id: 'representante', etiqueta: 'Representantes', icono: Users, descripcion: 'Novedad sobre uno o varios representantes.' },
   { id: 'alumno', etiqueta: 'Alumnos', icono: GraduationCap, descripcion: 'Novedad sobre uno o varios alumnos.' },
 ];
 
@@ -29,6 +30,7 @@ const CrearNovedadDialog = ({ abierto, onCerrar }: Props) => {
   const [tipo, setTipo] = useState<TipoNovedad>('general');
   const [texto, setTexto] = useState('');
   const [personas, setPersonas] = useState<number[]>([]);
+  const [representantes, setRepresentantes] = useState<number[]>([]);
   const [alumnos, setAlumnos] = useState<number[]>([]);
   const crear = useCrearNovedad();
 
@@ -37,6 +39,7 @@ const CrearNovedadDialog = ({ abierto, onCerrar }: Props) => {
       setTipo('general');
       setTexto('');
       setPersonas([]);
+      setRepresentantes([]);
       setAlumnos([]);
     }
   }, [abierto]);
@@ -45,6 +48,7 @@ const CrearNovedadDialog = ({ abierto, onCerrar }: Props) => {
   const faltaTexto = textoLimpio.length === 0;
   const faltanMenciones =
     (tipo === 'personal' && personas.length === 0) ||
+    (tipo === 'representante' && representantes.length === 0) ||
     (tipo === 'alumno' && alumnos.length === 0);
   const bloqueado = faltaTexto || faltanMenciones || crear.isPending;
 
@@ -55,6 +59,8 @@ const CrearNovedadDialog = ({ abierto, onCerrar }: Props) => {
         await crear.mutateAsync({ tipo: 'general', texto: textoLimpio });
       } else if (tipo === 'personal') {
         await crear.mutateAsync({ tipo: 'personal', texto: textoLimpio, usu_ids: personas });
+      } else if (tipo === 'representante') {
+        await crear.mutateAsync({ tipo: 'representante', texto: textoLimpio, usu_ids: representantes });
       } else {
         await crear.mutateAsync({ tipo: 'alumno', texto: textoLimpio, nino_ids: alumnos });
       }
@@ -75,7 +81,7 @@ const CrearNovedadDialog = ({ abierto, onCerrar }: Props) => {
         </DialogHeader>
 
         <div className="space-y-5">
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2">
             {TIPOS.map((t) => {
               const activo = tipo === t.id;
               const Icono = t.icono;
@@ -100,6 +106,16 @@ const CrearNovedadDialog = ({ abierto, onCerrar }: Props) => {
             <div className="space-y-1.5">
               <h3 className="text-sm font-medium">¿Sobre quién?</h3>
               <SelectorMenciones tipo="personal" seleccionados={personas} onCambio={setPersonas} />
+            </div>
+          )}
+          {tipo === 'representante' && (
+            <div className="space-y-1.5">
+              <h3 className="text-sm font-medium">¿Sobre qué representante(s)?</h3>
+              <SelectorMenciones
+                tipo="representante"
+                seleccionados={representantes}
+                onCambio={setRepresentantes}
+              />
             </div>
           )}
           {tipo === 'alumno' && (

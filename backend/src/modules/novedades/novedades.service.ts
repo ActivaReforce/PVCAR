@@ -17,12 +17,14 @@ import type { CrearInput, FiltrosListar } from './novedades.schemas.js';
  *   - Propietario y Admin ven todas.
  *   - El resto ve las suyas (nov_autor_id = él).
  *   - Con `notificar_mencionado` activo, también ve las de personal que lo
- *     mencionan; con `notificar_representante`, las de alumno sobre sus hijos.
+ *     mencionan; con `notificar_representante`, las de representante que lo
+ *     mencionan y las de alumno sobre sus hijos.
  *   - Las de tipo `general` solo las ve el autor y los globales.
  *
  * Correos:
  *   - Siempre al Para + CC configurado del tipo 'novedades'.
  *   - personal → con `notificar_mencionado`, también a los mencionados.
+ *   - representante → con `notificar_representante`, también a los mencionados.
  *   - alumno   → con `notificar_representante`, también a los representantes.
  */
 
@@ -80,6 +82,7 @@ export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<N
           actorId: actor.usuario.usu_id,
           ninosDelActor,
           verMenciones,
+          verComoRepresentante: verHijos,
         },
   });
   return lista.map((n) => paraActor(actor, n));
@@ -93,6 +96,8 @@ export async function obtener(actor: AuthUser, id: number): Promise<NovedadVista
     const config = await configuracion('novedades');
     let puedeVer = false;
     if (novedad.nov_tipo === 'personal' && config?.notificar_mencionado) {
+      puedeVer = novedad.personas.some((p) => p.id === actor.usuario.usu_id);
+    } else if (novedad.nov_tipo === 'representante' && config?.notificar_representante) {
       puedeVer = novedad.personas.some((p) => p.id === actor.usuario.usu_id);
     } else if (
       novedad.nov_tipo === 'alumno' &&
@@ -111,10 +116,16 @@ export async function obtener(actor: AuthUser, id: number): Promise<NovedadVista
 export async function crear(actor: AuthUser, input: CrearInput): Promise<NovedadVista> {
   // Validar que las menciones existan y estén activas, dentro del alcance.
   if (input.tipo === 'personal') {
-    const existen = await repo.existenUsuariosActivos(input.usu_ids);
-    const faltan = input.usu_ids.filter((id) => !existen.includes(id));
+    const validos = await repo.personalDisponible({ limit: 50, ids: input.usu_ids });
+    const faltan = input.usu_ids.filter((id) => !validos.some((v) => v.usu_id === id));
     if (faltan.length > 0) {
       throw new ApiError(400, `Hay personas que no se pueden mencionar: ${faltan.join(', ')}`);
+    }
+  } else if (input.tipo === 'representante') {
+    const validos = await representantesEnAlcance(actor, { limit: 50, ids: input.usu_ids });
+    const faltan = input.usu_ids.filter((id) => !validos.some((v) => v.usu_id === id));
+    if (faltan.length > 0) {
+      throw new ApiError(400, `Hay representantes que no se pueden mencionar: ${faltan.join(', ')}`);
     }
   } else if (input.tipo === 'alumno') {
     const existen = await repo.existenAlumnosActivos(input.nino_ids);
@@ -164,7 +175,7 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<Novedad
       texto: input.texto,
       autor_id: actor.usuario.usu_id,
     });
-    if (input.tipo === 'personal') {
+    if (input.tipo === 'personal' || input.tipo === 'representante') {
       await repo.ligarPersonas(client, nov_id, input.usu_ids);
     } else if (input.tipo === 'alumno') {
       await repo.ligarAlumnos(client, nov_id, input.nino_ids);
@@ -177,7 +188,8 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<Novedad
         entidadId: nov_id,
         detalle: {
           tipo: input.tipo,
-          personas: input.tipo === 'personal' ? input.usu_ids : undefined,
+          personas:
+            input.tipo === 'personal' || input.tipo === 'representante' ? input.usu_ids : undefined,
           alumnos: input.tipo === 'alumno' ? input.nino_ids : undefined,
         },
       },
@@ -221,15 +233,46 @@ export async function eliminar(actor: AuthUser, id: number): Promise<{ eliminada
 }
 
 /**
- * Personal mencionable. En v1 cualquier usuario activo; el cliente lo
- * confirmó así ("cualquier persona de la plataforma"). Si luego pide
- * restringir por alcance, se aplica aquí.
+ * Personal mencionable: cualquier usuario activo que no sea solo
+ * representante; el cliente lo confirmó así ("cualquier persona de la
+ * plataforma"). Si luego pide restringir por alcance, se aplica aquí.
  */
 export async function personalMencionable(
   _actor: AuthUser,
   opts: { buscar?: string; limit: number },
 ) {
   return repo.personalDisponible(opts);
+}
+
+/**
+ * Representantes mencionables: los de los alumnos que el actor puede
+ * mencionar (mismo alcance que la lista de alumnos). Propietario y Admin,
+ * todos.
+ */
+async function representantesEnAlcance(
+  actor: AuthUser,
+  opts: { buscar?: string; limit: number; ids?: number[] },
+) {
+  const alcance = await alcanceDe(actor.usuario);
+  let ninos: number[] | null = null;
+  if (!alcance.global) {
+    const alumnos = await repo.alumnosDisponibles({
+      limit: 10000,
+      global: false,
+      ninos: alcance.ninos,
+      disciplinas: [...alcance.disciplinas, ...alcance.disciplinasDeHijos],
+      colegios: alcance.colegios,
+    });
+    ninos = alumnos.map((a) => a.nino_id);
+  }
+  return repo.representantesDisponibles({ ...opts, ninos });
+}
+
+export async function representantesMencionables(
+  actor: AuthUser,
+  opts: { buscar?: string; limit: number },
+) {
+  return representantesEnAlcance(actor, opts);
 }
 
 /** Alumnos mencionables dentro del alcance del actor. */
@@ -258,6 +301,8 @@ async function mandarCorreo(novedad: repo.Novedad): Promise<void> {
   const paraExtra: string[] = [];
   if (novedad.nov_tipo === 'personal' && config.notificar_mencionado) {
     paraExtra.push(...(await repo.correosDeUsuarios(novedad.personas.map((p) => p.id))));
+  } else if (novedad.nov_tipo === 'representante' && config.notificar_representante) {
+    paraExtra.push(...(await repo.correosDeUsuarios(novedad.personas.map((p) => p.id))));
   } else if (novedad.nov_tipo === 'alumno' && config.notificar_representante) {
     paraExtra.push(
       ...(await repo.correosDeRepresentantesDe(novedad.alumnos.map((a) => a.id))),
@@ -271,7 +316,7 @@ async function mandarCorreo(novedad: repo.Novedad): Promise<void> {
 
 function asuntoDe(n: repo.Novedad): string {
   if (n.nov_tipo === 'general') return `Nueva novedad general — ${n.autor.usu_nombre}`;
-  if (n.nov_tipo === 'personal') {
+  if (n.nov_tipo === 'personal' || n.nov_tipo === 'representante') {
     const nombres = n.personas.map((p) => p.nombre);
     return `Novedad sobre ${listado(nombres)}`;
   }
@@ -289,11 +334,15 @@ function listado(xs: string[]): string {
 
 function cuerpoDe(n: repo.Novedad): { html: string; texto: string } {
   const fecha = ahoraEc();
-  const tipoTexto =
-    n.nov_tipo === 'general' ? 'General' : n.nov_tipo === 'personal' ? 'Sobre personal' : 'Sobre alumnos';
+  const tipoTexto = {
+    general: 'General',
+    personal: 'Sobre personal',
+    representante: 'Sobre representantes',
+    alumno: 'Sobre alumnos',
+  }[n.nov_tipo];
 
   const mencionesTexto =
-    n.nov_tipo === 'personal'
+    n.nov_tipo === 'personal' || n.nov_tipo === 'representante'
       ? n.personas.map((p) => p.nombre).join(', ')
       : n.nov_tipo === 'alumno'
         ? n.alumnos

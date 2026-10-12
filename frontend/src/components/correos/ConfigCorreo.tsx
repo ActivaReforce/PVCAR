@@ -31,7 +31,7 @@ const AVISOS = [
   },
   {
     campo: 'notificar_representante',
-    texto: 'Las novedades sobre un alumno avisan también al representante',
+    texto: 'Las novedades sobre un alumno o un representante avisan también al representante',
   },
 ] as const;
 

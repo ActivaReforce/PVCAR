@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useAlumnosMencionables, usePersonalMencionable } from '@/hooks/useNovedades';
+import {
+  useAlumnosMencionables,
+  usePersonalMencionable,
+  useRepresentantesMencionables,
+} from '@/hooks/useNovedades';
 
 interface MencionItem {
   id: number;
@@ -10,7 +14,7 @@ interface MencionItem {
 }
 
 interface Props {
-  tipo: 'personal' | 'alumno';
+  tipo: 'personal' | 'representante' | 'alumno';
   seleccionados: number[];
   onCambio: (ids: number[]) => void;
 }
@@ -30,6 +34,7 @@ const SelectorMenciones = ({ tipo, seleccionados, onCambio }: Props) => {
   }, [buscar]);
 
   const personal = usePersonalMencionable(consulta, tipo === 'personal');
+  const representantes = useRepresentantesMencionables(consulta, tipo === 'representante');
   const alumnos = useAlumnosMencionables(consulta, tipo === 'alumno');
 
   const items: MencionItem[] = useMemo(() => {
@@ -40,12 +45,19 @@ const SelectorMenciones = ({ tipo, seleccionados, onCambio }: Props) => {
         detalle: p.rol,
       }));
     }
+    if (tipo === 'representante') {
+      return (representantes.data ?? []).map((r) => ({
+        id: r.usu_id,
+        nombre: r.usu_nombre,
+        detalle: r.hijos ? `Representante de ${r.hijos}` : null,
+      }));
+    }
     return (alumnos.data ?? []).map((a) => ({
       id: a.nino_id,
       nombre: a.nino_nombre,
       detalle: [a.grado, a.col_nombre].filter(Boolean).join(' · ') || null,
     }));
-  }, [tipo, personal.data, alumnos.data]);
+  }, [tipo, personal.data, representantes.data, alumnos.data]);
 
   /** Mantener los seleccionados aunque no estén en el resultado filtrado. */
   const [memoria, setMemoria] = useState<Record<number, MencionItem>>({});
@@ -67,7 +79,7 @@ const SelectorMenciones = ({ tipo, seleccionados, onCambio }: Props) => {
 
   const quitar = (id: number) => onCambio(seleccionados.filter((x) => x !== id));
 
-  const cargando = tipo === 'personal' ? personal.isLoading : alumnos.isLoading;
+  const cargando = { personal, representante: representantes, alumno: alumnos }[tipo].isLoading;
 
   return (
     <div className="space-y-2">
@@ -101,7 +113,9 @@ const SelectorMenciones = ({ tipo, seleccionados, onCambio }: Props) => {
           type="search"
           value={buscar}
           onChange={(e) => setBuscar(e.target.value)}
-          placeholder={tipo === 'personal' ? 'Buscar personal…' : 'Buscar alumno…'}
+          placeholder={
+            { personal: 'Buscar personal…', representante: 'Buscar representante…', alumno: 'Buscar alumno…' }[tipo]
+          }
           className="h-11 pl-9 sm:h-10"
         />
       </div>

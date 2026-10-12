@@ -9,7 +9,7 @@ import { getPool } from '../../config/db.js';
  * consulta por fila.
  */
 
-export type TipoNovedad = 'general' | 'personal' | 'alumno';
+export type TipoNovedad = 'general' | 'personal' | 'representante' | 'alumno';
 
 export interface MencionPersona {
   id: number;
@@ -50,6 +50,8 @@ export interface FiltrosListar {
     ninosDelActor: number[];
     /** Ve las de personal que lo mencionan. */
     verMenciones: boolean;
+    /** Ve las de representante que lo mencionan. */
+    verComoRepresentante: boolean;
   } | null;
   limit: number;
   offset: number;
@@ -132,6 +134,13 @@ export async function listar(filtros: FiltrosListar, client?: PoolClient): Promi
       );
     }
 
+    if (v.verComoRepresentante) {
+      params.push(v.actorId);
+      partes.push(
+        `(n.nov_tipo = 'representante' AND EXISTS (SELECT 1 FROM public.novedad_persona np WHERE np.nov_id = n.nov_id AND np.usu_id = $${params.length}))`,
+      );
+    }
+
     if (v.ninosDelActor.length > 0) {
       params.push(v.ninosDelActor);
       partes.push(
@@ -204,16 +213,28 @@ export async function eliminar(client: PoolClient, nov_id: number): Promise<bool
   return (rowCount ?? 0) > 0;
 }
 
+/** Rol Representante (constants.ROL.REPRESENTANTE); aquí va en el SQL. */
+const ROL_REPRESENTANTE = 4;
+
 /**
- * Personal mencionable: cualquier usuario activo. El alcance se aplica
- * en el servicio (si se filtra por el rol del actor, mejor).
+ * Personal mencionable: usuarios activos con algún rol que no sea
+ * Representante. Quien es personal y además representante sale aquí.
  */
 export async function personalDisponible(opts: {
   buscar?: string;
   limit: number;
+  /** Si se da, solo estos ids (para validar al crear). */
+  ids?: number[];
 }): Promise<Array<{ usu_id: number; usu_nombre: string; usu_correo: string | null; rol: string | null }>> {
-  const params: unknown[] = [];
-  const where: string[] = ['u.est_id = 1'];
+  const params: unknown[] = [ROL_REPRESENTANTE];
+  const where: string[] = [
+    'u.est_id = 1',
+    'EXISTS (SELECT 1 FROM public.usuario_rol ur WHERE ur.usu_id = u.usu_id AND ur.rol_id <> $1)',
+  ];
+  if (opts.ids) {
+    params.push(opts.ids);
+    where.push(`u.usu_id = ANY($${params.length}::int[])`);
+  }
 
   if (opts.buscar) {
     params.push(`%${opts.buscar}%`);
@@ -226,6 +247,54 @@ export async function personalDisponible(opts: {
               FROM public.usuario_rol ur
               JOIN public.rol r ON r.rol_id = ur.rol_id
              WHERE ur.usu_id = u.usu_id) AS rol
+      FROM public.usuario u
+     WHERE ${where.join(' AND ')}
+     ORDER BY u.usu_nombre
+     LIMIT ${opts.limit}
+  `;
+  const { rows } = await getPool().query(sql, params);
+  return rows;
+}
+
+/**
+ * Representantes mencionables: usuarios activos con rol Representante.
+ * Con `ninos`, solo los representantes de esos niños (el alcance lo da el
+ * servicio); sin él, todos (Propietario y Admin).
+ */
+export async function representantesDisponibles(opts: {
+  buscar?: string;
+  limit: number;
+  ninos: number[] | null;
+  ids?: number[];
+}): Promise<Array<{ usu_id: number; usu_nombre: string; usu_correo: string | null; hijos: string | null }>> {
+  if (opts.ninos && opts.ninos.length === 0) return [];
+  const params: unknown[] = [ROL_REPRESENTANTE];
+  const where: string[] = [
+    'u.est_id = 1',
+    'EXISTS (SELECT 1 FROM public.usuario_rol ur WHERE ur.usu_id = u.usu_id AND ur.rol_id = $1)',
+  ];
+  if (opts.ninos) {
+    params.push(opts.ninos);
+    where.push(`EXISTS (SELECT 1 FROM public.padre p JOIN public.nino_padre np ON np.padre_id = p.padre_id
+                     WHERE p.usu_id = u.usu_id AND np.nino_id = ANY($${params.length}::int[]))`);
+  }
+  if (opts.ids) {
+    params.push(opts.ids);
+    where.push(`u.usu_id = ANY($${params.length}::int[])`);
+  }
+  if (opts.buscar) {
+    params.push(`%${opts.buscar}%`);
+    where.push(`u.usu_nombre ILIKE $${params.length}`);
+  }
+
+  // Los hijos ayudan a distinguir a dos representantes con el mismo nombre.
+  const sql = `
+    SELECT u.usu_id, u.usu_nombre, u.usu_correo,
+           (SELECT string_agg(n.nino_nombre, ', ' ORDER BY n.nino_nombre)
+              FROM public.padre p
+              JOIN public.nino_padre np ON np.padre_id = p.padre_id
+              JOIN public.nino n ON n.nino_id = np.nino_id
+             WHERE p.usu_id = u.usu_id AND n.est_id = 1) AS hijos
       FROM public.usuario u
      WHERE ${where.join(' AND ')}
      ORDER BY u.usu_nombre
@@ -337,15 +406,6 @@ export async function correosDeUsuarios(usu_ids: number[]): Promise<string[]> {
     [usu_ids],
   );
   return rows.map((r) => r.correo);
-}
-
-export async function existenUsuariosActivos(ids: number[]): Promise<number[]> {
-  if (ids.length === 0) return [];
-  const { rows } = await getPool().query<{ usu_id: number }>(
-    `SELECT usu_id FROM public.usuario WHERE usu_id = ANY($1::int[]) AND est_id = 1`,
-    [ids],
-  );
-  return rows.map((r) => r.usu_id);
 }
 
 export async function existenAlumnosActivos(ids: number[]): Promise<number[]> {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const TIPOS = ['general', 'personal', 'alumno'] as const;
+export const TIPOS = ['general', 'personal', 'representante', 'alumno'] as const;
 
 export const idParamSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -43,6 +43,15 @@ export const crearSchema = z.discriminatedUnion('tipo', [
     usu_ids: z
       .array(z.number().int().positive())
       .min(1, 'Elige al menos a una persona')
+      .max(50)
+      .transform((xs) => [...new Set(xs)]),
+  }),
+  z.object({
+    tipo: z.literal('representante'),
+    texto,
+    usu_ids: z
+      .array(z.number().int().positive())
+      .min(1, 'Elige al menos a un representante')
       .max(50)
       .transform((xs) => [...new Set(xs)]),
   }),

@@ -4,7 +4,7 @@ import { api } from '@/lib/api';
  * Cliente de Novedades (punto 8 del Roadmap, 2026-10-09).
  */
 
-export type TipoNovedad = 'general' | 'personal' | 'alumno';
+export type TipoNovedad = 'general' | 'personal' | 'representante' | 'alumno';
 
 export interface MencionPersona {
   id: number;
@@ -46,6 +46,7 @@ export interface FiltrosListar {
 export type CrearNovedadInput =
   | { tipo: 'general'; texto: string }
   | { tipo: 'personal'; texto: string; usu_ids: number[] }
+  | { tipo: 'representante'; texto: string; usu_ids: number[] }
   | { tipo: 'alumno'; texto: string; nino_ids: number[] };
 
 export interface PersonaMencionable {
@@ -53,6 +54,14 @@ export interface PersonaMencionable {
   usu_nombre: string;
   usu_correo: string | null;
   rol: string | null;
+}
+
+export interface RepresentanteMencionable {
+  usu_id: number;
+  usu_nombre: string;
+  usu_correo: string | null;
+  /** Nombres de sus hijos activos, para distinguir homónimos. */
+  hijos: string | null;
 }
 
 export interface AlumnoMencionable {
@@ -79,6 +88,10 @@ export const novedadesApi = {
   eliminar: (id: number) => api.delete<{ eliminada: true }>(`/novedades/${id}`),
   personal: (opts: { buscar?: string; limit?: number } = {}) =>
     api.get<PersonaMencionable[]>(`/novedades/personal-mencionable${queryStringImpl(opts)}`),
+  representantes: (opts: { buscar?: string; limit?: number } = {}) =>
+    api.get<RepresentanteMencionable[]>(
+      `/novedades/representantes-mencionables${queryStringImpl(opts)}`,
+    ),
   alumnos: (opts: { buscar?: string; limit?: number } = {}) =>
     api.get<AlumnoMencionable[]>(`/novedades/alumnos-mencionables${queryStringImpl(opts)}`),
 };

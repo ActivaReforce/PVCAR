@@ -38,7 +38,7 @@ El backend las rechaza con 400 aunque lleguen por otro lado (`permisos.service.t
 - **Encuestas (gestión):** el representante no entra aunque tenga la casilla (`requirePersonal`).
 - **Permisos:** guardar exige además ser Propietario o Admin. Al Propietario no se le pueden quitar Ver ni Editar de Permisos: sin ellas nadie podría volver a repartirlos.
 - **Correos** (Configuración de Inscripciones): solo Propietario, sin casilla. El de Novedades lo abre la casilla Editar de Novedades (`0029`: Propietario y Admin).
-- **Novedades:** sin Eliminar nadie borra, ni siquiera la suya: lo enviado se queda. Propietario y Admin ven todas; el resto, las suyas, las de personal que lo mencionan (si está activo el aviso al mencionado) y, si es representante, las de sus hijos (si está activo el aviso al representante). Las generales solo las ven su autor, Propietario y Admin.
+- **Novedades:** sin Eliminar nadie borra, ni siquiera la suya: lo enviado se queda. Propietario y Admin ven todas; el resto, las suyas, las de personal que lo mencionan (si está activo el aviso al mencionado) y, si es representante, las de representantes que lo mencionan y las de sus hijos (si está activo el aviso al representante). Al escribir, Personal lista a quien tiene algún rol que no sea Representante; Representantes, solo los de alumnos de su alcance. Las generales solo las ven su autor, Propietario y Admin.
 
 ## Qué cambió en la 0026
 
