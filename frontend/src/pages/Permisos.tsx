@@ -126,7 +126,7 @@ const AYUDA: Record<string, { acciones: Partial<Record<Accion, string>>; nota?: 
       ver: 'las suyas y las que le tocan.',
       crear: 'escribir una novedad.',
       editar: 'pestaña Configuración (correo y avisos).',
-      eliminar: 'borrar novedades ajenas que ve.',
+      eliminar: 'borrar novedades ajenas que ve y ver quién las escribió.',
     },
     nota: 'El autor siempre puede borrar la suya. Propietario y Admin ven todas.',
   },

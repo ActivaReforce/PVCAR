@@ -19,7 +19,7 @@ Vigente desde la migración `0026_permisos_crud.sql` (2026-10-07). Sale de las r
 | Asistencia de personal | Consultar listas | — | Pasar lista | — |
 | Encuestas | Lista, vista previa y resultados (solo de las familias de su alcance) | Crear | Preguntas, finalizar, publicar, volver a borrador | Borrar |
 | Inscripciones | Lista (el representante, solo las suyas) | *(las crea el representante desde el formulario)* | Aprobar, documentos, precios, abrir y cerrar | Rechazar |
-| Novedades | Las suyas y las que le tocan (ver abajo) | Escribir una novedad | Pestaña Configuración: correo y avisos | Borrar novedades ajenas que ve |
+| Novedades | Las suyas y las que le tocan (ver abajo) | Escribir una novedad | Pestaña Configuración: correo y avisos | Borrar novedades ajenas que ve y ver quién escribió cada una |
 | Reportes | Ver, gráficas y Data anterior | Exportar a Excel | — | — |
 | Perfil | Ver y editar el propio perfil | — | — | — |
 | Permisos | Ver la matriz | — | Guardar la matriz | — |

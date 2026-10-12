@@ -30,11 +30,31 @@ function esGlobal(actor: AuthUser): boolean {
   return actor.usuario.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id));
 }
 
+/**
+ * Quién escribió una novedad solo lo ve quien tiene Eliminar en Novedades
+ * (decidido por el cliente el 2026-10-12). Al resto se le quita el nombre y
+ * el correo aquí, no solo en la pantalla. El id se queda: con él la pantalla
+ * reconoce las propias para dejar borrarlas. El correo de aviso no cambia.
+ */
+function verAutor(actor: AuthUser): boolean {
+  return actor.permisos.some((p) => p.modulo === 'novedades' && p.accion === 'eliminar');
+}
+
+/** Lo que sale por el API: el autor puede llegar sin nombre ni correo. */
+export type NovedadVista = Omit<repo.Novedad, 'autor'> & {
+  autor: { usu_id: number; usu_nombre: string | null; usu_correo: string | null };
+};
+
+function paraActor(actor: AuthUser, n: repo.Novedad): NovedadVista {
+  if (verAutor(actor)) return n;
+  return { ...n, autor: { usu_id: n.autor.usu_id, usu_nombre: null, usu_correo: null } };
+}
+
 function esRepresentante(actor: AuthUser): boolean {
   return actor.usuario.roles.some((r) => r.rol_id === ROL.REPRESENTANTE);
 }
 
-export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<repo.Novedad[]> {
+export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<NovedadVista[]> {
   const global = esGlobal(actor);
   const config = await configuracion('novedades');
   const verMenciones = config?.notificar_mencionado ?? false;
@@ -44,7 +64,7 @@ export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<r
     ? await repo.ninosDelRepresentante(actor.usuario.usu_id)
     : [];
 
-  return repo.listar({
+  const lista = await repo.listar({
     tipo: filtros.tipo,
     autor: filtros.autor,
     persona: filtros.persona,
@@ -62,9 +82,10 @@ export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<r
           verMenciones,
         },
   });
+  return lista.map((n) => paraActor(actor, n));
 }
 
-export async function obtener(actor: AuthUser, id: number): Promise<repo.Novedad> {
+export async function obtener(actor: AuthUser, id: number): Promise<NovedadVista> {
   const novedad = await repo.obtener(id);
   if (!novedad) throw new ApiError(404, 'La novedad no existe');
 
@@ -84,10 +105,10 @@ export async function obtener(actor: AuthUser, id: number): Promise<repo.Novedad
     if (!puedeVer) throw new ApiError(403, 'No puedes ver esta novedad');
   }
 
-  return novedad;
+  return paraActor(actor, novedad);
 }
 
-export async function crear(actor: AuthUser, input: CrearInput): Promise<repo.Novedad> {
+export async function crear(actor: AuthUser, input: CrearInput): Promise<NovedadVista> {
   // Validar que las menciones existan y estén activas, dentro del alcance.
   if (input.tipo === 'personal') {
     const existen = await repo.existenUsuariosActivos(input.usu_ids);
@@ -169,7 +190,7 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<repo.No
   if (!novedad) throw new ApiError(500, 'La novedad se guardó pero no se puede releer');
 
   void mandarCorreo(novedad);
-  return novedad;
+  return paraActor(actor, novedad);
 }
 
 export async function eliminar(actor: AuthUser, id: number): Promise<{ eliminada: true }> {

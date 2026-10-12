@@ -227,9 +227,12 @@ const Novedades = () => {
                       </span>
                     </div>
                     <p className="whitespace-pre-wrap text-sm text-foreground">{n.nov_texto}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Por <strong className="font-medium text-foreground">{n.autor.usu_nombre}</strong>
-                    </p>
+                    {/* Llega en null a quien no tiene Eliminar: el backend lo oculta. */}
+                    {n.autor.usu_nombre && (
+                      <p className="text-xs text-muted-foreground">
+                        Por <strong className="font-medium text-foreground">{n.autor.usu_nombre}</strong>
+                      </p>
+                    )}
                     {n.nov_tipo === 'personal' && n.personas.length > 0 && (
                       <p className="text-xs text-muted-foreground">
                         <span className="font-medium">Sobre:</span>{' '}
