@@ -11,8 +11,6 @@ backend/    Express + TypeScript      → Railway (root dir: raíz del repo)
 frontend/   Vite + React + TypeScript → Vercel  (root dir: frontend)
 db/
   migrations/  SQL versionado — fuente de verdad del schema
-  checks/      consultas de verificación del schema
-  scripts/     utilidades de base de datos
 docs/       especificación y pruebas de cada módulo, permisos, plantillas de correo
 ```
 

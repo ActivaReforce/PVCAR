@@ -6,9 +6,9 @@ import { getPool } from '../../config/db.js';
  *
  * inscripciones        — aprobada: al representante, con copias.
  * inscripciones_aviso  — nueva: a la lista fija `para` del equipo.
- * novedades            — nuevas novedades: a la lista fija `para` + CC. Si
- *                        `notificar_mencionado` está en true, se añaden
- *                        también los mencionados (personal) y los
+ * novedades            — nuevas novedades: a la lista fija `para` + CC. Con
+ *                        `notificar_mencionado` se añaden los mencionados
+ *                        (personal); con `notificar_representante`, los
  *                        representantes (alumno).
  */
 export const TIPOS_CORREO = ['inscripciones', 'inscripciones_aviso', 'novedades'] as const;
@@ -22,8 +22,10 @@ export interface ConfigCorreo {
   para: string[];
   cc: string[];
   responder_a: string | null;
-  /** Solo para 'novedades': ¿avisar también al mencionado o representante? */
+  /** Solo para 'novedades': las de personal avisan también al mencionado. */
   notificar_mencionado: boolean;
+  /** Solo para 'novedades': las de alumno avisan también al representante. */
+  notificar_representante: boolean;
 }
 
 export async function obtenerConfig(
@@ -33,7 +35,8 @@ export async function obtenerConfig(
   const { rows } = await (client ?? getPool()).query<ConfigCorreo>(
     `SELECT corcfg_tipo AS tipo, corcfg_nombre AS nombre, corcfg_usuario AS usuario,
             corcfg_para AS para, corcfg_cc AS cc, corcfg_responder_a AS responder_a,
-            corcfg_notificar_mencionado AS notificar_mencionado
+            corcfg_notificar_mencionado AS notificar_mencionado,
+            corcfg_notificar_representante AS notificar_representante
        FROM public.correo_config
       WHERE corcfg_tipo = $1`,
     [tipo],
@@ -46,9 +49,10 @@ export async function guardarConfig(client: PoolClient, c: ConfigCorreo): Promis
     `UPDATE public.correo_config
         SET corcfg_nombre = $2, corcfg_usuario = $3, corcfg_para = $4, corcfg_cc = $5,
             corcfg_responder_a = $6, corcfg_notificar_mencionado = $7,
-            corcfg_fecha_modificacion = now()
+            corcfg_notificar_representante = $8, corcfg_fecha_modificacion = now()
       WHERE corcfg_tipo = $1`,
-    [c.tipo, c.nombre, c.usuario, c.para, c.cc, c.responder_a, c.notificar_mencionado],
+    [c.tipo, c.nombre, c.usuario, c.para, c.cc, c.responder_a, c.notificar_mencionado,
+     c.notificar_representante],
   );
   return (rowCount ?? 0) > 0;
 }

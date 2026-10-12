@@ -18,13 +18,24 @@ interface Props {
   /** Aviso interno: va a una lista fija de destinatarios ("Para"). */
   conPara?: boolean;
   /**
-   * Enseña el switch "notificar también al mencionado y al representante".
-   * Solo tiene sentido para 'novedades'.
+   * Enseña "Notificar también": al mencionado (novedades sobre personal) y
+   * al representante (novedades sobre un alumno). Solo para 'novedades'.
    */
-  conNotificarMencionado?: boolean;
-  /** Texto corto que explica qué hace el switch. */
-  textoNotificarMencionado?: string;
+  conAvisos?: boolean;
 }
+
+const AVISOS = [
+  {
+    campo: 'notificar_mencionado',
+    texto: 'Las novedades sobre personal avisan también al mencionado',
+  },
+  {
+    campo: 'notificar_representante',
+    texto: 'Las novedades sobre un alumno avisan también al representante',
+  },
+] as const;
+
+type Avisos = Record<(typeof AVISOS)[number]['campo'], boolean>;
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USUARIO = /^[a-z0-9][a-z0-9._-]{0,63}$/;
@@ -47,8 +58,7 @@ const ConfigCorreo = ({
   titulo,
   descripcion,
   conPara = false,
-  conNotificarMencionado = false,
-  textoNotificarMencionado,
+  conAvisos = false,
 }: Props) => {
   const { user } = useAuth();
   const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
@@ -60,7 +70,10 @@ const ConfigCorreo = ({
   const [destinatarios, setDestinatarios] = useState('');
   const [copias, setCopias] = useState('');
   const [responderA, setResponderA] = useState('');
-  const [notificar, setNotificar] = useState(false);
+  const [avisos, setAvisos] = useState<Avisos>({
+    notificar_mencionado: false,
+    notificar_representante: false,
+  });
 
   const datos = config.data;
   useEffect(() => {
@@ -70,7 +83,10 @@ const ConfigCorreo = ({
     setDestinatarios(datos.para.join('\n'));
     setCopias(datos.cc.join('\n'));
     setResponderA(datos.responder_a ?? '');
-    setNotificar(datos.notificar_mencionado);
+    setAvisos({
+      notificar_mencionado: datos.notificar_mencionado,
+      notificar_representante: datos.notificar_representante,
+    });
   }, [datos]);
 
   if (!esPropietario || !datos) return null;
@@ -98,7 +114,7 @@ const ConfigCorreo = ({
     para.join('\n') !== datos.para.join('\n') ||
     cc.join('\n') !== datos.cc.join('\n') ||
     responder !== (datos.responder_a ?? '') ||
-    (conNotificarMencionado && notificar !== datos.notificar_mencionado);
+    (conAvisos && AVISOS.some(({ campo }) => avisos[campo] !== datos[campo]));
 
   return (
     <TarjetaConfig titulo={titulo} descripcion={descripcion}>
@@ -185,26 +201,27 @@ const ConfigCorreo = ({
           </p>
         </div>
 
-        {conNotificarMencionado && (
-          <div className="flex items-start justify-between gap-3 rounded-md border p-3">
-            <div className="min-w-0 flex-1">
-              <Label htmlFor={`correo-notificar-${tipo}`} className="cursor-pointer">
-                Notificar también al mencionado y al representante
-              </Label>
-              {textoNotificarMencionado && (
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {textoNotificarMencionado}
-                </p>
-              )}
-            </div>
-            <input
-              id={`correo-notificar-${tipo}`}
-              type="checkbox"
-              checked={notificar}
-              onChange={(e) => setNotificar(e.target.checked)}
-              className="mt-1 h-5 w-5 flex-shrink-0 accent-primary"
-            />
-          </div>
+        {conAvisos && (
+          <fieldset className="space-y-2 rounded-md border p-3">
+            <legend className="px-1 text-sm font-medium">Notificar también</legend>
+            {AVISOS.map(({ campo, texto }) => (
+              <div key={campo} className="flex items-start justify-between gap-3">
+                <Label
+                  htmlFor={`correo-${campo}-${tipo}`}
+                  className="min-w-0 flex-1 cursor-pointer font-normal leading-snug"
+                >
+                  {texto}
+                </Label>
+                <input
+                  id={`correo-${campo}-${tipo}`}
+                  type="checkbox"
+                  checked={avisos[campo]}
+                  onChange={(e) => setAvisos((a) => ({ ...a, [campo]: e.target.checked }))}
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 accent-primary"
+                />
+              </div>
+            ))}
+          </fieldset>
         )}
       </div>
 
@@ -226,7 +243,8 @@ const ConfigCorreo = ({
             para,
             cc,
             responder_a: responder || null,
-            notificar_mencionado: conNotificarMencionado ? notificar : false,
+            notificar_mencionado: conAvisos && avisos.notificar_mencionado,
+            notificar_representante: conAvisos && avisos.notificar_representante,
           })
         }
       >

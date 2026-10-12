@@ -12,6 +12,7 @@ let fila: Record<string, unknown> | null = {
   cc: ['gerencia@activareforce.com'],
   responder_a: 'info@activareforce.com',
   notificar_mencionado: false,
+  notificar_representante: false,
 };
 const actualizaciones: unknown[][] = [];
 
@@ -50,6 +51,7 @@ const entrada = {
   cc: ['gerencia@activareforce.com'],
   responder_a: null,
   notificar_mencionado: false,
+  notificar_representante: false,
 };
 
 beforeEach(() => {

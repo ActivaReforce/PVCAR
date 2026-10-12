@@ -118,8 +118,7 @@ const Novedades = () => {
         titulo="Correo de Novedades"
         descripcion="Quién recibe el aviso cuando se escribe una novedad."
         conPara
-        conNotificarMencionado
-        textoNotificarMencionado="Si está activo, las novedades sobre personal avisan también al mencionado, y las de alumno al representante."
+        conAvisos
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_200px]">

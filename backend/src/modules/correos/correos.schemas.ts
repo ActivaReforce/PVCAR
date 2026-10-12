@@ -26,6 +26,7 @@ export const configCorreoSchema = z.object({
   responder_a: correo.nullable().or(z.literal('').transform(() => null)),
   /** Solo cuenta en 'novedades'; en el resto se guarda como false. */
   notificar_mencionado: z.boolean().default(false),
+  notificar_representante: z.boolean().default(false),
 });
 
 export type ConfigCorreoInput = z.infer<typeof configCorreoSchema>;

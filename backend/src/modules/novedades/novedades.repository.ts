@@ -46,8 +46,10 @@ export interface FiltrosListar {
   /** `null` → ve todas (Propietario / Admin). */
   visibilidad: {
     actorId: number;
+    /** Hijos del actor; vacío si no es representante o el aviso está apagado. */
     ninosDelActor: number[];
-    verSobreMi: boolean;
+    /** Ve las de personal que lo mencionan. */
+    verMenciones: boolean;
   } | null;
   limit: number;
   offset: number;
@@ -123,18 +125,18 @@ export async function listar(filtros: FiltrosListar, client?: PoolClient): Promi
     params.push(v.actorId);
     partes.push(`n.nov_autor_id = $${params.length}`);
 
-    if (v.verSobreMi) {
+    if (v.verMenciones) {
       params.push(v.actorId);
       partes.push(
         `(n.nov_tipo = 'personal' AND EXISTS (SELECT 1 FROM public.novedad_persona np WHERE np.nov_id = n.nov_id AND np.usu_id = $${params.length}))`,
       );
+    }
 
-      if (v.ninosDelActor.length > 0) {
-        params.push(v.ninosDelActor);
-        partes.push(
-          `(n.nov_tipo = 'alumno' AND EXISTS (SELECT 1 FROM public.novedad_alumno na WHERE na.nov_id = n.nov_id AND na.nino_id = ANY($${params.length}::int[])))`,
-        );
-      }
+    if (v.ninosDelActor.length > 0) {
+      params.push(v.ninosDelActor);
+      partes.push(
+        `(n.nov_tipo = 'alumno' AND EXISTS (SELECT 1 FROM public.novedad_alumno na WHERE na.nov_id = n.nov_id AND na.nino_id = ANY($${params.length}::int[])))`,
+      );
     }
 
     where.push(`(${partes.join(' OR ')})`);

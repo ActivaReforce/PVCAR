@@ -1,8 +1,8 @@
 # Contexto del workspace — Activa Reforce / PVCAR
 
-> **Vive en el repo** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo. Se borra del repo al cerrar el proyecto (Fase 17). Las rutas `PVCAR/...` son la raíz de este repo; `SQL/`, `Bitacora.md`, `Cosas/`, `Contratos/` y `.mcp.json` son de la carpeta de trabajo y no están aquí. En otro equipo hay que recrear `.mcp.json` (dos servidores Supabase `--read-only`) y los `.env`, que nunca se suben.
+> **Vive en el repo** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo. Se borra del repo al cerrar el proyecto (Fase 17). Las rutas `PVCAR/...` son la raíz de este repo; `SQL/`, `Cosas/`, `Contratos/` y `.mcp.json` son de la carpeta de trabajo y no están aquí. En otro equipo hay que recrear `.mcp.json` (dos servidores Supabase `--read-only`) y los `.env`, que nunca se suben.
 
-**Lee `PVCAR/Roadmap.md` antes de proponer o ejecutar cualquier cosa** (el `Roadmap.md` de la raíz es solo un aviso). Es el documento maestro: estado de cada fase, reglas transversales, especificación funcional de cada módulo y anexos de RLS e infraestructura. El historial de sesiones viejas está en `Bitacora.md`.
+**Lee `PVCAR/Roadmap.md` antes de proponer o ejecutar cualquier cosa** (el `Roadmap.md` de la raíz es solo un aviso). Es el documento maestro: estado de cada fase, reglas transversales, especificación funcional de cada módulo y anexos de RLS e infraestructura.
 
 ## Qué es esto
 
@@ -28,7 +28,6 @@ Los dashboards de **Vercel, Railway, Supabase y Cloudflare los opera el cliente*
 |---|---|
 | `PVCAR/` | Clon de trabajo del monorepo (remoto `ActivaReforce/PVCAR`). Aquí se trabaja. |
 | `PVCAR/Roadmap.md` | Documento maestro. Fuente de verdad. |
-| `Bitacora.md` | Archivo histórico: cómo se cerró cada fase 0–5 y los cortes de sesión viejos. |
 | `SQL/` | **Canal de entrega:** archivos que el cliente ejecuta a mano en el SQL Editor de Supabase, con `ORDEN.md`. Copia de `PVCAR/db/migrations/`, que es la fuente de verdad. Si se cambia la migración, hay que recopiarla. |
 | `Cosas/`, `Contratos/` | Contrato, RUC, assets de marca, documentos de inscripción. |
 

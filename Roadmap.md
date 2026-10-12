@@ -6,9 +6,7 @@
 >
 > **La plataforma anterior se dio de baja el 2026-10-12:** su base, su hosting, su repo y su respaldo local están borrados. De ella solo quedan los datos del esquema `archivo`, en solo lectura, en Reportes → Data anterior.
 
-Este documento sustituye a `Plan.md`. El historial de sesiones anteriores quedó en `Bitacora.md`.
-
-> **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/`, `Bitacora.md` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
+> **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
 
 **Corte de este documento: 2026-10-12 (lanzamiento hecho en `activareforce.com` y plataforma anterior borrada; siguiente: probar Novedades en `dev` y punto 9, aviso automático de ausencia).**
 
@@ -83,6 +81,8 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 - **PR #14** (asistencia más fluida) y **PR #15** (Novedades) en `main`. `0027` aplicada en dev y prod. En producción, `/novedades` enseña **"En desarrollo"** hasta que el cliente apruebe el módulo en `dev`: `NovedadesEnDesarrollo.tsx`, elegida en `App.tsx` cuando el build apunta al backend de producción. Al aprobarlo se borran las dos cosas.
 - **Lanzamiento (Fase 16):** `activareforce.com` en Vercel Production, `www` redirige a la raíz (308), DNS en Cloudflare. `FRONTEND_ORIGIN=https://activareforce.com` en Railway `production` (es el origen canónico de los enlaces de correo). Site URL `https://activareforce.com` y Redirect URL `https://activareforce.com/reset-password` en Supabase `PVCAR`. Verificado: HTTPS, redirección, CORS y login. `pvcar.vercel.app` ya no responde.
 - **Plataforma anterior dada de baja:** el cliente borró su hosting, su Supabase (y la cuenta) y su repo. Claude borró la copia local del código, `_ref/`, el respaldo local y el servidor MCP que apuntaba a ella.
+
+**Novedades, dos avisos (2026-10-12):** el switch único de "notificar también" se partió en dos casillas: las novedades sobre personal avisan al mencionado (y él las ve) y las de alumno avisan al representante (y él las ve). Migración `0028_novedades_dos_avisos.sql`.
 
 **Al retomar — lista de trabajo, uno por uno:**
 
@@ -347,8 +347,6 @@ Cada flecha es una dependencia real: Estudiantes necesita disciplinas para inscr
 | **3** | Backend Express+TS en Railway, dos ambientes, `/api/v1/health` con `db:"ok"`, servicios en `us-east4` (Virginia) para no pagar 55 ms por consulta contra Ohio. |
 | **4** | Frontend en Vercel, Production←`main` y Preview fijo←`dev`, env vars por ambiente, `lib/api.ts` con JWT y logout en 401. |
 | **5** | Autenticación real: login por el backend (un viaje trae sesión + usuario + roles + permisos), logout global, reset por correo con pantalla `/reset-password`, cambio de contraseña desde Perfil, rate limit por IP+cuenta. 12/12 pruebas. |
-
-Detalle histórico completo en `Bitacora.md`.
 
 ---
 
@@ -995,4 +993,4 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 | Dar un módulo por listo sin probarlo | La sección 3.5. Ya costó trece arreglos en la Fase 6 |
 | Free tier de Supabase sin backups automáticos | **Prod ya tiene datos reales desde el 2026-10-12.** `pg_dump` programado o plan Pro, cuanto antes |
 | PAT en texto plano en `.mcp.json` | Decisión cerrada del cliente; se rotan en la Fase 17 |
-| Repo público | Decisión cerrada; pasa a privado en la Fase 17. `Bitacora.md` no vive en el repo; este documento sí, hasta la Fase 17 |
+| Repo público | Decisión cerrada; pasa a privado en la Fase 17. este documento vive en el repo hasta la Fase 17 |

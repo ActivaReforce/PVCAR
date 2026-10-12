@@ -16,15 +16,14 @@ import type { CrearInput, FiltrosListar } from './novedades.schemas.js';
  * Reglas de visibilidad:
  *   - Propietario y Admin ven todas.
  *   - El resto ve las suyas (nov_autor_id = él).
- *   - Si el switch `notificar_mencionado` está activo, también ve las que
- *     lo mencionan (personal) o las que mencionan a sus hijos (alumno).
+ *   - Con `notificar_mencionado` activo, también ve las de personal que lo
+ *     mencionan; con `notificar_representante`, las de alumno sobre sus hijos.
  *   - Las de tipo `general` solo las ve el autor y los globales.
  *
  * Correos:
  *   - Siempre al Para + CC configurado del tipo 'novedades'.
- *   - Si el switch está activo:
- *       personal → se añaden los correos de los usuarios mencionados.
- *       alumno   → se añaden los correos de los representantes.
+ *   - personal → con `notificar_mencionado`, también a los mencionados.
+ *   - alumno   → con `notificar_representante`, también a los representantes.
  */
 
 function esGlobal(actor: AuthUser): boolean {
@@ -38,9 +37,10 @@ function esRepresentante(actor: AuthUser): boolean {
 export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<repo.Novedad[]> {
   const global = esGlobal(actor);
   const config = await configuracion('novedades');
-  const verSobreMi = config?.notificar_mencionado ?? false;
+  const verMenciones = config?.notificar_mencionado ?? false;
+  const verHijos = config?.notificar_representante ?? false;
 
-  const ninosDelActor = verSobreMi && esRepresentante(actor)
+  const ninosDelActor = verHijos && esRepresentante(actor)
     ? await repo.ninosDelRepresentante(actor.usuario.usu_id)
     : [];
 
@@ -59,7 +59,7 @@ export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<r
       : {
           actorId: actor.usuario.usu_id,
           ninosDelActor,
-          verSobreMi,
+          verMenciones,
         },
   });
 }
@@ -70,15 +70,16 @@ export async function obtener(actor: AuthUser, id: number): Promise<repo.Novedad
 
   if (!esGlobal(actor) && novedad.autor.usu_id !== actor.usuario.usu_id) {
     const config = await configuracion('novedades');
-    const switchOn = config?.notificar_mencionado ?? false;
     let puedeVer = false;
-    if (switchOn) {
-      if (novedad.nov_tipo === 'personal') {
-        puedeVer = novedad.personas.some((p) => p.id === actor.usuario.usu_id);
-      } else if (novedad.nov_tipo === 'alumno' && esRepresentante(actor)) {
-        const mios = new Set(await repo.ninosDelRepresentante(actor.usuario.usu_id));
-        puedeVer = novedad.alumnos.some((a) => mios.has(a.id));
-      }
+    if (novedad.nov_tipo === 'personal' && config?.notificar_mencionado) {
+      puedeVer = novedad.personas.some((p) => p.id === actor.usuario.usu_id);
+    } else if (
+      novedad.nov_tipo === 'alumno' &&
+      config?.notificar_representante &&
+      esRepresentante(actor)
+    ) {
+      const mios = new Set(await repo.ninosDelRepresentante(actor.usuario.usu_id));
+      puedeVer = novedad.alumnos.some((a) => mios.has(a.id));
     }
     if (!puedeVer) throw new ApiError(403, 'No puedes ver esta novedad');
   }
@@ -236,14 +237,12 @@ async function mandarCorreo(novedad: repo.Novedad): Promise<void> {
   if (!config) return;
 
   const paraExtra: string[] = [];
-  if (config.notificar_mencionado) {
-    if (novedad.nov_tipo === 'personal') {
-      const correos = await repo.correosDeUsuarios(novedad.personas.map((p) => p.id));
-      paraExtra.push(...correos);
-    } else if (novedad.nov_tipo === 'alumno') {
-      const correos = await repo.correosDeRepresentantesDe(novedad.alumnos.map((a) => a.id));
-      paraExtra.push(...correos);
-    }
+  if (novedad.nov_tipo === 'personal' && config.notificar_mencionado) {
+    paraExtra.push(...(await repo.correosDeUsuarios(novedad.personas.map((p) => p.id))));
+  } else if (novedad.nov_tipo === 'alumno' && config.notificar_representante) {
+    paraExtra.push(
+      ...(await repo.correosDeRepresentantesDe(novedad.alumnos.map((a) => a.id))),
+    );
   }
 
   const asunto = asuntoDe(novedad);

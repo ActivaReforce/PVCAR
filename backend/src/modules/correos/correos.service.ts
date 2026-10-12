@@ -18,7 +18,7 @@ import type { ConfigCorreoInput } from './correos.schemas.js';
 /** Tipos que van a una lista fija de destinatarios (avisos internos). */
 export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = ['inscripciones_aviso', 'novedades'];
 
-/** Tipos que usan el switch `notificar_mencionado`. */
+/** Tipos que usan los switches `notificar_mencionado` y `notificar_representante`. */
 export const TIPOS_CON_MENCIONADO: readonly repo.TipoCorreo[] = ['novedades'];
 
 function exigirPropietario(actor: AuthUser): void {
@@ -51,10 +51,14 @@ export async function guardar(
     // Solo el aviso interno tiene destinatarios fijos: en el resto el
     // destinatario es la persona del caso (el representante).
     const para = TIPOS_CON_PARA.includes(tipo) ? input.para : [];
-    const notificar_mencionado = TIPOS_CON_MENCIONADO.includes(tipo)
-      ? input.notificar_mencionado
-      : false;
-    await repo.guardarConfig(client, { tipo, ...input, para, notificar_mencionado });
+    const conAvisos = TIPOS_CON_MENCIONADO.includes(tipo);
+    await repo.guardarConfig(client, {
+      tipo,
+      ...input,
+      para,
+      notificar_mencionado: conAvisos && input.notificar_mencionado,
+      notificar_representante: conAvisos && input.notificar_representante,
+    });
     await auditar(
       {
         actor,
