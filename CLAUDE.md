@@ -1,6 +1,6 @@
 # Contexto del workspace — Activa Reforce / PVCAR
 
-> **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo. Se borra del repo al cerrar el proyecto (Fase 17). Las rutas `PVCAR/...` son la raíz de este repo; `SQL/`, `Backup_bd/`, `Bitacora.md`, `activa-forge-login/`, `Cosas/`, `_ref/` y `.mcp.json` son de la carpeta de trabajo y no están aquí. En otro equipo hay que recrear `.mcp.json` (tres servidores Supabase `--read-only`) y los `.env`, que nunca se suben.
+> **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo. Se borra del repo al cerrar el proyecto (Fase 17). Las rutas `PVCAR/...` son la raíz de este repo; `SQL/`, `Backup_bd/`, `Bitacora.md`, `Cosas/`, `_ref/` y `.mcp.json` son de la carpeta de trabajo y no están aquí. En otro equipo hay que recrear `.mcp.json` (dos servidores Supabase `--read-only`) y los `.env`, que nunca se suben.
 
 **Lee `PVCAR/Roadmap.md` antes de proponer o ejecutar cualquier cosa** (desde el 2026-10-07 vive en el repo; el `Roadmap.md` de la raíz es solo un aviso). Toda mención a `Roadmap.md` en este archivo se refiere a ese. Es el documento maestro (17 fases, reglas transversales, especificación funcional de cada módulo, anexos de autenticación, RLS e infraestructura). Sustituye a `Plan.md`, que quedó archivado entero en `Bitacora.md`.
 
@@ -14,8 +14,8 @@ Los dashboards de **Vercel, Railway y Supabase los opera el cliente**; Claude en
 
 ## Reglas duras
 
-1. **`activa-forge-login/` es el sistema en producción. No se modifica, no se despliega, no se borra hasta la Fase 17.** Sirve solo como referencia de código.
-2. **Nunca escribir en ninguna Supabase.** Todo MCP de Supabase va `--read-only` y así se queda; las consultas con `psql` también. Los cambios de schema los aplica el cliente a mano desde `SQL/`. `.mcp.json` tiene tres servidores, los tres `--read-only` y con `--project-ref` fijo: `pvcar_dev` (`vjwlwjqaalppzmycbalw`), `pvcar_prod` (`dahsgmpubbofrefvseir`) y `supabase_vieja` (`wfyytrdhqtspapxaikoh`). Las banderas no se tocan.
+1. **El sistema viejo ya no existe (2026-10-12).** El cliente borró el proyecto de Vercel de Flowward, la Supabase `wfyytrdhqtspapxaikoh`, el repo `flowward/activa-forge-login` y la copia local. Lo único que queda es el respaldo de `Backup_bd/` y el esquema `archivo`.
+2. **Nunca escribir en ninguna Supabase.** Todo MCP de Supabase va `--read-only` y así se queda; las consultas con `psql` también. Los cambios de schema los aplica el cliente a mano desde `SQL/`. `.mcp.json` tiene dos servidores, los dos `--read-only` y con `--project-ref` fijo: `pvcar_dev` (`vjwlwjqaalppzmycbalw`) y `pvcar_prod` (`dahsgmpubbofrefvseir`). (`supabase_vieja` se quitó el 2026-10-12 al borrarse esa base.) Las banderas no se tocan.
 3. **Ningún secreto en disco fuera de `.env` gitignoreados ni en el repo.** No crear archivos de notas con keys. El `service_role` y `DATABASE_URL` viven solo en variables de entorno de Railway. **Excepción decidida por el cliente (2026-07-29):** los dos PAT de Supabase van en texto plano en `.mcp.json` de la raíz del workspace, que no es repo git. Riesgo asumido, se rotan al cerrar la Fase 17. No reabrir.
 4. **Cada cambio de schema es una migración versionada** en `PVCAR/db/migrations`. Nada de cambios a mano en el dashboard de Supabase.
 5. Antes de cualquier operación destructiva sobre datos reales: respaldo fresco verificado.
@@ -27,7 +27,6 @@ Los dashboards de **Vercel, Railway y Supabase los opera el cliente**; Claude en
 |---|---|
 | `PVCAR/Roadmap.md` | Documento maestro. Fuente de verdad. En el repo para seguir desde otro equipo. |
 | `Bitacora.md` | El `Plan.md` viejo, archivado: cómo se cerró cada fase 0–5 y el registro día a día. |
-| `activa-forge-login/` | SPA viva en prod (Vite+React+TS+shadcn). Solo lectura. |
 | `Backup_bd/` | **Respaldo definitivo** de la prod vieja, 2026-10-01: `prod_full_2026-10-01.dump`, `usufoto/` y `MANIFIESTO.txt` (sha256 + conteos). Lleva datos de menores y contraseñas en texto plano: nunca al repo. |
 | `_ref/` | Material de arranque de la Fase 1, ya consumido. |
 | `Cosas/` | Contrato, RUC, assets de marca. |
@@ -40,7 +39,7 @@ Los dashboards de **Vercel, Railway y Supabase los opera el cliente**; Claude en
 |---|---|---|---|
 | Railway `production` | `pvcarbackend-production.up.railway.app` | `main` | `PVCAR` |
 | Railway `development` | `pvcarbackend-development.up.railway.app` | `dev` | `PVCAR_Dev` |
-| Vercel Production | `pvcar.vercel.app` | `main` | `PVCAR` |
+| Vercel Production | `activareforce.com` (desde el 2026-10-12; `pvcar.vercel.app` ya no responde) | `main` | `PVCAR` |
 | Vercel Preview | `dev-pvcar.vercel.app` | `dev` | `PVCAR_Dev` |
 
 Flujo de trabajo: commit a `dev` → CI → preview en Vercel y deploy en Railway `development`. A `main` solo por PR (rama protegida, checks `check` y `secrets-scan`).
@@ -64,8 +63,6 @@ Trampas de configuración que ya costaron tiempo:
 
 Estado de autenticación (verificado 2026-07-29): `gh` ✅ ActivaReforce · `vercel` ✅ activareforce, scope `pvcar` · `railway` ❌ sin autenticar · `supabase` ❌ sin autenticar (**hace falta para la Fase 2**).
 
-Para conectarse a la prod vieja en lectura (session pooler, puerto 5432):
-session pooler de `sa-east-1`, puerto 5432, usuario `postgres.<ref>`; la cadena completa no se versiona
 
 ## Siguiente paso
 
@@ -124,7 +121,7 @@ Prod está vacía de datos a propósito: los recibe en el cutover (Fase 16).
 
 **Decisión de la Fase 11 esperando respuesta** (`docs/fase11-asistencias.md` §4): si se permiten o no fechas futuras. (Lo de que `ver` habilitaba pasar lista quedó resuelto con la `0026`: ahora es `editar`.)
 
-**La prod vieja (`wfyytrdhqtspapxaikoh`)** sigue viva y en solo lectura para nosotros; se borra cuando la nueva esté en producción. Su respaldo definitivo es el del 2026-10-01 en `Backup_bd/`. Su `auth.users` tiene 0 filas y el trigger `on_auth_user_created` roto: el sistema viejo autentica con `usu_contrasena` en texto plano. Lo de "dump fresco", "19 chequeos", "correo inválido" y "copiar `usufoto`" **ya no aplica**: era para migrar datos, y no se migran.
+**La prod vieja (`wfyytrdhqtspapxaikoh`) se borró el 2026-10-12**, junto con su Vercel y su repo; `activareforce.com` apunta ya a la plataforma nueva. Su respaldo definitivo es el del 2026-10-01 en `Backup_bd/`. Su `auth.users` tiene 0 filas y el trigger `on_auth_user_created` roto: el sistema viejo autentica con `usu_contrasena` en texto plano. Lo de "dump fresco", "19 chequeos", "correo inválido" y "copiar `usufoto`" **ya no aplica**: era para migrar datos, y no se migran.
 
 **Las cuentas de acceso de los inactivos:** los 23 usuarios inactivos de `PVCAR_Dev` no tienen cuenta en Supabase Auth (el backfill solo cubrió a los 45 activos) y el CHECK del baseline no admite un activo sin ella. Reactivar a uno pide la contraseña y le crea la cuenta en el mismo gesto. **El del correo inválido es un usuario (`usu_id` 119)**: hay que corregirlo antes de reactivarlo.
 

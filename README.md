@@ -20,7 +20,7 @@ docs/       API.md, RUNBOOK-cutover.md (el plan maestro se mantiene fuera del re
 
 | | Rama | Backend | Frontend | Base de datos |
 |---|---|---|---|---|
-| Producción | `main` | `pvcarbackend-production.up.railway.app` | `pvcar.vercel.app` | Supabase `PVCAR` |
+| Producción | `main` | `pvcarbackend-production.up.railway.app` | `activareforce.com` | Supabase `PVCAR` |
 | Desarrollo | `dev` | `pvcarbackend-development.up.railway.app` | `dev-pvcar.vercel.app` | Supabase `PVCAR_Dev` |
 
 Un commit a `dev` dispara CI, el preview de Vercel y el deploy de Railway `development`. A `main` se llega solo por PR.

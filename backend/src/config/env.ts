@@ -44,7 +44,7 @@ export const allowedOrigins: string[] = env.FRONTEND_ORIGIN.split(',')
  * Origen canonico del frontend: el PRIMERO de FRONTEND_ORIGIN.
  * Con el se arma el enlace del correo de recuperacion de contrasena, asi que
  * el orden de la variable importa: el primero debe ser el dominio real del
- * ambiente (pvcar.vercel.app en production, dev-pvcar.vercel.app en development).
+ * ambiente (activareforce.com en production, dev-pvcar.vercel.app en development).
  */
 export const frontendBaseUrl: string =
   allowedOrigins[0] ?? 'http://localhost:5173';

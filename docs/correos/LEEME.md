@@ -71,7 +71,7 @@ habitual, y encaja con el pie del correo, que ya dice que no se responda.
 ## 3. A dónde lleva el enlace
 
 *Authentication → URL Configuration → Redirect URLs* tiene que incluir
-`https://pvcar.vercel.app/reset-password` en `PVCAR` y
+`https://activareforce.com/reset-password` en `PVCAR` y
 `https://dev-pvcar.vercel.app/reset-password` en `PVCAR_Dev`. Si falta, el
 enlace del correo rebota al Site URL y la pantalla de cambiar contraseña nunca
 se abre.
