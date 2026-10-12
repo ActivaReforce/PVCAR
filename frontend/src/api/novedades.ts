@@ -60,8 +60,8 @@ export interface RepresentanteMencionable {
   usu_id: number;
   usu_nombre: string;
   usu_correo: string | null;
-  /** Nombres de sus hijos activos, para distinguir homónimos. */
-  hijos: string | null;
+  /** Sus hijos activos dentro del alcance, con su colegio (para agrupar). */
+  hijos: Array<{ nombre: string; colegio: string | null }>;
 }
 
 export interface AlumnoMencionable {

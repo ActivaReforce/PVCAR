@@ -134,36 +134,10 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<Novedad
       throw new ApiError(400, `Hay alumnos que no se pueden mencionar: ${faltan.join(', ')}`);
     }
     // Alcance: el actor solo puede mencionar alumnos de su alcance.
-    const alcance = await alcanceDe(actor.usuario);
-    if (!alcance.global) {
-      const permitidos = new Set<number>([
-        ...alcance.ninos,
-      ]);
-      const porDisciplinas = new Set<number>();
-      if (alcance.disciplinas.length > 0 || alcance.disciplinasDeHijos.length > 0) {
-        // Delego: pido alumnos disponibles con mi alcance y chequeo que todos los
-        // nino_ids pedidos estén dentro.
-        const disponibles = await repo.alumnosDisponibles({
-          limit: 1000,
-          global: false,
-          ninos: [...alcance.ninos, ...permitidos],
-          disciplinas: [...alcance.disciplinas, ...alcance.disciplinasDeHijos],
-          colegios: alcance.colegios,
-        });
-        for (const n of disponibles) porDisciplinas.add(n.nino_id);
-      }
-      const porColegio = new Set<number>();
-      if (alcance.colegios.length > 0) {
-        const disp = await repo.alumnosDisponibles({
-          limit: 10000,
-          global: false,
-          colegios: alcance.colegios,
-        });
-        for (const n of disp) porColegio.add(n.nino_id);
-      }
-      const todos = new Set<number>([...permitidos, ...porDisciplinas, ...porColegio]);
-      const fuera = input.nino_ids.filter((id) => !todos.has(id));
-      if (fuera.length > 0) {
+    const permitidos = await alumnosDelAlcance(actor);
+    if (permitidos) {
+      const dentro = new Set(permitidos);
+      if (input.nino_ids.some((id) => !dentro.has(id))) {
         throw new ApiError(403, 'Hay alumnos fuera de tu alcance');
       }
     }
@@ -245,26 +219,33 @@ export async function personalMencionable(
 }
 
 /**
- * Representantes mencionables: los de los alumnos que el actor puede
- * mencionar (mismo alcance que la lista de alumnos). Propietario y Admin,
- * todos.
+ * Alumnos que el actor puede mencionar; null = todos (Propietario y Admin).
+ *
+ * Es el alcance de siempre (sus colegios, sus disciplinas) y, para el
+ * representante, los alumnos **del colegio de sus hijos** (pedido del
+ * cliente, 2026-10-12): en Novedades puede hablar de un compañero. Esto
+ * vale solo para mencionar; no abre nada más del alumno.
  */
+async function alumnosDelAlcance(actor: AuthUser): Promise<number[] | null> {
+  const alcance = await alcanceDe(actor.usuario);
+  if (alcance.global) return null;
+  const colegiosHijos = await repo.colegiosDeNinos(alcance.ninos);
+  const alumnos = await repo.alumnosDisponibles({
+    limit: 100000,
+    global: false,
+    ninos: alcance.ninos,
+    disciplinas: [...alcance.disciplinas, ...alcance.disciplinasDeHijos],
+    colegios: [...alcance.colegios, ...colegiosHijos],
+  });
+  return alumnos.map((a) => a.nino_id);
+}
+
+/** Representantes mencionables: los de los alumnos del alcance. */
 async function representantesEnAlcance(
   actor: AuthUser,
   opts: { buscar?: string; limit: number; ids?: number[] },
 ) {
-  const alcance = await alcanceDe(actor.usuario);
-  let ninos: number[] | null = null;
-  if (!alcance.global) {
-    const alumnos = await repo.alumnosDisponibles({
-      limit: 10000,
-      global: false,
-      ninos: alcance.ninos,
-      disciplinas: [...alcance.disciplinas, ...alcance.disciplinasDeHijos],
-      colegios: alcance.colegios,
-    });
-    ninos = alumnos.map((a) => a.nino_id);
-  }
+  const ninos = await alumnosDelAlcance(actor);
   return repo.representantesDisponibles({ ...opts, ninos });
 }
 
@@ -280,15 +261,9 @@ export async function alumnosMencionables(
   actor: AuthUser,
   opts: { buscar?: string; limit: number },
 ) {
-  const alcance = await alcanceDe(actor.usuario);
-  return repo.alumnosDisponibles({
-    buscar: opts.buscar,
-    limit: opts.limit,
-    global: alcance.global,
-    ninos: alcance.ninos,
-    disciplinas: [...alcance.disciplinas, ...alcance.disciplinasDeHijos],
-    colegios: alcance.colegios,
-  });
+  const ninos = await alumnosDelAlcance(actor);
+  if (ninos === null) return repo.alumnosDisponibles({ ...opts, global: true });
+  return repo.alumnosDisponibles({ ...opts, global: false, ninos });
 }
 
 // ---------------------------------------------------------------------------

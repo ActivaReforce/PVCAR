@@ -266,7 +266,14 @@ export async function representantesDisponibles(opts: {
   limit: number;
   ninos: number[] | null;
   ids?: number[];
-}): Promise<Array<{ usu_id: number; usu_nombre: string; usu_correo: string | null; hijos: string | null }>> {
+}): Promise<
+  Array<{
+    usu_id: number;
+    usu_nombre: string;
+    usu_correo: string | null;
+    hijos: Array<{ nombre: string; colegio: string | null }>;
+  }>
+> {
   if (opts.ninos && opts.ninos.length === 0) return [];
   const params: unknown[] = [ROL_REPRESENTANTE];
   const where: string[] = [
@@ -287,14 +294,20 @@ export async function representantesDisponibles(opts: {
     where.push(`u.usu_nombre ILIKE $${params.length}`);
   }
 
-  // Los hijos ayudan a distinguir a dos representantes con el mismo nombre.
+  // Los hijos (solo los del alcance) distinguen homónimos y dan el colegio
+  // para agrupar en pantalla. Con alcance, $2 son esos niños.
+  const filtroHijos = opts.ninos ? 'AND n.nino_id = ANY($2::int[])' : '';
   const sql = `
     SELECT u.usu_id, u.usu_nombre, u.usu_correo,
-           (SELECT string_agg(n.nino_nombre, ', ' ORDER BY n.nino_nombre)
-              FROM public.padre p
-              JOIN public.nino_padre np ON np.padre_id = p.padre_id
-              JOIN public.nino n ON n.nino_id = np.nino_id
-             WHERE p.usu_id = u.usu_id AND n.est_id = 1) AS hijos
+           COALESCE((
+             SELECT jsonb_agg(jsonb_build_object('nombre', n.nino_nombre, 'colegio', c.col_nombre)
+                              ORDER BY c.col_nombre, n.nino_nombre)
+               FROM public.padre p
+               JOIN public.nino_padre np ON np.padre_id = p.padre_id
+               JOIN public.nino n ON n.nino_id = np.nino_id
+               LEFT JOIN public.colegio c ON c.col_id = n.col_id
+              WHERE p.usu_id = u.usu_id AND n.est_id = 1 ${filtroHijos}
+           ), '[]'::jsonb) AS hijos
       FROM public.usuario u
      WHERE ${where.join(' AND ')}
      ORDER BY u.usu_nombre
@@ -379,6 +392,16 @@ export async function correosDeRepresentantesDe(nino_ids: number[]): Promise<str
     [nino_ids],
   );
   return rows.map((r) => r.correo);
+}
+
+/** Colegios de esos niños (para el alcance del representante al mencionar). */
+export async function colegiosDeNinos(nino_ids: number[]): Promise<number[]> {
+  if (nino_ids.length === 0) return [];
+  const { rows } = await getPool().query<{ col_id: number }>(
+    `SELECT DISTINCT col_id FROM public.nino WHERE nino_id = ANY($1::int[]) AND col_id IS NOT NULL`,
+    [nino_ids],
+  );
+  return rows.map((r) => r.col_id);
 }
 
 /** Niños del representante actual (via padre.usu_id). */
