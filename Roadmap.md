@@ -106,7 +106,7 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 
 - **Punto 8 — módulo Novedades.** Cualquier rol escribe una novedad con uno de tres alcances: **General** (texto suelto), **Personal de Activa Reforce** (menciona 1..N usuarios activos) y **Alumnos** (menciona 1..N alumnos del alcance). Al enviar sale correo al Para + CC configurados; si el switch "notificar también al mencionado y al representante" está activo, se añaden al Para los mencionados (personal) o los representantes (alumno).
 - **Visibilidad del listado:** Propietario y Admin ven todas; el resto ve las suyas; con el switch activo, los mencionados ven las que les tocan y los representantes las de sus hijos. Las generales solo las ven autor y globales.
-- **Eliminar:** autor o Propietario/Admin. No se edita (el correo ya salió).
+- **Eliminar:** solo con la casilla Eliminar (Propietario y Admin); el autor no borra la suya (decidido el 2026-10-12). No se edita (el correo ya salió). Quien no tiene Eliminar tampoco ve el autor.
 - **Permisos** `novedades` (`ver`, `crear`, `eliminar`) añadidos a `rol_permiso` por la propia `0027`: todos los roles ven y crean; eliminar solo Propietario y Admin. Si el cliente quiere restringir, se reparte desde la pantalla de Permisos.
 - **Nuevo tipo `novedades` en `correo_config`** y columna `corcfg_notificar_mencionado`.
 - **Infra añadida:** `backend/src/modules/novedades/*`, `frontend/src/pages/Novedades.tsx`, `components/novedades/{SelectorMenciones,CrearNovedadDialog}`, `api/novedades.ts`, `hooks/useNovedades.ts`. Montado en `app.ts` y en el sidebar con icono Megaphone.

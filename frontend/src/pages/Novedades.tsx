@@ -29,7 +29,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useAuth } from '@/contexts/AuthContext';
 import { useEliminarNovedad, useNovedades } from '@/hooks/useNovedades';
 import { ZONA } from '@/lib/fecha';
 import type { Novedad, TipoNovedad } from '@/api/novedades';
@@ -99,7 +98,6 @@ const Pestanas = ({
   );
 
 const Novedades = () => {
-  const { user } = useAuth();
   const { hasPermission } = usePermissions();
   const puedeCrear = hasPermission('novedades', 'crear');
   const puedeEliminar = hasPermission('novedades', 'eliminar');
@@ -203,8 +201,6 @@ const Novedades = () => {
         <ul className="space-y-3">
           {lista.map((n) => {
             const Icono = ICONO_TIPO[n.nov_tipo];
-            const esAutor = user?.usu_id === n.autor.usu_id;
-            const puedeBorrarEsta = puedeEliminar || esAutor;
 
             return (
               <li
@@ -228,7 +224,7 @@ const Novedades = () => {
                     </div>
                     <p className="whitespace-pre-wrap text-sm text-foreground">{n.nov_texto}</p>
                     {/* Llega en null a quien no tiene Eliminar: el backend lo oculta. */}
-                    {n.autor.usu_nombre && (
+                    {n.autor && (
                       <p className="text-xs text-muted-foreground">
                         Por <strong className="font-medium text-foreground">{n.autor.usu_nombre}</strong>
                       </p>
@@ -248,7 +244,7 @@ const Novedades = () => {
                       </p>
                     )}
                   </div>
-                  {puedeBorrarEsta && (
+                  {puedeEliminar && (
                     <Button
                       variant="ghost"
                       size="sm"

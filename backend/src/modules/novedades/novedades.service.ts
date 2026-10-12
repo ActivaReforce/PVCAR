@@ -32,22 +32,22 @@ function esGlobal(actor: AuthUser): boolean {
 
 /**
  * Quién escribió una novedad solo lo ve quien tiene Eliminar en Novedades
- * (decidido por el cliente el 2026-10-12). Al resto se le quita el nombre y
- * el correo aquí, no solo en la pantalla. El id se queda: con él la pantalla
- * reconoce las propias para dejar borrarlas. El correo de aviso no cambia.
+ * (decidido por el cliente el 2026-10-12). Al resto se le quita el autor
+ * entero aquí, no solo en la pantalla: con el id se podría cruzar con la
+ * lista de personal mencionable. El correo de aviso no cambia.
  */
 function verAutor(actor: AuthUser): boolean {
   return actor.permisos.some((p) => p.modulo === 'novedades' && p.accion === 'eliminar');
 }
 
-/** Lo que sale por el API: el autor puede llegar sin nombre ni correo. */
+/** Lo que sale por el API: sin autor para quien no tiene Eliminar. */
 export type NovedadVista = Omit<repo.Novedad, 'autor'> & {
-  autor: { usu_id: number; usu_nombre: string | null; usu_correo: string | null };
+  autor: repo.Novedad['autor'] | null;
 };
 
 function paraActor(actor: AuthUser, n: repo.Novedad): NovedadVista {
   if (verAutor(actor)) return n;
-  return { ...n, autor: { usu_id: n.autor.usu_id, usu_nombre: null, usu_correo: null } };
+  return { ...n, autor: null };
 }
 
 function esRepresentante(actor: AuthUser): boolean {
@@ -194,15 +194,10 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<Novedad
 }
 
 export async function eliminar(actor: AuthUser, id: number): Promise<{ eliminada: true }> {
-  // obtener() ya exige poder verla: Eliminar no abre novedades ajenas.
+  // La ruta ya exige Eliminar; obtener() exige además poder verla.
   const novedad = await obtener(actor, id);
-  const esAutor = novedad.autor.usu_id === actor.usuario.usu_id;
-  const conCasilla = actor.permisos.some(
-    (p) => p.modulo === 'novedades' && p.accion === 'eliminar',
-  );
-  if (!esAutor && !conCasilla) {
-    throw new ApiError(403, 'Solo el autor o quien tenga Eliminar en Novedades puede borrarla');
-  }
+  const { autor } = novedad;
+  if (!autor) throw new ApiError(403, 'Sin permiso: novedades:eliminar');
 
   await enTransaccion(async (client) => {
     await repo.eliminar(client, id);
@@ -214,7 +209,7 @@ export async function eliminar(actor: AuthUser, id: number): Promise<{ eliminada
         entidadId: id,
         detalle: {
           tipo: novedad.nov_tipo,
-          autor_id: novedad.autor.usu_id,
+          autor_id: autor.usu_id,
           texto: novedad.nov_texto,
         },
       },

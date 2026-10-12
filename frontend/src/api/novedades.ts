@@ -25,8 +25,8 @@ export interface Novedad {
   nov_tipo: TipoNovedad;
   nov_texto: string;
   nov_fecha_creacion: string;
-  /** Nombre y correo llegan en null a quien no tiene Eliminar en Novedades. */
-  autor: { usu_id: number; usu_nombre: string | null; usu_correo: string | null };
+  /** null para quien no tiene Eliminar en Novedades: el backend no lo manda. */
+  autor: { usu_id: number; usu_nombre: string; usu_correo: string | null } | null;
   personas: MencionPersona[];
   alumnos: MencionAlumno[];
 }
