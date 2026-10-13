@@ -116,6 +116,10 @@ vi.mock('../../config/db.js', () => ({
   getPool: () => ({ query, connect: async () => ({ query, release: vi.fn() }) }),
 }));
 
+// El aviso de ausencia (punto 9) llega hasta los correos y su configuración;
+// sin esto, en CI (sin .env) la validación de variables corta el proceso.
+vi.mock('../../config/env.js', () => ({ env: {} }));
+
 vi.mock('../../lib/storage.js', () => ({
   firmarFotos: async () => new Map(),
   firmarFoto: async () => null,
