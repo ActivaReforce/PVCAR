@@ -662,6 +662,10 @@ const Inscripcion = () => {
         {formulario.data?.disponible && !resultado && modo === 'cuenta' && misDatos.isLoading && (
           <p className="py-16 text-center text-muted-foreground">Cargando tus datos…</p>
         )}
+        {/* Sin esto, si falla la carga no se ve nada: ni el formulario ni un aviso. */}
+        {formulario.data?.disponible && !resultado && modo === 'cuenta' && misDatos.isError && (
+          <Aviso titulo="No se pudieron cargar tus datos">Revisa tu conexión y recarga la página.</Aviso>
+        )}
 
         {formulario.data?.disponible && !resultado && modo !== 'inicio' && !(modo === 'cuenta' && !misDatos.data) && (
           <div className="space-y-5">
