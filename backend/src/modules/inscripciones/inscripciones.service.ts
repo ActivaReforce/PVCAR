@@ -1354,7 +1354,7 @@ ${alumnos}
 export function correoDeAprobacion(nombre: string, correo: string, cuentaNueva: boolean) {
   const enlace = `${frontendBaseUrl}/login`;
   const acceso = cuentaNueva
-    ? 'Tu contraseña es tu número de cédula (o pasaporte), tal como lo escribiste en la inscripción. Puedes cambiarla cuando quieras desde tu Perfil.'
+    ? 'Tu contraseña es tu número de cédula, tal como lo escribiste en la inscripción. Puedes cambiarla cuando quieras desde tu Perfil.'
     : 'Entra con la contraseña que ya usas en la plataforma.';
   const documentos = 'Adjuntamos los documentos de la inscripción, aprobados.';
 

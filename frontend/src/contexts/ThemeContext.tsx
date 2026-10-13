@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useLayoutEffect, ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
 type ThemeType = "light" | "dark";
 
@@ -46,6 +47,9 @@ export const useTheme = () => {
  * en el formato que espera Tailwind (terna HSL suelta, sin `hsl()`). No hay
  * nada que arreglar desde JavaScript: si un contraste falla, se corrige el
  * token en el CSS.
+ *
+ * La clase la pone `TemaDelDocumento`, que vive dentro del router porque
+ * depende de la ruta.
  */
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -56,7 +60,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const theme: ThemeType = isDarkMode ? "dark" : "light";
     localStorage.setItem("theme", theme);
-    document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode]);
 
   const toggleTheme = () => {
@@ -68,4 +71,23 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </ThemeContext.Provider>
   );
+};
+
+/**
+ * Rutas que se ven siempre en claro, tenga el navegador guardado lo que
+ * tenga: el formulario de inscripción llega por correo a familias, casi
+ * siempre en el móvil, y los documentos que se leen ahí son de papel.
+ * No toca la preferencia guardada: al volver a la plataforma sigue la suya.
+ */
+const RUTAS_SIEMPRE_CLARAS = ["/inscripcion"];
+
+export const TemaDelDocumento = () => {
+  const { isDarkMode } = useTheme();
+  const { pathname } = useLocation();
+  const claro = RUTAS_SIEMPRE_CLARAS.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+  // Antes de pintar, para que no parpadee en oscuro.
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("dark", isDarkMode && !claro);
+  }, [isDarkMode, claro]);
+  return null;
 };

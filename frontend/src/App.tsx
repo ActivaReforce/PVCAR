@@ -4,7 +4,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ThemeProvider, TemaDelDocumento } from "@/contexts/ThemeContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AvisoAuxiliaresProvider } from "@/contexts/AvisoAuxiliaresContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -80,65 +81,68 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <AuthProvider>
-              <Suspense fallback={<Cargando />}>
-                <Routes>
-                  {/* Públicas */}
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  {/* Destino del enlace del correo de recuperación. Pública:
-                      quien llega aquí todavía no puede iniciar sesión. */}
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  {/* Formulario de inscripción: llega por correo a gente que
-                      todavía no tiene cuenta. */}
-                  <Route path="/inscripcion" element={<Inscripcion />} />
-
-                  {/* Protegidas */}
-                  <Route
-                    path="/*"
-                    element={
-                      <ProtectedRoute>
-                        <AvisoAuxiliaresProvider>
-                          <AppLayout>
-                            {/* Suspense propio: el de fuera ya se resolvió al
-                                montar el layout, así que sin este el salto entre
-                                pantallas desmontaría la barra lateral. */}
-                            <Suspense fallback={<Cargando />}>
-                              <Routes>
-                                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                                <Route path="/dashboard" element={<Dashboard />} />
-                                <Route path="/usuarios" element={<Usuarios />} />
-                                <Route path="/colegios" element={<Colegios />} />
-                                <Route path="/actividades" element={<Actividades />} />
-                                <Route path="/disciplinas" element={<Disciplinas />} />
-                                <Route path="/entrenadores" element={<Entrenadores />} />
-                                <Route path="/estudiantes" element={<Estudiantes />} />
-                                <Route path="/evaluaciones" element={<Evaluaciones />} />
-                                <Route path="/asistencias" element={<AsistenciasAlumnos />} />
-                                <Route
-                                  path="/asistencias/entrenadores"
-                                  element={<AsistenciasEntrenadores />}
-                                />
-                                <Route path="/reportes" element={<Reportes />} />
-                                <Route path="/reportes/data-anterior" element={<DataAnterior />} />
-                                <Route path="/reportes/:modulo" element={<ReporteDetalle />} />
-                                <Route path="/encuestas" element={<Encuestas />} />
-                                <Route path="/representantes" element={<Representantes />} />
-                                <Route path="/perfil" element={<Perfil />} />
-                                <Route path="/permisos" element={<Permisos />} />
-                                <Route path="/inscripciones" element={<Inscripciones />} />
-                                <Route path="/novedades" element={<Novedades />} />
-                                <Route path="*" element={<NotFound />} />
-                              </Routes>
-                            </Suspense>
-                          </AppLayout>
-                        </AvisoAuxiliaresProvider>
-                      </ProtectedRoute>
-                    }
-                  />
-                </Routes>
-              </Suspense>
-            </AuthProvider>
+            <TemaDelDocumento />
+            <ErrorBoundary>
+              <AuthProvider>
+                <Suspense fallback={<Cargando />}>
+                  <Routes>
+                    {/* Públicas */}
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    {/* Destino del enlace del correo de recuperación. Pública:
+                        quien llega aquí todavía no puede iniciar sesión. */}
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    {/* Formulario de inscripción: llega por correo a gente que
+                        todavía no tiene cuenta. */}
+                    <Route path="/inscripcion" element={<Inscripcion />} />
+  
+                    {/* Protegidas */}
+                    <Route
+                      path="/*"
+                      element={
+                        <ProtectedRoute>
+                          <AvisoAuxiliaresProvider>
+                            <AppLayout>
+                              {/* Suspense propio: el de fuera ya se resolvió al
+                                  montar el layout, así que sin este el salto entre
+                                  pantallas desmontaría la barra lateral. */}
+                              <Suspense fallback={<Cargando />}>
+                                <Routes>
+                                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                                  <Route path="/dashboard" element={<Dashboard />} />
+                                  <Route path="/usuarios" element={<Usuarios />} />
+                                  <Route path="/colegios" element={<Colegios />} />
+                                  <Route path="/actividades" element={<Actividades />} />
+                                  <Route path="/disciplinas" element={<Disciplinas />} />
+                                  <Route path="/entrenadores" element={<Entrenadores />} />
+                                  <Route path="/estudiantes" element={<Estudiantes />} />
+                                  <Route path="/evaluaciones" element={<Evaluaciones />} />
+                                  <Route path="/asistencias" element={<AsistenciasAlumnos />} />
+                                  <Route
+                                    path="/asistencias/entrenadores"
+                                    element={<AsistenciasEntrenadores />}
+                                  />
+                                  <Route path="/reportes" element={<Reportes />} />
+                                  <Route path="/reportes/data-anterior" element={<DataAnterior />} />
+                                  <Route path="/reportes/:modulo" element={<ReporteDetalle />} />
+                                  <Route path="/encuestas" element={<Encuestas />} />
+                                  <Route path="/representantes" element={<Representantes />} />
+                                  <Route path="/perfil" element={<Perfil />} />
+                                  <Route path="/permisos" element={<Permisos />} />
+                                  <Route path="/inscripciones" element={<Inscripciones />} />
+                                  <Route path="/novedades" element={<Novedades />} />
+                                  <Route path="*" element={<NotFound />} />
+                                </Routes>
+                              </Suspense>
+                            </AppLayout>
+                          </AvisoAuxiliaresProvider>
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </Suspense>
+              </AuthProvider>
+            </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>
