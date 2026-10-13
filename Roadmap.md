@@ -50,7 +50,7 @@
 | **13 — Tablero y Reportes** | 🟡 construida el 2026-09-17, en `dev`. 4 tableros, 9 reportes y 14 gráficas. **+ Data anterior** (2026-10-02): 15 conjuntos, 8 gráficas y Excel de todo; pruebas en `docs/data-anterior.md`. **La exportación a Excel de Reportes fallaba siempre** — arreglada el 2026-10-02. Solo falta probarla |
 | **14 — Encuestas y Representantes** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
 | **14B — Inscripciones** (nuevo, 2026-10-01) | 🟡 **rehecha el 2026-10-05 y en `dev`** con los seis documentos del cliente (4 generales + ficha y contrato por colegio), constancia por documento, PDF por alumno con membrete, IVA fijo 15 %, apertura general y por colegio, cuenta bancaria. `0014`–`0019` aplicadas en dev y prod. **El cobro por disciplina quedó resuelto el 2026-10-06** con Disciplinas v2 (una disciplina = una tarifa, máximo configurable por alumno, sin cruces). **Representante con cuenta previa hecho y probado el 2026-10-07**, en `main` desde el PR #11. Estado vigente en `docs/fase14b-contratos.md`. Solo Propietario |
-| **Novedades** (puntos 8 y 9, fuera de fase) | ✅ **cerrado el 2026-10-12**: probado y aprobado por el cliente en `dev`. Novedades a mano (general, personal, representantes, alumnos), ausencias y correcciones automáticas al pasar lista, correos configurables, número en el menú, baja lógica y reporte con hoja Ausencias. Falta pasarlo a `main` (`0033` y `0034` en prod antes) |
+| **Novedades** (puntos 8 y 9, fuera de fase) | ✅ **cerrado el 2026-10-12**: probado y aprobado por el cliente en `dev`. Novedades a mano (general, personal, representantes, alumnos), ausencias y correcciones automáticas al pasar lista, correos configurables, número en el menú, baja lógica y reporte con hoja Ausencias. En producción desde el PR #16 (2026-10-13) |
 | **15 — Endurecimiento y QA** | 🟡 en marcha desde el 2026-09-17. Hecho todo lo que no necesita la aplicación en marcha. SMTP de Resend puesto en prod y dev (2026-10-07). Falta la auditoría de fugas con token por rol, los e2e, el repaso de accesibilidad y **el respaldo de prod** |
 | **16 — Lanzamiento** | ✅ **2026-10-12**: `activareforce.com` en producción. Prod limpia de lo de prueba y con datos reales cargados por el cliente |
 | **17 — Cierre del proyecto** | 🟡 plataforma anterior borrada el 2026-10-12; faltan los PAT, el repo privado y la limpieza final |
@@ -94,7 +94,7 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 
 1. ~~**Punto 8 — Novedades**~~ — ✅ cerrado el 2026-10-12, aprobado por el cliente.
 2. ~~**Punto 9 — aviso automático de ausencia**~~ — ✅ cerrado el 2026-10-12, aprobado por el cliente.
-3. **Pasar a `main`:** antes, `0033_novedades_ausencias.sql` y `0034_correo_diario.sql` en prod (verificadas por MCP). Con el merge, prod deja de enseñar "En desarrollo" en Novedades.
+3. ~~**Pasar a `main`**~~ — ✅ **PR #16 mergeado el 2026-10-13**: Novedades, ausencias, correos del tablero y ficha/contrato por colegio en producción; `0028`–`0036` en prod. CRISFE Carcelén debe publicar su ficha y su contrato antes de abrir inscripciones.
 4. **Respaldo de prod:** ya hay datos reales y el plan gratuito de Supabase no hace copias automáticas. `pg_dump` programado o plan Pro.
 5. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
 6. **Pagos mensuales** — esperar a que el cliente lo cuente.

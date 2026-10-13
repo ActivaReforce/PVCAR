@@ -46,7 +46,7 @@ Flujo de trabajo: commit a `dev` → CI → preview en Vercel y deploy en Railwa
 
 **Quién mergea:** `main` no exige revisión de nadie y `gh` está autenticado como ActivaReforce. Claude **sí puede** abrir el PR y mergear con `gh pr merge`; no lo hace sin que el cliente lo pida. Cuando diga "sube a dev" o "mergea a main", se hace entero — nada de devolverle pasos manuales de GitHub. Antes de mergear, comprobar por MCP que el SQL que trae el PR ya está en prod.
 
-**Novedades aprobado por el cliente el 2026-10-12** (puntos 8 y 9). La pantalla temporal "En desarrollo" ya se borró en `dev`; prod la sigue enseñando hasta el próximo merge a `main`, que necesita antes `0033` y `0034` en prod.
+**Novedades aprobado por el cliente el 2026-10-12** (puntos 8 y 9) y **en producción desde el PR #16** (2026-10-13), sin la pantalla temporal.
 
 Trampas de configuración que ya costaron tiempo:
 - **Railway root dir = raíz del repo**, no `backend/` (el `package-lock.json` vive en la raíz por npm workspaces). `railway.json` está en la raíz.
@@ -66,7 +66,7 @@ Trampas de configuración que ya costaron tiempo:
 
 ## Dónde estamos
 
-**Si pregunta "¿en qué nos quedamos?": corte del 2026-10-12 en `Roadmap.md` §1**, con la lista de trabajo numerada. Novedades (puntos 8 y 9) está cerrado. Lo siguiente: pasar a `main` (antes, `0033` y `0034` en prod), el respaldo de prod y las pruebas en pantalla de las Fases 9–14.
+**Si pregunta "¿en qué nos quedamos?": corte del 2026-10-12 en `Roadmap.md` §1**, con la lista de trabajo numerada. Novedades (puntos 8 y 9) cerrado y en producción (PR #16, 2026-10-13). Lo siguiente: el respaldo de prod y las pruebas en pantalla de las Fases 9–14.
 
 **Bases:** migraciones `0001`–`0036` aplicadas y verificadas por MCP en dev y prod. `0004_seed_dev.sql` (catálogos) también está en prod; lo de prueba que traía ya se quitó. Dev lo usa el cliente para simular; prod tiene datos reales. **No hay SQL pendiente.**
 
