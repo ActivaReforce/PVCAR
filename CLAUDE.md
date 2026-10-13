@@ -68,7 +68,7 @@ Trampas de configuración que ya costaron tiempo:
 
 **Si pregunta "¿en qué nos quedamos?": corte del 2026-10-12 en `Roadmap.md` §1**, con la lista de trabajo numerada. Lo siguiente: que el cliente pruebe Novedades y el punto 9 (aviso automático de ausencia, hecho el 2026-10-12) en `dev`, después el respaldo de prod.
 
-**Bases:** migraciones `0001`–`0032` aplicadas y verificadas por MCP en dev y prod. `0004_seed_dev.sql` (catálogos) también está en prod; lo de prueba que traía ya se quitó. Dev lo usa el cliente para simular; prod tiene datos reales. **Pendiente:** `0033_novedades_ausencias.sql` en dev y en prod (el código de `dev` ya la necesita).
+**Bases:** migraciones `0001`–`0032` aplicadas y verificadas por MCP en dev y prod. `0004_seed_dev.sql` (catálogos) también está en prod; lo de prueba que traía ya se quitó. Dev lo usa el cliente para simular; prod tiene datos reales. **Pendiente:** `0033_novedades_ausencias.sql` en prod (en dev ya está) (el código de `dev` ya la necesita).
 
 **Decisiones esperando respuesta del cliente:** información de salud en el reporte de Alumnos (`docs/fase13-tablero-reportes.md` §4), Mobak escalado al puntaje del parámetro (`docs/fase12-evaluaciones.md` §4), fechas futuras en asistencia (`docs/fase11-asistencias.md` §4) y flujo de invitación por correo en vez de contraseña puesta por el admin (Resend ya funciona, se puede preguntar).
 

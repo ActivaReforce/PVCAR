@@ -59,6 +59,8 @@ export interface FiltrosReporte {
   estado?: number;
   desde?: string;
   hasta?: string;
+  /** Novedades: `false` quita ausencias y correcciones. Sin valor, salen. */
+  ausencias?: boolean;
 }
 
 /** Una opción de un desplegable de filtro. */
@@ -82,6 +84,8 @@ export interface FiltrosDisponibles {
   estado: { etiqueta: string; opciones: OpcionFiltro[] } | null;
   /** Rango de fechas. Si el reporte lo exige, lo usa; nunca al revés. */
   fechas: boolean;
+  /** Casilla "Ver ausencias" (solo Novedades). */
+  ausencias?: boolean;
 }
 
 const ACTIVO_INACTIVO = (etiqueta = 'Estado') => ({
@@ -132,6 +136,17 @@ export interface Definicion {
    */
   columnasSensibles?: string[];
   construir: (f: FiltrosReporte, ctx: ContextoReporte) => ConsultaReporte;
+  /**
+   * Una hoja más en el Excel, detrás del detalle, con parte de las mismas
+   * filas y sus propias columnas (que la consulta trae además de las suyas).
+   */
+  hojaExtra?: {
+    titulo: string;
+    columnas: Columna[];
+    incluye: (fila: Record<string, unknown>) => boolean;
+    /** Si sale con estos filtros. */
+    sale: (f: FiltrosReporte) => boolean;
+  };
 }
 
 /** `NULL` cuando el filtro no viene, que es como se apagan en el SQL. */
@@ -755,6 +770,7 @@ const novedades: Definicion = {
       ],
     },
     fechas: true,
+    ausencias: true,
   },
   columnas: [
     { clave: 'fecha', cabecera: 'Fecha', ancho: 17 },
@@ -771,7 +787,31 @@ const novedades: Definicion = {
    * Propietario y Admin, todas. Quien tenga Eliminar sin ser global, solo las
    * que escribió: en el módulo no ve las de los demás y aquí tampoco.
    * "Sobre" junta personas y alumnos; "Colegio", el de los alumnos.
+   *
+   * Las columnas `aus_*` solo las usa la hoja Ausencias del Excel: la clase
+   * tal como estaba al avisar (`nov_datos`) y los representantes de hoy.
    */
+  hojaExtra: {
+    titulo: 'Ausencias',
+    columnas: [
+      { clave: 'tipo', cabecera: 'Aviso', ancho: 14 },
+      { clave: 'fecha', cabecera: 'Avisado el', ancho: 17 },
+      { clave: 'sobre', cabecera: 'Alumno', ancho: 32 },
+      { clave: 'aus_colegio', cabecera: 'Colegio', ancho: 30 },
+      { clave: 'aus_actividad', cabecera: 'Disciplina', ancho: 22 },
+      { clave: 'aus_fecha', cabecera: 'Fecha de la clase', ancho: 16 },
+      { clave: 'aus_dia', cabecera: 'Día', ancho: 11 },
+      { clave: 'aus_horario', cabecera: 'Horario', ancho: 13 },
+      { clave: 'aus_asistencia', cabecera: 'Asistencia', ancho: 13 },
+      { clave: 'aus_hora', cabecera: 'Hora de llegada', ancho: 14 },
+      { clave: 'aus_motivo', cabecera: 'Motivo', ancho: 34 },
+      { clave: 'aus_representantes', cabecera: 'Representantes', ancho: 50 },
+      { clave: 'autor', cabecera: 'Registró', ancho: 30 },
+      { clave: 'estado', cabecera: 'Estado', ancho: 13 },
+    ],
+    incluye: (fila) => fila.tipo === 'Ausencia' || fila.tipo === 'Corrección',
+    sale: (f) => f.ausencias !== false,
+  },
   construir: (f, ctx) => ({
     sql: `
       SELECT ${textoEc('n.nov_fecha_creacion', 'DD/MM/YYYY HH24:MI')} AS fecha,
@@ -801,7 +841,24 @@ const novedades: Definicion = {
                         WHERE na.nov_id = n.nov_id), '')           AS colegios,
              CASE WHEN n.est_id = ${ESTADO.ACTIVO} THEN 'En pantalla' ELSE 'Eliminada' END AS estado,
              COALESCE(b.usu_nombre, '')                            AS eliminada_por,
-             COALESCE(${textoEc('n.nov_fecha_eliminacion', 'DD/MM/YYYY HH24:MI')}, '') AS eliminada_el
+             COALESCE(${textoEc('n.nov_fecha_eliminacion', 'DD/MM/YYYY HH24:MI')}, '') AS eliminada_el,
+             COALESCE(n.nov_datos->>'colegio', '')                 AS aus_colegio,
+             COALESCE(n.nov_datos->>'actividad', '')               AS aus_actividad,
+             COALESCE(to_char(n.nov_asis_fecha, 'DD/MM/YYYY'), '') AS aus_fecha,
+             COALESCE(n.nov_datos->>'dia', '')                     AS aus_dia,
+             COALESCE(n.nov_datos->>'horario', '')                 AS aus_horario,
+             COALESCE(n.nov_datos->>'estado', '')                  AS aus_asistencia,
+             COALESCE(n.nov_datos->>'hora_tarde', '')              AS aus_hora,
+             COALESCE(n.nov_datos->>'razon', '')                   AS aus_motivo,
+             CASE WHEN n.nov_tipo IN ('ausencia', 'correccion') THEN
+               COALESCE((SELECT string_agg(concat_ws(' · ', ru.usu_nombre, ru.usu_telefono, ru.usu_correo),
+                                           '; ' ORDER BY ru.usu_nombre)
+                           FROM public.novedad_alumno na
+                           JOIN public.nino_padre npa ON npa.nino_id = na.nino_id
+                           JOIN public.padre pa       ON pa.padre_id = npa.padre_id
+                           JOIN public.usuario ru     ON ru.usu_id = pa.usu_id
+                          WHERE na.nov_id = n.nov_id AND ru.est_id = ${ESTADO.ACTIVO}), '')
+             ELSE '' END                                           AS aus_representantes
         FROM public.novedad n
         JOIN public.usuario a      ON a.usu_id = n.nov_autor_id
         LEFT JOIN public.usuario b ON b.usu_id = n.nov_eliminada_por
@@ -811,6 +868,7 @@ const novedades: Definicion = {
          AND ($5::text IS NULL OR ${contieneSinTildes('n.nov_texto', '$5')}
                                OR ${contieneSinTildes('a.usu_nombre', '$5')})
          AND ($6::int IS NULL OR n.est_id = $6)
+         AND ($7::boolean IS DISTINCT FROM false OR n.nov_tipo NOT IN ('ausencia', 'correccion'))
        ORDER BY n.nov_fecha_creacion DESC, n.nov_id DESC`,
     params: [
       ctx.global,
@@ -819,6 +877,7 @@ const novedades: Definicion = {
       oNulo(f.hasta),
       textoONulo(f.buscar),
       oNulo(f.estado),
+      oNulo(f.ausencias),
     ],
   }),
 };

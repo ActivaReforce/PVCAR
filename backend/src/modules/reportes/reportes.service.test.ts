@@ -94,6 +94,20 @@ describe('el catalogo', () => {
     expect(service.catalogo(TODO).map((r) => r.id)).toContain('novedades');
   });
 
+  /** Casilla "Ver ausencias" y hoja Ausencias del Excel (2026-10-12). */
+  it('Novedades: la casilla de ausencias llega al SQL y decide la hoja extra', () => {
+    const def = DEFINICIONES.find((d) => d.id === 'novedades')!;
+    expect(service.catalogo(TODO).find((r) => r.id === 'novedades')!.filtros.ausencias).toBe(true);
+    const ctx = { global: true, colegios: [], disciplinas: [], actorId: 1 };
+    expect(def.construir({ ausencias: false }, ctx).params.at(-1)).toBe(false);
+    expect(def.construir({}, ctx).params.at(-1)).toBeNull();
+    expect(def.hojaExtra!.sale({})).toBe(true);
+    expect(def.hojaExtra!.sale({ ausencias: false })).toBe(false);
+    expect(def.hojaExtra!.incluye({ tipo: 'Ausencia' })).toBe(true);
+    expect(def.hojaExtra!.incluye({ tipo: 'Corrección' })).toBe(true);
+    expect(def.hojaExtra!.incluye({ tipo: 'General' })).toBe(false);
+  });
+
   /**
    * Hasta el 2026-10-07 la pantalla ofrecía Activo/Inactivo en los nueve: en
    * asistencias eso filtraba Presente/Ausente, y en evaluaciones nada.

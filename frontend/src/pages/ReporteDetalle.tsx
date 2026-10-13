@@ -53,6 +53,7 @@ const ReporteDetalle = () => {
   const [hasta, setHasta] = useState('');
   const [page, setPage] = useState(1);
   const [conSensibles, setConSensibles] = useState(false);
+  const [verAusencias, setVerAusencias] = useState(true);
 
   const catalogo = useCatalogoReportes();
   const definicion = catalogo.data?.find((r) => r.id === modulo);
@@ -77,6 +78,8 @@ const ReporteDetalle = () => {
     desde: disponibles?.fechas ? desde || undefined : undefined,
     hasta: disponibles?.fechas ? hasta || undefined : undefined,
     incluirSensibles: conSensibles || undefined,
+    // Solo viaja cuando se quitan: por defecto salen.
+    ausencias: disponibles?.ausencias && !verAusencias ? false : undefined,
   };
 
   const faltanFechas = Boolean(definicion?.exigeRango) && (!desde || !hasta);
@@ -273,6 +276,21 @@ const ReporteDetalle = () => {
         tiene por qué viajar en el Excel que alguien saca para contar
         inscripciones. Al exportarlas marcadas, queda registro en auditoría.
       */}
+      {definicion.filtros.ausencias && (
+        <label className="flex w-fit items-center gap-2 text-sm">
+          <Checkbox
+            checked={verAusencias}
+            onCheckedChange={(v) => cambiarFiltro(() => setVerAusencias(v === true))}
+          />
+          <span>
+            Ver ausencias{' '}
+            <span className="text-muted-foreground">
+              (y sus correcciones; en el Excel van además en su propia hoja)
+            </span>
+          </span>
+        </label>
+      )}
+
       {definicion.columnasSensibles.length > 0 && (
         <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
           <Checkbox

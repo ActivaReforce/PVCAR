@@ -40,6 +40,11 @@ export const filtrosSchema = z
     estado: z.coerce.number().int().positive().optional(),
     desde: fecha.optional(),
     hasta: fecha.optional(),
+    /** Novedades: false quita ausencias y correcciones. Por defecto, salen. */
+    ausencias: z
+      .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === true || v === 'true' || v === '1')),
     /** Incluir las columnas sensibles del reporte. Por defecto, no. */
     incluirSensibles: z
       .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])

@@ -259,6 +259,24 @@ export async function exportar(
   }
   hoja.commit();
 
+  // Una hoja más con parte de las filas (Novedades → Ausencias).
+  const extra = definicion.hojaExtra;
+  if (extra && extra.sale(filtros)) {
+    const hojaExtra = libro.addWorksheet(extra.titulo.slice(0, 31), {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+    hojaExtra.columns = extra.columnas.map((c) => ({ header: c.cabecera, key: c.clave, width: c.ancho }));
+    estiloCabecera(hojaExtra.getRow(1), extra.columnas.length);
+    hojaExtra.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: extra.columnas.length },
+    };
+    for (const fila of rows.filter(extra.incluye)) {
+      hojaExtra.addRow(proyectar(fila, extra.columnas)).commit();
+    }
+    hojaExtra.commit();
+  }
+
   await libro.commit();
 
   /**
