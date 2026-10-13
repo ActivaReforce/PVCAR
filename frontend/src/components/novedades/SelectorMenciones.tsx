@@ -156,7 +156,16 @@ const SelectorMenciones = ({ tipo, seleccionados, onCambio }: Props) => {
         />
       </div>
 
-      <div className="max-h-64 overflow-y-auto rounded-md border">
+      {/*
+        El modal bloquea la rueda del mouse en toda la página (react-remove-scroll)
+        y aquí, con la lista dentro de un modal que también desplaza, se comía
+        también la de la lista: solo servía la barra. Cortar la propagación
+        deja que la rueda la maneje el navegador, que desplaza esta lista.
+      */}
+      <div
+        className="max-h-64 overflow-y-auto overscroll-contain rounded-md border"
+        onWheel={(e) => e.stopPropagation()}
+      >
         {cargando && <p className="px-3 py-2 text-sm text-muted-foreground">Cargando…</p>}
         {!cargando && items.length === 0 && (
           <p className="px-3 py-2 text-sm text-muted-foreground">
