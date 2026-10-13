@@ -34,7 +34,10 @@ export function useCrearNovedad() {
     mutationFn: (input: CrearNovedadInput) => novedadesApi.crear(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['novedades'] });
-      toast({ title: 'Novedad creada' });
+      toast({
+        title: 'Novedad enviada',
+        description: 'Se notificará al personal encargado.',
+      });
     },
     onError: (error: unknown) => {
       toast({
