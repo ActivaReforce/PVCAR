@@ -30,6 +30,9 @@ export interface TableroGeneral {
   encuestasPublicadas: number;
   asistenciaAlumnos: Asistencia;
   asistenciaEntrenadores: Asistencia;
+  /** Correos que salieron hoy (día de Ecuador), todos los tipos. */
+  correosHoy: number;
+  correosHoyPorTipo: Array<{ tipo: string; enviados: number }>;
 }
 
 export interface ColegioDelCoordinador {

@@ -128,6 +128,7 @@ export async function enviarComo(
   const { paraExtra: _ignorado, ...resto } = correo;
   return enviarCorreo({
     ...resto,
+    tipo,
     para,
     de: `${config.nombre} <${config.usuario}@${env.CORREO_DOMINIO}>`,
     cc: config.cc,

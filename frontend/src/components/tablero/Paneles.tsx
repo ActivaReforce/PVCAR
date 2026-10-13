@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   ClipboardList,
   GraduationCap,
+  Mail,
   School,
   Users,
   UsersRound,
@@ -28,6 +29,20 @@ import TarjetaCifra from './TarjetaCifra';
  * su propio hook con entre 9 y 14 consultas a Supabase, y el del representante
  * además cruzaba asistencias y evaluaciones en memoria.
  */
+
+const NOMBRE_CORREO: Record<string, string> = {
+  inscripciones: 'inscripción aprobada',
+  inscripciones_aviso: 'inscripción nueva',
+  novedades: 'novedades',
+  ausencias: 'ausencias',
+  recuperar_contrasena: 'recuperar contraseña',
+};
+
+/** "3 ausencias · 1 novedades": de dónde salieron los de hoy. */
+const detalleCorreos = (porTipo: TableroGeneral['correosHoyPorTipo']) =>
+  porTipo.length === 0
+    ? 'Vuelve a 0 a las 00:00 (Ecuador)'
+    : porTipo.map((t) => `${t.enviados} ${NOMBRE_CORREO[t.tipo] ?? t.tipo}`).join(' · ');
 
 export const PanelGeneral = ({ datos }: { datos: TableroGeneral }) => (
   <div className="space-y-6">
@@ -75,6 +90,12 @@ export const PanelGeneral = ({ datos }: { datos: TableroGeneral }) => (
         valor={datos.encuestasPublicadas}
         detalle={datos.encuestasPublicadas === 0 ? 'El módulo se estrena vacío' : undefined}
         icono={CalendarCheck}
+      />
+      <TarjetaCifra
+        titulo="Correos enviados hoy"
+        valor={datos.correosHoy}
+        detalle={detalleCorreos(datos.correosHoyPorTipo)}
+        icono={Mail}
       />
     </div>
 

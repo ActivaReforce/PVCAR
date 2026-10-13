@@ -1,4 +1,6 @@
 import { env } from '../config/env.js';
+import { getPool } from '../config/db.js';
+import { HOY_EC } from './fecha.js';
 
 /**
  * Correo propio de la aplicacion, por la API HTTP de Resend.
@@ -23,6 +25,27 @@ export interface Correo {
   responderA?: string | null;
   /** Resend acepta adjuntos en base64; el total no debe pasar de 40 MB. */
   adjuntos?: Array<{ nombre: string; contenido: Buffer }>;
+  /** Para el contador del tablero (correo_diario). */
+  tipo?: string;
+}
+
+/**
+ * Suma uno al contador de hoy (día de Ecuador) de ese tipo: el número de
+ * "Correos enviados hoy" del tablero. Una fila por día y tipo, no por correo.
+ * Nunca lanza: un contador que falla no es motivo para dar un envío por malo.
+ */
+export async function contarEnvio(tipo: string): Promise<void> {
+  try {
+    await getPool().query(
+      `INSERT INTO public.correo_diario (cordia_dia, cordia_tipo, cordia_enviados)
+       VALUES (${HOY_EC}, $1, 1)
+       ON CONFLICT (cordia_dia, cordia_tipo)
+       DO UPDATE SET cordia_enviados = public.correo_diario.cordia_enviados + 1`,
+      [tipo],
+    );
+  } catch (err) {
+    console.error('No se pudo contar el correo enviado:', err);
+  }
 }
 
 export async function enviarCorreo(correo: Correo): Promise<boolean> {
@@ -62,6 +85,7 @@ export async function enviarCorreo(correo: Correo): Promise<boolean> {
       console.error(`Resend respondio ${respuesta.status}:`, await respuesta.text());
       return false;
     }
+    await contarEnvio(correo.tipo ?? 'otro');
     return true;
   } catch (err) {
     console.error('No se pudo llamar a Resend:', err);
