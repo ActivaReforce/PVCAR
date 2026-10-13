@@ -7,7 +7,14 @@ import { getPool } from '../../config/db.js';
  * El listado trae la novedad + autor + menciones agregadas en un solo
  * viaje con `jsonb_agg`; en el sistema viejo cada tipo de dato era una
  * consulta por fila.
+ *
+ * Eliminar es una baja (0032): `est_id` 2 la quita de la pantalla y del
+ * número del menú, pero sigue en Reportes → Novedades. Todo lo de aquí mira
+ * solo las que están en pantalla.
  */
+
+/** est_id de una novedad en pantalla (constants.ESTADO.ACTIVO). */
+const EN_PANTALLA = 1;
 
 export type TipoNovedad = 'general' | 'personal' | 'representante' | 'alumno';
 
@@ -96,7 +103,7 @@ const SQL_SELECT = `
 `;
 
 export async function listar(filtros: FiltrosListar, client?: PoolClient): Promise<Novedad[]> {
-  const where: string[] = [];
+  const where: string[] = [`n.est_id = ${EN_PANTALLA}`];
   const params: unknown[] = [];
   const add = (expr: string, valor: unknown) => {
     params.push(valor);
@@ -164,7 +171,7 @@ export async function listar(filtros: FiltrosListar, client?: PoolClient): Promi
 
 export async function obtener(id: number, client?: PoolClient): Promise<Novedad | null> {
   const { rows } = await (client ?? getPool()).query<Novedad>(
-    `${SQL_SELECT} WHERE n.nov_id = $1`,
+    `${SQL_SELECT} WHERE n.nov_id = $1 AND n.est_id = ${EN_PANTALLA}`,
     [id],
   );
   return rows[0] ?? null;
@@ -208,8 +215,14 @@ export async function ligarAlumnos(
   );
 }
 
-export async function eliminar(client: PoolClient, nov_id: number): Promise<boolean> {
-  const { rowCount } = await client.query('DELETE FROM public.novedad WHERE nov_id = $1', [nov_id]);
+/** Baja: deja de verse, pero queda con quién y cuándo la quitó. */
+export async function darDeBaja(client: PoolClient, nov_id: number, usu_id: number): Promise<boolean> {
+  const { rowCount } = await client.query(
+    `UPDATE public.novedad
+        SET est_id = 2, nov_eliminada_por = $2, nov_fecha_eliminacion = now()
+      WHERE nov_id = $1 AND est_id = ${EN_PANTALLA}`,
+    [nov_id, usu_id],
+  );
   return (rowCount ?? 0) > 0;
 }
 
@@ -399,13 +412,14 @@ export async function correosDeRepresentantesDe(nino_ids: number[]): Promise<str
  *
  * El "+ 1 ms" es porque la base guarda microsegundos y la fecha que vuelve
  * del navegador solo trae milisegundos: sin él, la última vista contaría
- * siempre como nueva. Usa ix_novedad_fecha.
+ * siempre como nueva. Usa ix_novedad_activas_fecha.
  */
 export async function contarNuevas(usu_id: number): Promise<number> {
   const { rows } = await getPool().query<{ nuevas: number }>(
     `SELECT count(*)::int AS nuevas
        FROM public.novedad n
-      WHERE n.nov_autor_id <> $1
+      WHERE n.est_id = ${EN_PANTALLA}
+        AND n.nov_autor_id <> $1
         AND n.nov_fecha_creacion >= COALESCE(
               (SELECT novvis_hasta FROM public.novedad_visto WHERE usu_id = $1),
               '-infinity'::timestamptz) + interval '1 millisecond'`,

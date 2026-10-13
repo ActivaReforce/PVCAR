@@ -47,8 +47,13 @@ export interface ReporteDisponible {
   columnasSensibles: Columna[];
 }
 
+function accionDe(definicion: Definicion): string {
+  return definicion.accion ?? 'ver';
+}
+
 function puedeVer(actor: AuthUser, definicion: Definicion): boolean {
-  return actor.permisos.some((p) => p.modulo === definicion.modulo && p.accion === 'ver');
+  const accion = accionDe(definicion);
+  return actor.permisos.some((p) => p.modulo === definicion.modulo && p.accion === accion);
 }
 
 /**
@@ -75,7 +80,7 @@ function exigirDefinicion(actor: AuthUser, id: string): Definicion {
   const definicion = definicionDe(id);
   if (!definicion) throw new ApiError(404, 'Ese reporte no existe');
   if (!puedeVer(actor, definicion)) {
-    throw new ApiError(403, `Sin permiso: ${definicion.modulo}:ver`);
+    throw new ApiError(403, `Sin permiso: ${definicion.modulo}:${accionDe(definicion)}`);
   }
   return definicion;
 }

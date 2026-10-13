@@ -81,7 +81,7 @@ export function useEliminarNovedad() {
     mutationFn: (id: number) => novedadesApi.eliminar(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['novedades'] });
-      toast({ title: 'Novedad eliminada' });
+      toast({ title: 'Novedad eliminada', description: 'Sigue en Reportes → Novedades.' });
     },
     onError: (error: unknown) => {
       toast({

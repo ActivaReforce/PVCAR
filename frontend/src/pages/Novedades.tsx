@@ -297,7 +297,7 @@ const Novedades = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar esta novedad?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se borra definitivamente. El correo que ya salió no se puede retirar.
+              Deja de verse aquí, pero queda guardada en Reportes → Novedades. El correo que ya salió no se puede retirar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

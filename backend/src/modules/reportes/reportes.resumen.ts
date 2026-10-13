@@ -476,6 +476,18 @@ const evaluaciones: Constructor = (filas) => {
   ];
 };
 
+const novedades: Constructor = (filas) => {
+  const medidas = (): Medida[] => [
+    cuenta('Total'),
+    cuantos('En pantalla', (f) => texto(f.estado) === 'En pantalla'),
+    cuantos('Eliminadas', (f) => texto(f.estado) === 'Eliminada'),
+  ];
+  return [
+    agrupar('Por tipo', filas, [{ cabecera: 'Tipo', de: campo('tipo') }], medidas()),
+    agrupar('Por autor', filas, [{ cabecera: 'Escrita por', de: campo('autor') }], medidas()),
+  ];
+};
+
 const RESUMENES: Record<string, Constructor> = {
   usuarios,
   colegios,
@@ -486,6 +498,7 @@ const RESUMENES: Record<string, Constructor> = {
   'asistencias-alumnos': asistenciasAlumnos,
   'asistencias-entrenadores': asistenciasEntrenadores,
   evaluaciones,
+  novedades,
 };
 
 export function resumenDe(id: string, filas: Fila[], filtros: FiltrosReporte): Bloque[] {

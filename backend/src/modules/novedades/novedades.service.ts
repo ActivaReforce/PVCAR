@@ -206,12 +206,15 @@ export async function eliminar(actor: AuthUser, id: number): Promise<{ eliminada
   const { autor } = novedad;
   if (!autor) throw new ApiError(403, 'Sin permiso: novedades:eliminar');
 
+  // Baja, no borrado: la novedad sigue en Reportes → Novedades.
   await enTransaccion(async (client) => {
-    await repo.eliminar(client, id);
+    if (!(await repo.darDeBaja(client, id, actor.usuario.usu_id))) {
+      throw new ApiError(404, 'Esa novedad ya no está');
+    }
     await auditar(
       {
         actor,
-        accion: 'eliminar',
+        accion: 'baja',
         entidad: 'novedad',
         entidadId: id,
         detalle: {

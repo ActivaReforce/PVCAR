@@ -45,8 +45,12 @@ vi.mock('../../config/db.js', () => ({
 
 const service = await import('./reportes.service.js');
 
-function actorCon(modulos: string[], roles: number[] = [ROL.COORDINADOR]) {
-  const permisos = modulos.map((modulo) => ({ modulo, accion: 'ver' }));
+function actorCon(
+  modulos: string[],
+  roles: number[] = [ROL.COORDINADOR],
+  extra: Array<{ modulo: string; accion: string }> = [],
+) {
+  const permisos = [...modulos.map((modulo) => ({ modulo, accion: 'ver' })), ...extra];
   return {
     authUserId: 'auth-58',
     usuario: {
@@ -64,6 +68,7 @@ function actorCon(modulos: string[], roles: number[] = [ROL.COORDINADOR]) {
 const TODO = actorCon(
   DEFINICIONES.map((d) => d.modulo),
   [ROL.PROPIETARIO],
+  [{ modulo: 'novedades', accion: 'eliminar' }],
 );
 
 beforeEach(() => {
@@ -72,8 +77,21 @@ beforeEach(() => {
 });
 
 describe('el catalogo', () => {
-  it('trae los nueve reportes a quien tiene todos los permisos', () => {
-    expect(service.catalogo(TODO)).toHaveLength(9);
+  it('trae los diez reportes a quien tiene todos los permisos', () => {
+    expect(service.catalogo(TODO)).toHaveLength(10);
+  });
+
+  /**
+   * Todos tienen novedades:ver, pero el reporte enseña autores y eliminadas:
+   * pide Eliminar, como en el módulo (2026-10-12).
+   */
+  it('el de Novedades pide Eliminar, no basta con Ver', async () => {
+    const soloVer = actorCon(['novedades'], [ROL.ENTRENADOR]);
+    expect(service.catalogo(soloVer).map((r) => r.id)).not.toContain('novedades');
+    await expect(
+      service.ejecutar(soloVer, 'novedades', { page: 1, limit: 50 }),
+    ).rejects.toMatchObject({ statusCode: 403, message: 'Sin permiso: novedades:eliminar' });
+    expect(service.catalogo(TODO).map((r) => r.id)).toContain('novedades');
   });
 
   /**

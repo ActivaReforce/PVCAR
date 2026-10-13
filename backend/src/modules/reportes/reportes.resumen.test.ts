@@ -100,7 +100,7 @@ describe('ej2 — alumnos por disciplina', () => {
 });
 
 describe('los demás reportes', () => {
-  it('los nueve tienen Resumen', () => {
+  it('todos tienen Resumen', () => {
     const fila: Fila = { estado: 'Activo', _roles: ['Entrenador'], _colegios: ['Colegio A'] };
     for (const def of DEFINICIONES) {
       expect(resumenDe(def.id, [fila], {}).length, def.id).toBeGreaterThan(0);

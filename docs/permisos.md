@@ -19,7 +19,7 @@ Vigente desde la migración `0026_permisos_crud.sql` (2026-10-07). Sale de las r
 | Asistencia de personal | Consultar listas | — | Pasar lista | — |
 | Encuestas | Lista, vista previa y resultados (solo de las familias de su alcance) | Crear | Preguntas, finalizar, publicar, volver a borrador | Borrar |
 | Inscripciones | Lista (el representante, solo las suyas) | *(las crea el representante desde el formulario)* | Aprobar, documentos, precios, abrir y cerrar | Rechazar |
-| Novedades | Las suyas y las que le tocan (ver abajo) | Escribir una novedad | Pestaña Configuración: correo y avisos | Borrar novedades (también las propias) y ver quién escribió cada una |
+| Novedades | Las suyas y las que le tocan (ver abajo) | Escribir una novedad | Pestaña Configuración: correo y avisos | Quitar novedades de la pantalla (también las propias; siguen en Reportes), ver quién escribió cada una y el reporte de Novedades |
 | Reportes | Ver, gráficas y Data anterior | Exportar a Excel | — | — |
 | Perfil | Ver y editar el propio perfil | — | — | — |
 | Permisos | Ver la matriz | — | Guardar la matriz | — |
@@ -38,7 +38,7 @@ El backend las rechaza con 400 aunque lleguen por otro lado (`permisos.service.t
 - **Encuestas (gestión):** el representante no entra aunque tenga la casilla (`requirePersonal`).
 - **Permisos:** guardar exige además ser Propietario o Admin. Al Propietario no se le pueden quitar Ver ni Editar de Permisos: sin ellas nadie podría volver a repartirlos.
 - **Correos** (Configuración de Inscripciones): solo Propietario, sin casilla. El de Novedades lo abre la casilla Editar de Novedades (`0029`: Propietario y Admin).
-- **Novedades:** sin Eliminar nadie borra, ni siquiera la suya: lo enviado se queda. Propietario y Admin ven todas; el resto, las suyas, las de personal que lo mencionan (si está activo el aviso al mencionado) y, si es representante, las de representantes que lo mencionan y las de sus hijos (si está activo el aviso al representante). Al escribir, Personal lista a quien tiene algún rol que no sea Representante; Alumnos y Representantes, solo los de su alcance; para el representante, su alcance al mencionar son **los alumnos del colegio de sus hijos** (excepción pedida por el cliente el 2026-10-12, solo para mencionar: no le abre fichas ni datos). Las listas se agrupan por colegio cuando hay más de uno. Las generales solo las ven su autor, Propietario y Admin.
+- **Novedades:** sin Eliminar nadie quita ninguna, ni siquiera la suya: lo enviado se queda. Eliminar es una baja: deja de verse en el módulo y sigue en Reportes → Novedades, que también pide Eliminar (Propietario y Admin, todas; otro con Eliminar, las suyas). Propietario y Admin ven todas; el resto, las suyas, las de personal que lo mencionan (si está activo el aviso al mencionado) y, si es representante, las de representantes que lo mencionan y las de sus hijos (si está activo el aviso al representante). Al escribir, Personal lista a quien tiene algún rol que no sea Representante; Alumnos y Representantes, solo los de su alcance; para el representante, su alcance al mencionar son **los alumnos del colegio de sus hijos** (excepción pedida por el cliente el 2026-10-12, solo para mencionar: no le abre fichas ni datos). Las listas se agrupan por colegio cuando hay más de uno. Las generales solo las ven su autor, Propietario y Admin.
 
 ## Qué cambió en la 0026
 

@@ -126,9 +126,9 @@ const AYUDA: Record<string, { acciones: Partial<Record<Accion, string>>; nota?: 
       ver: 'las suyas y las que le tocan.',
       crear: 'escribir una novedad.',
       editar: 'pestaña Configuración (correo y avisos).',
-      eliminar: 'borrar novedades y ver quién las escribió.',
+      eliminar: 'quitarlas de la pantalla, ver quién las escribió y su reporte.',
     },
-    nota: 'Sin Eliminar nadie borra, ni la suya. Propietario y Admin ven todas.',
+    nota: 'Sin Eliminar nadie quita ninguna, ni la suya. Las eliminadas siguen en Reportes. Propietario y Admin ven todas.',
   },
   reportes: {
     acciones: { ver: 'reportes, gráficas y Data anterior.', crear: 'exportar a Excel.' },
