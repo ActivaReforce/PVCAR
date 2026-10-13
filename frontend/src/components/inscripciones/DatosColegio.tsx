@@ -29,8 +29,8 @@ const camposDe = (f: PrecioColegio): Campos => ({
 /**
  * Lo de un colegio que usan la inscripción y sus documentos: la tarifa
  * mensual, el descuento por hermano, el mínimo de alumnos y cómo se nombra
- * la sede. La ficha y el contrato son un texto común para todos; estos datos
- * entran en él con marcadores ({{sede}}, {{tarifa}}…).
+ * la sede. Estos datos entran en la ficha y el contrato del colegio con
+ * marcadores ({{sede}}, {{tarifa}}…).
  *
  * Dentro de un colegio todas las disciplinas cuestan lo mismo. Si en una
  * misma inscripción van hermanos, lidera el que más disciplinas tiene (paga

@@ -5,7 +5,6 @@ import {
   FileDown,
   History,
   Pencil,
-  RotateCcw,
   Save,
   Send,
   Trash2,
@@ -51,12 +50,10 @@ import {
   useGuardarBorrador,
   usePrecios,
   usePublicarDocumento,
-  useVolverAlComun,
 } from '@/hooks/useInscripciones';
 import {
   inscripcionesApi,
   NOMBRE_DOCUMENTO,
-  TIPOS_DOCUMENTO,
   type Documentos,
   type PrecioColegio,
   type TipoDocumento,
@@ -75,7 +72,7 @@ import { ZONA } from '@/lib/fecha';
 
 /** Iguales para cualquier colegio: se leen y se aceptan. */
 const GENERALES: TipoDocumento[] = ['autorizacion_datos', 'datos_medicos', 'imagen', 'politica'];
-/** Un texto común, llenado con los datos de cada colegio; o uno propio del colegio (0035). */
+/** Uno por colegio: cada colegio publica los suyos (2026-10-13). */
 const POR_COLEGIO: Array<'ficha_matricula' | 'contrato'> = ['ficha_matricula', 'contrato'];
 
 /**
@@ -101,11 +98,10 @@ const GRUPOS_DE_DATOS: Array<{ titulo: string; ayuda: string; claves: string[] }
  *
  * - **Generales**: autorización de datos, salud, imagen y política. Se leen
  *   y se aceptan; son iguales para todos los colegios.
- * - **Por colegio**: ficha de matrícula y contrato. Se elige el colegio, se
- *   editan sus datos y se ven sus documentos llenos. Por defecto el texto es
- *   **común** (los Word de cada colegio eran el mismo texto con otros datos),
- *   pero un colegio puede tener **el suyo** (2026-10-12): editarlo desde su
- *   tarjeta crea una versión solo para él, y "Volver al texto común" la deja.
+ * - **Por colegio**: ficha de matrícula y contrato, **una de cada por
+ *   colegio** (2026-10-13). Todos arrancan con el texto base, sin publicar;
+ *   se publican tal cual o se editan antes, y lo de un colegio no toca a los
+ *   demás.
  * - **Configuración**: el membrete de los PDF.
  *
  * Cada documento es una tarjeta: tocarla enseña cómo queda; desde ahí se
@@ -127,7 +123,7 @@ const DocumentosLegales = () => {
     );
   }
 
-  const sinPublicar = TIPOS_DOCUMENTO.filter((t) => !documentos.data.vigentes.some((v) => v.doc_tipo === t));
+  const sinPublicar = GENERALES.filter((t) => !documentos.data.vigentes.some((v) => v.doc_tipo === t));
 
   const verEjemplo = async () => {
     setBajando(true);
@@ -152,12 +148,14 @@ const DocumentosLegales = () => {
             <p className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
               <span>
-                El formulario no se abre hasta que estén publicados los seis. Faltan:{' '}
+                El formulario no se abre hasta que estén publicados los cuatro generales. Faltan:{' '}
                 {sinPublicar.map((t) => NOMBRE_DOCUMENTO[t]).join(', ')}.
               </span>
             </p>
           ) : (
-            <p className="text-muted-foreground">Los seis están publicados.</p>
+            <p className="text-muted-foreground">
+              Los cuatro generales están publicados. La ficha y el contrato se publican en cada colegio.
+            </p>
           )}
         </div>
         <Button
@@ -335,9 +333,8 @@ const PorColegio = ({ datos }: { datos: Documentos }) => {
       <div className="space-y-1 pt-2">
         <h3 className="text-base font-semibold">Ficha de matrícula y contrato de {fila.col_nombre}</h3>
         <p className="text-sm text-muted-foreground">
-          Usan el texto común con los datos de este colegio. Si este colegio necesita algo distinto, edítalo
-          aquí: el cambio vale <strong>solo para {fila.col_nombre}</strong> y lo acepta quien se inscriba en él.
-          "Volver al texto común" lo deshace.
+          Arrancan con el texto de siempre y los datos de este colegio. Publícalos tal cual o edítalos antes:
+          lo que cambies vale <strong>solo para {fila.col_nombre}</strong>.
         </p>
       </div>
       {POR_COLEGIO.map((tipo) => (
@@ -350,22 +347,11 @@ const PorColegio = ({ datos }: { datos: Documentos }) => {
         />
       ))}
       <PdfDeEjemplo colId={fila.col_id} texto={`PDF de ejemplo de ${fila.col_nombre}`} />
-
-      <div className="space-y-1 border-t pt-5">
-        <h3 className="text-base font-semibold">Texto común</h3>
-        <p className="text-sm text-muted-foreground">
-          Lo usan todos los colegios que no tienen texto propio. Un cambio aquí vale para todos ellos; la
-          vista previa sale con los datos de {fila.col_nombre}.
-        </p>
-      </div>
-      {POR_COLEGIO.map((tipo) => (
-        <TarjetaDocumento key={`comun-${tipo}`} tipo={tipo} datos={datos} ejemplo={ejemploDe(fila)} />
-      ))}
     </div>
   );
 };
 
-/** El PDF de ejemplo con la ficha y el contrato de un colegio (los suyos o los comunes). */
+/** El PDF de ejemplo con la ficha y el contrato de un colegio. */
 const PdfDeEjemplo = ({ colId, texto }: { colId: number; texto: string }) => {
   const { toast } = useToast();
   const [bajando, setBajando] = useState(false);
@@ -407,20 +393,16 @@ const TarjetaDocumento = ({
   datos: Documentos;
   /** Con qué se llena la vista previa: por defecto el alumno de ejemplo. */
   ejemplo?: DatosDocumento;
-  /** Si se da, la tarjeta es la de ese colegio: editar crea su texto propio. */
+  /** Ficha y contrato: el colegio de la tarjeta. */
   colegio?: { id: number; nombre: string };
 }) => {
   const { hasPermission } = usePermissions();
   const puedeEditar = hasPermission('inscripciones', 'editar');
 
   const colId = colegio?.id ?? null;
-  const comun = datos.vigentes.find((d) => d.doc_tipo === tipo);
-  const propio = colegio
+  const vigente = colegio
     ? datos.propios.find((p) => p.doc_tipo === tipo && p.col_id === colegio.id)
-    : undefined;
-  /** El colegio usa hoy su texto propio (no una vuelta al común). */
-  const usaPropio = propio !== undefined && !propio.doc_usa_comun;
-  const vigente = usaPropio ? propio : comun;
+    : datos.vigentes.find((d) => d.doc_tipo === tipo);
   const borrador = datos.borradores.find((d) => d.doc_tipo === tipo && d.col_id === colId);
   const anteriores = datos.historial.filter(
     (h) => h.doc_tipo === tipo && h.col_id === colId && h.doc_id !== vigente?.doc_id,
@@ -451,36 +433,24 @@ const TarjetaDocumento = ({
   const guardar = useGuardarBorrador();
   const publicar = usePublicarDocumento();
   const descartar = useBorrarBorrador();
-  const volver = useVolverAlComun();
-  const [confirmarVolver, setConfirmarVolver] = useState(false);
 
   const sinCambios = base !== undefined && base.doc_titulo === titulo.trim() && base.doc_contenido === contenido;
   const valido = titulo.trim().length >= 3 && contenido.trim().length >= 20;
   const problemas = problemasDePlantilla(tipo, editando ? contenido : textoGuardado, datos.marcadores);
 
   const estado = borrador
-    ? {
-        texto: `Borrador${colegio ? ' propio' : ''} v${borrador.doc_version} sin publicar`,
-        variante: 'secondary' as const,
-      }
+    ? { texto: `Borrador v${borrador.doc_version} sin publicar`, variante: 'secondary' as const }
     : vigente
-      ? {
-          texto: !colegio
-            ? `Publicado · v${vigente.doc_version}`
-            : usaPropio
-              ? `Propio · v${vigente.doc_version}`
-              : `Texto común · v${vigente.doc_version}`,
-          variante: (colegio && !usaPropio ? 'outline' : 'default') as 'outline' | 'default',
-        }
-      : { texto: 'Sin guardar', variante: 'outline' as const };
+      ? { texto: `Publicado · v${vigente.doc_version}`, variante: 'default' as const }
+      : { texto: 'Sin publicar', variante: 'outline' as const };
 
-  const resumen = !vigente
-    ? base
+  const resumen = vigente
+    ? `Publicado el ${fechaCorta(vigente.doc_publicado ?? vigente.doc_fecha)} · ${aceptaciones} inscripciones lo aceptaron`
+    : base
       ? 'Guardado, sin publicar'
-      : 'Texto de su Word, sin guardar todavía'
-    : colegio && !usaPropio
-      ? `Usa el texto común. Editar crea uno solo para ${colegio.nombre}.`
-      : `${colegio ? 'Propio de este colegio · p' : 'P'}ublicado el ${fechaCorta(vigente.doc_publicado ?? vigente.doc_fecha)} · ${aceptaciones} inscripciones lo aceptaron`;
+      : colegio
+        ? 'Con el texto de siempre, sin publicar todavía en este colegio'
+        : 'Texto de su Word, sin guardar todavía';
 
   const insertar = (clave: string) => {
     const marca = `{{${clave}}}`;
@@ -519,10 +489,13 @@ const TarjetaDocumento = ({
     setEditando(false);
   };
 
+  /** Publica el borrador; sin borrador, guarda primero el texto tal como se ve. */
   const publicarAhora = async () => {
-    if (!borrador) return;
     try {
-      await publicar.mutateAsync(borrador.doc_id);
+      const doc =
+        borrador ??
+        (await guardar.mutateAsync({ tipo, col_id: colId, titulo: tituloGuardado, contenido: textoGuardado }));
+      await publicar.mutateAsync(doc.doc_id);
     } catch {
       // El hook ya muestra el motivo.
     }
@@ -574,14 +547,21 @@ const TarjetaDocumento = ({
                   <Button className="h-11 sm:h-10" variant="outline" onClick={() => setEditando(true)}>
                     <Pencil className="mr-2 h-4 w-4" /> Editar
                   </Button>
-                  {!base && (
+                  {!base && colegio && (
+                    <Button
+                      className="h-11 sm:h-10"
+                      disabled={problemas.length > 0 || guardar.isPending || publicar.isPending}
+                      onClick={() => setConfirmarPublicar(true)}
+                    >
+                      <Send className="mr-2 h-4 w-4" /> Publicar tal cual
+                    </Button>
+                  )}
+                  {!base && !colegio && (
                     <Button
                       className="h-11 sm:h-10"
                       variant="outline"
                       disabled={guardar.isPending}
-                      onClick={() =>
-                        guardar.mutate({ tipo, col_id: colId, titulo: tituloGuardado, contenido: textoGuardado })
-                      }
+                      onClick={() => guardar.mutate({ tipo, titulo: tituloGuardado, contenido: textoGuardado })}
                     >
                       <Save className="mr-2 h-4 w-4" /> Guardar tal cual
                     </Button>
@@ -605,16 +585,7 @@ const TarjetaDocumento = ({
                       </Button>
                     </>
                   )}
-                  {colegio && usaPropio && (
-                    <Button
-                      className="h-11 sm:h-10"
-                      variant="ghost"
-                      disabled={volver.isPending}
-                      onClick={() => setConfirmarVolver(true)}
-                    >
-                      <RotateCcw className="mr-2 h-4 w-4" /> Volver al texto común
-                    </Button>
-                  )}
+
                 </div>
               </ConditionalAction>
             </>
@@ -647,14 +618,12 @@ const TarjetaDocumento = ({
                 {anteriores.map((h) => (
                   <li key={h.doc_id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                     <span className="min-w-0">
-                      Versión {h.doc_version} · {fechaCorta(h.doc_publicado ?? h.doc_fecha)} ·{' '}
-                      {h.doc_usa_comun ? 'volvió al texto común' : `${h.aceptaciones} inscripciones`}
+                      Versión {h.doc_version} · {fechaCorta(h.doc_publicado ?? h.doc_fecha)} · {h.aceptaciones}{' '}
+                      inscripciones
                     </span>
-                    {!h.doc_usa_comun && (
-                      <Button variant="ghost" size="sm" onClick={() => setViendo(h.doc_id)}>
-                        Ver
-                      </Button>
-                    )}
+                    <Button variant="ghost" size="sm" onClick={() => setViendo(h.doc_id)}>
+                      Ver
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -666,11 +635,13 @@ const TarjetaDocumento = ({
       <AlertDialog open={confirmarPublicar} onOpenChange={setConfirmarPublicar}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Publicar la versión {borrador?.doc_version}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {borrador ? `¿Publicar la versión ${borrador.doc_version}?` : `¿Publicar ${NOMBRE_DOCUMENTO[tipo].toLowerCase()} tal cual?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {colegio
                 ? `Desde ahora la aceptarán quienes se inscriban en ${colegio.nombre}; los demás colegios no cambian.`
-                : 'Desde ahora la aceptarán quienes se inscriban en los colegios sin texto propio.'}{' '}
+                : 'Desde ahora la aceptarán quienes se inscriban.'}{' '}
               Ya no se podrá editar: para cambiarla habrá que publicar otra. Las inscripciones ya enviadas
               conservan la versión que aceptaron.
             </AlertDialogDescription>
@@ -681,29 +652,6 @@ const TarjetaDocumento = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {colegio && (
-        <AlertDialog open={confirmarVolver} onOpenChange={setConfirmarVolver}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿{colegio.nombre} vuelve al texto común?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Quienes se inscriban en {colegio.nombre} aceptarán desde ahora el texto común de{' '}
-                {NOMBRE_DOCUMENTO[tipo].toLowerCase()}. Su texto propio queda en las versiones anteriores, y
-                las inscripciones ya enviadas conservan la versión que aceptaron.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => volver.mutate({ tipo: tipo as 'ficha_matricula' | 'contrato', colId: colegio.id })}
-              >
-                Volver al texto común
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
 
       <VisorDocumento id={viendo} ejemplo={ejemplo} onClose={() => setViendo(null)} />
     </section>

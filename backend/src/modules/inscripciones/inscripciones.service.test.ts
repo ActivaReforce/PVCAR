@@ -523,7 +523,14 @@ describe('calcularEstado', () => {
     'imagen',
     'politica',
   ]);
-  const listo = { col_id: 1, col_nombre: 'A', precio: 30, abierta: true, disciplinas_activas: 2 };
+  const listo = {
+    col_id: 1,
+    col_nombre: 'A',
+    precio: 30,
+    abierta: true,
+    disciplinas_activas: 2,
+    publicados: ['ficha_matricula', 'contrato'] as Tipo[],
+  };
 
   it('abiertas con todo publicado, interruptor encendido y un colegio listo', () => {
     const e = calcularEstado(todos, true, [listo, { ...listo, col_id: 2, abierta: false }]);
@@ -545,44 +552,33 @@ describe('calcularEstado', () => {
   });
 
   it('un colegio sin contrato publicado, sin valores ni disciplinas dice por que', () => {
-    const sinContrato = new Set([...todos].filter((t) => t !== 'contrato'));
-    const e = calcularEstado(sinContrato, true, [
-      { col_id: 1, col_nombre: 'A', precio: null, abierta: null, disciplinas_activas: 0 },
+    const e = calcularEstado(todos, true, [
+      { col_id: 1, col_nombre: 'A', precio: null, abierta: null, disciplinas_activas: 0, publicados: ['ficha_matricula'] },
     ]);
     expect(e.colegios[0]!.motivos).toHaveLength(4);
     expect(e.motivos).toContain('Ningún colegio tiene las inscripciones abiertas.');
   });
 });
 
-describe('ficha y contrato propios de un colegio (0035)', () => {
+describe('ficha y contrato de cada colegio (0036)', () => {
   type Doc = Parameters<typeof documentoDelColegio>[0][number];
-  const doc = (doc_id: number, extra: Partial<Doc> = {}): Doc =>
-    ({ doc_id, doc_tipo: 'contrato', col_id: null, doc_usa_comun: false, ...extra }) as Doc;
-  const comunes = [doc(1)];
+  const doc = (doc_id: number, col_id: number): Doc => ({ doc_id, doc_tipo: 'contrato', col_id }) as Doc;
+  const listo = { col_id: 1, col_nombre: 'A', precio: 30, abierta: true, disciplinas_activas: 2 };
+  const generales = new Set(['autorizacion_datos', 'datos_medicos', 'imagen', 'politica'] as const);
 
-  it('sin texto propio, el común', () => {
-    expect(documentoDelColegio(comunes, [], 7, 'contrato')!.doc_id).toBe(1);
+  it('cada colegio, el suyo; sin publicar, ninguno', () => {
+    const delColegio = [doc(5, 7)];
+    expect(documentoDelColegio(delColegio, 7, 'contrato')!.doc_id).toBe(5);
+    expect(documentoDelColegio(delColegio, 8, 'contrato')).toBeUndefined();
   });
 
-  it('con texto propio, el suyo; los demás colegios siguen con el común', () => {
-    const propios = [doc(5, { col_id: 7 })];
-    expect(documentoDelColegio(comunes, propios, 7, 'contrato')!.doc_id).toBe(5);
-    expect(documentoDelColegio(comunes, propios, 8, 'contrato')!.doc_id).toBe(1);
-  });
-
-  it('tras volver al común, el común otra vez', () => {
-    const propios = [doc(6, { col_id: 7, doc_usa_comun: true })];
-    expect(documentoDelColegio(comunes, propios, 7, 'contrato')!.doc_id).toBe(1);
-  });
-
-  it('un colegio con contrato propio se abre aunque no haya común', () => {
-    const sinContrato = new Set(['ficha_matricula', 'autorizacion_datos', 'datos_medicos', 'imagen', 'politica'] as const);
-    const listo = { col_id: 1, col_nombre: 'A', precio: 30, abierta: true, disciplinas_activas: 2 };
-    const e = calcularEstado(sinContrato, true, [
-      { ...listo, propios: ['contrato'] },
-      { ...listo, col_id: 2, col_nombre: 'B' },
+  it('un colegio nuevo no abre hasta publicar su ficha y su contrato', () => {
+    const e = calcularEstado(generales, true, [
+      { ...listo, publicados: ['ficha_matricula', 'contrato'] },
+      { ...listo, col_id: 2, col_nombre: 'Nuevo', publicados: ['ficha_matricula'] },
     ]);
     expect(e.colegios.map((c) => c.abierto)).toEqual([true, false]);
+    expect(e.colegios[1]!.motivos[0]).toContain('Contrato');
     expect(e.abiertas).toBe(true);
   });
 });

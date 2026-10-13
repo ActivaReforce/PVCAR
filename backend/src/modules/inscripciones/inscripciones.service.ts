@@ -305,27 +305,25 @@ export interface Formulario {
 
 /** Iguales para cualquier colegio. */
 export const TIPOS_GENERALES: TipoDocumento[] = ['autorizacion_datos', 'datos_medicos', 'imagen', 'politica'];
-/** Texto común, llenado con los datos de cada colegio; o uno propio del colegio (0035). */
+/**
+ * Uno por colegio (2026-10-13, 0036): cada colegio publica los suyos. Todos
+ * arrancan con el texto base (el que se publicó sin colegio, o el del Word)
+ * y lo que se edita en uno no toca a los demás.
+ */
 export const TIPOS_POR_COLEGIO: TipoDocumento[] = ['ficha_matricula', 'contrato'];
 
-/**
- * La ficha o el contrato que usa un colegio: su última versión propia
- * publicada, salvo que sea una vuelta al común; si no tiene, el común.
- */
+/** La ficha o el contrato vigentes de un colegio: su última versión publicada. */
 export function documentoDelColegio(
-  comunes: repo.DocumentoLegal[],
-  propios: repo.DocumentoLegal[],
+  delColegio: repo.DocumentoLegal[],
   colId: number,
   tipo: TipoDocumento,
 ): repo.DocumentoLegal | undefined {
-  const propio = propios.find((p) => p.col_id === colId && p.doc_tipo === tipo);
-  if (propio && !propio.doc_usa_comun) return propio;
-  return comunes.find((c) => c.doc_tipo === tipo);
+  return delColegio.find((p) => p.col_id === colId && p.doc_tipo === tipo);
 }
 
-/** Los tipos en los que ese colegio usa hoy un texto propio. */
-function propiosActivos(propios: repo.DocumentoLegal[], colId: number): TipoDocumento[] {
-  return propios.filter((p) => p.col_id === colId && !p.doc_usa_comun).map((p) => p.doc_tipo);
+/** Los tipos que ese colegio tiene publicados. */
+function publicadosDelColegio(delColegio: repo.DocumentoLegal[], colId: number): TipoDocumento[] {
+  return delColegio.filter((p) => p.col_id === colId).map((p) => p.doc_tipo);
 }
 
 export interface EstadoColegio {
@@ -362,13 +360,13 @@ export function calcularEstado(
     precio: number | null;
     abierta: boolean | null;
     disciplinas_activas: number;
-    /** Tipos con texto propio publicado y en uso (0035). Cubren al común. */
-    propios?: TipoDocumento[];
+    /** La ficha y el contrato que el colegio tiene publicados. */
+    publicados: TipoDocumento[];
   }>,
 ): EstadoInscripciones {
   const faltan = (tipos: TipoDocumento[]) => tipos.filter((t) => !publicados.has(t));
   const estados = colegios.map((c): EstadoColegio => {
-    const faltanColegio = faltan(TIPOS_POR_COLEGIO).filter((t) => !(c.propios ?? []).includes(t));
+    const faltanColegio = TIPOS_POR_COLEGIO.filter((t) => !c.publicados.includes(t));
     const motivos: string[] = [];
     if (c.precio === null) motivos.push('Faltan los valores del colegio.');
     if (c.disciplinas_activas === 0) motivos.push('No tiene disciplinas activas.');
@@ -405,7 +403,7 @@ export async function estado(): Promise<EstadoInscripciones> {
   return calcularEstado(
     new Set(vigentes.map((v) => v.doc_tipo)),
     config.abiertas,
-    colegios.map((c) => ({ ...c, propios: propiosActivos(propios, c.col_id) })),
+    colegios.map((c) => ({ ...c, publicados: publicadosDelColegio(propios, c.col_id) })),
   );
 }
 
@@ -446,15 +444,18 @@ export async function formulario(): Promise<Formulario> {
     estado(),
     repo.obtenerConfig(),
   ]);
+  // Aquí solo los generales: la ficha y el contrato van por colegio.
   const documentos: Partial<Record<TipoDocumento, repo.DocumentoLegal>> = {};
-  for (const doc of vigentes) documentos[doc.doc_tipo] = doc;
+  for (const doc of vigentes) {
+    if (TIPOS_GENERALES.includes(doc.doc_tipo)) documentos[doc.doc_tipo] = doc;
+  }
   const abiertos = new Set(situacion.colegios.filter((c) => c.abierto).map((c) => c.col_id));
   const colegios = situacion.abiertas ? oferta.filter((c) => abiertos.has(c.col_id)) : [];
 
   const documentos_colegio: Formulario['documentos_colegio'] = {};
   for (const c of colegios) {
     for (const p of propios) {
-      if (p.col_id === c.col_id && !p.doc_usa_comun) {
+      if (p.col_id === c.col_id) {
         (documentos_colegio[c.col_id] ??= {})[p.doc_tipo] = p;
       }
     }
@@ -590,7 +591,7 @@ export async function enviar(
 
   /**
    * Los seis de cada alumno: los generales son de todos, y la ficha y el
-   * contrato los de su colegio (propios o comunes, 0035). Cada uno tiene que
+   * contrato, los de su colegio. Cada uno tiene que
    * ser exactamente la versión que el representante tuvo delante.
    */
   const [vigentes, propios] = await Promise.all([repo.documentosVigentes(), repo.propiosVigentes()]);
@@ -603,13 +604,12 @@ export async function enviar(
     TIPOS_DOCUMENTO.map((tipo) => {
       const porColegio = TIPOS_POR_COLEGIO.includes(tipo);
       const d = porColegio
-        ? documentoDelColegio(vigentes, propios, n.col_id, tipo)
+        ? documentoDelColegio(propios, n.col_id, tipo)
         : vigentes.find((v) => v.doc_tipo === tipo);
       if (!d) throw new ApiError(503, 'Las inscripciones no están abiertas todavía.');
-      const leido =
-        d.col_id !== null
-          ? input.documentos_colegio?.[String(d.col_id)]?.[tipo as 'ficha_matricula' | 'contrato']
-          : input.documentos[tipo];
+      const leido = porColegio
+        ? input.documentos_colegio?.[String(n.col_id)]?.[tipo as 'ficha_matricula' | 'contrato']
+        : input.documentos[tipo as keyof typeof input.documentos];
       if (leido !== d.doc_id) throw desactualizado();
       return { doc_id: d.doc_id, tipo, titulo: d.doc_titulo, contenido: d.doc_contenido, version: d.doc_version };
     }),
@@ -1442,18 +1442,31 @@ export async function documentos() {
     repo.historialDocumentos(),
   ]);
   return {
-    /** El texto común. */
-    vigentes,
-    /** La última versión de cada colegio que tiene algo propio (incluye vueltas al común). */
+    /** Los cuatro generales vigentes. */
+    vigentes: vigentes.filter((v) => TIPOS_GENERALES.includes(v.doc_tipo)),
+    /** La ficha y el contrato vigentes de cada colegio. */
     propios,
-    /** Los borradores, del común (col_id null) y de cada colegio. */
+    /** Los borradores: generales (col_id null) y de cada colegio. */
     borradores,
-    historial,
+    historial: historial.filter((h) => TIPOS_GENERALES.includes(h.doc_tipo) || h.col_id !== null),
     marcadores: MARCADORES,
     reglas: REGLAS,
-    /** Con qué arranca el editor de un tipo que todavía no tiene texto. */
-    iniciales: PLANTILLAS_INICIALES,
+    /**
+     * Con qué arranca el editor de un tipo que todavía no tiene texto. La
+     * ficha y el contrato de cada colegio, con el texto base: el que se
+     * publicó sin colegio, o si no el del Word.
+     */
+    iniciales: textosBase(vigentes),
   };
+}
+
+function textosBase(vigentes: repo.DocumentoLegal[]): Record<TipoDocumento, { titulo: string; contenido: string }> {
+  const base = { ...PLANTILLAS_INICIALES };
+  for (const tipo of TIPOS_POR_COLEGIO) {
+    const d = vigentes.find((v) => v.doc_tipo === tipo);
+    if (d) base[tipo] = { titulo: d.doc_titulo, contenido: d.doc_contenido };
+  }
+  return base;
 }
 
 export async function documento(docId: number): Promise<repo.DocumentoLegal> {
@@ -1467,8 +1480,13 @@ export async function guardarBorrador(
   input: { tipo: TipoDocumento; col_id?: number | null; titulo: string; contenido: string },
 ): Promise<repo.DocumentoLegal> {
   const colId = input.col_id ?? null;
-  if (colId !== null && !TIPOS_POR_COLEGIO.includes(input.tipo)) {
-    throw new ApiError(400, 'Solo la ficha de matrícula y el contrato pueden ser propios de un colegio');
+  if ((colId !== null) !== TIPOS_POR_COLEGIO.includes(input.tipo)) {
+    throw new ApiError(
+      400,
+      colId === null
+        ? 'La ficha de matrícula y el contrato son de cada colegio: falta el colegio'
+        : 'Solo la ficha de matrícula y el contrato son de un colegio',
+    );
   }
   return enTransaccion(async (client) => {
     let doc: repo.DocumentoLegal;
@@ -1486,35 +1504,6 @@ export async function guardarBorrador(
         entidad: 'documento_legal',
         entidadId: doc.doc_id,
         detalle: { tipo: doc.doc_tipo, col_id: colId, version: doc.doc_version, borrador: true },
-      },
-      client,
-    );
-    return doc;
-  });
-}
-
-/**
- * El colegio deja su texto propio de ese tipo y vuelve al común. Solo si hoy
- * usa uno propio: si solo tenía un borrador, basta con descartarlo.
- */
-export async function volverAlComun(
-  actor: AuthUser,
-  tipo: TipoDocumento,
-  colId: number,
-): Promise<repo.DocumentoLegal> {
-  const propios = await repo.propiosVigentes();
-  if (!propiosActivos(propios, colId).includes(tipo)) {
-    throw new ApiError(409, 'Ese colegio ya usa el texto común');
-  }
-  return enTransaccion(async (client) => {
-    const doc = await repo.volverAlComun(client, tipo, colId);
-    await auditar(
-      {
-        actor,
-        accion: 'crear',
-        entidad: 'documento_legal',
-        entidadId: doc.doc_id,
-        detalle: { tipo, col_id: colId, version: doc.doc_version, vuelve_al_comun: true },
       },
       client,
     );
@@ -1604,7 +1593,8 @@ export const REPRESENTANTE_DE_EJEMPLO: RepresentanteFormulario = {
  * borrador si lo hay, si no la vigente) y una marca de "EJEMPLO". Es el
  * mismo generador que el de verdad, no una imitacion. Un tipo sin texto
  * todavia se salta. Con `colId`, la ficha y el contrato son los de ese
- * colegio: su borrador propio, su texto propio, o el común.
+ * colegio (su borrador o su publicada); si no tiene, o sin `colId`, el
+ * texto base.
  */
 export async function ejemploPaquete(colId: number | null = null): Promise<Buffer> {
   const [vigentes, propios, borradores, membrete] = await Promise.all([
@@ -1616,14 +1606,11 @@ export async function ejemploPaquete(colId: number | null = null): Promise<Buffe
   const comun = (tipo: TipoDocumento) =>
     borradores.find((b) => b.doc_tipo === tipo && b.col_id === null) ??
     vigentes.find((v) => v.doc_tipo === tipo);
-  const deColegio = (tipo: TipoDocumento) => {
-    if (colId === null) return undefined;
-    const usaPropio = propiosActivos(propios, colId).includes(tipo);
-    return (
-      borradores.find((b) => b.doc_tipo === tipo && b.col_id === colId) ??
-      (usaPropio ? propios.find((p) => p.doc_tipo === tipo && p.col_id === colId) : undefined)
-    );
-  };
+  const deColegio = (tipo: TipoDocumento) =>
+    colId === null
+      ? undefined
+      : (borradores.find((b) => b.doc_tipo === tipo && b.col_id === colId) ??
+        propios.find((p) => p.doc_tipo === tipo && p.col_id === colId));
   const documentos: DocumentoVigente[] = [];
   for (const tipo of TIPOS_DOCUMENTO) {
     const d = (TIPOS_POR_COLEGIO.includes(tipo) ? deColegio(tipo) : undefined) ?? comun(tipo);

@@ -8,7 +8,6 @@ import {
   borradorDocumentoSchema,
   colIdParamSchema,
   ejemploSchema,
-  volverAlComunSchema,
   cotizacionSchema,
   envioSchema,
   abrirSchema,
@@ -239,20 +238,6 @@ inscripcionesRouter.post(
     try {
       const { id } = idParamSchema.parse(req.params);
       res.json({ data: await service.publicarDocumento(actor(req), id), error: null });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-/** Un colegio deja su ficha o su contrato propios y vuelve al texto común. */
-inscripcionesRouter.post(
-  '/documentos/volver-al-comun',
-  requirePermission('inscripciones', 'editar'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { tipo, col_id } = volverAlComunSchema.parse(req.body);
-      res.json({ data: await service.volverAlComun(actor(req), tipo, col_id), error: null });
     } catch (err) {
       next(err);
     }

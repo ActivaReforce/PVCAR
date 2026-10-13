@@ -32,16 +32,20 @@ export interface DocumentoLegal {
   doc_fecha: string;
   /** null = borrador: se edita y se borra. Con fecha = publicado, intocable. */
   doc_publicado: string | null;
-  /** null = texto común. Con colegio: versión propia de ese colegio (0035). */
+  /**
+   * Ficha y contrato: el colegio al que pertenecen. Sin colegio (null), los
+   * generales y el texto base de la ficha y el contrato (0036).
+   */
   col_id: number | null;
-  /** Versión de un colegio que vuelve al texto común (sin texto propio). */
-  doc_usa_comun: boolean;
 }
 
 const COLUMNAS_DOC =
-  'doc_id, doc_tipo, doc_version, doc_titulo, doc_contenido, doc_fecha, doc_publicado, col_id, doc_usa_comun';
+  'doc_id, doc_tipo, doc_version, doc_titulo, doc_contenido, doc_fecha, doc_publicado, col_id';
 
-/** El texto común: la publicada más alta de cada tipo. Puede faltar alguno. */
+/**
+ * Sin colegio: la publicada más alta de cada tipo. Los generales, y la ficha
+ * y el contrato que sirven de texto base a los colegios. Puede faltar alguno.
+ */
 export async function documentosVigentes(): Promise<DocumentoLegal[]> {
   const { rows } = await getPool().query<DocumentoLegal>(
     `SELECT DISTINCT ON (doc_tipo) ${COLUMNAS_DOC}
@@ -52,10 +56,7 @@ export async function documentosVigentes(): Promise<DocumentoLegal[]> {
   return rows;
 }
 
-/**
- * La última versión publicada de cada colegio y tipo que tenga algo propio.
- * Incluye las "vuelta al común" (`doc_usa_comun`): quien la use decide.
- */
+/** La ficha y el contrato vigentes de cada colegio: su última versión publicada. */
 export async function propiosVigentes(): Promise<DocumentoLegal[]> {
   const { rows } = await getPool().query<DocumentoLegal>(
     `SELECT DISTINCT ON (col_id, doc_tipo) ${COLUMNAS_DOC}
@@ -83,14 +84,13 @@ export interface VersionDocumento {
   doc_fecha: string;
   doc_publicado: string | null;
   col_id: number | null;
-  doc_usa_comun: boolean;
   aceptaciones: number;
 }
 
 export async function historialDocumentos(): Promise<VersionDocumento[]> {
   const { rows } = await getPool().query<VersionDocumento>(
     `SELECT d.doc_id, d.doc_tipo, d.doc_version, d.doc_titulo, d.doc_fecha, d.doc_publicado,
-            d.col_id, d.doc_usa_comun,
+            d.col_id,
             (SELECT count(DISTINCT a.ins_id) FROM public.inscripcion_aceptacion a
               WHERE a.doc_id = d.doc_id)::int AS aceptaciones
        FROM public.documento_legal d
@@ -112,8 +112,8 @@ export async function obtenerDocumento(
 }
 
 /**
- * Guarda el borrador de un tipo (del común si `colId` es null, o de ese
- * colegio): lo actualiza si ya hay uno, o crea la versión siguiente de ese
+ * Guarda el borrador de un tipo (un general si `colId` es null, o la ficha
+ * o el contrato de ese colegio): lo actualiza si ya hay uno, o crea la versión siguiente de ese
  * tipo y colegio. El número se calcula dentro del INSERT; si dos lo crean a
  * la vez, el índice de un-borrador-por-tipo-y-colegio hace fallar al segundo.
  */
@@ -139,30 +139,6 @@ export async function guardarBorrador(
        FROM public.documento_legal WHERE doc_tipo = $1 AND col_id IS NOT DISTINCT FROM $4::int
      RETURNING ${COLUMNAS_DOC}`,
     [tipo, titulo, contenido, colId],
-  );
-  return rows[0]!;
-}
-
-/**
- * Un colegio vuelve al texto común: una versión suya, ya publicada, sin texto.
- * Antes se descarta su borrador, si lo tenía: ya no tiene a qué aplicarse.
- */
-export async function volverAlComun(
-  client: PoolClient,
-  tipo: TipoDocumento,
-  colId: number,
-): Promise<DocumentoLegal> {
-  await client.query(
-    'DELETE FROM public.documento_legal WHERE doc_tipo = $1 AND col_id = $2 AND doc_publicado IS NULL',
-    [tipo, colId],
-  );
-  const { rows } = await client.query<DocumentoLegal>(
-    `INSERT INTO public.documento_legal
-         (doc_tipo, col_id, doc_version, doc_titulo, doc_contenido, doc_usa_comun, doc_publicado)
-     SELECT $1, $2, COALESCE(max(doc_version), 0) + 1, 'Vuelve al texto común', '', true, now()
-       FROM public.documento_legal WHERE doc_tipo = $1 AND col_id = $2
-     RETURNING ${COLUMNAS_DOC}`,
-    [tipo, colId],
   );
   return rows[0]!;
 }

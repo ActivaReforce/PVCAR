@@ -100,14 +100,6 @@ export function useGuardarBorrador() {
   return useMutacion((datos: DatosBorrador) => inscripcionesApi.guardarBorrador(datos), 'Borrador guardado');
 }
 
-export function useVolverAlComun() {
-  return useMutacion(
-    ({ tipo, colId }: { tipo: 'ficha_matricula' | 'contrato'; colId: number }) =>
-      inscripcionesApi.volverAlComun(tipo, colId),
-    'El colegio vuelve al texto común',
-  );
-}
-
 export function usePublicarDocumento() {
   return useMutacion((id: number) => inscripcionesApi.publicarDocumento(id), 'Versión publicada');
 }

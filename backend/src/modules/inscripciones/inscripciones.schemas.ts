@@ -176,18 +176,16 @@ export const envioSchema = z.object({
   /**
    * Las versiones que el representante tuvo delante (doc_id de cada tipo).
    * Si cambiaron mientras llenaba el formulario, se rechaza: no puede
-   * aceptar un texto que no leyó. Ficha y contrato van aquí si son los
-   * comunes, y en `documentos_colegio` si su colegio tiene texto propio.
+   * aceptar un texto que no leyó. Aquí los generales; la ficha y el
+   * contrato, en `documentos_colegio`.
    */
   documentos: z.object({
     autorizacion_datos: z.number().int().positive(),
     datos_medicos: z.number().int().positive(),
     imagen: z.number().int().positive(),
     politica: z.number().int().positive(),
-    ficha_matricula: z.number().int().positive().optional(),
-    contrato: z.number().int().positive().optional(),
   }),
-  /** Por colegio (clave = col_id): la ficha y el contrato propios que leyó (0035). */
+  /** Por colegio (clave = col_id): la ficha y el contrato de ese colegio que leyó. */
   documentos_colegio: z
     .record(
       z.string().regex(/^\d+$/),
@@ -297,7 +295,7 @@ export const rechazarSchema = z.object({
 
 /**
  * Guarda el borrador del tipo (lo crea o lo actualiza). Publicar es aparte.
- * Con `col_id`, el borrador es del texto propio de ese colegio (0035).
+ * La ficha y el contrato son siempre de un colegio: llevan `col_id`.
  */
 export const borradorDocumentoSchema = z.object({
   tipo: z.enum(TIPOS_DOCUMENTO),
@@ -306,13 +304,7 @@ export const borradorDocumentoSchema = z.object({
   contenido: texto(20, 60_000, 'El texto es demasiado corto'),
 });
 
-/** Un colegio deja su texto propio y vuelve al común. */
-export const volverAlComunSchema = z.object({
-  tipo: z.enum(['ficha_matricula', 'contrato']),
-  col_id: z.number().int().positive(),
-});
-
-/** PDF de ejemplo: con `col_id`, con la ficha y el contrato de ese colegio. */
+/** PDF de ejemplo: con `col_id`, con la ficha y el contrato de ese colegio; sin él, con el texto base. */
 export const ejemploSchema = z.object({
   col_id: z.number().int().positive().nullable().optional(),
 });

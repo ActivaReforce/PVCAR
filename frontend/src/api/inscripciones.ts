@@ -32,10 +32,8 @@ export interface DocumentoLegal {
   doc_fecha: string;
   /** null = borrador. */
   doc_publicado: string | null;
-  /** null = texto común. Con colegio: versión propia de ese colegio. */
+  /** Ficha y contrato: su colegio. null en los generales (y en el texto base). */
   col_id: number | null;
-  /** Versión de un colegio que vuelve al texto común (sin texto). */
-  doc_usa_comun: boolean;
 }
 
 export interface DisciplinaOfertada {
@@ -91,7 +89,7 @@ export interface Formulario {
   grados: Array<{ catninograd_id: number; catninograd_nombre: string }>;
   parentescos: string[];
   documentos: Partial<Record<TipoDocumento, DocumentoLegal>>;
-  /** Ficha y contrato propios de los colegios que los tienen (clave = col_id). */
+  /** La ficha y el contrato publicados de cada colegio ofrecido (clave = col_id). */
   documentos_colegio: Record<number, Partial<Record<TipoDocumento, DocumentoLegal>>>;
   /** A dónde transferir el pago. */
   cuenta_bancaria: string | null;
@@ -175,9 +173,9 @@ export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id'>
 export interface Envio {
   representante: RepresentanteEnvio;
   ninos: NinoEnvio[];
-  /** Los que leyó: generales, y ficha y contrato si eran los comunes. */
+  /** Los generales que leyó. */
   documentos: Partial<Record<TipoDocumento, number>>;
-  /** Ficha y contrato propios que leyó, por colegio (clave = col_id). */
+  /** La ficha y el contrato que leyó, por colegio (clave = col_id). */
   documentos_colegio: Record<string, Partial<Record<'ficha_matricula' | 'contrato', number>>>;
   acepta: Record<TipoDocumento, true>;
   comprobante: { mime: string; base64: string };
@@ -345,11 +343,10 @@ export interface VersionDocumento {
   doc_fecha: string;
   doc_publicado: string | null;
   col_id: number | null;
-  doc_usa_comun: boolean;
   aceptaciones: number;
 }
 
-/** Un borrador del texto común (sin col_id) o del propio de un colegio. */
+/** Un borrador de un general (sin col_id) o de la ficha o el contrato de un colegio. */
 export interface DatosBorrador {
   tipo: TipoDocumento;
   col_id?: number | null;
@@ -357,24 +354,22 @@ export interface DatosBorrador {
   contenido: string;
 }
 
-/**
- * La ficha o el contrato que lee un alumno de ese colegio: el propio del
- * colegio si lo tiene, si no el común. Misma regla que el backend.
- */
+/** Lo que lee un alumno: los generales, y la ficha y el contrato de su colegio. */
 export function documentoPara(
   formulario: Pick<Formulario, 'documentos' | 'documentos_colegio'>,
   colId: number | null,
   tipo: TipoDocumento,
 ): DocumentoLegal | undefined {
-  return (colId !== null ? formulario.documentos_colegio[colId]?.[tipo] : undefined) ?? formulario.documentos[tipo];
+  if (tipo !== 'ficha_matricula' && tipo !== 'contrato') return formulario.documentos[tipo];
+  return colId !== null ? formulario.documentos_colegio[colId]?.[tipo] : undefined;
 }
 
 export interface Documentos {
-  /** El texto común de cada tipo. */
+  /** Los cuatro generales vigentes. */
   vigentes: DocumentoLegal[];
-  /** La última versión de cada colegio que tiene algo propio (incluye vueltas al común). */
+  /** La ficha y el contrato vigentes de cada colegio. */
   propios: DocumentoLegal[];
-  /** Del común (col_id null) y de cada colegio. */
+  /** Generales (col_id null) y de cada colegio. */
   borradores: DocumentoLegal[];
   historial: VersionDocumento[];
   marcadores: Record<string, string>;
@@ -476,8 +471,6 @@ export const inscripcionesApi = {
   documentos: () => api.get<Documentos>('/inscripciones/documentos'),
   documento: (id: number) => api.get<DocumentoLegal>(`/inscripciones/documentos/${id}`),
   guardarBorrador: (datos: DatosBorrador) => api.post<DocumentoLegal>('/inscripciones/documentos', datos),
-  volverAlComun: (tipo: 'ficha_matricula' | 'contrato', colId: number) =>
-    api.post<DocumentoLegal>('/inscripciones/documentos/volver-al-comun', { tipo, col_id: colId }),
   publicarDocumento: (id: number) =>
     api.post<DocumentoLegal>(`/inscripciones/documentos/${id}/publicar`),
   borrarBorrador: (id: number) => api.delete<{ doc_id: number }>(`/inscripciones/documentos/${id}`),
