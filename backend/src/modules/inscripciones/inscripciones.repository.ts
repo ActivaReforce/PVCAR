@@ -32,22 +32,41 @@ export interface DocumentoLegal {
   doc_fecha: string;
   /** null = borrador: se edita y se borra. Con fecha = publicado, intocable. */
   doc_publicado: string | null;
+  /** null = texto común. Con colegio: versión propia de ese colegio (0035). */
+  col_id: number | null;
+  /** Versión de un colegio que vuelve al texto común (sin texto propio). */
+  doc_usa_comun: boolean;
 }
 
-const COLUMNAS_DOC = 'doc_id, doc_tipo, doc_version, doc_titulo, doc_contenido, doc_fecha, doc_publicado';
+const COLUMNAS_DOC =
+  'doc_id, doc_tipo, doc_version, doc_titulo, doc_contenido, doc_fecha, doc_publicado, col_id, doc_usa_comun';
 
-/** La publicada mas alta de cada tipo. Puede faltar alguno si nunca se publico. */
+/** El texto común: la publicada más alta de cada tipo. Puede faltar alguno. */
 export async function documentosVigentes(): Promise<DocumentoLegal[]> {
   const { rows } = await getPool().query<DocumentoLegal>(
     `SELECT DISTINCT ON (doc_tipo) ${COLUMNAS_DOC}
        FROM public.documento_legal
-      WHERE doc_publicado IS NOT NULL
+      WHERE doc_publicado IS NOT NULL AND col_id IS NULL
       ORDER BY doc_tipo, doc_version DESC`,
   );
   return rows;
 }
 
-/** El borrador de cada tipo, si lo hay (como mucho uno: indice de 0015). */
+/**
+ * La última versión publicada de cada colegio y tipo que tenga algo propio.
+ * Incluye las "vuelta al común" (`doc_usa_comun`): quien la use decide.
+ */
+export async function propiosVigentes(): Promise<DocumentoLegal[]> {
+  const { rows } = await getPool().query<DocumentoLegal>(
+    `SELECT DISTINCT ON (col_id, doc_tipo) ${COLUMNAS_DOC}
+       FROM public.documento_legal
+      WHERE doc_publicado IS NOT NULL AND col_id IS NOT NULL
+      ORDER BY col_id, doc_tipo, doc_version DESC`,
+  );
+  return rows;
+}
+
+/** El borrador de cada tipo y colegio, si lo hay (como mucho uno: índice de 0035). */
 export async function borradores(): Promise<DocumentoLegal[]> {
   const { rows } = await getPool().query<DocumentoLegal>(
     `SELECT ${COLUMNAS_DOC} FROM public.documento_legal
@@ -63,17 +82,20 @@ export interface VersionDocumento {
   doc_titulo: string;
   doc_fecha: string;
   doc_publicado: string | null;
+  col_id: number | null;
+  doc_usa_comun: boolean;
   aceptaciones: number;
 }
 
 export async function historialDocumentos(): Promise<VersionDocumento[]> {
   const { rows } = await getPool().query<VersionDocumento>(
     `SELECT d.doc_id, d.doc_tipo, d.doc_version, d.doc_titulo, d.doc_fecha, d.doc_publicado,
+            d.col_id, d.doc_usa_comun,
             (SELECT count(DISTINCT a.ins_id) FROM public.inscripcion_aceptacion a
               WHERE a.doc_id = d.doc_id)::int AS aceptaciones
        FROM public.documento_legal d
       WHERE d.doc_publicado IS NOT NULL
-      ORDER BY d.doc_tipo, d.doc_version DESC`,
+      ORDER BY d.doc_tipo, d.col_id NULLS FIRST, d.doc_version DESC`,
   );
   return rows;
 }
@@ -90,31 +112,57 @@ export async function obtenerDocumento(
 }
 
 /**
- * Guarda el borrador de un tipo: lo actualiza si ya hay uno, o crea la
- * version siguiente. El numero se calcula dentro del INSERT; si dos lo crean
- * a la vez, el indice de un-borrador-por-tipo hace fallar al segundo.
+ * Guarda el borrador de un tipo (del común si `colId` es null, o de ese
+ * colegio): lo actualiza si ya hay uno, o crea la versión siguiente de ese
+ * tipo y colegio. El número se calcula dentro del INSERT; si dos lo crean a
+ * la vez, el índice de un-borrador-por-tipo-y-colegio hace fallar al segundo.
  */
 export async function guardarBorrador(
   client: PoolClient,
   tipo: TipoDocumento,
+  colId: number | null,
   titulo: string,
   contenido: string,
 ): Promise<DocumentoLegal> {
   const { rows: actualizado } = await client.query<DocumentoLegal>(
     `UPDATE public.documento_legal
         SET doc_titulo = $2, doc_contenido = $3, doc_fecha = now()
-      WHERE doc_tipo = $1 AND doc_publicado IS NULL
+      WHERE doc_tipo = $1 AND col_id IS NOT DISTINCT FROM $4::int AND doc_publicado IS NULL
       RETURNING ${COLUMNAS_DOC}`,
-    [tipo, titulo, contenido],
+    [tipo, titulo, contenido, colId],
   );
   if (actualizado[0]) return actualizado[0];
 
   const { rows } = await client.query<DocumentoLegal>(
-    `INSERT INTO public.documento_legal (doc_tipo, doc_version, doc_titulo, doc_contenido)
-     SELECT $1, COALESCE(max(doc_version), 0) + 1, $2, $3
-       FROM public.documento_legal WHERE doc_tipo = $1
+    `INSERT INTO public.documento_legal (doc_tipo, col_id, doc_version, doc_titulo, doc_contenido)
+     SELECT $1, $4::int, COALESCE(max(doc_version), 0) + 1, $2, $3
+       FROM public.documento_legal WHERE doc_tipo = $1 AND col_id IS NOT DISTINCT FROM $4::int
      RETURNING ${COLUMNAS_DOC}`,
-    [tipo, titulo, contenido],
+    [tipo, titulo, contenido, colId],
+  );
+  return rows[0]!;
+}
+
+/**
+ * Un colegio vuelve al texto común: una versión suya, ya publicada, sin texto.
+ * Antes se descarta su borrador, si lo tenía: ya no tiene a qué aplicarse.
+ */
+export async function volverAlComun(
+  client: PoolClient,
+  tipo: TipoDocumento,
+  colId: number,
+): Promise<DocumentoLegal> {
+  await client.query(
+    'DELETE FROM public.documento_legal WHERE doc_tipo = $1 AND col_id = $2 AND doc_publicado IS NULL',
+    [tipo, colId],
+  );
+  const { rows } = await client.query<DocumentoLegal>(
+    `INSERT INTO public.documento_legal
+         (doc_tipo, col_id, doc_version, doc_titulo, doc_contenido, doc_usa_comun, doc_publicado)
+     SELECT $1, $2, COALESCE(max(doc_version), 0) + 1, 'Vuelve al texto común', '', true, now()
+       FROM public.documento_legal WHERE doc_tipo = $1 AND col_id = $2
+     RETURNING ${COLUMNAS_DOC}`,
+    [tipo, colId],
   );
   return rows[0]!;
 }

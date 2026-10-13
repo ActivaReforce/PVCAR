@@ -176,14 +176,27 @@ export const envioSchema = z.object({
   /**
    * Las versiones que el representante tuvo delante (doc_id de cada tipo).
    * Si cambiaron mientras llenaba el formulario, se rechaza: no puede
-   * aceptar un texto que no leyó.
+   * aceptar un texto que no leyó. Ficha y contrato van aquí si son los
+   * comunes, y en `documentos_colegio` si su colegio tiene texto propio.
    */
-  documentos: z.object(
-    Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, z.number().int().positive()])) as Record<
-      TipoDocumento,
-      z.ZodNumber
-    >,
-  ),
+  documentos: z.object({
+    autorizacion_datos: z.number().int().positive(),
+    datos_medicos: z.number().int().positive(),
+    imagen: z.number().int().positive(),
+    politica: z.number().int().positive(),
+    ficha_matricula: z.number().int().positive().optional(),
+    contrato: z.number().int().positive().optional(),
+  }),
+  /** Por colegio (clave = col_id): la ficha y el contrato propios que leyó (0035). */
+  documentos_colegio: z
+    .record(
+      z.string().regex(/^\d+$/),
+      z.object({
+        ficha_matricula: z.number().int().positive().optional(),
+        contrato: z.number().int().positive().optional(),
+      }),
+    )
+    .optional(),
   /**
    * Una casilla por documento. En la autorización de datos es su propia
    * casilla; en los demás, "He leído y acepto". Todas en true.
@@ -282,11 +295,26 @@ export const rechazarSchema = z.object({
   confirmacion: z.string().trim().min(1),
 });
 
-/** Guarda el borrador del tipo (lo crea o lo actualiza). Publicar es aparte. */
+/**
+ * Guarda el borrador del tipo (lo crea o lo actualiza). Publicar es aparte.
+ * Con `col_id`, el borrador es del texto propio de ese colegio (0035).
+ */
 export const borradorDocumentoSchema = z.object({
   tipo: z.enum(TIPOS_DOCUMENTO),
+  col_id: z.number().int().positive().nullable().optional(),
   titulo: texto(3, 160, 'Escribe un título'),
   contenido: texto(20, 60_000, 'El texto es demasiado corto'),
+});
+
+/** Un colegio deja su texto propio y vuelve al común. */
+export const volverAlComunSchema = z.object({
+  tipo: z.enum(['ficha_matricula', 'contrato']),
+  col_id: z.number().int().positive(),
+});
+
+/** PDF de ejemplo: con `col_id`, con la ficha y el contrato de ese colegio. */
+export const ejemploSchema = z.object({
+  col_id: z.number().int().positive().nullable().optional(),
 });
 
 export const abrirSchema = z.object({ abiertas: z.boolean() });

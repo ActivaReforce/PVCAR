@@ -32,6 +32,10 @@ export interface DocumentoLegal {
   doc_fecha: string;
   /** null = borrador. */
   doc_publicado: string | null;
+  /** null = texto común. Con colegio: versión propia de ese colegio. */
+  col_id: number | null;
+  /** Versión de un colegio que vuelve al texto común (sin texto). */
+  doc_usa_comun: boolean;
 }
 
 export interface DisciplinaOfertada {
@@ -87,6 +91,8 @@ export interface Formulario {
   grados: Array<{ catninograd_id: number; catninograd_nombre: string }>;
   parentescos: string[];
   documentos: Partial<Record<TipoDocumento, DocumentoLegal>>;
+  /** Ficha y contrato propios de los colegios que los tienen (clave = col_id). */
+  documentos_colegio: Record<number, Partial<Record<TipoDocumento, DocumentoLegal>>>;
   /** A dónde transferir el pago. */
   cuenta_bancaria: string | null;
   /** Cuántas disciplinas puede elegir cada alumno. */
@@ -169,7 +175,10 @@ export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id'>
 export interface Envio {
   representante: RepresentanteEnvio;
   ninos: NinoEnvio[];
-  documentos: Record<TipoDocumento, number>;
+  /** Los que leyó: generales, y ficha y contrato si eran los comunes. */
+  documentos: Partial<Record<TipoDocumento, number>>;
+  /** Ficha y contrato propios que leyó, por colegio (clave = col_id). */
+  documentos_colegio: Record<string, Partial<Record<'ficha_matricula' | 'contrato', number>>>;
   acepta: Record<TipoDocumento, true>;
   comprobante: { mime: string; base64: string };
 }
@@ -335,11 +344,37 @@ export interface VersionDocumento {
   doc_titulo: string;
   doc_fecha: string;
   doc_publicado: string | null;
+  col_id: number | null;
+  doc_usa_comun: boolean;
   aceptaciones: number;
 }
 
+/** Un borrador del texto común (sin col_id) o del propio de un colegio. */
+export interface DatosBorrador {
+  tipo: TipoDocumento;
+  col_id?: number | null;
+  titulo: string;
+  contenido: string;
+}
+
+/**
+ * La ficha o el contrato que lee un alumno de ese colegio: el propio del
+ * colegio si lo tiene, si no el común. Misma regla que el backend.
+ */
+export function documentoPara(
+  formulario: Pick<Formulario, 'documentos' | 'documentos_colegio'>,
+  colId: number | null,
+  tipo: TipoDocumento,
+): DocumentoLegal | undefined {
+  return (colId !== null ? formulario.documentos_colegio[colId]?.[tipo] : undefined) ?? formulario.documentos[tipo];
+}
+
 export interface Documentos {
+  /** El texto común de cada tipo. */
   vigentes: DocumentoLegal[];
+  /** La última versión de cada colegio que tiene algo propio (incluye vueltas al común). */
+  propios: DocumentoLegal[];
+  /** Del común (col_id null) y de cada colegio. */
   borradores: DocumentoLegal[];
   historial: VersionDocumento[];
   marcadores: Record<string, string>;
@@ -440,14 +475,15 @@ export const inscripcionesApi = {
 
   documentos: () => api.get<Documentos>('/inscripciones/documentos'),
   documento: (id: number) => api.get<DocumentoLegal>(`/inscripciones/documentos/${id}`),
-  guardarBorrador: (datos: { tipo: TipoDocumento; titulo: string; contenido: string }) =>
-    api.post<DocumentoLegal>('/inscripciones/documentos', datos),
+  guardarBorrador: (datos: DatosBorrador) => api.post<DocumentoLegal>('/inscripciones/documentos', datos),
+  volverAlComun: (tipo: 'ficha_matricula' | 'contrato', colId: number) =>
+    api.post<DocumentoLegal>('/inscripciones/documentos/volver-al-comun', { tipo, col_id: colId }),
   publicarDocumento: (id: number) =>
     api.post<DocumentoLegal>(`/inscripciones/documentos/${id}/publicar`),
   borrarBorrador: (id: number) => api.delete<{ doc_id: number }>(`/inscripciones/documentos/${id}`),
   /** El PDF de ejemplo se baja como archivo: no es { data, error }. */
-  ejemploPaquete: () =>
-    api.descargar('/inscripciones/documentos/ejemplo', {}, 'inscripcion-ejemplo.pdf'),
+  ejemploPaquete: (colId: number | null = null) =>
+    api.descargar('/inscripciones/documentos/ejemplo', { col_id: colId }, 'inscripcion-ejemplo.pdf'),
 
   precios: () => api.get<PrecioColegio[]>('/inscripciones/precios'),
   guardarPrecio: (colId: number, datos: DatosPrecio) =>

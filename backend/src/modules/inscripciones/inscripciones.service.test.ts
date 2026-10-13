@@ -6,6 +6,7 @@ process.env.FRONTEND_ORIGIN ??= 'https://dev-pvcar.vercel.app';
 const {
   bloqueosDeAprobacion,
   calcularEstado,
+  documentoDelColegio,
   nombreDeDescarga,
   correoDeAprobacion,
   correoDeInscripcionNueva,
@@ -550,6 +551,39 @@ describe('calcularEstado', () => {
     ]);
     expect(e.colegios[0]!.motivos).toHaveLength(4);
     expect(e.motivos).toContain('Ningún colegio tiene las inscripciones abiertas.');
+  });
+});
+
+describe('ficha y contrato propios de un colegio (0035)', () => {
+  type Doc = Parameters<typeof documentoDelColegio>[0][number];
+  const doc = (doc_id: number, extra: Partial<Doc> = {}): Doc =>
+    ({ doc_id, doc_tipo: 'contrato', col_id: null, doc_usa_comun: false, ...extra }) as Doc;
+  const comunes = [doc(1)];
+
+  it('sin texto propio, el común', () => {
+    expect(documentoDelColegio(comunes, [], 7, 'contrato')!.doc_id).toBe(1);
+  });
+
+  it('con texto propio, el suyo; los demás colegios siguen con el común', () => {
+    const propios = [doc(5, { col_id: 7 })];
+    expect(documentoDelColegio(comunes, propios, 7, 'contrato')!.doc_id).toBe(5);
+    expect(documentoDelColegio(comunes, propios, 8, 'contrato')!.doc_id).toBe(1);
+  });
+
+  it('tras volver al común, el común otra vez', () => {
+    const propios = [doc(6, { col_id: 7, doc_usa_comun: true })];
+    expect(documentoDelColegio(comunes, propios, 7, 'contrato')!.doc_id).toBe(1);
+  });
+
+  it('un colegio con contrato propio se abre aunque no haya común', () => {
+    const sinContrato = new Set(['ficha_matricula', 'autorizacion_datos', 'datos_medicos', 'imagen', 'politica'] as const);
+    const listo = { col_id: 1, col_nombre: 'A', precio: 30, abierta: true, disciplinas_activas: 2 };
+    const e = calcularEstado(sinContrato, true, [
+      { ...listo, propios: ['contrato'] },
+      { ...listo, col_id: 2, col_nombre: 'B' },
+    ]);
+    expect(e.colegios.map((c) => c.abierto)).toEqual([true, false]);
+    expect(e.abiertas).toBe(true);
   });
 });
 

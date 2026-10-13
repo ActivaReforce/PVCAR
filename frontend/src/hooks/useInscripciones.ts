@@ -3,9 +3,9 @@ import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
 import {
   inscripcionesApi,
+  type DatosBorrador,
   type DatosPrecio,
   type EstadoInscripcion,
-  type TipoDocumento,
 } from '@/api/inscripciones';
 
 function mensajeDe(error: unknown): string {
@@ -97,10 +97,14 @@ export function useRechazarInscripcion() {
 }
 
 export function useGuardarBorrador() {
+  return useMutacion((datos: DatosBorrador) => inscripcionesApi.guardarBorrador(datos), 'Borrador guardado');
+}
+
+export function useVolverAlComun() {
   return useMutacion(
-    (datos: { tipo: TipoDocumento; titulo: string; contenido: string }) =>
-      inscripcionesApi.guardarBorrador(datos),
-    'Borrador guardado',
+    ({ tipo, colId }: { tipo: 'ficha_matricula' | 'contrato'; colId: number }) =>
+      inscripcionesApi.volverAlComun(tipo, colId),
+    'El colegio vuelve al texto común',
   );
 }
 

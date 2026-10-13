@@ -27,6 +27,8 @@ Vienen de los 8 Word de `Contratos/` (raíz del workspace). Los dos de cada cole
 
 **No hay firma dibujada** (decisión del cliente): aceptar es firmar. En el bloque del representante sale "Aceptado electrónicamente" con nombre, C.C. y fecha. En el de Activa queda fijo "Pablo Fernando Andrade Rodríguez — Gerente General" y al aprobar se añade "Aprobado por {usuario en sesión} el {fecha}".
 
+**Texto propio de un colegio (2026-10-12, `0035`).** La ficha y el contrato siguen siendo un texto común, pero cada colegio puede tener **el suyo**: editarlo desde la tarjeta del colegio en Documentos → Por colegio crea un borrador solo para él, con sus propias versiones; al publicarlo, quien se inscriba en ese colegio acepta ese texto y los demás colegios siguen con el común. "Volver al texto común" publica una versión del colegio sin texto (`doc_usa_comun`) y desde ahí vuelve a usar el común; queda en su historial. Regla única en `documentoDelColegio` (backend) y `documentoPara` (frontend). El formulario manda las versiones leídas de cada colegio en `documentos_colegio` y el envío comprueba alumno por alumno que sean las vigentes de su colegio. El PDF de ejemplo puede sacarse por colegio. Un colegio con versiones propias publicadas no se puede borrar para siempre (son historia aceptada).
+
 **Una versión publicada no se edita ni se borra** (trigger de 0015); cambiar un texto es publicar otra versión. Publicar exige que estén las piezas obligatorias de ese tipo.
 
 ## 2. El formulario público (`/inscripcion`)

@@ -107,7 +107,7 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 - **Fase 11 §4:** **no** se permiten fechas futuras en asistencia; ahora lo rechaza también el servidor.
 - **Sin invitación por correo:** el admin pone siempre la contraseña al crear el usuario.
 
-**Pendiente de decidir:** si la ficha de matrícula y el contrato pueden tener un texto distinto en algún colegio (hoy hay un texto común con los datos de cada colegio por marcadores; ver `docs/fase14b-contratos.md` §1).
+**Ficha y contrato propios de un colegio (2026-10-12, `0035`):** decidido por el cliente. Por defecto el texto común; cada colegio puede editar y publicar el suyo, que solo vale para quien se inscriba en él, y volver al común cuando quiera. Detalle en `docs/fase14b-contratos.md` §1.
 
 ### Corte de sesión — 2026-10-09
 

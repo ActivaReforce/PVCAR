@@ -332,7 +332,9 @@ export async function calcularImpacto(colId: number): Promise<ImpactoColegio> {
         (SELECT count(*) FROM public.colegio_actividad_horario WHERE col_id = $1) AS disciplinas,
         (SELECT count(*) FROM public.nino                      WHERE col_id = $1) AS estudiantes,
         (SELECT count(*) FROM public.asistencia_entrenador     WHERE col_id = $1) AS asistencias_entrenador,
-        (SELECT count(*) FROM public.asistencia_auxiliar       WHERE col_id = $1) AS asistencias_auxiliar
+        (SELECT count(*) FROM public.asistencia_auxiliar       WHERE col_id = $1) AS asistencias_auxiliar,
+        (SELECT count(*) FROM public.documento_legal
+          WHERE col_id = $1 AND doc_publicado IS NOT NULL)                   AS documentos_propios
     `,
     [colId],
   );
@@ -344,6 +346,7 @@ export async function calcularImpacto(colId: number): Promise<ImpactoColegio> {
     estudiantes: n('estudiantes'),
     asistencias_entrenador: n('asistencias_entrenador'),
     asistencias_auxiliar: n('asistencias_auxiliar'),
+    documentos_propios: n('documentos_propios'),
   };
 
   const bloqueos = Object.fromEntries(
@@ -360,5 +363,10 @@ export async function calcularImpacto(colId: number): Promise<ImpactoColegio> {
 /** Solo se llama cuando calcularImpacto dijo que no hay bloqueos. */
 export async function eliminarColegio(client: PoolClient, colId: number): Promise<void> {
   await client.query('DELETE FROM public.colegio_coordinador WHERE col_id = $1', [colId]);
+  // Borradores de su ficha o contrato propios (los publicados ya lo impidieron).
+  await client.query(
+    'DELETE FROM public.documento_legal WHERE col_id = $1 AND doc_publicado IS NULL',
+    [colId],
+  );
   await client.query('DELETE FROM public.colegio WHERE col_id = $1', [colId]);
 }

@@ -7,6 +7,8 @@ import * as service from './inscripciones.service.js';
 import {
   borradorDocumentoSchema,
   colIdParamSchema,
+  ejemploSchema,
+  volverAlComunSchema,
   cotizacionSchema,
   envioSchema,
   abrirSchema,
@@ -243,6 +245,20 @@ inscripcionesRouter.post(
   },
 );
 
+/** Un colegio deja su ficha o su contrato propios y vuelve al texto común. */
+inscripcionesRouter.post(
+  '/documentos/volver-al-comun',
+  requirePermission('inscripciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { tipo, col_id } = volverAlComunSchema.parse(req.body);
+      res.json({ data: await service.volverAlComun(actor(req), tipo, col_id), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 /** Descartar un borrador. Uno publicado no se borra. */
 inscripcionesRouter.delete(
   '/documentos/:id',
@@ -262,9 +278,10 @@ inscripcionesRouter.delete(
 inscripcionesRouter.post(
   '/documentos/ejemplo',
   requirePermission('inscripciones', 'ver'),
-  async (_req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const pdf = await service.ejemploPaquete();
+      const { col_id } = ejemploSchema.parse(req.body ?? {});
+      const pdf = await service.ejemploPaquete(col_id ?? null);
       res
         .status(200)
         .type('application/pdf')
