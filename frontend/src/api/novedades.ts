@@ -4,7 +4,31 @@ import { api } from '@/lib/api';
  * Cliente de Novedades (punto 8 del Roadmap, 2026-10-09).
  */
 
-export type TipoNovedad = 'general' | 'personal' | 'representante' | 'alumno';
+export type TipoNovedad =
+  | 'general'
+  | 'personal'
+  | 'representante'
+  | 'alumno'
+  /** Las escribe el sistema al guardar la asistencia (punto 9). */
+  | 'ausencia'
+  | 'correccion';
+
+/** Los que se escriben a mano. */
+export type TipoManual = Exclude<TipoNovedad, 'ausencia' | 'correccion'>;
+
+/** La clase de una ausencia o corrección, tal como estaba al guardar. */
+export interface DatosClase {
+  colacthor_id: number;
+  /** AAAA-MM-DD */
+  fecha: string;
+  colegio: string;
+  actividad: string;
+  dia: string;
+  horario: string | null;
+  estado: string;
+  hora_tarde: string | null;
+  razon: string | null;
+}
 
 export interface MencionPersona {
   id: number;
@@ -18,6 +42,7 @@ export interface MencionAlumno {
   col_id: number | null;
   col_nombre: string | null;
   grado: string | null;
+  representantes: Array<{ nombre: string; correo: string | null; telefono: string | null }>;
 }
 
 export interface Novedad {
@@ -29,6 +54,8 @@ export interface Novedad {
   autor: { usu_id: number; usu_nombre: string; usu_correo: string | null } | null;
   personas: MencionPersona[];
   alumnos: MencionAlumno[];
+  /** Solo en ausencia y corrección. */
+  datos: DatosClase | null;
 }
 
 export interface FiltrosListar {

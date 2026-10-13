@@ -93,6 +93,7 @@ function avisoDe(resultado: ResultadoGuardado): string {
   const partes: string[] = [];
   if (resultado.altas > 0) partes.push(`${resultado.altas} registrada(s)`);
   if (resultado.cambios > 0) partes.push(`${resultado.cambios} corregida(s)`);
+  if (resultado.avisos) partes.push(`${resultado.avisos} aviso(s) de ausencia enviado(s)`);
   return partes.join(' · ') || 'Sin cambios';
 }
 

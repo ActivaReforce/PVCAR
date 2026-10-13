@@ -12,17 +12,23 @@ import type { ConfigCorreoInput } from './correos.schemas.js';
  * Configuracion de correos: quien envia cada tipo y a quien va en copia.
  *
  * Los de Inscripciones, solo el Propietario (decidido por el cliente el
- * 2026-10-07): regla fija, sin casilla. El de Novedades lo abre la casilla
- * Editar de Novedades (2026-10-12), que es su pestaña Configuración.
+ * 2026-10-07): regla fija, sin casilla. Los de Novedades y Ausencias los abre
+ * la casilla Editar de Novedades (2026-10-12), que es su pestaña Configuración.
  */
 /** Tipos que van a una lista fija de destinatarios (avisos internos). */
-export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = ['inscripciones_aviso', 'novedades'];
+export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = ['inscripciones_aviso', 'novedades', 'ausencias'];
 
-/** Tipos que usan los switches `notificar_mencionado` y `notificar_representante`. */
+/** Tipos que usan el switch `notificar_mencionado`. */
 export const TIPOS_CON_MENCIONADO: readonly repo.TipoCorreo[] = ['novedades'];
 
+/** Tipos que usan el switch `notificar_representante`. */
+export const TIPOS_CON_REPRESENTANTE: readonly repo.TipoCorreo[] = ['novedades', 'ausencias'];
+
+/** Los dos de la pestaña Configuración de Novedades. */
+const TIPOS_DE_NOVEDADES: readonly repo.TipoCorreo[] = ['novedades', 'ausencias'];
+
 function exigirPuedeConfigurar(actor: AuthUser, tipo: repo.TipoCorreo): void {
-  if (tipo === 'novedades') {
+  if (TIPOS_DE_NOVEDADES.includes(tipo)) {
     const ok = actor.permisos.some((p) => p.modulo === 'novedades' && p.accion === 'editar');
     if (!ok) throw new ApiError(403, 'Sin permiso: novedades:editar');
     return;
@@ -56,13 +62,13 @@ export async function guardar(
     // Solo el aviso interno tiene destinatarios fijos: en el resto el
     // destinatario es la persona del caso (el representante).
     const para = TIPOS_CON_PARA.includes(tipo) ? input.para : [];
-    const conAvisos = TIPOS_CON_MENCIONADO.includes(tipo);
     await repo.guardarConfig(client, {
       tipo,
       ...input,
       para,
-      notificar_mencionado: conAvisos && input.notificar_mencionado,
-      notificar_representante: conAvisos && input.notificar_representante,
+      notificar_mencionado: TIPOS_CON_MENCIONADO.includes(tipo) && input.notificar_mencionado,
+      notificar_representante:
+        TIPOS_CON_REPRESENTANTE.includes(tipo) && input.notificar_representante,
     });
     await auditar(
       {

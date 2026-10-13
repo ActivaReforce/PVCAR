@@ -2,17 +2,16 @@ import { Loader2, Save, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Props {
+  /** Filas de la lista entera. */
+  total: number;
   sinMarcar: number;
   cambios: number;
   incompletas: number;
   guardando: boolean;
   onDeshacer: () => void;
-  /**
-   * `marcarRestantes` dice si antes de guardar hay que poner Presente a los
-   * que no tienen estado. El padre tiene las marcas en su cierre al momento
-   * del clic; el barra solo elige la variante.
-   */
-  onGuardar: (marcarRestantes: boolean) => void;
+  /** Presente a quien aún no tiene estado. No guarda. */
+  onMarcarRestantes: () => void;
+  onGuardar: () => void;
   /**
    * Barra arriba o abajo. Las dos acciones son las mismas: el entrenador que
    * acaba de marcar al último no sube a buscar el botón, y el coordinador que
@@ -27,27 +26,34 @@ interface Props {
  * Dice **por qué** no se puede guardar en vez de dejar el botón apagado sin
  * explicación, que es el peor estado de una interfaz.
  *
- * El botón cambia de nombre según lo que falte:
- * - **"Presentes a los N y guardar"** mientras quede alguien sin marcar:
- *   un solo gesto para el caso normal. Si ya marcaste a algunos Ausente,
- *   no se pisan — solo se marcan Presente los que no tienen estado todavía.
- * - **"Guardar N"** cuando ya no hay sin marcar y solo quedan cambios por
- *   guardar.
+ * Dos botones separados (pedido del cliente, 2026-10-12):
+ * - **"Marcar Presente a Todos"** si nadie tiene estado todavía, o
+ *   **"Marcar Presentes a N"** si ya hay alguno marcado. Solo marca: no pisa a
+ *   los ya marcados y **no guarda**, para poder revisar antes.
+ * - **"Guardar"**, apagado mientras no haya nada que guardar.
+ *
+ * Antes era un solo "Presentes a los N y guardar": guardaba sin dejar ver el
+ * resultado, y desde el punto 9 guardar un Ausente manda un correo.
  */
 const BarraGuardar = ({
+  total,
   sinMarcar,
   cambios,
   incompletas,
   guardando,
   onDeshacer,
+  onMarcarRestantes,
   onGuardar,
   posicion = 'abajo',
 }: Props) => {
-  const marcarRestantes = sinMarcar > 0 && incompletas === 0;
-  const bloqueado =
-    incompletas > 0 || (!marcarRestantes && cambios === 0) || guardando;
+  const bloqueado = incompletas > 0 || cambios === 0 || guardando;
 
   const base = posicion === 'arriba' ? 'top-0 border-b' : 'bottom-0 border-t mt-2';
+
+  const textoMarcar =
+    sinMarcar === total
+      ? 'Marcar Presente a Todos'
+      : `Marcar ${sinMarcar === 1 ? 'Presente' : 'Presentes'} a ${sinMarcar}`;
 
   return (
     <div
@@ -71,7 +77,7 @@ const BarraGuardar = ({
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {cambios > 0 && (
             <Button
               type="button"
@@ -86,23 +92,32 @@ const BarraGuardar = ({
             </Button>
           )}
 
+          {sinMarcar > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 flex-1 sm:h-10 sm:flex-none"
+              onClick={onMarcarRestantes}
+              disabled={guardando}
+            >
+              <UserCheck className="mr-2 h-4 w-4" />
+              {textoMarcar}
+            </Button>
+          )}
+
           <Button
             type="button"
             variant="brand"
             className="h-11 flex-1 sm:h-10 sm:flex-none"
-            onClick={() => onGuardar(marcarRestantes)}
+            onClick={onGuardar}
             disabled={bloqueado}
           >
             {guardando ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : marcarRestantes ? (
-              <UserCheck className="mr-2 h-4 w-4" />
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            {marcarRestantes
-              ? `Presentes a los ${sinMarcar} y guardar`
-              : `Guardar${cambios > 0 ? ` ${cambios}` : ''}`}
+            {`Guardar${cambios > 0 ? ` ${cambios}` : ''}`}
           </Button>
         </div>
       </div>

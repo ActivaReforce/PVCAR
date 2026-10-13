@@ -10,8 +10,11 @@ import { getPool } from '../../config/db.js';
  *                        `notificar_mencionado` se añaden los mencionados
  *                        (personal); con `notificar_representante`, los
  *                        representantes (alumno).
+ * ausencias            — aviso automático de ausencia y su corrección (punto
+ *                        9): a la lista fija `para` + CC; con
+ *                        `notificar_representante`, también al representante.
  */
-export const TIPOS_CORREO = ['inscripciones', 'inscripciones_aviso', 'novedades'] as const;
+export const TIPOS_CORREO = ['inscripciones', 'inscripciones_aviso', 'novedades', 'ausencias'] as const;
 export type TipoCorreo = (typeof TIPOS_CORREO)[number];
 
 export interface ConfigCorreo {
@@ -24,7 +27,7 @@ export interface ConfigCorreo {
   responder_a: string | null;
   /** Solo para 'novedades': las de personal avisan también al mencionado. */
   notificar_mencionado: boolean;
-  /** Solo para 'novedades': las de alumno avisan también al representante. */
+  /** 'novedades': las de alumno avisan también al representante. 'ausencias': igual. */
   notificar_representante: boolean;
 }
 

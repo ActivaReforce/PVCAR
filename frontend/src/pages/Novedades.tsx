@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  CheckCircle2,
   GraduationCap,
   Loader2,
   Megaphone,
@@ -7,6 +8,7 @@ import {
   Search,
   Trash2,
   UserCog,
+  UserX,
   Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,7 +38,7 @@ import { ROLES_GLOBALES } from '@/hooks/useUserForm';
 import { ZONA } from '@/lib/fecha';
 import type { Novedad, TipoNovedad } from '@/api/novedades';
 import CrearNovedadDialog from '@/components/novedades/CrearNovedadDialog';
-import ConfigCorreo from '@/components/correos/ConfigCorreo';
+import ConfigCorreo, { type Aviso } from '@/components/correos/ConfigCorreo';
 
 const TODOS = 'todos';
 
@@ -45,6 +47,8 @@ const ETIQUETA_TIPO: Record<TipoNovedad, string> = {
   personal: 'Personal',
   representante: 'Representantes',
   alumno: 'Alumnos',
+  ausencia: 'Ausencia',
+  correccion: 'Corrección',
 };
 
 const COLOR_TIPO: Record<TipoNovedad, string> = {
@@ -52,6 +56,8 @@ const COLOR_TIPO: Record<TipoNovedad, string> = {
   personal: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200',
   representante: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
   alumno: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
+  ausencia: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
+  correccion: 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200',
 };
 
 const ICONO_TIPO: Record<TipoNovedad, typeof Megaphone> = {
@@ -59,6 +65,72 @@ const ICONO_TIPO: Record<TipoNovedad, typeof Megaphone> = {
   personal: UserCog,
   representante: Users,
   alumno: GraduationCap,
+  ausencia: UserX,
+  correccion: CheckCircle2,
+};
+
+const AVISOS_NOVEDADES: Aviso[] = [
+  { campo: 'notificar_mencionado', texto: 'Las novedades sobre personal avisan también al mencionado' },
+  {
+    campo: 'notificar_representante',
+    texto: 'Las novedades sobre un alumno o un representante avisan también al representante',
+  },
+];
+
+const AVISOS_AUSENCIAS: Aviso[] = [
+  {
+    campo: 'notificar_representante',
+    texto:
+      'La notificación de ausencia del alumno se avisa también al representante (correo y en sus Novedades)',
+  },
+];
+
+/** 2026-10-12 → 12/10/2026 */
+const fechaLegible = (fecha: string) => fecha.split('-').reverse().join('/');
+
+/** Ficha de una ausencia o corrección: la clase, el alumno y su representante. */
+const DetalleClase = ({ n }: { n: Novedad }) => {
+  const d = n.datos;
+  if (!d) return null;
+  const alumno = n.alumnos[0];
+  const filas: Array<[string, string]> = [
+    ['Alumno', alumno?.nombre ?? '—'],
+    ['Colegio', d.colegio],
+    ['Disciplina', d.actividad],
+    ['Clase', `${d.dia ? `${d.dia} ` : ''}${fechaLegible(d.fecha)}${d.horario ? ` · ${d.horario}` : ''}`],
+    ['Asistencia', d.estado + (d.hora_tarde ? ` · llegó ${d.hora_tarde}` : '')],
+    ...(d.razon ? ([['Motivo', d.razon]] as Array<[string, string]>) : []),
+  ];
+  const representantes = alumno?.representantes ?? [];
+  return (
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-md bg-muted/50 p-3 text-xs">
+      {filas.map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="font-medium text-muted-foreground">{k}</dt>
+          <dd className="break-words text-foreground">{v}</dd>
+        </div>
+      ))}
+      <dt className="font-medium text-muted-foreground">Representante</dt>
+      <dd className="min-w-0 space-y-0.5 text-foreground">
+        {representantes.length === 0
+          ? 'Sin representante activo'
+          : representantes.map((r) => (
+              <p key={`${r.nombre}-${r.correo ?? ''}`} className="break-words">
+                {r.nombre}
+                {r.telefono && (
+                  <>
+                    {' · '}
+                    <a href={`tel:${r.telefono}`} className="underline underline-offset-2">
+                      {r.telefono}
+                    </a>
+                  </>
+                )}
+                {r.correo && <span className="text-muted-foreground"> · {r.correo}</span>}
+              </p>
+            ))}
+      </dd>
+    </dl>
+  );
 };
 
 const fechaCorta = (iso: string) =>
@@ -171,13 +243,22 @@ const Novedades = () => {
       <Pestanas
         conConfig={puedeConfigurar}
         config={
-          <ConfigCorreo
-            tipo="novedades"
-            titulo="Correo de Novedades"
-            descripcion="Quién recibe el aviso cuando se escribe una novedad."
-            conPara
-            conAvisos
-          />
+          <div className="space-y-6">
+            <ConfigCorreo
+              tipo="novedades"
+              titulo="Correo de Novedades"
+              descripcion="Quién recibe el aviso cuando se escribe una novedad."
+              conPara
+              avisos={AVISOS_NOVEDADES}
+            />
+            <ConfigCorreo
+              tipo="ausencias"
+              titulo="Notificación por ausencia en asistencias de alumnos"
+              descripcion="Al guardar la asistencia, cada alumno marcado Ausente genera un aviso; si después se corrige a Presente, Tarde o Justificado, sale otro con la corrección. Solo clases de hoy y de los 7 días anteriores."
+              conPara
+              avisos={AVISOS_AUSENCIAS}
+            />
+          </div>
         }
       >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_200px]">
@@ -201,6 +282,8 @@ const Novedades = () => {
               <SelectItem value="personal">Sobre personal</SelectItem>
               <SelectItem value="representante">Sobre representantes</SelectItem>
               <SelectItem value="alumno">Sobre alumnos</SelectItem>
+              <SelectItem value="ausencia">Ausencias</SelectItem>
+              <SelectItem value="correccion">Correcciones de ausencia</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -260,6 +343,7 @@ const Novedades = () => {
                         {n.personas.map((p) => p.nombre).join(', ')}
                       </p>
                     )}
+                    <DetalleClase n={n} />
                     {n.nov_tipo === 'alumno' && n.alumnos.length > 0 && (
                       <p className="text-xs text-muted-foreground">
                         <span className="font-medium">Alumnos:</span>{' '}

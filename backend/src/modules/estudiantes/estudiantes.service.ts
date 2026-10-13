@@ -451,6 +451,13 @@ export async function eliminar(
   }
 
   const impactoPrevio = await repo.calcularImpacto(ninoId);
+  if (!impactoPrevio.puedeEliminar) {
+    throw new ApiError(
+      409,
+      'No se puede eliminar: sale en novedades, que se conservan para Reportes. Dalo de baja.',
+      impactoPrevio.bloqueos,
+    );
+  }
 
   await enTransaccion(async (client) => {
     await auditar(

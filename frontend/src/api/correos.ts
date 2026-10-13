@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
  */
 
 /** inscripciones: aprobada, al representante. inscripciones_aviso: nueva, al equipo. novedades: punto 8. */
-export type TipoCorreo = 'inscripciones' | 'inscripciones_aviso' | 'novedades';
+export type TipoCorreo = 'inscripciones' | 'inscripciones_aviso' | 'novedades' | 'ausencias';
 
 export interface ConfigCorreo {
   tipo: TipoCorreo;

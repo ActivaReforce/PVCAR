@@ -239,7 +239,7 @@ describe('guardado por lote de alumnos', () => {
       fecha: JUEVES,
       marcas,
     });
-    expect(res.resultado).toEqual({ altas: 2, cambios: 0 });
+    expect(res.resultado).toEqual({ altas: 2, cambios: 0, avisos: 0 });
   });
 
   it('un alumno que no estaba en esa clase se rechaza entero', async () => {
@@ -268,7 +268,7 @@ describe('guardado por lote de alumnos', () => {
       fecha: JUEVES,
       marcas,
     });
-    expect(res.resultado).toEqual({ altas: 0, cambios: 2 });
+    expect(res.resultado).toEqual({ altas: 0, cambios: 2, avisos: 0 });
     expect(auditorias).toHaveLength(1);
   });
 

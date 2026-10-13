@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const TIPOS = ['general', 'personal', 'representante', 'alumno'] as const;
+/** Los que se filtran en la lista: los cuatro manuales y los dos de asistencia. */
+export const TIPOS = ['general', 'personal', 'representante', 'alumno', 'ausencia', 'correccion'] as const;
 
 export const idParamSchema = z.object({
   id: z.coerce.number().int().positive(),

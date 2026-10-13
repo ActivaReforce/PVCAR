@@ -6,6 +6,7 @@ import { enTransaccion } from '../../lib/tx.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
 import * as repo from './asistencias.repository.js';
+import { enviarAvisos, registrarAvisos } from '../novedades/novedades.ausencias.js';
 import {
   ASISTENCIA,
   type GuardarAlumnosInput,
@@ -187,6 +188,8 @@ export async function listaAlumnos(
 export interface ResultadoGuardado {
   altas: number;
   cambios: number;
+  /** Ausencias y correcciones avisadas en este guardado (solo alumnos). */
+  avisos?: number;
 }
 
 /**
@@ -264,10 +267,26 @@ export async function guardarAlumnos(
       );
     }
 
-    return { altas, cambios };
+    /**
+     * Punto 9: ausencias y correcciones. En la misma transacción, para que
+     * no quede una novedad de una lista que no se guardó; el correo, después.
+     */
+    const avisos = await registrarAvisos(client, {
+      clase: sesion,
+      fecha: input.fecha,
+      marcas: input.marcas,
+      autorId: actor.usuario.usu_id,
+    });
+
+    return { altas, cambios, avisos };
   });
 
-  return { ...(await listaAlumnos(actor, { disciplina: input.colacthor_id, fecha: input.fecha })), resultado };
+  void enviarAvisos(resultado.avisos);
+
+  return {
+    ...(await listaAlumnos(actor, { disciplina: input.colacthor_id, fecha: input.fecha })),
+    resultado: { altas: resultado.altas, cambios: resultado.cambios, avisos: resultado.avisos.length },
+  };
 }
 
 export async function historial(

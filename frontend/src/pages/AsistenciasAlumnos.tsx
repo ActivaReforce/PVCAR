@@ -197,10 +197,11 @@ const AsistenciasAlumnos = () => {
     });
   }, [alumnos, buscar]);
 
-  const enviar = (marcarRestantes: boolean) => {
+  /** Guarda lo marcado. Marcar a los que faltan es otro botón y no guarda. */
+  const enviar = () => {
     if (!elegida) return;
 
-    const marcas: MarcaAlumno[] = borrador.envio(marcarRestantes).map(({ clave, marca }) => ({
+    const marcas: MarcaAlumno[] = borrador.envio().map(({ clave, marca }) => ({
       nino_id: Number(clave),
       asisest_id: marca.asisest_id as number,
       hora_tarde: marca.asisest_id === ESTADO_ASISTENCIA.TARDE ? marca.hora : null,
@@ -209,7 +210,6 @@ const AsistenciasAlumnos = () => {
     }));
 
     if (marcas.length === 0) return;
-    if (marcarRestantes) borrador.presenteALosQueFaltan();
     guardar.mutate({ colacthorId: elegida.colacthor_id, fecha, marcas });
   };
 
@@ -413,6 +413,7 @@ const AsistenciasAlumnos = () => {
                   {puedePasarLista && (
                     <BarraGuardar
                       posicion="arriba"
+                      total={Object.keys(borrador.marcas).length}
                       sinMarcar={
                         Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length
                       }
@@ -420,6 +421,7 @@ const AsistenciasAlumnos = () => {
                       incompletas={borrador.incompletas.length}
                       guardando={guardar.isPending}
                       onDeshacer={borrador.deshacer}
+                      onMarcarRestantes={borrador.presenteALosQueFaltan}
                       onGuardar={enviar}
                     />
                   )}
@@ -485,6 +487,7 @@ const AsistenciasAlumnos = () => {
               {puedePasarLista && alumnos.length > 0 && (
                 <BarraGuardar
                   posicion="abajo"
+                  total={Object.keys(borrador.marcas).length}
                   sinMarcar={
                     Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length
                   }
@@ -492,6 +495,7 @@ const AsistenciasAlumnos = () => {
                   incompletas={borrador.incompletas.length}
                   guardando={guardar.isPending}
                   onDeshacer={borrador.deshacer}
+                  onMarcarRestantes={borrador.presenteALosQueFaltan}
                   onGuardar={enviar}
                 />
               )}

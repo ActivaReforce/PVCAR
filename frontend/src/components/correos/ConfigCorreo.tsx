@@ -17,25 +17,19 @@ interface Props {
   descripcion: string;
   /** Aviso interno: va a una lista fija de destinatarios ("Para"). */
   conPara?: boolean;
-  /**
-   * Enseña "Notificar también": al mencionado (novedades sobre personal) y
-   * al representante (novedades sobre un alumno). Solo para 'novedades'.
-   */
-  conAvisos?: boolean;
+  /** Casillas de "Notificar también" que enseña; ninguna si no se pasa. */
+  avisos?: Aviso[];
 }
 
-const AVISOS = [
-  {
-    campo: 'notificar_mencionado',
-    texto: 'Las novedades sobre personal avisan también al mencionado',
-  },
-  {
-    campo: 'notificar_representante',
-    texto: 'Las novedades sobre un alumno o un representante avisan también al representante',
-  },
-] as const;
+type CampoAviso = 'notificar_mencionado' | 'notificar_representante';
+export interface Aviso {
+  campo: CampoAviso;
+  texto: string;
+}
+type Avisos = Record<CampoAviso, boolean>;
 
-type Avisos = Record<(typeof AVISOS)[number]['campo'], boolean>;
+/** Los tipos de la pestaña Configuración de Novedades: los abre su casilla Editar. */
+const DE_NOVEDADES: TipoCorreo[] = ['novedades', 'ausencias'];
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USUARIO = /^[a-z0-9][a-z0-9._-]{0,63}$/;
@@ -58,12 +52,13 @@ const ConfigCorreo = ({
   titulo,
   descripcion,
   conPara = false,
-  conAvisos = false,
+  avisos: AVISOS = [],
 }: Props) => {
+  const conAvisos = AVISOS.length > 0;
   const { user, hasPermission } = useAuth();
   // Misma regla que el backend: Novedades, la casilla Editar; el resto, Propietario.
   const puede =
-    tipo === 'novedades'
+    DE_NOVEDADES.includes(tipo)
       ? hasPermission('novedades', 'editar')
       : (user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false);
   const config = useConfigCorreo(tipo, puede);
@@ -247,8 +242,9 @@ const ConfigCorreo = ({
             para,
             cc,
             responder_a: responder || null,
-            notificar_mencionado: conAvisos && avisos.notificar_mencionado,
-            notificar_representante: conAvisos && avisos.notificar_representante,
+            notificar_mencionado: AVISOS.some((a) => a.campo === 'notificar_mencionado') && avisos.notificar_mencionado,
+            notificar_representante:
+              AVISOS.some((a) => a.campo === 'notificar_representante') && avisos.notificar_representante,
           })
         }
       >

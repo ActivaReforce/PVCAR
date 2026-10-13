@@ -8,7 +8,7 @@
 
 > **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
 
-**Corte de este documento: 2026-10-12 (lanzamiento hecho en `activareforce.com` y plataforma anterior borrada; siguiente: probar Novedades en `dev` y punto 9, aviso automático de ausencia).**
+**Corte de este documento: 2026-10-12 (lanzamiento hecho en `activareforce.com` y plataforma anterior borrada; punto 9, aviso automático de ausencia, hecho en `dev`; siguiente: que el cliente pruebe Novedades y ausencias).**
 
 ---
 
@@ -84,10 +84,12 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 
 **Novedades, dos avisos (2026-10-12):** el switch único de "notificar también" se partió en dos casillas: las novedades sobre personal avisan al mencionado (y él las ve) y las de alumno avisan al representante (y él las ve). Migración `0028_novedades_dos_avisos.sql`. Después, **pestañas Novedades / Configuración** (la segunda con la casilla Editar de Novedades, `0029`), las cuatro casillas de Novedades visibles en Permisos, y borrar solo con la casilla Eliminar (el autor tampoco; sin Eliminar no se ve el autor). **Tipo nuevo "Representantes"** (`0030`): Personal de Activa Reforce ya no lista representantes; los representantes mencionables son los de los alumnos del alcance de quien escribe, y avisa y deja ver con la casilla del representante. El representante menciona alumnos (y sus representantes) del colegio de sus hijos; las listas se agrupan por colegio. **Número rojo de Novedades en el menú** (`0031`, tabla `novedad_visto`): solo Propietario y Admin, novedades de otros desde la última que llegó a su pantalla; una consulta que solo cuenta, cada minuto y solo con la pestaña a la vista. **Eliminar ya no borra** (`0032`): la novedad pasa a `est_id` 2 con quién y cuándo, deja de verse en el módulo y en el número del menú, y sigue en el **reporte nuevo Reportes → Novedades** (todas, en pantalla y eliminadas; filtros de fechas, texto/autor y estado; Resumen por tipo y por autor). Ese reporte pide la casilla Eliminar de Novedades, no Ver: enseña autores y eliminadas. Propietario y Admin ven todas; otro con Eliminar, solo las suyas.
 
+**Punto 9 — aviso automático de ausencia (2026-10-12, `0033`):** guardar la asistencia de alumnos escribe, en la misma transacción, una novedad **Ausencia** (etiqueta roja) por cada alumno que pasa a Ausente y una **Corrección** si después pasa a Presente, Tarde o Justificado. Lo decide el último aviso de esa clase (disciplina + fecha + alumno, también entre los eliminados), no la marca anterior: guardar dos veces no repite, y sin ausencia avisada no hay corrección. Solo clases de hoy y de los 7 días anteriores (pasar lista atrasada no escribe a los padres). La novedad va a nombre de quien guardó y guarda una foto de la clase (`nov_datos`: colegio, actividad, día, horario, estado, hora de llegada, motivo); la tarjeta enseña además los representantes con teléfono y correo. Correo propio `ausencias` en Configuración de Novedades (Para, CC, respuestas y la casilla "avisar también al representante", que también se las enseña en sus Novedades); uno por alumno, después del COMMIT, en fila a 600 ms (Resend admite 2/s). Código en `backend/src/modules/novedades/novedades.ausencias.ts`. Además: borrar para siempre a un alumno o usuario que sale en novedades ya no da 500; se bloquea con el recuento y se pide la baja. Y en las dos asistencias el botón "Presentes a los N y guardar" se partió en **"Marcar Presente a Todos" / "Marcar Presentes a N"** (solo marca) y **"Guardar"** al lado (apagado sin cambios).
+
 **Al retomar — lista de trabajo, uno por uno:**
 
 1. **Probar Novedades** en `dev-pvcar.vercel.app`: crear una de cada tipo, ver que llegan los correos (con y sin el switch de mencionados) y entrar con un rol que no sea Propietario. Si pasa, quitar la pantalla temporal y mergear.
-2. **Punto 9 — aviso automático de ausencia** (construye sobre Novedades).
+2. ~~**Punto 9 — aviso automático de ausencia**~~ — hecho en `dev` el 2026-10-12; falta la prueba del cliente.
 3. **Pagos mensuales** — esperar a que el cliente lo cuente.
 4. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
 5. **Respaldo de prod:** ya hay datos reales y el plan gratuito de Supabase no hace copias automáticas. `pg_dump` programado o plan Pro.

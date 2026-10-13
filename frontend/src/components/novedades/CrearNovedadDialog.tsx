@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useCrearNovedad } from '@/hooks/useNovedades';
-import type { TipoNovedad } from '@/api/novedades';
+import type { TipoManual } from '@/api/novedades';
 import SelectorMenciones from './SelectorMenciones';
 
 interface Props {
@@ -19,7 +19,7 @@ interface Props {
   onCerrar: () => void;
 }
 
-const TIPOS: Array<{ id: TipoNovedad; etiqueta: string; icono: typeof Megaphone; descripcion: string }> = [
+const TIPOS: Array<{ id: TipoManual; etiqueta: string; icono: typeof Megaphone; descripcion: string }> = [
   { id: 'general', etiqueta: 'General', icono: Megaphone, descripcion: 'Avisa a Activa Reforce sin ligarlo a nadie.' },
   { id: 'personal', etiqueta: 'Personal de Activa Reforce', icono: UserCog, descripcion: 'Novedad sobre una o varias personas.' },
   { id: 'representante', etiqueta: 'Representantes', icono: Users, descripcion: 'Novedad sobre uno o varios representantes.' },
@@ -27,7 +27,7 @@ const TIPOS: Array<{ id: TipoNovedad; etiqueta: string; icono: typeof Megaphone;
 ];
 
 const CrearNovedadDialog = ({ abierto, onCerrar }: Props) => {
-  const [tipo, setTipo] = useState<TipoNovedad>('general');
+  const [tipo, setTipo] = useState<TipoManual>('general');
   const [texto, setTexto] = useState('');
   const [personas, setPersonas] = useState<number[]>([]);
   const [representantes, setRepresentantes] = useState<number[]>([]);

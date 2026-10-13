@@ -20,6 +20,10 @@ import type { CrearInput, FiltrosListar } from './novedades.schemas.js';
  *     mencionan; con `notificar_representante`, las de representante que lo
  *     mencionan y las de alumno sobre sus hijos.
  *   - Las de tipo `general` solo las ve el autor y los globales.
+ *   - Ausencias y correcciones (punto 9, `novedades.ausencias.ts`): las
+ *     escribe el sistema a nombre de quien guardó la lista; con
+ *     `notificar_representante` del correo 'ausencias', las ve también el
+ *     representante del alumno.
  *
  * Correos:
  *   - Siempre al Para + CC configurado del tipo 'novedades'.
@@ -79,11 +83,15 @@ function esRepresentante(actor: AuthUser): boolean {
 
 export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<NovedadVista[]> {
   const global = esGlobal(actor);
-  const config = await configuracion('novedades');
+  const [config, configAusencias] = await Promise.all([
+    configuracion('novedades'),
+    configuracion('ausencias'),
+  ]);
   const verMenciones = config?.notificar_mencionado ?? false;
   const verHijos = config?.notificar_representante ?? false;
+  const verAusencias = configAusencias?.notificar_representante ?? false;
 
-  const ninosDelActor = verHijos && esRepresentante(actor)
+  const hijos = (verHijos || verAusencias) && esRepresentante(actor)
     ? await repo.ninosDelRepresentante(actor.usuario.usu_id)
     : [];
 
@@ -101,9 +109,10 @@ export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<N
       ? null
       : {
           actorId: actor.usuario.usu_id,
-          ninosDelActor,
+          ninosDelActor: verHijos ? hijos : [],
           verMenciones,
           verComoRepresentante: verHijos,
+          ninosAusencias: verAusencias ? hijos : [],
         },
   });
   return lista.map((n) => paraActor(actor, n));
@@ -124,6 +133,13 @@ export async function obtener(actor: AuthUser, id: number): Promise<NovedadVista
       novedad.nov_tipo === 'alumno' &&
       config?.notificar_representante &&
       esRepresentante(actor)
+    ) {
+      const mios = new Set(await repo.ninosDelRepresentante(actor.usuario.usu_id));
+      puedeVer = novedad.alumnos.some((a) => mios.has(a.id));
+    } else if (
+      (novedad.nov_tipo === 'ausencia' || novedad.nov_tipo === 'correccion') &&
+      esRepresentante(actor) &&
+      (await configuracion('ausencias'))?.notificar_representante
     ) {
       const mios = new Set(await repo.ninosDelRepresentante(actor.usuario.usu_id));
       puedeVer = novedad.alumnos.some((a) => mios.has(a.id));
@@ -338,6 +354,8 @@ function cuerpoDe(n: repo.Novedad): { html: string; texto: string } {
     personal: 'Sobre personal',
     representante: 'Sobre representantes',
     alumno: 'Sobre alumnos',
+    ausencia: 'Ausencia',
+    correccion: 'Corrección',
   }[n.nov_tipo];
 
   const mencionesTexto =

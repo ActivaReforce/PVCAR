@@ -119,10 +119,11 @@ const AsistenciasEntrenadores = () => {
     });
   }, [personas, buscar]);
 
-  const enviar = (marcarRestantes: boolean) => {
+  /** Guarda lo marcado. Marcar a los que faltan es otro botón y no guarda. */
+  const enviar = () => {
     if (!colegio) return;
 
-    const marcas: MarcaPersona[] = borrador.envio(marcarRestantes).map(({ clave, marca }) => {
+    const marcas: MarcaPersona[] = borrador.envio().map(({ clave, marca }) => {
       const [tipo, id] = clave.split(':');
       return {
         tipo: tipo as 'entrenador' | 'auxiliar',
@@ -135,7 +136,6 @@ const AsistenciasEntrenadores = () => {
     });
 
     if (marcas.length === 0) return;
-    if (marcarRestantes) borrador.presenteALosQueFaltan();
     guardar.mutate({ colId: Number(colegio), fecha, marcas });
   };
 
@@ -268,6 +268,7 @@ const AsistenciasEntrenadores = () => {
                   {puedePasarLista && (
                     <BarraGuardar
                       posicion="arriba"
+                      total={Object.keys(borrador.marcas).length}
                       sinMarcar={
                         Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length
                       }
@@ -275,6 +276,7 @@ const AsistenciasEntrenadores = () => {
                       incompletas={borrador.incompletas.length}
                       guardando={guardar.isPending}
                       onDeshacer={borrador.deshacer}
+                      onMarcarRestantes={borrador.presenteALosQueFaltan}
                       onGuardar={enviar}
                     />
                   )}
@@ -348,6 +350,7 @@ const AsistenciasEntrenadores = () => {
               {puedePasarLista && personas.length > 0 && (
                 <BarraGuardar
                   posicion="abajo"
+                  total={Object.keys(borrador.marcas).length}
                   sinMarcar={
                     Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length
                   }
@@ -355,6 +358,7 @@ const AsistenciasEntrenadores = () => {
                   incompletas={borrador.incompletas.length}
                   guardando={guardar.isPending}
                   onDeshacer={borrador.deshacer}
+                  onMarcarRestantes={borrador.presenteALosQueFaltan}
                   onGuardar={enviar}
                 />
               )}
