@@ -254,13 +254,14 @@ export async function exportar(
   estiloCabecera(hoja.getRow(1), columnas.length);
   hoja.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columnas.length } };
 
-  for (const fila of rows) {
+  const extra = definicion.hojaExtra;
+  const delDetalle = extra?.aparte ? rows.filter((f) => !extra.incluye(f)) : rows;
+  for (const fila of delDetalle) {
     hoja.addRow(proyectar(fila, columnas)).commit();
   }
   hoja.commit();
 
   // Una hoja más con parte de las filas (Novedades → Ausencias).
-  const extra = definicion.hojaExtra;
   if (extra && extra.sale(filtros)) {
     const hojaExtra = libro.addWorksheet(extra.titulo.slice(0, 31), {
       views: [{ state: 'frozen', ySplit: 1 }],

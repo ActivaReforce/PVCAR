@@ -146,6 +146,8 @@ export interface Definicion {
     incluye: (fila: Record<string, unknown>) => boolean;
     /** Si sale con estos filtros. */
     sale: (f: FiltrosReporte) => boolean;
+    /** Sus filas salen solo en ella, no en la hoja del detalle. */
+    aparte?: boolean;
   };
 }
 
@@ -811,6 +813,8 @@ const novedades: Definicion = {
     ],
     incluye: (fila) => fila.tipo === 'Ausencia' || fila.tipo === 'Corrección',
     sale: (f) => f.ausencias !== false,
+    // La hoja Novedades del Excel lleva solo las escritas a mano (2026-10-12).
+    aparte: true,
   },
   construir: (f, ctx) => ({
     sql: `

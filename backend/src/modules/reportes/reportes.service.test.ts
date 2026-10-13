@@ -106,6 +106,8 @@ describe('el catalogo', () => {
     expect(def.hojaExtra!.incluye({ tipo: 'Ausencia' })).toBe(true);
     expect(def.hojaExtra!.incluye({ tipo: 'Corrección' })).toBe(true);
     expect(def.hojaExtra!.incluye({ tipo: 'General' })).toBe(false);
+    // En el Excel no se repiten en la hoja Novedades.
+    expect(def.hojaExtra!.aparte).toBe(true);
   });
 
   /**
