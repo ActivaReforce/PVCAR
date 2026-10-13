@@ -7,6 +7,7 @@ import * as service from './inscripciones.service.js';
 import {
   borradorDocumentoSchema,
   colIdParamSchema,
+  ejemploSchema,
   cotizacionSchema,
   envioSchema,
   abrirSchema,
@@ -262,9 +263,10 @@ inscripcionesRouter.delete(
 inscripcionesRouter.post(
   '/documentos/ejemplo',
   requirePermission('inscripciones', 'ver'),
-  async (_req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const pdf = await service.ejemploPaquete();
+      const { col_id } = ejemploSchema.parse(req.body ?? {});
+      const pdf = await service.ejemploPaquete(col_id ?? null);
       res
         .status(200)
         .type('application/pdf')

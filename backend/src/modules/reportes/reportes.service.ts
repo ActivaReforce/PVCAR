@@ -47,8 +47,13 @@ export interface ReporteDisponible {
   columnasSensibles: Columna[];
 }
 
+function accionDe(definicion: Definicion): string {
+  return definicion.accion ?? 'ver';
+}
+
 function puedeVer(actor: AuthUser, definicion: Definicion): boolean {
-  return actor.permisos.some((p) => p.modulo === definicion.modulo && p.accion === 'ver');
+  const accion = accionDe(definicion);
+  return actor.permisos.some((p) => p.modulo === definicion.modulo && p.accion === accion);
 }
 
 /**
@@ -75,7 +80,7 @@ function exigirDefinicion(actor: AuthUser, id: string): Definicion {
   const definicion = definicionDe(id);
   if (!definicion) throw new ApiError(404, 'Ese reporte no existe');
   if (!puedeVer(actor, definicion)) {
-    throw new ApiError(403, `Sin permiso: ${definicion.modulo}:ver`);
+    throw new ApiError(403, `Sin permiso: ${definicion.modulo}:${accionDe(definicion)}`);
   }
   return definicion;
 }
@@ -249,10 +254,29 @@ export async function exportar(
   estiloCabecera(hoja.getRow(1), columnas.length);
   hoja.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columnas.length } };
 
-  for (const fila of rows) {
+  const extra = definicion.hojaExtra;
+  const delDetalle = extra?.aparte ? rows.filter((f) => !extra.incluye(f)) : rows;
+  for (const fila of delDetalle) {
     hoja.addRow(proyectar(fila, columnas)).commit();
   }
   hoja.commit();
+
+  // Una hoja más con parte de las filas (Novedades → Ausencias).
+  if (extra && extra.sale(filtros)) {
+    const hojaExtra = libro.addWorksheet(extra.titulo.slice(0, 31), {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+    hojaExtra.columns = extra.columnas.map((c) => ({ header: c.cabecera, key: c.clave, width: c.ancho }));
+    estiloCabecera(hojaExtra.getRow(1), extra.columnas.length);
+    hojaExtra.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: extra.columnas.length },
+    };
+    for (const fila of rows.filter(extra.incluye)) {
+      hojaExtra.addRow(proyectar(fila, extra.columnas)).commit();
+    }
+    hojaExtra.commit();
+  }
 
   await libro.commit();
 

@@ -49,6 +49,8 @@ const ETIQUETAS: Record<string, string> = {
   encuestas_creadas: 'encuestas que creó',
   estudiantes_vinculados: 'estudiantes vinculados',
   encuestas_respondidas: 'encuestas respondidas',
+  novedades_escritas: 'novedades que escribió o eliminó',
+  novedades_sobre_el: 'novedades que lo mencionan',
 };
 
 const etiqueta = (clave: string) => ETIQUETAS[clave] ?? clave.replace(/_/g, ' ');

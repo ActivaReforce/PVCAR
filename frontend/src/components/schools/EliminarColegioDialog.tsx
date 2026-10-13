@@ -37,6 +37,7 @@ const ETIQUETAS: Record<string, string> = {
   estudiantes: 'alumnos matriculados',
   asistencias_entrenador: 'asistencias de entrenadores',
   asistencias_auxiliar: 'asistencias de auxiliares',
+  documentos_propios: 'versiones de su ficha o contrato propios',
 };
 
 const etiqueta = (clave: string) => ETIQUETAS[clave] ?? clave.replace(/_/g, ' ');

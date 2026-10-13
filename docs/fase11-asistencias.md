@@ -83,7 +83,7 @@ Va en **las dos bases**, después de `0009`. Dos cosas:
 
 ---
 
-## 3. Lo que se arregló del sistema viejo
+## 3. Lo que se arregló del sistema anterior
 
 | Estaba mal | Ahora |
 |---|---|
@@ -106,6 +106,6 @@ Va en **las dos bases**, después de `0009`. Dos cosas:
 
 Si quieres separar "consultar la asistencia" de "pasar lista", hay que conceder `editar` a los roles que deban marcar (desde Permisos) y cambiar dos líneas de `asistencias.routes.ts`. **Tal como está hoy, exigir `editar` dejaría el módulo inservible para todos.**
 
-**2. Fechas futuras.** El selector no deja pasar de hoy. El sistema viejo proponía la **próxima** sesión, o sea registrar una clase que aún no ha ocurrido. Si alguna vez hace falta dejar constancia por adelantado, se quita el tope.
+**2. Fechas futuras.** **Decidido por el cliente el 2026-10-12: no se permiten.** El selector no deja pasar de hoy y desde esa fecha el servidor también lo rechaza (400), en alumnos y en entrenadores, contando "hoy" en Ecuador. El sistema anterior proponía la **próxima** sesión, o sea registrar una clase que aún no ha ocurrido. Si alguna vez hace falta dejar constancia por adelantado, se quita el tope.
 
 **3. Disciplina dada de baja.** Su historial se consulta pero no admite marcas nuevas (409). Si una clase se da de baja por error y hay que registrar la sesión que faltaba, primero se reactiva la disciplina.

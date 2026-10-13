@@ -1,6 +1,6 @@
-# Mapa de módulos — sistema viejo
+# Mapa de módulos
 
-Levantado el 2026-08-06 sobre `activa-forge-login/` (la SPA en producción) y contrastado con el esquema de `PVCAR_Dev`, que ya tiene los datos reales del respaldo del 2026-07-27.
+Levantado el 2026-08-06 sobre el código de la plataforma anterior (ya dada de baja) y contrastado con el esquema de `PVCAR_Dev`. Las referencias a "código viejo" describen cómo lo hacía aquella y por qué aquí se hizo distinto.
 
 Sirve para dos cosas: saber qué hay que reconstruir en las Fases 6–14, y dejar por escrito **qué está mal hecho** para no copiarlo. El cliente lo pidió explícito: *"analiza qué está mal y mejora, todo estaba funcionando pero se usaron métodos y malas prácticas"*.
 

@@ -20,9 +20,8 @@ import { EstadoGeneral } from '@/components/inscripciones/EstadoInscripciones';
 import { fechaHora } from '@/components/inscripciones/formato';
 import MisInscripciones from '@/components/inscripciones/MisInscripciones';
 import { useAuth } from '@/contexts/AuthContext';
-import { ROL } from '@/hooks/useUserForm';
+import { ROLES_GLOBALES } from '@/hooks/useUserForm';
 
-const GLOBALES: number[] = [ROL.PROPIETARIO, ROL.ADMIN];
 
 /**
  * El personal (Propietario y Admin) administra; cualquier otro con permiso de
@@ -30,7 +29,7 @@ const GLOBALES: number[] = [ROL.PROPIETARIO, ROL.ADMIN];
  */
 const Inscripciones = () => {
   const { user } = useAuth();
-  const esPersonal = user?.roles.some((r) => GLOBALES.includes(r.rol_id)) ?? false;
+  const esPersonal = user?.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id)) ?? false;
   return esPersonal ? <InscripcionesPersonal /> : <MisInscripciones />;
 };
 

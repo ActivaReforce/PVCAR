@@ -12,6 +12,7 @@ let fila: Record<string, unknown> | null = {
   cc: ['gerencia@activareforce.com'],
   responder_a: 'info@activareforce.com',
   notificar_mencionado: false,
+  notificar_representante: false,
 };
 const actualizaciones: unknown[][] = [];
 
@@ -50,6 +51,7 @@ const entrada = {
   cc: ['gerencia@activareforce.com'],
   responder_a: null,
   notificar_mencionado: false,
+  notificar_representante: false,
 };
 
 beforeEach(() => {
@@ -68,6 +70,25 @@ describe('solo el Propietario', () => {
     const config = await service.obtener(persona(ROL.PROPIETARIO), 'inscripciones');
     expect(config.dominio).toBe('activareforce.com');
     await service.guardar(persona(ROL.PROPIETARIO), 'inscripciones', entrada);
+    expect(actualizaciones).toHaveLength(1);
+  });
+});
+
+describe('Novedades: la casilla Editar de Novedades', () => {
+  const conPermisos = (rol: number, permisos: Array<{ modulo: string; accion: string }>) =>
+    ({ ...(persona(rol) as object), permisos }) as never;
+
+  it('sin Editar no la ve ni la cambia, aunque sea Propietario (403)', async () => {
+    const sin = conPermisos(ROL.PROPIETARIO, [{ modulo: 'novedades', accion: 'ver' }]);
+    await expect(service.obtener(sin, 'novedades')).rejects.toMatchObject({ statusCode: 403 });
+    await expect(service.guardar(sin, 'novedades', entrada)).rejects.toMatchObject({ statusCode: 403 });
+    expect(actualizaciones).toHaveLength(0);
+  });
+
+  it('con Editar la ve y la guarda, aunque no sea Propietario', async () => {
+    const con = conPermisos(ROL.COORDINADOR, [{ modulo: 'novedades', accion: 'editar' }]);
+    await service.obtener(con, 'novedades');
+    await service.guardar(con, 'novedades', entrada);
     expect(actualizaciones).toHaveLength(1);
   });
 });

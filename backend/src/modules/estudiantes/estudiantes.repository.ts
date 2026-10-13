@@ -734,7 +734,8 @@ export async function calcularImpacto(ninoId: number): Promise<ImpactoEstudiante
            FROM public.evaluacion_intento ei
            JOIN public.evaluacion_nino_pendiente enp ON enp.evaninopen_id = ei.evaninopen_id
            JOIN public.nino_asignacion na ON na.ninoasig_id = enp.ninoasig_id
-          WHERE na.nino_id = $1) AS intentos`,
+          WHERE na.nino_id = $1) AS intentos,
+        (SELECT count(*) FROM public.novedad_alumno WHERE nino_id = $1) AS novedades`,
     [ninoId],
   );
 
@@ -748,8 +749,12 @@ export async function calcularImpacto(ninoId: number): Promise<ImpactoEstudiante
       intentos: n('intentos'),
       representantes: n('representantes'),
     },
-    bloqueos: {},
-    puedeEliminar: true,
+    /**
+     * Las novedades (también sus ausencias) son historia que queda en
+     * Reportes: su FK no lleva cascada. Con alguna, se da de baja.
+     */
+    bloqueos: n('novedades') > 0 ? { novedades: n('novedades') } : {},
+    puedeEliminar: n('novedades') === 0,
   };
 }
 

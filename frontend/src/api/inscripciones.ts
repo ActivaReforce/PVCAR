@@ -32,6 +32,8 @@ export interface DocumentoLegal {
   doc_fecha: string;
   /** null = borrador. */
   doc_publicado: string | null;
+  /** Ficha y contrato: su colegio. null en los generales (y en el texto base). */
+  col_id: number | null;
 }
 
 export interface DisciplinaOfertada {
@@ -87,6 +89,8 @@ export interface Formulario {
   grados: Array<{ catninograd_id: number; catninograd_nombre: string }>;
   parentescos: string[];
   documentos: Partial<Record<TipoDocumento, DocumentoLegal>>;
+  /** La ficha y el contrato publicados de cada colegio ofrecido (clave = col_id). */
+  documentos_colegio: Record<number, Partial<Record<TipoDocumento, DocumentoLegal>>>;
   /** A dónde transferir el pago. */
   cuenta_bancaria: string | null;
   /** Cuántas disciplinas puede elegir cada alumno. */
@@ -169,7 +173,10 @@ export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id'>
 export interface Envio {
   representante: RepresentanteEnvio;
   ninos: NinoEnvio[];
-  documentos: Record<TipoDocumento, number>;
+  /** Los generales que leyó. */
+  documentos: Partial<Record<TipoDocumento, number>>;
+  /** La ficha y el contrato que leyó, por colegio (clave = col_id). */
+  documentos_colegio: Record<string, Partial<Record<'ficha_matricula' | 'contrato', number>>>;
   acepta: Record<TipoDocumento, true>;
   comprobante: { mime: string; base64: string };
 }
@@ -335,11 +342,34 @@ export interface VersionDocumento {
   doc_titulo: string;
   doc_fecha: string;
   doc_publicado: string | null;
+  col_id: number | null;
   aceptaciones: number;
 }
 
+/** Un borrador de un general (sin col_id) o de la ficha o el contrato de un colegio. */
+export interface DatosBorrador {
+  tipo: TipoDocumento;
+  col_id?: number | null;
+  titulo: string;
+  contenido: string;
+}
+
+/** Lo que lee un alumno: los generales, y la ficha y el contrato de su colegio. */
+export function documentoPara(
+  formulario: Pick<Formulario, 'documentos' | 'documentos_colegio'>,
+  colId: number | null,
+  tipo: TipoDocumento,
+): DocumentoLegal | undefined {
+  if (tipo !== 'ficha_matricula' && tipo !== 'contrato') return formulario.documentos[tipo];
+  return colId !== null ? formulario.documentos_colegio[colId]?.[tipo] : undefined;
+}
+
 export interface Documentos {
+  /** Los cuatro generales vigentes. */
   vigentes: DocumentoLegal[];
+  /** La ficha y el contrato vigentes de cada colegio. */
+  propios: DocumentoLegal[];
+  /** Generales (col_id null) y de cada colegio. */
   borradores: DocumentoLegal[];
   historial: VersionDocumento[];
   marcadores: Record<string, string>;
@@ -440,14 +470,13 @@ export const inscripcionesApi = {
 
   documentos: () => api.get<Documentos>('/inscripciones/documentos'),
   documento: (id: number) => api.get<DocumentoLegal>(`/inscripciones/documentos/${id}`),
-  guardarBorrador: (datos: { tipo: TipoDocumento; titulo: string; contenido: string }) =>
-    api.post<DocumentoLegal>('/inscripciones/documentos', datos),
+  guardarBorrador: (datos: DatosBorrador) => api.post<DocumentoLegal>('/inscripciones/documentos', datos),
   publicarDocumento: (id: number) =>
     api.post<DocumentoLegal>(`/inscripciones/documentos/${id}/publicar`),
   borrarBorrador: (id: number) => api.delete<{ doc_id: number }>(`/inscripciones/documentos/${id}`),
   /** El PDF de ejemplo se baja como archivo: no es { data, error }. */
-  ejemploPaquete: () =>
-    api.descargar('/inscripciones/documentos/ejemplo', {}, 'inscripcion-ejemplo.pdf'),
+  ejemploPaquete: (colId: number | null = null) =>
+    api.descargar('/inscripciones/documentos/ejemplo', { col_id: colId }, 'inscripcion-ejemplo.pdf'),
 
   precios: () => api.get<PrecioColegio[]>('/inscripciones/precios'),
   guardarPrecio: (colId: number, datos: DatosPrecio) =>

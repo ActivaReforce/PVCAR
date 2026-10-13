@@ -2,10 +2,12 @@ import { alcanceDe, alcanzaColegio, alcanzaDisciplina } from '../../lib/alcance.
 import { auditar } from '../../lib/auditoria.js';
 import { ESTADO } from '../../lib/constants.js';
 import { firmarFotos } from '../../lib/storage.js';
+import { hoyEc } from '../../lib/fecha.js';
 import { enTransaccion } from '../../lib/tx.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
 import * as repo from './asistencias.repository.js';
+import { enviarAvisos, registrarAvisos } from '../novedades/novedades.ausencias.js';
 import {
   ASISTENCIA,
   type GuardarAlumnosInput,
@@ -100,6 +102,16 @@ async function exigirSesion(
   return sesion;
 }
 
+/**
+ * No se pasa lista de una clase que aún no ha ocurrido (decidido por el
+ * cliente el 2026-10-12). La pantalla ya no deja elegirla; esto lo cierra en
+ * el servidor. "Hoy" es el de Ecuador: a las 20:00 de Guayaquil UTC ya es
+ * mañana, y esa fecha sigue siendo futura.
+ */
+function exigirNoFutura(fecha: string): void {
+  if (fecha > hoyEc()) throw new ApiError(400, 'No se puede pasar lista de una fecha futura');
+}
+
 async function exigirColegio(actor: AuthUser, colId: number): Promise<repo.ColegioBasico> {
   const colegio = await repo.obtenerColegio(colId);
   if (!colegio) throw new ApiError(404, 'Ese colegio no existe');
@@ -187,6 +199,8 @@ export async function listaAlumnos(
 export interface ResultadoGuardado {
   altas: number;
   cambios: number;
+  /** Ausencias y correcciones avisadas en este guardado (solo alumnos). */
+  avisos?: number;
 }
 
 /**
@@ -204,6 +218,7 @@ export async function guardarAlumnos(
   actor: AuthUser,
   input: GuardarAlumnosInput,
 ): Promise<ListaAlumnos & { resultado: ResultadoGuardado }> {
+  exigirNoFutura(input.fecha);
   const sesion = await exigirSesion(actor, input.colacthor_id, input.fecha);
 
   if (sesion.est_id !== ESTADO.ACTIVO) {
@@ -264,10 +279,26 @@ export async function guardarAlumnos(
       );
     }
 
-    return { altas, cambios };
+    /**
+     * Punto 9: ausencias y correcciones. En la misma transacción, para que
+     * no quede una novedad de una lista que no se guardó; el correo, después.
+     */
+    const avisos = await registrarAvisos(client, {
+      clase: sesion,
+      fecha: input.fecha,
+      marcas: input.marcas,
+      autorId: actor.usuario.usu_id,
+    });
+
+    return { altas, cambios, avisos };
   });
 
-  return { ...(await listaAlumnos(actor, { disciplina: input.colacthor_id, fecha: input.fecha })), resultado };
+  void enviarAvisos(resultado.avisos);
+
+  return {
+    ...(await listaAlumnos(actor, { disciplina: input.colacthor_id, fecha: input.fecha })),
+    resultado: { altas: resultado.altas, cambios: resultado.cambios, avisos: resultado.avisos.length },
+  };
 }
 
 export async function historial(
@@ -337,6 +368,7 @@ export async function guardarEntrenadores(
   actor: AuthUser,
   input: GuardarEntrenadoresInput,
 ): Promise<ListaEntrenadores & { resultado: ResultadoGuardado }> {
+  exigirNoFutura(input.fecha);
   const colegio = await exigirColegio(actor, input.col_id);
 
   const resultado = await enTransaccion(async (client) => {

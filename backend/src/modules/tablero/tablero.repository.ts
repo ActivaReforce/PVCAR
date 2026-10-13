@@ -1,7 +1,7 @@
 import { getPool } from '../../config/db.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
-import { textoEc } from '../../lib/fecha.js';
+import { HOY_EC, textoEc } from '../../lib/fecha.js';
 
 /**
  * Consultas del Tablero.
@@ -56,6 +56,9 @@ export interface TableroGeneral {
   encuestasPublicadas: number;
   asistenciaAlumnos: Asistencia;
   asistenciaEntrenadores: Asistencia;
+  /** Correos que salieron hoy (día de Ecuador), todos los tipos. */
+  correosHoy: number;
+  correosHoyPorTipo: Array<{ tipo: string; enviados: number }>;
 }
 
 export async function tableroGeneral(desde: string, hasta: string): Promise<TableroGeneral> {
@@ -72,7 +75,12 @@ export async function tableroGeneral(desde: string, hasta: string): Promise<Tabl
         (SELECT ${resumenAsistencia('a')} FROM public.asistencia_nino a
           WHERE a.asisnino_fecha BETWEEN $1::date AND $2::date)                                AS "asistenciaAlumnos",
         (SELECT ${resumenAsistencia('a')} FROM public.asistencia_entrenador a
-          WHERE a.asisent_fecha BETWEEN $1::date AND $2::date)                                 AS "asistenciaEntrenadores"`,
+          WHERE a.asisent_fecha BETWEEN $1::date AND $2::date)                                 AS "asistenciaEntrenadores",
+        (SELECT COALESCE(sum(cordia_enviados), 0) FROM public.correo_diario
+          WHERE cordia_dia = ${HOY_EC})::int                                                     AS "correosHoy",
+        (SELECT COALESCE(jsonb_agg(jsonb_build_object('tipo', cordia_tipo, 'enviados', cordia_enviados)
+                                   ORDER BY cordia_enviados DESC, cordia_tipo), '[]'::jsonb)
+           FROM public.correo_diario WHERE cordia_dia = ${HOY_EC})                              AS "correosHoyPorTipo"`,
     [desde, hasta],
   );
   return rows[0]!;

@@ -4,9 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCatalogoReportes } from '@/hooks/useTablero';
 import { useAuth } from '@/contexts/AuthContext';
-import { ROL } from '@/hooks/useUserForm';
+import { ROLES_GLOBALES } from '@/hooks/useUserForm';
 
-const GLOBALES: number[] = [ROL.PROPIETARIO, ROL.ADMIN];
 
 /**
  * Índice de Reportes.
@@ -19,7 +18,7 @@ const GLOBALES: number[] = [ROL.PROPIETARIO, ROL.ADMIN];
 const Reportes = () => {
   const catalogo = useCatalogoReportes();
   const { user } = useAuth();
-  const esGlobal = user?.roles.some((r) => GLOBALES.includes(r.rol_id)) ?? false;
+  const esGlobal = user?.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id)) ?? false;
 
   if (catalogo.isLoading) {
     return (

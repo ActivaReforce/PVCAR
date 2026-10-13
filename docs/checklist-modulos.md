@@ -12,7 +12,7 @@ En la Fase 6 di el módulo de Usuarios por funcionando cuando lo único verifica
 | 500 al abrir la lista | La consulta de conteos recibía seis parámetros y nombraba cinco. El typecheck no ve dentro de una cadena SQL. |
 | Recargar echaba al tablero | El guardia de rutas leía los permisos antes de que `/me` los cargara. |
 | Los conteos se contradecían | Los tres salían del mismo filtro: al marcar un rol, los demás caían a 0. |
-| 403 en la consola en todas las pantallas | Un componente global del sistema viejo seguía consultando Supabase directo. |
+| 403 en la consola en todas las pantallas | Un componente global del sistema anterior seguía consultando Supabase directo. |
 | Textos montados unos sobre otros | Nunca se miró la pantalla con datos largos. |
 | Botón invisible en modo oscuro | Nunca se abrió la aplicación en oscuro. |
 | Modales torcidos en móvil | Nunca se miró en móvil. |
@@ -69,4 +69,4 @@ Ninguno era difícil. Todos se habrían encontrado mirando. **El cliente no es e
 - **Los modales se centran con `translate`**: un `mx-4` no los encoge, los desplaza. El ancho debe descontar el margen.
 - **La variante `default` del botón trae `dark:bg-primary`**, que en oscuro es casi blanco. Pintar el fondo por `className` no la desactiva: tailwind-merge no cruza modificadores.
 - **`DebouncedSearchInput` ya debounce.** Envolverlo en `useDebounce` duplica la espera.
-- **Componentes globales del sistema viejo** (montados en `App.tsx`) consultan Supabase en todas las pantallas. Al empezar un módulo, comprobar qué se monta fuera de la ruta.
+- **Componentes globales del sistema anterior** (montados en `App.tsx`) consultan Supabase en todas las pantallas. Al empezar un módulo, comprobar qué se monta fuera de la ruta.

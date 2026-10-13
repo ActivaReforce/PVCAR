@@ -176,14 +176,25 @@ export const envioSchema = z.object({
   /**
    * Las versiones que el representante tuvo delante (doc_id de cada tipo).
    * Si cambiaron mientras llenaba el formulario, se rechaza: no puede
-   * aceptar un texto que no leyó.
+   * aceptar un texto que no leyó. Aquí los generales; la ficha y el
+   * contrato, en `documentos_colegio`.
    */
-  documentos: z.object(
-    Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, z.number().int().positive()])) as Record<
-      TipoDocumento,
-      z.ZodNumber
-    >,
-  ),
+  documentos: z.object({
+    autorizacion_datos: z.number().int().positive(),
+    datos_medicos: z.number().int().positive(),
+    imagen: z.number().int().positive(),
+    politica: z.number().int().positive(),
+  }),
+  /** Por colegio (clave = col_id): la ficha y el contrato de ese colegio que leyó. */
+  documentos_colegio: z
+    .record(
+      z.string().regex(/^\d+$/),
+      z.object({
+        ficha_matricula: z.number().int().positive().optional(),
+        contrato: z.number().int().positive().optional(),
+      }),
+    )
+    .optional(),
   /**
    * Una casilla por documento. En la autorización de datos es su propia
    * casilla; en los demás, "He leído y acepto". Todas en true.
@@ -282,11 +293,20 @@ export const rechazarSchema = z.object({
   confirmacion: z.string().trim().min(1),
 });
 
-/** Guarda el borrador del tipo (lo crea o lo actualiza). Publicar es aparte. */
+/**
+ * Guarda el borrador del tipo (lo crea o lo actualiza). Publicar es aparte.
+ * La ficha y el contrato son siempre de un colegio: llevan `col_id`.
+ */
 export const borradorDocumentoSchema = z.object({
   tipo: z.enum(TIPOS_DOCUMENTO),
+  col_id: z.number().int().positive().nullable().optional(),
   titulo: texto(3, 160, 'Escribe un título'),
   contenido: texto(20, 60_000, 'El texto es demasiado corto'),
+});
+
+/** PDF de ejemplo: con `col_id`, con la ficha y el contrato de ese colegio; sin él, con el texto base. */
+export const ejemploSchema = z.object({
+  col_id: z.number().int().positive().nullable().optional(),
 });
 
 export const abrirSchema = z.object({ abiertas: z.boolean() });

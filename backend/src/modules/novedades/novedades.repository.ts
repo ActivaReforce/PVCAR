@@ -7,9 +7,44 @@ import { getPool } from '../../config/db.js';
  * El listado trae la novedad + autor + menciones agregadas en un solo
  * viaje con `jsonb_agg`; en el sistema viejo cada tipo de dato era una
  * consulta por fila.
+ *
+ * Eliminar es una baja (0032): `est_id` 2 la quita de la pantalla y del
+ * número del menú, pero sigue en Reportes → Novedades. Todo lo de aquí mira
+ * solo las que están en pantalla.
  */
 
-export type TipoNovedad = 'general' | 'personal' | 'alumno';
+/** est_id de una novedad en pantalla (constants.ESTADO.ACTIVO). */
+const EN_PANTALLA = 1;
+
+export type TipoNovedad =
+  | 'general'
+  | 'personal'
+  | 'representante'
+  | 'alumno'
+  /** Las dos que escribe el sistema al guardar la asistencia (punto 9). */
+  | 'ausencia'
+  | 'correccion';
+
+/** Tipos que se escriben a mano desde la pantalla. */
+export type TipoManual = Exclude<TipoNovedad, 'ausencia' | 'correccion'>;
+
+/**
+ * La clase de una ausencia o corrección, tal como estaba al guardar. Es una
+ * foto: si mañana cambian el horario, el aviso sigue diciendo lo que pasó.
+ */
+export interface DatosClase {
+  colacthor_id: number;
+  /** AAAA-MM-DD. */
+  fecha: string;
+  colegio: string;
+  actividad: string;
+  dia: string;
+  horario: string | null;
+  /** Presente, Ausente, Tarde o Justificado. */
+  estado: string;
+  hora_tarde: string | null;
+  razon: string | null;
+}
 
 export interface MencionPersona {
   id: number;
@@ -23,6 +58,8 @@ export interface MencionAlumno {
   col_id: number | null;
   col_nombre: string | null;
   grado: string | null;
+  /** Sus representantes, para la tarjeta de ausencia. */
+  representantes: Array<{ nombre: string; correo: string | null; telefono: string | null }>;
 }
 
 export interface Novedad {
@@ -33,6 +70,8 @@ export interface Novedad {
   autor: { usu_id: number; usu_nombre: string; usu_correo: string | null };
   personas: MencionPersona[];
   alumnos: MencionAlumno[];
+  /** Solo en ausencia y corrección. */
+  datos: DatosClase | null;
 }
 
 export interface FiltrosListar {
@@ -46,8 +85,14 @@ export interface FiltrosListar {
   /** `null` → ve todas (Propietario / Admin). */
   visibilidad: {
     actorId: number;
+    /** Hijos del actor; vacío si no es representante o el aviso está apagado. */
     ninosDelActor: number[];
-    verSobreMi: boolean;
+    /** Ve las de personal que lo mencionan. */
+    verMenciones: boolean;
+    /** Ve las de representante que lo mencionan. */
+    verComoRepresentante: boolean;
+    /** Hijos del actor para ausencias y correcciones; vacío si el aviso está apagado. */
+    ninosAusencias: number[];
   } | null;
   limit: number;
   offset: number;
@@ -58,6 +103,7 @@ const SQL_SELECT = `
          n.nov_tipo,
          n.nov_texto,
          n.nov_fecha_creacion,
+         n.nov_datos AS datos,
          jsonb_build_object(
            'usu_id', a.usu_id,
            'usu_nombre', a.usu_nombre,
@@ -79,7 +125,18 @@ const SQL_SELECT = `
                     'nombre', nn.nino_nombre,
                     'col_id', nn.col_id,
                     'col_nombre', c.col_nombre,
-                    'grado', g.catninograd_nombre
+                    'grado', g.catninograd_nombre,
+                    'representantes', COALESCE((
+                      SELECT jsonb_agg(jsonb_build_object(
+                               'nombre', ru.usu_nombre,
+                               'correo', ru.usu_correo,
+                               'telefono', ru.usu_telefono
+                             ) ORDER BY ru.usu_nombre)
+                        FROM public.nino_padre npa
+                        JOIN public.padre pa   ON pa.padre_id = npa.padre_id
+                        JOIN public.usuario ru ON ru.usu_id = pa.usu_id
+                       WHERE npa.nino_id = nn.nino_id AND ru.est_id = 1
+                    ), '[]'::jsonb)
                   ) ORDER BY nn.nino_nombre)
              FROM public.novedad_alumno na
              JOIN public.nino nn ON nn.nino_id = na.nino_id
@@ -92,7 +149,7 @@ const SQL_SELECT = `
 `;
 
 export async function listar(filtros: FiltrosListar, client?: PoolClient): Promise<Novedad[]> {
-  const where: string[] = [];
+  const where: string[] = [`n.est_id = ${EN_PANTALLA}`];
   const params: unknown[] = [];
   const add = (expr: string, valor: unknown) => {
     params.push(valor);
@@ -123,18 +180,32 @@ export async function listar(filtros: FiltrosListar, client?: PoolClient): Promi
     params.push(v.actorId);
     partes.push(`n.nov_autor_id = $${params.length}`);
 
-    if (v.verSobreMi) {
+    if (v.verMenciones) {
       params.push(v.actorId);
       partes.push(
         `(n.nov_tipo = 'personal' AND EXISTS (SELECT 1 FROM public.novedad_persona np WHERE np.nov_id = n.nov_id AND np.usu_id = $${params.length}))`,
       );
+    }
 
-      if (v.ninosDelActor.length > 0) {
-        params.push(v.ninosDelActor);
-        partes.push(
-          `(n.nov_tipo = 'alumno' AND EXISTS (SELECT 1 FROM public.novedad_alumno na WHERE na.nov_id = n.nov_id AND na.nino_id = ANY($${params.length}::int[])))`,
-        );
-      }
+    if (v.verComoRepresentante) {
+      params.push(v.actorId);
+      partes.push(
+        `(n.nov_tipo = 'representante' AND EXISTS (SELECT 1 FROM public.novedad_persona np WHERE np.nov_id = n.nov_id AND np.usu_id = $${params.length}))`,
+      );
+    }
+
+    if (v.ninosDelActor.length > 0) {
+      params.push(v.ninosDelActor);
+      partes.push(
+        `(n.nov_tipo = 'alumno' AND EXISTS (SELECT 1 FROM public.novedad_alumno na WHERE na.nov_id = n.nov_id AND na.nino_id = ANY($${params.length}::int[])))`,
+      );
+    }
+
+    if (v.ninosAusencias.length > 0) {
+      params.push(v.ninosAusencias);
+      partes.push(
+        `(n.nov_tipo IN ('ausencia', 'correccion') AND EXISTS (SELECT 1 FROM public.novedad_alumno na WHERE na.nov_id = n.nov_id AND na.nino_id = ANY($${params.length}::int[])))`,
+      );
     }
 
     where.push(`(${partes.join(' OR ')})`);
@@ -153,7 +224,7 @@ export async function listar(filtros: FiltrosListar, client?: PoolClient): Promi
 
 export async function obtener(id: number, client?: PoolClient): Promise<Novedad | null> {
   const { rows } = await (client ?? getPool()).query<Novedad>(
-    `${SQL_SELECT} WHERE n.nov_id = $1`,
+    `${SQL_SELECT} WHERE n.nov_id = $1 AND n.est_id = ${EN_PANTALLA}`,
     [id],
   );
   return rows[0] ?? null;
@@ -161,7 +232,7 @@ export async function obtener(id: number, client?: PoolClient): Promise<Novedad 
 
 export async function insertar(
   client: PoolClient,
-  datos: { tipo: TipoNovedad; texto: string; autor_id: number },
+  datos: { tipo: TipoManual; texto: string; autor_id: number },
 ): Promise<number> {
   const { rows } = await client.query<{ nov_id: number }>(
     `INSERT INTO public.novedad (nov_tipo, nov_texto, nov_autor_id)
@@ -197,21 +268,114 @@ export async function ligarAlumnos(
   );
 }
 
-export async function eliminar(client: PoolClient, nov_id: number): Promise<boolean> {
-  const { rowCount } = await client.query('DELETE FROM public.novedad WHERE nov_id = $1', [nov_id]);
+// ---------------------------------------------------------------------------
+// Ausencias y correcciones (punto 9)
+
+/**
+ * El último aviso de cada alumno en esa clase, también los eliminados de la
+ * pantalla: el correo ya salió. Decide si toca ausencia, corrección o nada.
+ */
+export async function ultimoAvisoDeClase(
+  client: PoolClient,
+  colacthorId: number,
+  fecha: string,
+  ninoIds: number[],
+): Promise<Map<number, 'ausencia' | 'correccion'>> {
+  if (ninoIds.length === 0) return new Map();
+  const { rows } = await client.query<{ nino_id: number; nov_tipo: 'ausencia' | 'correccion' }>(
+    `SELECT DISTINCT ON (na.nino_id) na.nino_id, n.nov_tipo
+       FROM public.novedad n
+       JOIN public.novedad_alumno na ON na.nov_id = n.nov_id
+      WHERE n.nov_colacthor_id = $1
+        AND n.nov_asis_fecha = $2::date
+        AND n.nov_tipo IN ('ausencia', 'correccion')
+        AND na.nino_id = ANY($3::int[])
+      ORDER BY na.nino_id, n.nov_fecha_creacion DESC, n.nov_id DESC`,
+    [colacthorId, fecha, ninoIds],
+  );
+  return new Map(rows.map((r) => [r.nino_id, r.nov_tipo]));
+}
+
+export async function insertarAviso(
+  client: PoolClient,
+  aviso: {
+    tipo: 'ausencia' | 'correccion';
+    texto: string;
+    autor_id: number;
+    nino_id: number;
+    datos: DatosClase;
+  },
+): Promise<number> {
+  const { rows } = await client.query<{ nov_id: number }>(
+    `INSERT INTO public.novedad
+         (nov_tipo, nov_texto, nov_autor_id, nov_colacthor_id, nov_asis_fecha, nov_datos)
+     VALUES ($1, $2, $3, $4, $5::date, $6)
+     RETURNING nov_id`,
+    [
+      aviso.tipo,
+      aviso.texto,
+      aviso.autor_id,
+      aviso.datos.colacthor_id,
+      aviso.datos.fecha,
+      JSON.stringify(aviso.datos),
+    ],
+  );
+  const nov_id = rows[0]!.nov_id;
+  await ligarAlumnos(client, nov_id, [aviso.nino_id]);
+  return nov_id;
+}
+
+export async function nombresDeAlumnos(client: PoolClient, ids: number[]): Promise<Map<number, string>> {
+  const { rows } = await client.query<{ nino_id: number; nino_nombre: string }>(
+    'SELECT nino_id, nino_nombre FROM public.nino WHERE nino_id = ANY($1::int[])',
+    [ids],
+  );
+  return new Map(rows.map((r) => [r.nino_id, r.nino_nombre]));
+}
+
+/** Sin mirar si está en pantalla: para mandar el correo justo después de crearla. */
+export async function obtenerVarias(ids: number[]): Promise<Novedad[]> {
+  if (ids.length === 0) return [];
+  const { rows } = await getPool().query<Novedad>(
+    `${SQL_SELECT} WHERE n.nov_id = ANY($1::int[]) ORDER BY n.nov_id`,
+    [ids],
+  );
+  return rows;
+}
+
+/** Baja: deja de verse, pero queda con quién y cuándo la quitó. */
+export async function darDeBaja(client: PoolClient, nov_id: number, usu_id: number): Promise<boolean> {
+  const { rowCount } = await client.query(
+    `UPDATE public.novedad
+        SET est_id = 2, nov_eliminada_por = $2, nov_fecha_eliminacion = now()
+      WHERE nov_id = $1 AND est_id = ${EN_PANTALLA}`,
+    [nov_id, usu_id],
+  );
   return (rowCount ?? 0) > 0;
 }
 
+/** Rol Representante (constants.ROL.REPRESENTANTE); aquí va en el SQL. */
+const ROL_REPRESENTANTE = 4;
+
 /**
- * Personal mencionable: cualquier usuario activo. El alcance se aplica
- * en el servicio (si se filtra por el rol del actor, mejor).
+ * Personal mencionable: usuarios activos con algún rol que no sea
+ * Representante. Quien es personal y además representante sale aquí.
  */
 export async function personalDisponible(opts: {
   buscar?: string;
   limit: number;
+  /** Si se da, solo estos ids (para validar al crear). */
+  ids?: number[];
 }): Promise<Array<{ usu_id: number; usu_nombre: string; usu_correo: string | null; rol: string | null }>> {
-  const params: unknown[] = [];
-  const where: string[] = ['u.est_id = 1'];
+  const params: unknown[] = [ROL_REPRESENTANTE];
+  const where: string[] = [
+    'u.est_id = 1',
+    'EXISTS (SELECT 1 FROM public.usuario_rol ur WHERE ur.usu_id = u.usu_id AND ur.rol_id <> $1)',
+  ];
+  if (opts.ids) {
+    params.push(opts.ids);
+    where.push(`u.usu_id = ANY($${params.length}::int[])`);
+  }
 
   if (opts.buscar) {
     params.push(`%${opts.buscar}%`);
@@ -224,6 +388,67 @@ export async function personalDisponible(opts: {
               FROM public.usuario_rol ur
               JOIN public.rol r ON r.rol_id = ur.rol_id
              WHERE ur.usu_id = u.usu_id) AS rol
+      FROM public.usuario u
+     WHERE ${where.join(' AND ')}
+     ORDER BY u.usu_nombre
+     LIMIT ${opts.limit}
+  `;
+  const { rows } = await getPool().query(sql, params);
+  return rows;
+}
+
+/**
+ * Representantes mencionables: usuarios activos con rol Representante.
+ * Con `ninos`, solo los representantes de esos niños (el alcance lo da el
+ * servicio); sin él, todos (Propietario y Admin).
+ */
+export async function representantesDisponibles(opts: {
+  buscar?: string;
+  limit: number;
+  ninos: number[] | null;
+  ids?: number[];
+}): Promise<
+  Array<{
+    usu_id: number;
+    usu_nombre: string;
+    usu_correo: string | null;
+    hijos: Array<{ nombre: string; colegio: string | null }>;
+  }>
+> {
+  if (opts.ninos && opts.ninos.length === 0) return [];
+  const params: unknown[] = [ROL_REPRESENTANTE];
+  const where: string[] = [
+    'u.est_id = 1',
+    'EXISTS (SELECT 1 FROM public.usuario_rol ur WHERE ur.usu_id = u.usu_id AND ur.rol_id = $1)',
+  ];
+  if (opts.ninos) {
+    params.push(opts.ninos);
+    where.push(`EXISTS (SELECT 1 FROM public.padre p JOIN public.nino_padre np ON np.padre_id = p.padre_id
+                     WHERE p.usu_id = u.usu_id AND np.nino_id = ANY($${params.length}::int[]))`);
+  }
+  if (opts.ids) {
+    params.push(opts.ids);
+    where.push(`u.usu_id = ANY($${params.length}::int[])`);
+  }
+  if (opts.buscar) {
+    params.push(`%${opts.buscar}%`);
+    where.push(`u.usu_nombre ILIKE $${params.length}`);
+  }
+
+  // Los hijos (solo los del alcance) distinguen homónimos y dan el colegio
+  // para agrupar en pantalla. Con alcance, $2 son esos niños.
+  const filtroHijos = opts.ninos ? 'AND n.nino_id = ANY($2::int[])' : '';
+  const sql = `
+    SELECT u.usu_id, u.usu_nombre, u.usu_correo,
+           COALESCE((
+             SELECT jsonb_agg(jsonb_build_object('nombre', n.nino_nombre, 'colegio', c.col_nombre)
+                              ORDER BY c.col_nombre, n.nino_nombre)
+               FROM public.padre p
+               JOIN public.nino_padre np ON np.padre_id = p.padre_id
+               JOIN public.nino n ON n.nino_id = np.nino_id
+               LEFT JOIN public.colegio c ON c.col_id = n.col_id
+              WHERE p.usu_id = u.usu_id AND n.est_id = 1 ${filtroHijos}
+           ), '[]'::jsonb) AS hijos
       FROM public.usuario u
      WHERE ${where.join(' AND ')}
      ORDER BY u.usu_nombre
@@ -310,6 +535,49 @@ export async function correosDeRepresentantesDe(nino_ids: number[]): Promise<str
   return rows.map((r) => r.correo);
 }
 
+/**
+ * Número del menú: novedades de otros posteriores a la última que vio.
+ *
+ * El "+ 1 ms" es porque la base guarda microsegundos y la fecha que vuelve
+ * del navegador solo trae milisegundos: sin él, la última vista contaría
+ * siempre como nueva. Usa ix_novedad_activas_fecha.
+ */
+export async function contarNuevas(usu_id: number): Promise<number> {
+  const { rows } = await getPool().query<{ nuevas: number }>(
+    `SELECT count(*)::int AS nuevas
+       FROM public.novedad n
+      WHERE n.est_id = ${EN_PANTALLA}
+        AND n.nov_autor_id <> $1
+        AND n.nov_fecha_creacion >= COALESCE(
+              (SELECT novvis_hasta FROM public.novedad_visto WHERE usu_id = $1),
+              '-infinity'::timestamptz) + interval '1 millisecond'`,
+    [usu_id],
+  );
+  return rows[0]?.nuevas ?? 0;
+}
+
+/** Guarda hasta dónde vio; nunca retrocede. */
+export async function marcarVisto(usu_id: number, hasta: Date): Promise<void> {
+  await getPool().query(
+    `INSERT INTO public.novedad_visto (usu_id, novvis_hasta)
+     VALUES ($1, $2)
+     ON CONFLICT (usu_id) DO UPDATE
+        SET novvis_hasta = GREATEST(public.novedad_visto.novvis_hasta, EXCLUDED.novvis_hasta),
+            novvis_fecha_modificacion = now()`,
+    [usu_id, hasta],
+  );
+}
+
+/** Colegios de esos niños (para el alcance del representante al mencionar). */
+export async function colegiosDeNinos(nino_ids: number[]): Promise<number[]> {
+  if (nino_ids.length === 0) return [];
+  const { rows } = await getPool().query<{ col_id: number }>(
+    `SELECT DISTINCT col_id FROM public.nino WHERE nino_id = ANY($1::int[]) AND col_id IS NOT NULL`,
+    [nino_ids],
+  );
+  return rows.map((r) => r.col_id);
+}
+
 /** Niños del representante actual (via padre.usu_id). */
 export async function ninosDelRepresentante(usu_id: number): Promise<number[]> {
   const { rows } = await getPool().query<{ nino_id: number }>(
@@ -335,15 +603,6 @@ export async function correosDeUsuarios(usu_ids: number[]): Promise<string[]> {
     [usu_ids],
   );
   return rows.map((r) => r.correo);
-}
-
-export async function existenUsuariosActivos(ids: number[]): Promise<number[]> {
-  if (ids.length === 0) return [];
-  const { rows } = await getPool().query<{ usu_id: number }>(
-    `SELECT usu_id FROM public.usuario WHERE usu_id = ANY($1::int[]) AND est_id = 1`,
-    [ids],
-  );
-  return rows.map((r) => r.usu_id);
 }
 
 export async function existenAlumnosActivos(ids: number[]): Promise<number[]> {

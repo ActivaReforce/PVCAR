@@ -70,7 +70,7 @@ Los **11 tests en `describe.skip`** que arrastraba el repo desde la Fase 1 se bo
 
 ---
 
-## 3. Qué se arregló del sistema viejo
+## 3. Qué se arregló del sistema anterior
 
 | Antes | Ahora |
 |---|---|
@@ -92,7 +92,7 @@ Los **11 tests en `describe.skip`** que arrastraba el repo desde la Fase 1 se bo
 |---|---|
 | La lista **no** devuelve cédula, salud ni datos del representante | Son datos sensibles de un menor y la lista se pinta 20 veces al día. Van solo en la ficha |
 | Cambiar de colegio con inscripciones activas se **rechaza** | Esas inscripciones son de disciplinas del colegio viejo; cerrarlas automáticamente escondería que el alumno deja esas clases |
-| Las inscripciones se editan con casillas y **un** botón de guardar | El sistema viejo hacía una escritura por clic. Así la diferencia se calcula en el servidor y entra entera o no entra |
+| Las inscripciones se editan con casillas y **un** botón de guardar | El sistema anterior hacía una escritura por clic. Así la diferencia se calcula en el servidor y entra entera o no entra |
 | Soltar un representante **sí** es DELETE | `nino_padre` es un vínculo puro, sin estado ni fechas: no hay historial que perder |
 | El borrado no tiene bloqueos | Las tres FK hacia `nino` son ON DELETE CASCADE. No hay nada que lo impida, y por eso el aviso es lo único que protege |
 

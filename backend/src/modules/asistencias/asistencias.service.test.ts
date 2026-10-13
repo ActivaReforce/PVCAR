@@ -116,6 +116,10 @@ vi.mock('../../config/db.js', () => ({
   getPool: () => ({ query, connect: async () => ({ query, release: vi.fn() }) }),
 }));
 
+// El aviso de ausencia (punto 9) llega hasta los correos y su configuración;
+// sin esto, en CI (sin .env) la validación de variables corta el proceso.
+vi.mock('../../config/env.js', () => ({ env: {} }));
+
 vi.mock('../../lib/storage.js', () => ({
   firmarFotos: async () => new Map(),
   firmarFoto: async () => null,
@@ -233,13 +237,26 @@ describe('guardado por lote de alumnos', () => {
     { nino_id: 22, asisest_id: ASISTENCIA.TARDE as number, hora_tarde: '16:35' },
   ];
 
+  it('una fecha futura se rechaza, en alumnos y en entrenadores', async () => {
+    await expect(
+      service.guardarAlumnos(propietario, { colacthor_id: 135, fecha: '2999-01-01', marcas }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      service.guardarEntrenadores(propietario, {
+        col_id: 14,
+        fecha: '2999-01-01',
+        marcas: [{ tipo: 'entrenador', id: 76, asisest_id: ASISTENCIA.PRESENTE }],
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
   it('guarda y cuenta las altas', async () => {
     const res = await service.guardarAlumnos(propietario, {
       colacthor_id: 135,
       fecha: JUEVES,
       marcas,
     });
-    expect(res.resultado).toEqual({ altas: 2, cambios: 0 });
+    expect(res.resultado).toEqual({ altas: 2, cambios: 0, avisos: 0 });
   });
 
   it('un alumno que no estaba en esa clase se rechaza entero', async () => {
@@ -268,7 +285,7 @@ describe('guardado por lote de alumnos', () => {
       fecha: JUEVES,
       marcas,
     });
-    expect(res.resultado).toEqual({ altas: 0, cambios: 2 });
+    expect(res.resultado).toEqual({ altas: 0, cambios: 2, avisos: 0 });
     expect(auditorias).toHaveLength(1);
   });
 

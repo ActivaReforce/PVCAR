@@ -17,14 +17,19 @@ interface Props {
   descripcion: string;
   /** Aviso interno: va a una lista fija de destinatarios ("Para"). */
   conPara?: boolean;
-  /**
-   * Enseña el switch "notificar también al mencionado y al representante".
-   * Solo tiene sentido para 'novedades'.
-   */
-  conNotificarMencionado?: boolean;
-  /** Texto corto que explica qué hace el switch. */
-  textoNotificarMencionado?: string;
+  /** Casillas de "Notificar también" que enseña; ninguna si no se pasa. */
+  avisos?: Aviso[];
 }
+
+type CampoAviso = 'notificar_mencionado' | 'notificar_representante';
+export interface Aviso {
+  campo: CampoAviso;
+  texto: string;
+}
+type Avisos = Record<CampoAviso, boolean>;
+
+/** Los tipos de la pestaña Configuración de Novedades: los abre su casilla Editar. */
+const DE_NOVEDADES: TipoCorreo[] = ['novedades', 'ausencias'];
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USUARIO = /^[a-z0-9][a-z0-9._-]{0,63}$/;
@@ -38,7 +43,7 @@ const lineas = (texto: string) =>
 /**
  * Quién envía un tipo de correo y a quién va en copia (2026-10-07).
  *
- * Solo la ve el Propietario. El dominio es fijo (el verificado en Resend) y
+ * La ve el Propietario; la de Novedades, quien tenga Editar en Novedades. El dominio es fijo (el verificado en Resend) y
  * no se escribe: un dominio distinto haría que los correos dejaran de salir
  * sin avisar. Las copias son visibles: el destinatario ve a quién más llegó.
  */
@@ -47,12 +52,16 @@ const ConfigCorreo = ({
   titulo,
   descripcion,
   conPara = false,
-  conNotificarMencionado = false,
-  textoNotificarMencionado,
+  avisos: AVISOS = [],
 }: Props) => {
-  const { user } = useAuth();
-  const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
-  const config = useConfigCorreo(tipo, esPropietario);
+  const conAvisos = AVISOS.length > 0;
+  const { user, hasPermission } = useAuth();
+  // Misma regla que el backend: Novedades, la casilla Editar; el resto, Propietario.
+  const puede =
+    DE_NOVEDADES.includes(tipo)
+      ? hasPermission('novedades', 'editar')
+      : (user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false);
+  const config = useConfigCorreo(tipo, puede);
   const guardar = useGuardarConfigCorreo(tipo);
 
   const [nombre, setNombre] = useState('');
@@ -60,7 +69,10 @@ const ConfigCorreo = ({
   const [destinatarios, setDestinatarios] = useState('');
   const [copias, setCopias] = useState('');
   const [responderA, setResponderA] = useState('');
-  const [notificar, setNotificar] = useState(false);
+  const [avisos, setAvisos] = useState<Avisos>({
+    notificar_mencionado: false,
+    notificar_representante: false,
+  });
 
   const datos = config.data;
   useEffect(() => {
@@ -70,10 +82,13 @@ const ConfigCorreo = ({
     setDestinatarios(datos.para.join('\n'));
     setCopias(datos.cc.join('\n'));
     setResponderA(datos.responder_a ?? '');
-    setNotificar(datos.notificar_mencionado);
+    setAvisos({
+      notificar_mencionado: datos.notificar_mencionado,
+      notificar_representante: datos.notificar_representante,
+    });
   }, [datos]);
 
-  if (!esPropietario || !datos) return null;
+  if (!puede || !datos) return null;
 
   const para = conPara ? lineas(destinatarios) : [];
   const paraMalos = para.filter((c) => !CORREO.test(c));
@@ -98,7 +113,7 @@ const ConfigCorreo = ({
     para.join('\n') !== datos.para.join('\n') ||
     cc.join('\n') !== datos.cc.join('\n') ||
     responder !== (datos.responder_a ?? '') ||
-    (conNotificarMencionado && notificar !== datos.notificar_mencionado);
+    (conAvisos && AVISOS.some(({ campo }) => avisos[campo] !== datos[campo]));
 
   return (
     <TarjetaConfig titulo={titulo} descripcion={descripcion}>
@@ -185,26 +200,27 @@ const ConfigCorreo = ({
           </p>
         </div>
 
-        {conNotificarMencionado && (
-          <div className="flex items-start justify-between gap-3 rounded-md border p-3">
-            <div className="min-w-0 flex-1">
-              <Label htmlFor={`correo-notificar-${tipo}`} className="cursor-pointer">
-                Notificar también al mencionado y al representante
-              </Label>
-              {textoNotificarMencionado && (
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {textoNotificarMencionado}
-                </p>
-              )}
-            </div>
-            <input
-              id={`correo-notificar-${tipo}`}
-              type="checkbox"
-              checked={notificar}
-              onChange={(e) => setNotificar(e.target.checked)}
-              className="mt-1 h-5 w-5 flex-shrink-0 accent-primary"
-            />
-          </div>
+        {conAvisos && (
+          <fieldset className="space-y-2 rounded-md border p-3">
+            <legend className="px-1 text-sm font-medium">Notificar también</legend>
+            {AVISOS.map(({ campo, texto }) => (
+              <div key={campo} className="flex items-start justify-between gap-3">
+                <Label
+                  htmlFor={`correo-${campo}-${tipo}`}
+                  className="min-w-0 flex-1 cursor-pointer font-normal leading-snug"
+                >
+                  {texto}
+                </Label>
+                <input
+                  id={`correo-${campo}-${tipo}`}
+                  type="checkbox"
+                  checked={avisos[campo]}
+                  onChange={(e) => setAvisos((a) => ({ ...a, [campo]: e.target.checked }))}
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 accent-primary"
+                />
+              </div>
+            ))}
+          </fieldset>
         )}
       </div>
 
@@ -226,7 +242,9 @@ const ConfigCorreo = ({
             para,
             cc,
             responder_a: responder || null,
-            notificar_mencionado: conNotificarMencionado ? notificar : false,
+            notificar_mencionado: AVISOS.some((a) => a.campo === 'notificar_mencionado') && avisos.notificar_mencionado,
+            notificar_representante:
+              AVISOS.some((a) => a.campo === 'notificar_representante') && avisos.notificar_representante,
           })
         }
       >

@@ -2,7 +2,7 @@
 
 Estado al **2026-10-02**. Construido y en `dev`. **Sin probar en pantalla.**
 
-La plataforma vieja, de solo lectura, en **Reportes → Data anterior**. Lee el esquema `archivo` (migración `0013`, cargado y verificado en dev y prod el 2026-10-02: 35 tablas, 20 620 filas). Solo Propietario y Admin.
+La plataforma anterior, de solo lectura, en **Reportes → Data anterior**. Lee el esquema `archivo` (migración `0013`, cargado y verificado en dev y prod el 2026-10-02: 35 tablas, 20 620 filas). Solo Propietario y Admin.
 
 ---
 

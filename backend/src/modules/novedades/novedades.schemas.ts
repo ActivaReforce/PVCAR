@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const TIPOS = ['general', 'personal', 'alumno'] as const;
+/** Los que se filtran en la lista: los cuatro manuales y los dos de asistencia. */
+export const TIPOS = ['general', 'personal', 'representante', 'alumno', 'ausencia', 'correccion'] as const;
 
 export const idParamSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -47,6 +48,15 @@ export const crearSchema = z.discriminatedUnion('tipo', [
       .transform((xs) => [...new Set(xs)]),
   }),
   z.object({
+    tipo: z.literal('representante'),
+    texto,
+    usu_ids: z
+      .array(z.number().int().positive())
+      .min(1, 'Elige al menos a un representante')
+      .max(50)
+      .transform((xs) => [...new Set(xs)]),
+  }),
+  z.object({
     tipo: z.literal('alumno'),
     texto,
     nino_ids: z
@@ -58,6 +68,10 @@ export const crearSchema = z.discriminatedUnion('tipo', [
 ]);
 
 export type CrearInput = z.infer<typeof crearSchema>;
+
+export const vistoSchema = z.object({
+  hasta: z.coerce.date(),
+});
 
 export const buscarSchema = z.object({
   buscar: z.string().trim().min(1).max(80).optional(),

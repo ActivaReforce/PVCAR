@@ -476,6 +476,15 @@ const evaluaciones: Constructor = (filas) => {
   ];
 };
 
+const novedades: Constructor = (filas) => {
+  // Solo el total: en pantalla / eliminadas no le servía al cliente (2026-10-12).
+  const medidas = (): Medida[] => [cuenta('Novedades')];
+  return [
+    agrupar('Por tipo', filas, [{ cabecera: 'Tipo', de: campo('tipo') }], medidas()),
+    agrupar('Por autor', filas, [{ cabecera: 'Escrita por', de: campo('autor') }], medidas()),
+  ];
+};
+
 const RESUMENES: Record<string, Constructor> = {
   usuarios,
   colegios,
@@ -486,6 +495,7 @@ const RESUMENES: Record<string, Constructor> = {
   'asistencias-alumnos': asistenciasAlumnos,
   'asistencias-entrenadores': asistenciasEntrenadores,
   evaluaciones,
+  novedades,
 };
 
 export function resumenDe(id: string, filas: Fila[], filtros: FiltrosReporte): Bloque[] {

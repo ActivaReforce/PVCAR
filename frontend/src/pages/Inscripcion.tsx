@@ -38,12 +38,14 @@ import { diaDeCruce, horarioLargo } from '@/lib/horarios';
 import { compressImage } from '@/lib/imageCompression';
 import {
   dinero,
+  documentoPara,
   inscripcionesApi,
   NOMBRE_DOCUMENTO,
   TIPOS_DOCUMENTO,
   type Cobro,
   type CobroAlumno,
   type DisciplinaOfertada,
+  type Envio,
   type EnvioRecibido,
   type Formulario,
   type ModalidadSalida,
@@ -296,6 +298,32 @@ function aBase64(archivo: Blob): Promise<string> {
     lector.onerror = () => reject(lector.error);
     lector.readAsDataURL(archivo);
   });
+}
+
+/**
+ * Qué versión de cada documento leyó: los generales, y la ficha y el
+ * contrato de cada colegio elegido (propios o comunes). El backend comprueba
+ * que sean exactamente los vigentes.
+ */
+function documentosLeidos(
+  formulario: Formulario,
+  alumnos: Alumno[],
+): Pick<Envio, 'documentos' | 'documentos_colegio'> {
+  const documentos: Envio['documentos'] = {};
+  const documentos_colegio: Envio['documentos_colegio'] = {};
+  for (const tipo of TIPOS_DOCUMENTO) {
+    const comun = formulario.documentos[tipo];
+    if (comun) documentos[tipo] = comun.doc_id;
+  }
+  for (const a of alumnos) {
+    const propios = formulario.documentos_colegio[Number(a.col_id)];
+    if (!propios) continue;
+    for (const tipo of ['ficha_matricula', 'contrato'] as const) {
+      const d = propios[tipo];
+      if (d) (documentos_colegio[a.col_id] ??= {})[tipo] = d.doc_id;
+    }
+  }
+  return { documentos, documentos_colegio };
 }
 
 /** Con qué se llenan los documentos de un alumno, igual que en el PDF. */
@@ -559,9 +587,7 @@ const Inscripcion = () => {
           },
           imagen: a.imagen,
         })),
-        documentos: Object.fromEntries(
-          TIPOS_DOCUMENTO.map((t) => [t, datos.documentos[t]!.doc_id]),
-        ) as Record<TipoDocumento, number>,
+        ...documentosLeidos(datos, alumnos),
         acepta: Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, true])) as Record<TipoDocumento, true>,
         comprobante: { mime, base64: await aBase64(comprobante) },
       }, conSesion);
@@ -1435,7 +1461,7 @@ const PasoDocumentos = ({
   const indice = Math.max(0, alumnos.findIndex((a) => a.clave === claveAlumno));
   const alumno = alumnos[indice]!;
   const datos = datosDocumento(rep, alumno, formulario, cobro?.alumnos[indice]);
-  const doc = abierto ? formulario.documentos[abierto] : undefined;
+  const doc = abierto ? documentoPara(formulario, Number(alumno.col_id) || null, abierto) : undefined;
   const varios = alumnos.length > 1 ? ` (para los ${alumnos.length} alumnos)` : '';
 
   return (

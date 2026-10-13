@@ -27,6 +27,8 @@ Vienen de los 8 Word de `Contratos/` (raíz del workspace). Los dos de cada cole
 
 **No hay firma dibujada** (decisión del cliente): aceptar es firmar. En el bloque del representante sale "Aceptado electrónicamente" con nombre, C.C. y fecha. En el de Activa queda fijo "Pablo Fernando Andrade Rodríguez — Gerente General" y al aprobar se añade "Aprobado por {usuario en sesión} el {fecha}".
 
+**Ficha y contrato, uno por colegio (2026-10-13, `0035` + `0036`).** Cada colegio tiene **su** ficha de matrícula y **su** contrato, con sus versiones, y los publica él: sin publicarlos, el colegio no abre. Todos arrancan con el **texto base** (la ficha y el contrato publicados sin colegio, que ya nadie acepta; si no hay, el del Word). En Documentos → Por colegio hay una tarjeta de cada uno: "Publicar tal cual" o Editar → Guardar → Publicar, y lo que se cambie vale solo para ese colegio. El formulario manda en `documentos_colegio` las versiones leídas de cada colegio y el envío comprueba alumno por alumno que sean las vigentes del suyo. PDF de ejemplo por colegio. Un colegio con versiones publicadas no se puede borrar para siempre (son historia aceptada). La 0035 traía además un texto común con "vuelta al común"; el cliente lo encontró confuso y la 0036 quitó esa columna.
+
 **Una versión publicada no se edita ni se borra** (trigger de 0015); cambiar un texto es publicar otra versión. Publicar exige que estén las piezas obligatorias de ese tipo.
 
 ## 2. El formulario público (`/inscripcion`)
@@ -71,7 +73,7 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 | Configuración | `inscripcion_config` (interruptor general, membrete, cuenta bancaria), `colegio_precio` (valores e interruptor de cada colegio), `documento_legal` (las versiones) |
 | Archivos | Bucket privado `inscripciones`: comprobantes, PDF y membrete propio |
 
-**Sobre `padre`** (revisado con el cliente el 2026-10-05): es la ficha del rol Representante, nombre heredado del sistema viejo. Guarda también los datos de facturación, que pueden ser de otra persona (por ejemplo, la esposa). Se valoró moverlos a una tabla `facturacion` y renombrar `padre` a `representante`; **el cliente decidió dejarlo como está**. El inventario de columnas no encontró nada de más en la base.
+**Sobre `padre`** (revisado con el cliente el 2026-10-05): es la ficha del rol Representante, nombre heredado del sistema anterior. Guarda también los datos de facturación, que pueden ser de otra persona (por ejemplo, la esposa). Se valoró moverlos a una tabla `facturacion` y renombrar `padre` a `representante`; **el cliente decidió dejarlo como está**. El inventario de columnas no encontró nada de más en la base.
 
 ## 7. Borrado en la 0017 ("solo usamos lo nuevo")
 

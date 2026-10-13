@@ -45,8 +45,12 @@ vi.mock('../../config/db.js', () => ({
 
 const service = await import('./reportes.service.js');
 
-function actorCon(modulos: string[], roles: number[] = [ROL.COORDINADOR]) {
-  const permisos = modulos.map((modulo) => ({ modulo, accion: 'ver' }));
+function actorCon(
+  modulos: string[],
+  roles: number[] = [ROL.COORDINADOR],
+  extra: Array<{ modulo: string; accion: string }> = [],
+) {
+  const permisos = [...modulos.map((modulo) => ({ modulo, accion: 'ver' })), ...extra];
   return {
     authUserId: 'auth-58',
     usuario: {
@@ -64,6 +68,7 @@ function actorCon(modulos: string[], roles: number[] = [ROL.COORDINADOR]) {
 const TODO = actorCon(
   DEFINICIONES.map((d) => d.modulo),
   [ROL.PROPIETARIO],
+  [{ modulo: 'novedades', accion: 'eliminar' }],
 );
 
 beforeEach(() => {
@@ -72,8 +77,37 @@ beforeEach(() => {
 });
 
 describe('el catalogo', () => {
-  it('trae los nueve reportes a quien tiene todos los permisos', () => {
-    expect(service.catalogo(TODO)).toHaveLength(9);
+  it('trae los diez reportes a quien tiene todos los permisos', () => {
+    expect(service.catalogo(TODO)).toHaveLength(10);
+  });
+
+  /**
+   * Todos tienen novedades:ver, pero el reporte enseña autores y eliminadas:
+   * pide Eliminar, como en el módulo (2026-10-12).
+   */
+  it('el de Novedades pide Eliminar, no basta con Ver', async () => {
+    const soloVer = actorCon(['novedades'], [ROL.ENTRENADOR]);
+    expect(service.catalogo(soloVer).map((r) => r.id)).not.toContain('novedades');
+    await expect(
+      service.ejecutar(soloVer, 'novedades', { page: 1, limit: 50 }),
+    ).rejects.toMatchObject({ statusCode: 403, message: 'Sin permiso: novedades:eliminar' });
+    expect(service.catalogo(TODO).map((r) => r.id)).toContain('novedades');
+  });
+
+  /** Casilla "Ver ausencias" y hoja Ausencias del Excel (2026-10-12). */
+  it('Novedades: la casilla de ausencias llega al SQL y decide la hoja extra', () => {
+    const def = DEFINICIONES.find((d) => d.id === 'novedades')!;
+    expect(service.catalogo(TODO).find((r) => r.id === 'novedades')!.filtros.ausencias).toBe(true);
+    const ctx = { global: true, colegios: [], disciplinas: [], actorId: 1 };
+    expect(def.construir({ ausencias: false }, ctx).params.at(-1)).toBe(false);
+    expect(def.construir({}, ctx).params.at(-1)).toBeNull();
+    expect(def.hojaExtra!.sale({})).toBe(true);
+    expect(def.hojaExtra!.sale({ ausencias: false })).toBe(false);
+    expect(def.hojaExtra!.incluye({ tipo: 'Ausencia' })).toBe(true);
+    expect(def.hojaExtra!.incluye({ tipo: 'Corrección' })).toBe(true);
+    expect(def.hojaExtra!.incluye({ tipo: 'General' })).toBe(false);
+    // En el Excel no se repiten en la hoja Novedades.
+    expect(def.hojaExtra!.aparte).toBe(true);
   });
 
   /**

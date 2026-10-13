@@ -58,14 +58,8 @@ export interface UsoBorrador {
   /** Marca Presente **solo a quien no tiene estado todavía**. */
   presenteALosQueFaltan: () => void;
   deshacer: () => void;
-  /**
-   * Lo que se mandaría al servidor **ahora mismo**, sin esperar a que el
-   * `setState` corra. Si `incluyeRestantes` es true, los que no tienen estado
-   * entran como Presente. Se usa al guardar: el padre no puede chainear
-   * `presenteALosQueFaltan()` + `onGuardar()` porque las marcas vendrían
-   * atrasadas un render.
-   */
-  envio: (incluyeRestantes: boolean) => EnvioFila[];
+  /** Lo que se manda al guardar: las filas con estado que cambiaron. */
+  envio: () => EnvioFila[];
 }
 
 const vacio = (fila: FilaOriginal): Borrador => ({
@@ -194,15 +188,11 @@ export function useBorradorAsistencia(filas: FilaOriginal[], firma: string): Uso
   }, [filas, marcas]);
 
   const envio = useCallback(
-    (incluyeRestantes: boolean): EnvioFila[] => {
+    (): EnvioFila[] => {
       const resultado: EnvioFila[] = [];
       for (const fila of filas) {
-        const base = marcas[fila.clave];
-        if (!base) continue;
-
-        const efectivo: Borrador =
-          incluyeRestantes && base.asisest_id === null ? comoPresente : base;
-        if (efectivo.asisest_id === null) continue;
+        const efectivo = marcas[fila.clave];
+        if (!efectivo || efectivo.asisest_id === null) continue;
 
         const original = vacio(fila);
         const diferente =

@@ -26,6 +26,8 @@ export interface FiltrosDisponibles {
   disciplina: boolean;
   estado: { etiqueta: string; opciones: OpcionFiltro[] } | null;
   fechas: boolean;
+  /** Casilla "Ver ausencias" (solo Novedades). */
+  ausencias?: boolean;
 }
 
 export interface ReporteDisponible {
@@ -96,6 +98,8 @@ export interface FiltrosReporte {
   hasta?: string;
   /** Incluir las columnas sensibles. Por defecto, no. */
   incluirSensibles?: boolean;
+  /** Novedades: false quita ausencias y correcciones. */
+  ausencias?: boolean;
 }
 
 function queryString(filtros: object): string {

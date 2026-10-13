@@ -7,9 +7,8 @@ import ResumenHistorico from '@/components/historico/ResumenHistorico';
 import ExploradorHistorico from '@/components/historico/ExploradorHistorico';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExportarHistorico } from '@/hooks/useHistorico';
-import { ROL } from '@/hooks/useUserForm';
+import { ROLES_GLOBALES } from '@/hooks/useUserForm';
 
-const GLOBALES: number[] = [ROL.PROPIETARIO, ROL.ADMIN];
 
 /**
  * Data anterior: lo que hubo en la plataforma vieja.
@@ -38,7 +37,7 @@ const DataAnterior = () => {
       return nuevo;
     });
 
-  const esGlobal = user?.roles.some((r) => GLOBALES.includes(r.rol_id)) ?? false;
+  const esGlobal = user?.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id)) ?? false;
 
   if (!esGlobal) {
     return (

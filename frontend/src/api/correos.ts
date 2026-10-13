@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
  */
 
 /** inscripciones: aprobada, al representante. inscripciones_aviso: nueva, al equipo. novedades: punto 8. */
-export type TipoCorreo = 'inscripciones' | 'inscripciones_aviso' | 'novedades';
+export type TipoCorreo = 'inscripciones' | 'inscripciones_aviso' | 'novedades' | 'ausencias';
 
 export interface ConfigCorreo {
   tipo: TipoCorreo;
@@ -17,15 +17,17 @@ export interface ConfigCorreo {
   para: string[];
   cc: string[];
   responder_a: string | null;
-  /** Solo para 'novedades': ¿avisar también al mencionado o representante? */
+  /** Solo para 'novedades': las de personal avisan también al mencionado. */
   notificar_mencionado: boolean;
+  /** Solo para 'novedades': las de alumno avisan también al representante. */
+  notificar_representante: boolean;
   /** El dominio verificado (CORREO_DOMINIO de Railway). null si falta. */
   dominio: string | null;
 }
 
 export type ConfigCorreoInput = Pick<
   ConfigCorreo,
-  'nombre' | 'usuario' | 'para' | 'cc' | 'responder_a' | 'notificar_mencionado'
+  'nombre' | 'usuario' | 'para' | 'cc' | 'responder_a' | 'notificar_mencionado' | 'notificar_representante'
 >;
 
 export const correosApi = {

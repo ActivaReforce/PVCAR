@@ -104,7 +104,7 @@ Las consultas nuevas, ejecutadas contra `PVCAR_Dev` por MCP; los `INSERT` valida
 
 ---
 
-## 3. Lo que se arregló del sistema viejo
+## 3. Lo que se arregló del sistema anterior
 
 | Estaba mal | Ahora |
 |---|---|
@@ -122,9 +122,11 @@ Las consultas nuevas, ejecutadas contra `PVCAR_Dev` por MCP; los `INSERT` valida
 
 ---
 
-## 4. Decisión que hay que confirmar
+## 4. Decisión aplazada
 
-**Mobak y el puntaje del parámetro.** MOBAK puntúa de 0 a 2 por ítem, y el sistema viejo guardaba ese 0, 1 o 2 **literal**, ignorando el `evaparam_puntaje` configurado. Un parámetro Mobak de 10 puntos no podía dar más de 2, así que `eva_puntaje_total` prometía un máximo inalcanzable y los porcentajes de los informes salían mal.
+> **2026-10-12: Mobak se deja como está** (escalado al puntaje del parámetro). El cliente lo revisa al probar esta fase.
+
+**Mobak y el puntaje del parámetro.** MOBAK puntúa de 0 a 2 por ítem, y el sistema anterior guardaba ese 0, 1 o 2 **literal**, ignorando el `evaparam_puntaje` configurado. Un parámetro Mobak de 10 puntos no podía dar más de 2, así que `eva_puntaje_total` prometía un máximo inalcanzable y los porcentajes de los informes salían mal.
 
 Ahora el 0-2 **se escala al puntaje del parámetro**: con 10 puntos, una puntuación de 6 en Mobak-6 da 10.
 

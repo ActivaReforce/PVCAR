@@ -16,35 +16,86 @@ import type { CrearInput, FiltrosListar } from './novedades.schemas.js';
  * Reglas de visibilidad:
  *   - Propietario y Admin ven todas.
  *   - El resto ve las suyas (nov_autor_id = él).
- *   - Si el switch `notificar_mencionado` está activo, también ve las que
- *     lo mencionan (personal) o las que mencionan a sus hijos (alumno).
+ *   - Con `notificar_mencionado` activo, también ve las de personal que lo
+ *     mencionan; con `notificar_representante`, las de representante que lo
+ *     mencionan y las de alumno sobre sus hijos.
  *   - Las de tipo `general` solo las ve el autor y los globales.
+ *   - Ausencias y correcciones (punto 9, `novedades.ausencias.ts`): las
+ *     escribe el sistema a nombre de quien guardó la lista; con
+ *     `notificar_representante` del correo 'ausencias', las ve también el
+ *     representante del alumno.
  *
  * Correos:
  *   - Siempre al Para + CC configurado del tipo 'novedades'.
- *   - Si el switch está activo:
- *       personal → se añaden los correos de los usuarios mencionados.
- *       alumno   → se añaden los correos de los representantes.
+ *   - personal → con `notificar_mencionado`, también a los mencionados.
+ *   - representante → con `notificar_representante`, también a los mencionados.
+ *   - alumno   → con `notificar_representante`, también a los representantes.
  */
 
 function esGlobal(actor: AuthUser): boolean {
   return actor.usuario.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id));
 }
 
+/**
+ * Quién escribió una novedad solo lo ve quien tiene Eliminar en Novedades
+ * (decidido por el cliente el 2026-10-12). Al resto se le quita el autor
+ * entero aquí, no solo en la pantalla: con el id se podría cruzar con la
+ * lista de personal mencionable. El correo de aviso no cambia.
+ */
+function verAutor(actor: AuthUser): boolean {
+  return actor.permisos.some((p) => p.modulo === 'novedades' && p.accion === 'eliminar');
+}
+
+/** Lo que sale por el API: sin autor para quien no tiene Eliminar. */
+export type NovedadVista = Omit<repo.Novedad, 'autor'> & {
+  autor: repo.Novedad['autor'] | null;
+};
+
+// ---------------------------------------------------------------------------
+// Número del menú (2026-10-12): solo Propietario y Admin, por rol.
+
+function exigirGlobal(actor: AuthUser): void {
+  if (!esGlobal(actor)) throw new ApiError(403, 'Solo Propietario y Admin');
+}
+
+export async function aviso(actor: AuthUser): Promise<{ nuevas: number }> {
+  exigirGlobal(actor);
+  return { nuevas: await repo.contarNuevas(actor.usuario.usu_id) };
+}
+
+/** `hasta` = la novedad más reciente que llegó a su pantalla. */
+export async function marcarVisto(actor: AuthUser, hasta: Date): Promise<{ nuevas: number }> {
+  exigirGlobal(actor);
+  // Una fecha del futuro taparía las que aún no existen.
+  const tope = new Date();
+  await repo.marcarVisto(actor.usuario.usu_id, hasta > tope ? tope : hasta);
+  return aviso(actor);
+}
+
+function paraActor(actor: AuthUser, n: repo.Novedad): NovedadVista {
+  if (verAutor(actor)) return n;
+  return { ...n, autor: null };
+}
+
 function esRepresentante(actor: AuthUser): boolean {
   return actor.usuario.roles.some((r) => r.rol_id === ROL.REPRESENTANTE);
 }
 
-export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<repo.Novedad[]> {
+export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<NovedadVista[]> {
   const global = esGlobal(actor);
-  const config = await configuracion('novedades');
-  const verSobreMi = config?.notificar_mencionado ?? false;
+  const [config, configAusencias] = await Promise.all([
+    configuracion('novedades'),
+    configuracion('ausencias'),
+  ]);
+  const verMenciones = config?.notificar_mencionado ?? false;
+  const verHijos = config?.notificar_representante ?? false;
+  const verAusencias = configAusencias?.notificar_representante ?? false;
 
-  const ninosDelActor = verSobreMi && esRepresentante(actor)
+  const hijos = (verHijos || verAusencias) && esRepresentante(actor)
     ? await repo.ninosDelRepresentante(actor.usuario.usu_id)
     : [];
 
-  return repo.listar({
+  const lista = await repo.listar({
     tipo: filtros.tipo,
     autor: filtros.autor,
     persona: filtros.persona,
@@ -58,41 +109,60 @@ export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<r
       ? null
       : {
           actorId: actor.usuario.usu_id,
-          ninosDelActor,
-          verSobreMi,
+          ninosDelActor: verHijos ? hijos : [],
+          verMenciones,
+          verComoRepresentante: verHijos,
+          ninosAusencias: verAusencias ? hijos : [],
         },
   });
+  return lista.map((n) => paraActor(actor, n));
 }
 
-export async function obtener(actor: AuthUser, id: number): Promise<repo.Novedad> {
+export async function obtener(actor: AuthUser, id: number): Promise<NovedadVista> {
   const novedad = await repo.obtener(id);
   if (!novedad) throw new ApiError(404, 'La novedad no existe');
 
   if (!esGlobal(actor) && novedad.autor.usu_id !== actor.usuario.usu_id) {
     const config = await configuracion('novedades');
-    const switchOn = config?.notificar_mencionado ?? false;
     let puedeVer = false;
-    if (switchOn) {
-      if (novedad.nov_tipo === 'personal') {
-        puedeVer = novedad.personas.some((p) => p.id === actor.usuario.usu_id);
-      } else if (novedad.nov_tipo === 'alumno' && esRepresentante(actor)) {
-        const mios = new Set(await repo.ninosDelRepresentante(actor.usuario.usu_id));
-        puedeVer = novedad.alumnos.some((a) => mios.has(a.id));
-      }
+    if (novedad.nov_tipo === 'personal' && config?.notificar_mencionado) {
+      puedeVer = novedad.personas.some((p) => p.id === actor.usuario.usu_id);
+    } else if (novedad.nov_tipo === 'representante' && config?.notificar_representante) {
+      puedeVer = novedad.personas.some((p) => p.id === actor.usuario.usu_id);
+    } else if (
+      novedad.nov_tipo === 'alumno' &&
+      config?.notificar_representante &&
+      esRepresentante(actor)
+    ) {
+      const mios = new Set(await repo.ninosDelRepresentante(actor.usuario.usu_id));
+      puedeVer = novedad.alumnos.some((a) => mios.has(a.id));
+    } else if (
+      (novedad.nov_tipo === 'ausencia' || novedad.nov_tipo === 'correccion') &&
+      esRepresentante(actor) &&
+      (await configuracion('ausencias'))?.notificar_representante
+    ) {
+      const mios = new Set(await repo.ninosDelRepresentante(actor.usuario.usu_id));
+      puedeVer = novedad.alumnos.some((a) => mios.has(a.id));
     }
     if (!puedeVer) throw new ApiError(403, 'No puedes ver esta novedad');
   }
 
-  return novedad;
+  return paraActor(actor, novedad);
 }
 
-export async function crear(actor: AuthUser, input: CrearInput): Promise<repo.Novedad> {
+export async function crear(actor: AuthUser, input: CrearInput): Promise<NovedadVista> {
   // Validar que las menciones existan y estén activas, dentro del alcance.
   if (input.tipo === 'personal') {
-    const existen = await repo.existenUsuariosActivos(input.usu_ids);
-    const faltan = input.usu_ids.filter((id) => !existen.includes(id));
+    const validos = await repo.personalDisponible({ limit: 50, ids: input.usu_ids });
+    const faltan = input.usu_ids.filter((id) => !validos.some((v) => v.usu_id === id));
     if (faltan.length > 0) {
       throw new ApiError(400, `Hay personas que no se pueden mencionar: ${faltan.join(', ')}`);
+    }
+  } else if (input.tipo === 'representante') {
+    const validos = await representantesEnAlcance(actor, { limit: 50, ids: input.usu_ids });
+    const faltan = input.usu_ids.filter((id) => !validos.some((v) => v.usu_id === id));
+    if (faltan.length > 0) {
+      throw new ApiError(400, `Hay representantes que no se pueden mencionar: ${faltan.join(', ')}`);
     }
   } else if (input.tipo === 'alumno') {
     const existen = await repo.existenAlumnosActivos(input.nino_ids);
@@ -101,36 +171,10 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<repo.No
       throw new ApiError(400, `Hay alumnos que no se pueden mencionar: ${faltan.join(', ')}`);
     }
     // Alcance: el actor solo puede mencionar alumnos de su alcance.
-    const alcance = await alcanceDe(actor.usuario);
-    if (!alcance.global) {
-      const permitidos = new Set<number>([
-        ...alcance.ninos,
-      ]);
-      const porDisciplinas = new Set<number>();
-      if (alcance.disciplinas.length > 0 || alcance.disciplinasDeHijos.length > 0) {
-        // Delego: pido alumnos disponibles con mi alcance y chequeo que todos los
-        // nino_ids pedidos estén dentro.
-        const disponibles = await repo.alumnosDisponibles({
-          limit: 1000,
-          global: false,
-          ninos: [...alcance.ninos, ...permitidos],
-          disciplinas: [...alcance.disciplinas, ...alcance.disciplinasDeHijos],
-          colegios: alcance.colegios,
-        });
-        for (const n of disponibles) porDisciplinas.add(n.nino_id);
-      }
-      const porColegio = new Set<number>();
-      if (alcance.colegios.length > 0) {
-        const disp = await repo.alumnosDisponibles({
-          limit: 10000,
-          global: false,
-          colegios: alcance.colegios,
-        });
-        for (const n of disp) porColegio.add(n.nino_id);
-      }
-      const todos = new Set<number>([...permitidos, ...porDisciplinas, ...porColegio]);
-      const fuera = input.nino_ids.filter((id) => !todos.has(id));
-      if (fuera.length > 0) {
+    const permitidos = await alumnosDelAlcance(actor);
+    if (permitidos) {
+      const dentro = new Set(permitidos);
+      if (input.nino_ids.some((id) => !dentro.has(id))) {
         throw new ApiError(403, 'Hay alumnos fuera de tu alcance');
       }
     }
@@ -142,7 +186,7 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<repo.No
       texto: input.texto,
       autor_id: actor.usuario.usu_id,
     });
-    if (input.tipo === 'personal') {
+    if (input.tipo === 'personal' || input.tipo === 'representante') {
       await repo.ligarPersonas(client, nov_id, input.usu_ids);
     } else if (input.tipo === 'alumno') {
       await repo.ligarAlumnos(client, nov_id, input.nino_ids);
@@ -155,7 +199,8 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<repo.No
         entidadId: nov_id,
         detalle: {
           tipo: input.tipo,
-          personas: input.tipo === 'personal' ? input.usu_ids : undefined,
+          personas:
+            input.tipo === 'personal' || input.tipo === 'representante' ? input.usu_ids : undefined,
           alumnos: input.tipo === 'alumno' ? input.nino_ids : undefined,
         },
       },
@@ -168,28 +213,29 @@ export async function crear(actor: AuthUser, input: CrearInput): Promise<repo.No
   if (!novedad) throw new ApiError(500, 'La novedad se guardó pero no se puede releer');
 
   void mandarCorreo(novedad);
-  return novedad;
+  return paraActor(actor, novedad);
 }
 
 export async function eliminar(actor: AuthUser, id: number): Promise<{ eliminada: true }> {
-  const novedad = await repo.obtener(id);
-  if (!novedad) throw new ApiError(404, 'La novedad no existe');
+  // La ruta ya exige Eliminar; obtener() exige además poder verla.
+  const novedad = await obtener(actor, id);
+  const { autor } = novedad;
+  if (!autor) throw new ApiError(403, 'Sin permiso: novedades:eliminar');
 
-  if (novedad.autor.usu_id !== actor.usuario.usu_id && !esGlobal(actor)) {
-    throw new ApiError(403, 'Solo el autor o un administrador puede borrarla');
-  }
-
+  // Baja, no borrado: la novedad sigue en Reportes → Novedades.
   await enTransaccion(async (client) => {
-    await repo.eliminar(client, id);
+    if (!(await repo.darDeBaja(client, id, actor.usuario.usu_id))) {
+      throw new ApiError(404, 'Esa novedad ya no está');
+    }
     await auditar(
       {
         actor,
-        accion: 'eliminar',
+        accion: 'baja',
         entidad: 'novedad',
         entidadId: id,
         detalle: {
           tipo: novedad.nov_tipo,
-          autor_id: novedad.autor.usu_id,
+          autor_id: autor.usu_id,
           texto: novedad.nov_texto,
         },
       },
@@ -201,9 +247,9 @@ export async function eliminar(actor: AuthUser, id: number): Promise<{ eliminada
 }
 
 /**
- * Personal mencionable. En v1 cualquier usuario activo; el cliente lo
- * confirmó así ("cualquier persona de la plataforma"). Si luego pide
- * restringir por alcance, se aplica aquí.
+ * Personal mencionable: cualquier usuario activo que no sea solo
+ * representante; el cliente lo confirmó así ("cualquier persona de la
+ * plataforma"). Si luego pide restringir por alcance, se aplica aquí.
  */
 export async function personalMencionable(
   _actor: AuthUser,
@@ -212,20 +258,52 @@ export async function personalMencionable(
   return repo.personalDisponible(opts);
 }
 
+/**
+ * Alumnos que el actor puede mencionar; null = todos (Propietario y Admin).
+ *
+ * Es el alcance de siempre (sus colegios, sus disciplinas) y, para el
+ * representante, los alumnos **del colegio de sus hijos** (pedido del
+ * cliente, 2026-10-12): en Novedades puede hablar de un compañero. Esto
+ * vale solo para mencionar; no abre nada más del alumno.
+ */
+async function alumnosDelAlcance(actor: AuthUser): Promise<number[] | null> {
+  const alcance = await alcanceDe(actor.usuario);
+  if (alcance.global) return null;
+  const colegiosHijos = await repo.colegiosDeNinos(alcance.ninos);
+  const alumnos = await repo.alumnosDisponibles({
+    limit: 100000,
+    global: false,
+    ninos: alcance.ninos,
+    disciplinas: [...alcance.disciplinas, ...alcance.disciplinasDeHijos],
+    colegios: [...alcance.colegios, ...colegiosHijos],
+  });
+  return alumnos.map((a) => a.nino_id);
+}
+
+/** Representantes mencionables: los de los alumnos del alcance. */
+async function representantesEnAlcance(
+  actor: AuthUser,
+  opts: { buscar?: string; limit: number; ids?: number[] },
+) {
+  const ninos = await alumnosDelAlcance(actor);
+  return repo.representantesDisponibles({ ...opts, ninos });
+}
+
+export async function representantesMencionables(
+  actor: AuthUser,
+  opts: { buscar?: string; limit: number },
+) {
+  return representantesEnAlcance(actor, opts);
+}
+
 /** Alumnos mencionables dentro del alcance del actor. */
 export async function alumnosMencionables(
   actor: AuthUser,
   opts: { buscar?: string; limit: number },
 ) {
-  const alcance = await alcanceDe(actor.usuario);
-  return repo.alumnosDisponibles({
-    buscar: opts.buscar,
-    limit: opts.limit,
-    global: alcance.global,
-    ninos: alcance.ninos,
-    disciplinas: [...alcance.disciplinas, ...alcance.disciplinasDeHijos],
-    colegios: alcance.colegios,
-  });
+  const ninos = await alumnosDelAlcance(actor);
+  if (ninos === null) return repo.alumnosDisponibles({ ...opts, global: true });
+  return repo.alumnosDisponibles({ ...opts, global: false, ninos });
 }
 
 // ---------------------------------------------------------------------------
@@ -236,14 +314,14 @@ async function mandarCorreo(novedad: repo.Novedad): Promise<void> {
   if (!config) return;
 
   const paraExtra: string[] = [];
-  if (config.notificar_mencionado) {
-    if (novedad.nov_tipo === 'personal') {
-      const correos = await repo.correosDeUsuarios(novedad.personas.map((p) => p.id));
-      paraExtra.push(...correos);
-    } else if (novedad.nov_tipo === 'alumno') {
-      const correos = await repo.correosDeRepresentantesDe(novedad.alumnos.map((a) => a.id));
-      paraExtra.push(...correos);
-    }
+  if (novedad.nov_tipo === 'personal' && config.notificar_mencionado) {
+    paraExtra.push(...(await repo.correosDeUsuarios(novedad.personas.map((p) => p.id))));
+  } else if (novedad.nov_tipo === 'representante' && config.notificar_representante) {
+    paraExtra.push(...(await repo.correosDeUsuarios(novedad.personas.map((p) => p.id))));
+  } else if (novedad.nov_tipo === 'alumno' && config.notificar_representante) {
+    paraExtra.push(
+      ...(await repo.correosDeRepresentantesDe(novedad.alumnos.map((a) => a.id))),
+    );
   }
 
   const asunto = asuntoDe(novedad);
@@ -253,7 +331,7 @@ async function mandarCorreo(novedad: repo.Novedad): Promise<void> {
 
 function asuntoDe(n: repo.Novedad): string {
   if (n.nov_tipo === 'general') return `Nueva novedad general — ${n.autor.usu_nombre}`;
-  if (n.nov_tipo === 'personal') {
+  if (n.nov_tipo === 'personal' || n.nov_tipo === 'representante') {
     const nombres = n.personas.map((p) => p.nombre);
     return `Novedad sobre ${listado(nombres)}`;
   }
@@ -271,11 +349,17 @@ function listado(xs: string[]): string {
 
 function cuerpoDe(n: repo.Novedad): { html: string; texto: string } {
   const fecha = ahoraEc();
-  const tipoTexto =
-    n.nov_tipo === 'general' ? 'General' : n.nov_tipo === 'personal' ? 'Sobre personal' : 'Sobre alumnos';
+  const tipoTexto = {
+    general: 'General',
+    personal: 'Sobre personal',
+    representante: 'Sobre representantes',
+    alumno: 'Sobre alumnos',
+    ausencia: 'Ausencia',
+    correccion: 'Corrección',
+  }[n.nov_tipo];
 
   const mencionesTexto =
-    n.nov_tipo === 'personal'
+    n.nov_tipo === 'personal' || n.nov_tipo === 'representante'
       ? n.personas.map((p) => p.nombre).join(', ')
       : n.nov_tipo === 'alumno'
         ? n.alumnos

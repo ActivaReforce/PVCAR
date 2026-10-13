@@ -26,6 +26,7 @@ const ETIQUETAS: Record<string, string> = {
   evaluaciones: 'evaluaciones asignadas',
   intentos: 'intentos de evaluación',
   representantes: 'vínculos con representantes',
+  novedades: 'novedades (también ausencias) que lo mencionan',
 };
 
 const etiqueta = (clave: string) => ETIQUETAS[clave] ?? clave.replace(/_/g, ' ');
@@ -51,6 +52,8 @@ const EliminarEstudianteDialog = ({ estudiante, onClose, onEliminado }: Props) =
     confirmacion.trim().toLowerCase() === (estudiante?.nino_nombre ?? '').trim().toLowerCase();
 
   const aDestruir = Object.entries(impacto.data?.eliminables ?? {}).filter(([, n]) => n > 0);
+  const bloqueos = Object.entries(impacto.data?.bloqueos ?? {});
+  const puedeEliminar = impacto.data?.puedeEliminar ?? false;
 
   const cerrar = () => {
     setConfirmacion('');
@@ -84,7 +87,24 @@ const EliminarEstudianteDialog = ({ estudiante, onClose, onEliminado }: Props) =
 
         {impacto.isLoading && <p className="text-sm text-muted-foreground">Calculando…</p>}
 
-        {impacto.data && (
+        {impacto.data && !puedeEliminar && (
+          <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+            <p className="text-sm font-medium">No se puede eliminar: sale en novedades.</p>
+            <ul className="list-disc pl-5 text-sm">
+              {bloqueos.map(([clave, n]) => (
+                <li key={clave}>
+                  {n} {etiqueta(clave)}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm text-muted-foreground">
+              Las novedades se conservan para Reportes. <strong>Dalo de baja</strong> en su lugar: el
+              historial se conserva y se puede reactivar.
+            </p>
+          </div>
+        )}
+
+        {impacto.data && puedeEliminar && (
           <div className="space-y-3">
             <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
               <p className="mb-1 text-sm font-medium">Se eliminarán también:</p>
@@ -128,7 +148,7 @@ const EliminarEstudianteDialog = ({ estudiante, onClose, onEliminado }: Props) =
           <Button
             variant="destructive"
             onClick={confirmar}
-            disabled={!coincide || eliminar.isPending}
+            disabled={!puedeEliminar || !coincide || eliminar.isPending}
           >
             {eliminar.isPending ? 'Eliminando…' : 'Eliminar para siempre'}
           </Button>

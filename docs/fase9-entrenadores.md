@@ -84,7 +84,7 @@ Este módulo no da de alta personas — un entrenador **es** un usuario con el r
 
 ---
 
-## 3. Qué se arregló del sistema viejo
+## 3. Qué se arregló del sistema anterior
 
 | Antes | Ahora |
 |---|---|
@@ -100,7 +100,7 @@ Este módulo no da de alta personas — un entrenador **es** un usuario con el r
 
 ## 4. Lo que los datos reales enseñaron (y que la pantalla ahora avisa)
 
-Medido en `PVCAR_Dev` el 2026-09-16 — son datos que vienen del sistema viejo, no errores nuevos:
+Medido en `PVCAR_Dev` el 2026-09-16 — son datos que vienen del sistema anterior, no errores nuevos:
 
 | Hallazgo | Cantidad |
 |---|---|

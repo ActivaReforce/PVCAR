@@ -102,6 +102,8 @@ export interface ListaEntrenadores {
 export interface ResultadoGuardado {
   altas: number;
   cambios: number;
+  /** Ausencias y correcciones avisadas (solo alumnos). */
+  avisos?: number;
 }
 
 export interface MarcaAlumno {

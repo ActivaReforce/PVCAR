@@ -1,9 +1,8 @@
 # Correos de Auth en español
 
-Los únicos correos que manda el sistema. **No los manda la aplicación: los manda
-Supabase Auth.** Por eso no aparecen en el código del backend y por eso la
-plataforma vieja no tiene nada parecido — aquella guardaba la contraseña en
-texto plano en `usu_contrasena` y la comparaba a mano, sin Auth de por medio.
+Los correos de Auth (recuperar contraseña). **No los manda la aplicación: los
+manda Supabase Auth.** Por eso no aparecen en el código del backend. Los de
+Inscripciones y Novedades sí los manda el backend, con Resend y `correo_config`.
 
 Hoy salen con la plantilla por defecto de Supabase: en inglés y con remitente
 genérico.
@@ -19,8 +18,8 @@ Password".** Asunto: `Cambia tu contraseña de Activa Reforce`.
 
 ### Por qué las otras dos no
 
-Porque no se disparan nunca. Crear un usuario en Activa Reforce funciona igual
-que en el sistema viejo: **el admin lo crea y escribe él la contraseña**. El
+Porque no se disparan nunca. Crear un usuario en Activa Reforce funciona así:
+**el admin lo crea y escribe él la contraseña**. El
 backend llama a `createUser` con `email_confirm: true` — "este correo ya está
 dado por bueno, no preguntes" — así que Supabase no manda nada. Reactivar a un
 usuario inactivo hace lo mismo.
@@ -71,7 +70,7 @@ habitual, y encaja con el pie del correo, que ya dice que no se responda.
 ## 3. A dónde lleva el enlace
 
 *Authentication → URL Configuration → Redirect URLs* tiene que incluir
-`https://pvcar.vercel.app/reset-password` en `PVCAR` y
+`https://activareforce.com/reset-password` en `PVCAR` y
 `https://dev-pvcar.vercel.app/reset-password` en `PVCAR_Dev`. Si falta, el
 enlace del correo rebota al Site URL y la pantalla de cambiar contraseña nunca
 se abre.

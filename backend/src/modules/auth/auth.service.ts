@@ -2,6 +2,7 @@ import { frontendBaseUrl } from '../../config/env.js';
 import { getSupabaseAdmin, getSupabaseAnon } from '../../config/supabase.js';
 import { ApiError } from '../../middleware/error.js';
 import { findUsuarioByAuthUserId, findUsuarioByCorreo, type UsuarioConRoles } from './auth.repository.js';
+import { contarEnvio } from '../../lib/correo.js';
 
 /** Lo que el navegador necesita para instalar la sesion con supabase-js. */
 export interface SessionPayload {
@@ -108,7 +109,10 @@ export async function forgotPassword(email: string): Promise<void> {
   // "no te mande nada porque no existes" de "fallo el envio".
   if (error) {
     console.error('Fallo el envio del correo de recuperacion:', error.message);
+    return;
   }
+  // Lo manda Supabase, pero cuenta como correo de la plataforma.
+  await contarEnvio('recuperar_contrasena');
 }
 
 /**

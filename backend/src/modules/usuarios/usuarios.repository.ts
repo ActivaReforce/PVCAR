@@ -640,7 +640,10 @@ export async function calcularImpacto(usuId: number): Promise<ImpactoEliminacion
         (SELECT count(*) FROM public.nino_padre np JOIN public.padre p ON p.padre_id = np.padre_id
           WHERE p.usu_id = $1) AS estudiantes_vinculados,
         (SELECT count(*) FROM public.encuesta_respondida er JOIN public.padre p ON p.padre_id = er.padre_id
-          WHERE p.usu_id = $1) AS encuestas_respondidas
+          WHERE p.usu_id = $1) AS encuestas_respondidas,
+        (SELECT count(*) FROM public.novedad
+          WHERE nov_autor_id = $1 OR nov_eliminada_por = $1) AS novedades_escritas,
+        (SELECT count(*) FROM public.novedad_persona WHERE usu_id = $1) AS novedades_sobre_el
     `,
     [usuId],
   );
@@ -668,6 +671,8 @@ export async function calcularImpacto(usuId: number): Promise<ImpactoEliminacion
     encuestas_creadas: n('encuestas_creadas'),
     estudiantes_vinculados: n('estudiantes_vinculados'),
     encuestas_respondidas: n('encuestas_respondidas'),
+    novedades_escritas: n('novedades_escritas'),
+    novedades_sobre_el: n('novedades_sobre_el'),
   };
 
   const bloqueos = Object.fromEntries(
