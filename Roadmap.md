@@ -100,12 +100,14 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 6. **Pagos mensuales** — esperar a que el cliente lo cuente.
 7. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
 
-**Pendientes de decidir:**
+**Decididas por el cliente el 2026-10-12:**
 
-- **Fase 13 §4:** si el reporte de Alumnos sigue sacando la información de salud.
-- **Fase 12 §4:** que Mobak escale su 0–2 al puntaje del parámetro.
-- **Fase 11 §4:** si se permiten fechas futuras en asistencia (en `archivo` hay marcas hasta el 2026-10-05).
-- **Flujo de invitación por correo** en vez de contraseña puesta por el admin. Resend ya funciona, así que se puede preguntar.
+- **Fase 13 §4:** el reporte de Alumnos **sí** saca la información de salud (columna sensible con casilla y auditoría, como está).
+- **Fase 12 §4:** Mobak se deja como está; se revisa al probar la Fase 12.
+- **Fase 11 §4:** **no** se permiten fechas futuras en asistencia; ahora lo rechaza también el servidor.
+- **Sin invitación por correo:** el admin pone siempre la contraseña al crear el usuario.
+
+**Pendiente de decidir:** si la ficha de matrícula y el contrato pueden tener un texto distinto en algún colegio (hoy hay un texto común con los datos de cada colegio por marcadores; ver `docs/fase14b-contratos.md` §1).
 
 ### Corte de sesión — 2026-10-09
 

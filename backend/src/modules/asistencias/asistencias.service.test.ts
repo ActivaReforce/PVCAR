@@ -233,6 +233,19 @@ describe('guardado por lote de alumnos', () => {
     { nino_id: 22, asisest_id: ASISTENCIA.TARDE as number, hora_tarde: '16:35' },
   ];
 
+  it('una fecha futura se rechaza, en alumnos y en entrenadores', async () => {
+    await expect(
+      service.guardarAlumnos(propietario, { colacthor_id: 135, fecha: '2999-01-01', marcas }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      service.guardarEntrenadores(propietario, {
+        col_id: 14,
+        fecha: '2999-01-01',
+        marcas: [{ tipo: 'entrenador', id: 76, asisest_id: ASISTENCIA.PRESENTE }],
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
   it('guarda y cuenta las altas', async () => {
     const res = await service.guardarAlumnos(propietario, {
       colacthor_id: 135,

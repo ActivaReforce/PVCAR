@@ -170,7 +170,9 @@ Las consultas nuevas, ejecutadas contra `PVCAR_Dev` por MCP antes de subirlas.
 
 ---
 
-## 4. Decisión que hay que confirmar
+## 4. Decisión tomada
+
+> **Decidido por el cliente el 2026-10-12: el reporte sí saca la información de salud.** Se queda como está: columna sensible que sale solo marcando su casilla, y cada exportación con ella queda en auditoría.
 
 **La información de salud en el Excel de Alumnos.**
 

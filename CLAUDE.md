@@ -70,10 +70,11 @@ Trampas de configuración que ya costaron tiempo:
 
 **Bases:** migraciones `0001`–`0032` aplicadas y verificadas por MCP en dev y prod. `0004_seed_dev.sql` (catálogos) también está en prod; lo de prueba que traía ya se quitó. Dev lo usa el cliente para simular; prod tiene datos reales. **Pendiente:** `0033_novedades_ausencias.sql` en prod (en dev ya está) y `0034_correo_diario.sql` en dev y prod (el código de `dev` ya la necesita).
 
-**Decisiones esperando respuesta del cliente:** información de salud en el reporte de Alumnos (`docs/fase13-tablero-reportes.md` §4), Mobak escalado al puntaje del parámetro (`docs/fase12-evaluaciones.md` §4), fechas futuras en asistencia (`docs/fase11-asistencias.md` §4) y flujo de invitación por correo en vez de contraseña puesta por el admin (Resend ya funciona, se puede preguntar).
+**Decisiones esperando respuesta del cliente:** si la ficha de matrícula y el contrato pueden ser distintos en algún colegio (hoy un texto común con marcadores). Mobak se revisa al probar la Fase 12.
 
 **Decisiones cerradas, no reabrir:**
 - Publicar una encuesta **no** manda correo; le aparece al representante cuando entra.
+- (2026-10-12) El reporte de Alumnos **sí** saca la información de salud (con casilla y auditoría). **No** hay fechas futuras en asistencia (lo rechaza el servidor). **No** hay invitación por correo: el admin pone siempre la contraseña.
 - Varios roles por usuario; el alcance es la **unión** de todos.
 - Borrado permanente junto a la baja lógica, con recuento previo, confirmación escribiendo el nombre y auditoría.
 - `padre` guarda también la facturación, que puede ser de otra persona; no se separa.

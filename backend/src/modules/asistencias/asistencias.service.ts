@@ -2,6 +2,7 @@ import { alcanceDe, alcanzaColegio, alcanzaDisciplina } from '../../lib/alcance.
 import { auditar } from '../../lib/auditoria.js';
 import { ESTADO } from '../../lib/constants.js';
 import { firmarFotos } from '../../lib/storage.js';
+import { hoyEc } from '../../lib/fecha.js';
 import { enTransaccion } from '../../lib/tx.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
@@ -99,6 +100,16 @@ async function exigirSesion(
   }
 
   return sesion;
+}
+
+/**
+ * No se pasa lista de una clase que aún no ha ocurrido (decidido por el
+ * cliente el 2026-10-12). La pantalla ya no deja elegirla; esto lo cierra en
+ * el servidor. "Hoy" es el de Ecuador: a las 20:00 de Guayaquil UTC ya es
+ * mañana, y esa fecha sigue siendo futura.
+ */
+function exigirNoFutura(fecha: string): void {
+  if (fecha > hoyEc()) throw new ApiError(400, 'No se puede pasar lista de una fecha futura');
 }
 
 async function exigirColegio(actor: AuthUser, colId: number): Promise<repo.ColegioBasico> {
@@ -207,6 +218,7 @@ export async function guardarAlumnos(
   actor: AuthUser,
   input: GuardarAlumnosInput,
 ): Promise<ListaAlumnos & { resultado: ResultadoGuardado }> {
+  exigirNoFutura(input.fecha);
   const sesion = await exigirSesion(actor, input.colacthor_id, input.fecha);
 
   if (sesion.est_id !== ESTADO.ACTIVO) {
@@ -356,6 +368,7 @@ export async function guardarEntrenadores(
   actor: AuthUser,
   input: GuardarEntrenadoresInput,
 ): Promise<ListaEntrenadores & { resultado: ResultadoGuardado }> {
+  exigirNoFutura(input.fecha);
   const colegio = await exigirColegio(actor, input.col_id);
 
   const resultado = await enTransaccion(async (client) => {

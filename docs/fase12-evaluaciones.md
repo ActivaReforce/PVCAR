@@ -122,7 +122,9 @@ Las consultas nuevas, ejecutadas contra `PVCAR_Dev` por MCP; los `INSERT` valida
 
 ---
 
-## 4. Decisión que hay que confirmar
+## 4. Decisión aplazada
+
+> **2026-10-12: Mobak se deja como está** (escalado al puntaje del parámetro). El cliente lo revisa al probar esta fase.
 
 **Mobak y el puntaje del parámetro.** MOBAK puntúa de 0 a 2 por ítem, y el sistema anterior guardaba ese 0, 1 o 2 **literal**, ignorando el `evaparam_puntaje` configurado. Un parámetro Mobak de 10 puntos no podía dar más de 2, así que `eva_puntaje_total` prometía un máximo inalcanzable y los porcentajes de los informes salían mal.
 
