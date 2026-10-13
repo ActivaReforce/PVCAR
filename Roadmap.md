@@ -8,7 +8,7 @@
 
 > **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
 
-**Corte de este documento: 2026-10-12 (lanzamiento hecho en `activareforce.com` y plataforma anterior borrada; punto 9, aviso automático de ausencia, hecho en `dev`; siguiente: que el cliente pruebe Novedades y ausencias).**
+**Corte de este documento: 2026-10-12 (lanzamiento hecho en `activareforce.com`, plataforma anterior borrada y **módulo Novedades cerrado** —puntos 8 y 9, probados y aprobados por el cliente—; siguiente: pasar a `main` con `0033`/`0034` en prod y el respaldo de prod).**
 
 ---
 
@@ -50,6 +50,7 @@
 | **13 — Tablero y Reportes** | 🟡 construida el 2026-09-17, en `dev`. 4 tableros, 9 reportes y 14 gráficas. **+ Data anterior** (2026-10-02): 15 conjuntos, 8 gráficas y Excel de todo; pruebas en `docs/data-anterior.md`. **La exportación a Excel de Reportes fallaba siempre** — arreglada el 2026-10-02. Solo falta probarla |
 | **14 — Encuestas y Representantes** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
 | **14B — Inscripciones** (nuevo, 2026-10-01) | 🟡 **rehecha el 2026-10-05 y en `dev`** con los seis documentos del cliente (4 generales + ficha y contrato por colegio), constancia por documento, PDF por alumno con membrete, IVA fijo 15 %, apertura general y por colegio, cuenta bancaria. `0014`–`0019` aplicadas en dev y prod. **El cobro por disciplina quedó resuelto el 2026-10-06** con Disciplinas v2 (una disciplina = una tarifa, máximo configurable por alumno, sin cruces). **Representante con cuenta previa hecho y probado el 2026-10-07**, en `main` desde el PR #11. Estado vigente en `docs/fase14b-contratos.md`. Solo Propietario |
+| **Novedades** (puntos 8 y 9, fuera de fase) | ✅ **cerrado el 2026-10-12**: probado y aprobado por el cliente en `dev`. Novedades a mano (general, personal, representantes, alumnos), ausencias y correcciones automáticas al pasar lista, correos configurables, número en el menú, baja lógica y reporte con hoja Ausencias. Falta pasarlo a `main` (`0033` y `0034` en prod antes) |
 | **15 — Endurecimiento y QA** | 🟡 en marcha desde el 2026-09-17. Hecho todo lo que no necesita la aplicación en marcha. SMTP de Resend puesto en prod y dev (2026-10-07). Falta la auditoría de fugas con token por rol, los e2e, el repaso de accesibilidad y **el respaldo de prod** |
 | **16 — Lanzamiento** | ✅ **2026-10-12**: `activareforce.com` en producción. Prod limpia de lo de prueba y con datos reales cargados por el cliente |
 | **17 — Cierre del proyecto** | 🟡 plataforma anterior borrada el 2026-10-12; faltan los PAT, el repo privado y la limpieza final |
@@ -78,7 +79,8 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 
 **Hecho:**
 
-- **PR #14** (asistencia más fluida) y **PR #15** (Novedades) en `main`. `0027` aplicada en dev y prod. En producción, `/novedades` enseña **"En desarrollo"** hasta que el cliente apruebe el módulo en `dev`: `NovedadesEnDesarrollo.tsx`, elegida en `App.tsx` cuando el build apunta al backend de producción. Al aprobarlo se borran las dos cosas.
+- **PR #14** (asistencia más fluida) y **PR #15** (Novedades) en `main`. `0027` aplicada en dev y prod. En producción, `/novedades` enseñaba **"En desarrollo"** mientras el cliente lo probaba en `dev`; aprobado el 2026-10-12, la pantalla temporal ya está borrada en `dev` y desaparece de prod con el próximo merge.
+- **Módulo Novedades cerrado (puntos 8 y 9):** el cliente lo probó y lo aprobó el 2026-10-12.
 - **Lanzamiento (Fase 16):** `activareforce.com` en Vercel Production, `www` redirige a la raíz (308), DNS en Cloudflare. `FRONTEND_ORIGIN=https://activareforce.com` en Railway `production` (es el origen canónico de los enlaces de correo). Site URL `https://activareforce.com` y Redirect URL `https://activareforce.com/reset-password` en Supabase `PVCAR`. Verificado: HTTPS, redirección, CORS y login. `pvcar.vercel.app` ya no responde.
 - **Plataforma anterior dada de baja:** el cliente borró su hosting, su Supabase (y la cuenta) y su repo. Claude borró la copia local del código, `_ref/`, el respaldo local y el servidor MCP que apuntaba a ella.
 
@@ -90,12 +92,13 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 
 **Al retomar — lista de trabajo, uno por uno:**
 
-1. **Probar Novedades** en `dev-pvcar.vercel.app`: crear una de cada tipo, ver que llegan los correos (con y sin el switch de mencionados) y entrar con un rol que no sea Propietario. Si pasa, quitar la pantalla temporal y mergear.
-2. ~~**Punto 9 — aviso automático de ausencia**~~ — hecho en `dev` el 2026-10-12; falta la prueba del cliente.
-3. **Pagos mensuales** — esperar a que el cliente lo cuente.
-4. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
-5. **Respaldo de prod:** ya hay datos reales y el plan gratuito de Supabase no hace copias automáticas. `pg_dump` programado o plan Pro.
-6. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
+1. ~~**Punto 8 — Novedades**~~ — ✅ cerrado el 2026-10-12, aprobado por el cliente.
+2. ~~**Punto 9 — aviso automático de ausencia**~~ — ✅ cerrado el 2026-10-12, aprobado por el cliente.
+3. **Pasar a `main`:** antes, `0033_novedades_ausencias.sql` y `0034_correo_diario.sql` en prod (verificadas por MCP). Con el merge, prod deja de enseñar "En desarrollo" en Novedades.
+4. **Respaldo de prod:** ya hay datos reales y el plan gratuito de Supabase no hace copias automáticas. `pg_dump` programado o plan Pro.
+5. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
+6. **Pagos mensuales** — esperar a que el cliente lo cuente.
+7. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
 
 **Pendientes de decidir:**
 
@@ -124,9 +127,9 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 **Al retomar — lista de trabajo, uno por uno:**
 
 1–8. ~~Fechas · Cambio de entrenador · Correos · Correo de aprobación · Reportes · Permisos · Asistencia más fluida · Novedades~~ — hechos.
-9. **Aviso automático de ausencia:** cuando un alumno queda ausente, se crea una novedad del tipo alumno automáticamente y se dispara el correo al representante (si el switch está activo) y a Para/CC. Depende del 8 (ya montado).
+9. ~~**Aviso automático de ausencia**~~ — ✅ cerrado el 2026-10-12 (ver corte del 2026-10-12).
 10. **Pagos mensuales** — esperar al cliente.
-11. **Pruebas en pantalla del cliente** incluidas las de Novedades.
+11. **Pruebas en pantalla del cliente** (las de Novedades, hechas y aprobadas el 2026-10-12).
 12. **Decisiones pendientes.**
 13. **Siembra de prod** + Fases 15/16/17.
 
