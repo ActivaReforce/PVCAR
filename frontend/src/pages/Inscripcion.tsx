@@ -1685,7 +1685,7 @@ const Exito = ({ resultado, correo, cuenta }: { resultado: EnvioRecibido; correo
         <p>Entra a la plataforma con tu cuenta de siempre.</p>
       ) : (
         <p>
-          Si es tu primera inscripción, tu contraseña será tu <strong>número de cédula o pasaporte</strong>, tal
+          Si es tu primera inscripción, tu contraseña será tu <strong>número de cédula</strong>, tal
           como lo escribiste.
         </p>
       )}
