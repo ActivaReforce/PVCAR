@@ -88,7 +88,6 @@ export const PanelGeneral = ({ datos }: { datos: TableroGeneral }) => (
       <TarjetaCifra
         titulo="Encuestas publicadas"
         valor={datos.encuestasPublicadas}
-        detalle={datos.encuestasPublicadas === 0 ? 'El módulo se estrena vacío' : undefined}
         icono={CalendarCheck}
       />
       <TarjetaCifra
