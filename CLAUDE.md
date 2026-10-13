@@ -68,7 +68,7 @@ Trampas de configuración que ya costaron tiempo:
 
 **Si pregunta "¿en qué nos quedamos?": corte del 2026-10-12 en `Roadmap.md` §1**, con la lista de trabajo numerada. Novedades (puntos 8 y 9) está cerrado. Lo siguiente: pasar a `main` (antes, `0033` y `0034` en prod), el respaldo de prod y las pruebas en pantalla de las Fases 9–14.
 
-**Bases:** migraciones `0001`–`0032` aplicadas y verificadas por MCP en dev y prod. `0004_seed_dev.sql` (catálogos) también está en prod; lo de prueba que traía ya se quitó. Dev lo usa el cliente para simular; prod tiene datos reales. **Pendiente:** `0033_novedades_ausencias.sql` en prod (en dev ya está) `0034_correo_diario.sql` y `0035_documentos_por_colegio.sql` en dev y prod (el código de `dev` ya la necesita).
+**Bases:** migraciones `0001`–`0032` aplicadas y verificadas por MCP en dev y prod. `0004_seed_dev.sql` (catálogos) también está en prod; lo de prueba que traía ya se quitó. Dev lo usa el cliente para simular; prod tiene datos reales. **Pendiente:** `0033_novedades_ausencias.sql` en prod (en dev ya está) `0034_correo_diario.sql` en prod (en dev ya está) y `0035_documentos_por_colegio.sql` en dev y prod (el código de `dev` ya la necesita).
 
 **Decisiones esperando respuesta del cliente:** ninguna. Mobak se revisa al probar la Fase 12. (Ficha y contrato propios por colegio: hecho el 2026-10-12, `0035`.)
 
