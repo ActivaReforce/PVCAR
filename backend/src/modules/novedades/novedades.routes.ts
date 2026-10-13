@@ -3,7 +3,13 @@ import { requireAuth } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/requirePermission.js';
 import { ApiError } from '../../middleware/error.js';
 import * as service from './novedades.service.js';
-import { buscarSchema, crearSchema, idParamSchema, listarSchema } from './novedades.schemas.js';
+import {
+  buscarSchema,
+  crearSchema,
+  idParamSchema,
+  listarSchema,
+  vistoSchema,
+} from './novedades.schemas.js';
 
 /**
  * Rutas de Novedades (punto 8 del Roadmap, 2026-10-09).
@@ -63,6 +69,36 @@ novedadesRouter.get(
     try {
       const opts = buscarSchema.parse(req.query);
       res.json({ data: await service.alumnosMencionables(actor(req), opts), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /novedades/aviso — cuántas nuevas desde la última vista, para el
+ * número del menú. POST /novedades/aviso/visto — hasta dónde vio. Solo
+ * Propietario y Admin (lo comprueba el servicio).
+ */
+novedadesRouter.get(
+  '/aviso',
+  requirePermission('novedades', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.aviso(actor(req)), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+novedadesRouter.post(
+  '/aviso/visto',
+  requirePermission('novedades', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { hasta } = vistoSchema.parse(req.body);
+      res.json({ data: await service.marcarVisto(actor(req), hasta), error: null });
     } catch (err) {
       next(err);
     }

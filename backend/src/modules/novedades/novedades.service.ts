@@ -47,6 +47,27 @@ export type NovedadVista = Omit<repo.Novedad, 'autor'> & {
   autor: repo.Novedad['autor'] | null;
 };
 
+// ---------------------------------------------------------------------------
+// Número del menú (2026-10-12): solo Propietario y Admin, por rol.
+
+function exigirGlobal(actor: AuthUser): void {
+  if (!esGlobal(actor)) throw new ApiError(403, 'Solo Propietario y Admin');
+}
+
+export async function aviso(actor: AuthUser): Promise<{ nuevas: number }> {
+  exigirGlobal(actor);
+  return { nuevas: await repo.contarNuevas(actor.usuario.usu_id) };
+}
+
+/** `hasta` = la novedad más reciente que llegó a su pantalla. */
+export async function marcarVisto(actor: AuthUser, hasta: Date): Promise<{ nuevas: number }> {
+  exigirGlobal(actor);
+  // Una fecha del futuro taparía las que aún no existen.
+  const tope = new Date();
+  await repo.marcarVisto(actor.usuario.usu_id, hasta > tope ? tope : hasta);
+  return aviso(actor);
+}
+
 function paraActor(actor: AuthUser, n: repo.Novedad): NovedadVista {
   if (verAutor(actor)) return n;
   return { ...n, autor: null };

@@ -394,6 +394,38 @@ export async function correosDeRepresentantesDe(nino_ids: number[]): Promise<str
   return rows.map((r) => r.correo);
 }
 
+/**
+ * Número del menú: novedades de otros posteriores a la última que vio.
+ *
+ * El "+ 1 ms" es porque la base guarda microsegundos y la fecha que vuelve
+ * del navegador solo trae milisegundos: sin él, la última vista contaría
+ * siempre como nueva. Usa ix_novedad_fecha.
+ */
+export async function contarNuevas(usu_id: number): Promise<number> {
+  const { rows } = await getPool().query<{ nuevas: number }>(
+    `SELECT count(*)::int AS nuevas
+       FROM public.novedad n
+      WHERE n.nov_autor_id <> $1
+        AND n.nov_fecha_creacion >= COALESCE(
+              (SELECT novvis_hasta FROM public.novedad_visto WHERE usu_id = $1),
+              '-infinity'::timestamptz) + interval '1 millisecond'`,
+    [usu_id],
+  );
+  return rows[0]?.nuevas ?? 0;
+}
+
+/** Guarda hasta dónde vio; nunca retrocede. */
+export async function marcarVisto(usu_id: number, hasta: Date): Promise<void> {
+  await getPool().query(
+    `INSERT INTO public.novedad_visto (usu_id, novvis_hasta)
+     VALUES ($1, $2)
+     ON CONFLICT (usu_id) DO UPDATE
+        SET novvis_hasta = GREATEST(public.novedad_visto.novvis_hasta, EXCLUDED.novvis_hasta),
+            novvis_fecha_modificacion = now()`,
+    [usu_id, hasta],
+  );
+}
+
 /** Colegios de esos niños (para el alcance del representante al mencionar). */
 export async function colegiosDeNinos(nino_ids: number[]): Promise<number[]> {
   if (nino_ids.length === 0) return [];

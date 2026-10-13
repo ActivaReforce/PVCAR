@@ -68,6 +68,10 @@ export const crearSchema = z.discriminatedUnion('tipo', [
 
 export type CrearInput = z.infer<typeof crearSchema>;
 
+export const vistoSchema = z.object({
+  hasta: z.coerce.date(),
+});
+
 export const buscarSchema = z.object({
   buscar: z.string().trim().min(1).max(80).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),

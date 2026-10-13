@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   GraduationCap,
   Loader2,
@@ -30,7 +30,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useEliminarNovedad, useNovedades } from '@/hooks/useNovedades';
+import { useEliminarNovedad, useMarcarNovedadesVistas, useNovedades } from '@/hooks/useNovedades';
+import { useAuth } from '@/contexts/AuthContext';
+import { ROLES_GLOBALES } from '@/hooks/useUserForm';
 import { ZONA } from '@/lib/fecha';
 import type { Novedad, TipoNovedad } from '@/api/novedades';
 import CrearNovedadDialog from '@/components/novedades/CrearNovedadDialog';
@@ -119,6 +121,23 @@ const Novedades = () => {
   });
 
   const eliminar = useEliminarNovedad();
+
+  /**
+   * Lo que llega a la pantalla cuenta como visto (solo Propietario y Admin):
+   * se manda la fecha de la más reciente de la lista, no "ahora", para no dar
+   * por vista una que entre mientras tanto. Solo se llama si avanza.
+   */
+  const { user } = useAuth();
+  const esGlobal = user?.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id)) ?? false;
+  const marcarVisto = useMarcarNovedadesVistas();
+  const ultimaMarcada = useRef('');
+  const masReciente = novedades.data?.[0]?.nov_fecha_creacion;
+  useEffect(() => {
+    if (!esGlobal || !masReciente || masReciente <= ultimaMarcada.current) return;
+    ultimaMarcada.current = masReciente;
+    marcarVisto.mutate(masReciente);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate es estable
+  }, [esGlobal, masReciente]);
 
   const confirmar = async () => {
     if (!confirmarEliminar) return;

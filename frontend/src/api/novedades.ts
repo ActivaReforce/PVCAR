@@ -86,6 +86,9 @@ export const novedadesApi = {
   obtener: (id: number) => api.get<Novedad>(`/novedades/${id}`),
   crear: (input: CrearNovedadInput) => api.post<Novedad>('/novedades', input),
   eliminar: (id: number) => api.delete<{ eliminada: true }>(`/novedades/${id}`),
+  /** Solo Propietario y Admin: nuevas desde la última que vio. */
+  aviso: () => api.get<{ nuevas: number }>('/novedades/aviso'),
+  marcarVisto: (hasta: string) => api.post<{ nuevas: number }>('/novedades/aviso/visto', { hasta }),
   personal: (opts: { buscar?: string; limit?: number } = {}) =>
     api.get<PersonaMencionable[]>(`/novedades/personal-mencionable${queryStringImpl(opts)}`),
   representantes: (opts: { buscar?: string; limit?: number } = {}) =>

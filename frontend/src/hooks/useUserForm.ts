@@ -30,6 +30,9 @@ export const ROL = {
   RESPALDO_ENTRENADOR: 7,
 } as const;
 
+/** Propietario y Admin: ven todo, sin alcance. */
+export const ROLES_GLOBALES: number[] = [ROL.PROPIETARIO, ROL.ADMIN];
+
 const VACIO: DatosFormularioUsuario = {
   usu_nombre: '',
   usu_correo: '',

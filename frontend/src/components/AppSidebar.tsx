@@ -38,6 +38,8 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { inscripcionesApi } from "@/api/inscripciones";
+import { useAvisoNovedades } from "@/hooks/useNovedades";
+import { ROLES_GLOBALES } from "@/hooks/useUserForm";
 
 export function AppSidebar() {
   const navigate = useNavigate();
@@ -60,7 +62,14 @@ export function AppSidebar() {
     enabled: puedeAprobar,
     refetchInterval: (q) => (q.state.data?.abiertas ? 60_000 : false),
   });
-  const avisos: Record<string, number> = { "/inscripciones": aviso.data?.pendientes ?? 0 };
+  /** Novedades nuevas desde la última vista: solo Propietario y Admin. */
+  const esGlobal = user?.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id)) ?? false;
+  const avisoNovedades = useAvisoNovedades(esGlobal && hasPermission("novedades", "ver"));
+
+  const avisos: Record<string, number> = {
+    "/inscripciones": aviso.data?.pendientes ?? 0,
+    "/novedades": avisoNovedades.data?.nuevas ?? 0,
+  };
 
   const handleLogout = async () => {
     try {
