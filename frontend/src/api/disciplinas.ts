@@ -42,8 +42,11 @@ export interface Disciplina {
   entrenadores: EntrenadorDeDisciplina[];
   alumnos: number;
   evaluaciones: number;
-  /** Cursos para los que es (catninograd_id). Vacío = para todos. */
-  grados: number[];
+  /**
+   * Cursos para los que es (catninograd_id). Vacío = para todos. Opcional
+   * porque el frontend se publica antes que el backend: un rato llega sin él.
+   */
+  grados?: number[];
   /** Solo para un representante: cuáles de sus hijos van a esta disciplina. */
   hijos?: Array<{ nino_id: number; nino_nombre: string }>;
 }

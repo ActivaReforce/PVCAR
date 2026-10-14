@@ -278,14 +278,14 @@ const Contenido = ({
         </div>
       )}
 
-      {datos.avisos.length > 0 && (
+      {(datos.avisos ?? []).length > 0 && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
           <p className="mb-1 flex items-center gap-2 font-medium">
             <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Revisa antes de
             aprobar
           </p>
           <ul className="list-disc space-y-1 pl-5">
-            {datos.avisos.map((a) => (
+            {(datos.avisos ?? []).map((a) => (
               <li key={a}>{a}</li>
             ))}
           </ul>

@@ -45,10 +45,11 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
   const [actId, setActId] = useState(String(disciplina.act_id));
   const [horarios, setHorarios] = useState<Franja[]>(() => aFranjas(disciplina));
 
-  const [grados, setGrados] = useState<number[]>(disciplina.grados);
+  const originales = disciplina.grados ?? [];
+  const [grados, setGrados] = useState<number[]>(originales);
 
   const cambiaHorario = JSON.stringify(horarios) !== JSON.stringify(aFranjas(disciplina));
-  const cambianCursos = JSON.stringify(grados) !== JSON.stringify(disciplina.grados);
+  const cambianCursos = JSON.stringify(grados) !== JSON.stringify(originales);
 
   const tieneHistorial = disciplina.alumnos > 0 || disciplina.evaluaciones > 0;
 
@@ -127,7 +128,7 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
       </div>
 
       <CursosSelector value={grados} onChange={setGrados} />
-      {disciplina.grados.length === 0 && grados.length === 0 && (
+      {originales.length === 0 && grados.length === 0 && (
         <p className="text-sm text-muted-foreground">
           Sin cursos marcados todavía: hoy se ofrece a todos los cursos.
         </p>

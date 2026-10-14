@@ -45,8 +45,11 @@ export interface DisciplinaOfertada {
   horarios: HorarioDisciplina[];
   /** "Lun y Mié 15:00–16:00". */
   horario: string;
-  /** Cursos para los que es. Vacío = para todos. */
-  grados: number[];
+  /**
+   * Cursos para los que es (catninograd_id). Vacío = para todos. Opcional
+   * porque el frontend se publica antes que el backend: un rato llega sin él.
+   */
+  grados?: number[];
 }
 
 export interface ColegioOfertado {
@@ -288,8 +291,8 @@ export interface InscripcionDetalle {
   coincidencias: UsuarioCoincidente[];
   cuenta: CuentaPrevia | null;
   bloqueos: string[];
-  /** Para revisar, sin impedir aprobar: disciplina de otro curso. */
-  avisos: string[];
+  /** Para revisar, sin impedir aprobar: disciplina de otro curso. Opcional, como `grados`. */
+  avisos?: string[];
 }
 
 /** "Ya inscribí antes": solo si hay cuenta, sin ningún dato. */
