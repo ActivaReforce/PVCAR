@@ -15,6 +15,7 @@ import { useCrearDisciplina } from '@/hooks/useDisciplinas';
 import type { Franja } from '@/api/disciplinas';
 import { problemaDeHorarios } from '@/lib/horarios';
 import HorariosEditor from './HorariosEditor';
+import CursosSelector from './CursosSelector';
 
 interface Props {
   onSuccess: () => void;
@@ -22,7 +23,8 @@ interface Props {
 }
 
 /**
- * Alta de una disciplina: colegio, actividad y sus días, cada uno con su hora.
+ * Alta de una disciplina: colegio, actividad, los cursos para los que es y
+ * sus días, cada uno con su hora.
  *
  * "Fútbol en Quitumbe, lunes 15:00 y miércoles 16:00" es UNA disciplina: el
  * alumno se inscribe una vez, se cobra una vez y tiene un entrenador. Si se
@@ -39,12 +41,17 @@ const NuevaDisciplinaForm = ({ onSuccess, onCancel }: Props) => {
   const [colId, setColId] = useState('');
   const [actId, setActId] = useState('');
   const [horarios, setHorarios] = useState<Franja[]>([]);
+  const [grados, setGrados] = useState<number[]>([]);
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!colId || !actId) {
       toast({ title: 'Elige colegio y actividad', variant: 'destructive' });
+      return;
+    }
+    if (grados.length === 0) {
+      toast({ title: 'Marca al menos un curso', variant: 'destructive' });
       return;
     }
     const problema = problemaDeHorarios(horarios);
@@ -54,7 +61,7 @@ const NuevaDisciplinaForm = ({ onSuccess, onCancel }: Props) => {
     }
 
     try {
-      await crear.mutateAsync({ col_id: Number(colId), act_id: Number(actId), horarios });
+      await crear.mutateAsync({ col_id: Number(colId), act_id: Number(actId), horarios, grados });
       onSuccess();
     } catch {
       // El hook ya muestra el motivo; el formulario queda abierto.
@@ -96,6 +103,8 @@ const NuevaDisciplinaForm = ({ onSuccess, onCancel }: Props) => {
           </Select>
         </div>
       </div>
+
+      <CursosSelector value={grados} onChange={setGrados} />
 
       <HorariosEditor value={horarios} onChange={setHorarios} />
 

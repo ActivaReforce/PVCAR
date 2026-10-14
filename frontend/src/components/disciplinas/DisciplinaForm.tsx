@@ -16,6 +16,7 @@ import { useActualizarDisciplina, useImpactoDisciplina } from '@/hooks/useDiscip
 import type { Disciplina, Franja } from '@/api/disciplinas';
 import { problemaDeHorarios } from '@/lib/horarios';
 import HorariosEditor from './HorariosEditor';
+import CursosSelector from './CursosSelector';
 
 interface Props {
   disciplina: Disciplina;
@@ -44,7 +45,11 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
   const [actId, setActId] = useState(String(disciplina.act_id));
   const [horarios, setHorarios] = useState<Franja[]>(() => aFranjas(disciplina));
 
+  const originales = disciplina.grados ?? [];
+  const [grados, setGrados] = useState<number[]>(originales);
+
   const cambiaHorario = JSON.stringify(horarios) !== JSON.stringify(aFranjas(disciplina));
+  const cambianCursos = JSON.stringify(grados) !== JSON.stringify(originales);
 
   const tieneHistorial = disciplina.alumnos > 0 || disciplina.evaluaciones > 0;
 
@@ -61,6 +66,10 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (cambianCursos && grados.length === 0) {
+      toast({ title: 'Marca al menos un curso', variant: 'destructive' });
+      return;
+    }
     const problema = problemaDeHorarios(horarios);
     if (problema) {
       toast({ title: problema, variant: 'destructive' });
@@ -73,6 +82,7 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
         datos: {
           ...(identidadFija ? {} : { col_id: Number(colId), act_id: Number(actId) }),
           ...(cambiaHorario ? { horarios } : {}),
+          ...(cambianCursos ? { grados } : {}),
         },
       });
       onSuccess();
@@ -116,6 +126,19 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
           </Select>
         </div>
       </div>
+
+      <CursosSelector value={grados} onChange={setGrados} />
+      {originales.length === 0 && grados.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Sin cursos marcados todavía: hoy se ofrece a todos los cursos.
+        </p>
+      )}
+      {cambianCursos && disciplina.alumnos > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Los {disciplina.alumnos} alumnos ya inscritos siguen igual: los cursos solo deciden a
+          quién se le ofrece desde ahora en la inscripción.
+        </p>
+      )}
 
       <HorariosEditor value={horarios} onChange={setHorarios} />
 
