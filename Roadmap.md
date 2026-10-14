@@ -95,6 +95,7 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 1. ~~**Punto 8 — Novedades**~~ — ✅ cerrado el 2026-10-12, aprobado por el cliente.
 2. ~~**Punto 9 — aviso automático de ausencia**~~ — ✅ cerrado el 2026-10-12, aprobado por el cliente.
 3. ~~**Pasar a `main`**~~ — ✅ **PR #16 mergeado el 2026-10-13**: Novedades, ausencias, correos del tablero y ficha/contrato por colegio en producción; `0028`–`0036` en prod. CRISFE Carcelén debe publicar su ficha y su contrato antes de abrir inscripciones.
+3b. ~~**Arreglos de Inscripción en prod**~~ — ✅ **PR #17 y #18 (2026-10-13)**: `/inscripcion` siempre en claro; sin traductor automático ni pantalla negra al reventar (`ErrorBoundary`); "Tus datos" detecta la cuenta también por correo (una cuenta sin cédula ya no llena todo para que la rechacen al enviar). Detalle en `docs/fase14b-contratos.md` §9. Sin SQL.
 4. **Respaldo de prod:** ya hay datos reales y el plan gratuito de Supabase no hace copias automáticas. `pg_dump` programado o plan Pro.
 5. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
 6. **Pagos mensuales** — esperar a que el cliente lo cuente.

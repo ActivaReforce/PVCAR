@@ -92,15 +92,17 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 
 **La inscripción es de una vez en la vida.** Se vuelve solo para añadir disciplinas a un hijo o para inscribir a otro. Nada se da de baja automáticamente: sacar a un alumno de una disciplina es cosa del admin.
 
-**Entrada a `/inscripcion`:** "Es mi primera vez" o "Ya inscribí antes". Y el paso **Tus datos**, al pulsar Continuar, comprueba la cédula:
+**Entrada a `/inscripcion`:** "Es mi primera vez" o "Ya inscribí antes". Y el paso **Tus datos**, al pulsar Continuar, comprueba la cédula **y el correo** (el correo desde el 2026-10-13, PR #18: una cuenta creada por el admin puede no tener cédula y antes se enteraba al final, al enviar; manda la cuenta activa, sea por cédula o por correo):
 
-| La cédula… | Qué pasa |
+| La cédula o el correo… | Qué pasa |
 |---|---|
 | no existe | sigue como nuevo |
 | es de una cuenta activa | "Ya tienes cuenta: entra" → correo y contraseña (la cédula, si no la cambió) y "Olvidé mi contraseña" (el mismo del login: plantilla de Supabase con Resend) |
 | es de una cuenta dada de baja | puede inscribir igual, llenando el formulario; la inscripción queda atada a esa cuenta y **al aprobar se reactiva** (el admin lo ve antes de aprobar) |
 
-**Con la cédula sola no se enseña nada:** son datos de menores (salud, contactos). Solo dice si hay cuenta; los datos se ven después de iniciar sesión. Al enviar como nuevo se vuelven a comprobar cédula y correo: si alguno es de una cuenta activa, se le pide entrar.
+**Con la cédula sola no se enseña nada:** son datos de menores (salud, contactos). Solo dice si hay cuenta; los datos se ven después de iniciar sesión. Al enviar como nuevo se vuelven a comprobar cédula y correo: si alguno es de una cuenta activa, se le pide entrar. Si entra a mitad, se conservan la cédula que escribió (si su cuenta no tenía) y los alumnos nuevos que ya llenó. La cédula se guarda en su usuario solo al aprobar la inscripción.
+
+**Aspecto (2026-10-13, PR #17):** `/inscripcion` se ve siempre en claro, sin tocar la preferencia guardada (`TemaDelDocumento` en `ThemeContext.tsx`). `index.html` va en `lang="es"` y sin traductor automático: Google Translate cambiaba los textos por `<font>` y React reventaba al elegir en un Select (pantalla negra al elegir el parentesco). Hay un `ErrorBoundary` global con "Recargar".
 
 **Con sesión iniciada:**
 - Sus datos y los de facturación salen llenos y se editan; al aprobar se guardan (nombre, teléfono, factura). El correo es el de la cuenta: se cambia en Perfil.
