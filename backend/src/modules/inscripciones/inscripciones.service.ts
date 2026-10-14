@@ -1813,8 +1813,14 @@ export function pistaDeCorreo(correo: string): string {
  * Con la cédula sola no se enseña nada (son datos de menores): solo si hay
  * cuenta. Los datos se ven después de iniciar sesión.
  */
-export async function identificar(cedula: string): Promise<Identificacion> {
-  const cuenta = await repo.cuentaPorCedula(cedula);
+export async function identificar(cedula: string, correo?: string): Promise<Identificacion> {
+  // La misma regla que al enviar (cuentaDelEnvio): manda la cuenta activa,
+  // sea por la cédula o por el correo.
+  const [porCedula, porCorreo] = await Promise.all([
+    repo.cuentaPorCedula(cedula),
+    correo ? repo.cuentaPorCorreo(correo) : Promise.resolve(null),
+  ]);
+  const cuenta = [porCedula, porCorreo].find((c) => c?.est_id === ESTADO.ACTIVO) ?? porCedula ?? porCorreo;
   if (!cuenta) return { estado: 'nuevo' };
   if (cuenta.est_id === ESTADO.ACTIVO) return { estado: 'cuenta', correo_pista: pistaDeCorreo(cuenta.usu_correo) };
   return { estado: 'inactiva' };

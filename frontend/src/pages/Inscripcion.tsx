@@ -431,13 +431,17 @@ const Inscripcion = () => {
     refetchOnWindowFocus: false,
   });
 
-  /** Al entrar con su cuenta: sus datos llenos; los hijos los elige él. */
+  /**
+   * Al entrar con su cuenta: sus datos llenos; los hijos los elige él. Si su
+   * cuenta no tiene cédula se queda la que escribió, y los alumnos nuevos que
+   * ya llenó no se pierden (entra a mitad cuando el envío le pide sesión).
+   */
   useEffect(() => {
     const d = misDatos.data;
     if (!d) return;
     const r = d.representante;
     const f = r.factura;
-    const cedula = r.cedula ?? '';
+    const cedula = r.cedula ?? rep.cedula;
     setRep({
       nombre: r.nombre,
       cedula,
@@ -446,8 +450,10 @@ const Inscripcion = () => {
       facturaPropia: !f || (f.nombre === r.nombre && f.identificacion === cedula && f.correo === r.correo),
       factura: f ?? { nombre: '', identificacion: '', correo: '', direccion: '' },
     });
-    setAlumnos([]);
+    setAlumnos((antes) => antes.filter((a) => a.nino_id === null && a.nombre.trim() !== ''));
     setPistaCuenta(undefined);
+    // Solo al llegar sus datos: rep.cedula es la de ese momento.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [misDatos.data]);
 
   // El total lo calcula el backend con los precios de la base, para que lo
@@ -492,12 +498,12 @@ const Inscripcion = () => {
       subir();
       return;
     }
-    // Sin sesión, "Tus datos" comprueba la cédula: si ya tiene cuenta, que
-    // entre en vez de llenar todo de nuevo (§9).
+    // Sin sesión, "Tus datos" comprueba la cédula y el correo: si ya tiene
+    // cuenta, que entre en vez de llenar todo de nuevo (§9).
     if (paso === 0 && !conSesion) {
       setComprobandoCedula(true);
       try {
-        const r = await inscripcionesApi.identificar(rep.cedula.trim());
+        const r = await inscripcionesApi.identificar(rep.cedula.trim(), rep.correo.trim());
         if (r.estado === 'cuenta') {
           setPistaCuenta(r.correo_pista);
           subir();
