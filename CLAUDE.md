@@ -66,7 +66,7 @@ Trampas de configuración que ya costaron tiempo:
 
 ## Dónde estamos
 
-**Si pregunta "¿en qué nos quedamos?": corte del 2026-10-12 en `Roadmap.md` §1**, con la lista de trabajo numerada. Novedades (puntos 8 y 9) cerrado y en producción (PR #16, 2026-10-13). Lo siguiente: el respaldo de prod y las pruebas en pantalla de las Fases 9–14.
+**Si pregunta "¿en qué nos quedamos?": corte del 2026-10-12 en `Roadmap.md` §1**, con la lista de trabajo numerada. Novedades (puntos 8 y 9) cerrado y en producción (PR #16, 2026-10-13). Arreglos de Inscripción en producción (PR #17 y #18, 2026-10-13): siempre en claro, sin pantalla negra, cuenta detectada también por correo. Lo siguiente: el respaldo de prod y las pruebas en pantalla de las Fases 9–14.
 
 **Bases:** migraciones `0001`–`0036` aplicadas y verificadas por MCP en dev y prod. `0004_seed_dev.sql` (catálogos) también está en prod; lo de prueba que traía ya se quitó. Dev lo usa el cliente para simular; prod tiene datos reales. **No hay SQL pendiente.**
 
@@ -74,6 +74,7 @@ Trampas de configuración que ya costaron tiempo:
 
 **Decisiones cerradas, no reabrir:**
 - Publicar una encuesta **no** manda correo; le aparece al representante cuando entra.
+- (2026-10-13) Solo hay representantes **ecuatorianos que hablan español**: la cédula es de 10 números (sin pasaporte) y la página va sin traductor.
 - (2026-10-12) El reporte de Alumnos **sí** saca la información de salud (con casilla y auditoría). **No** hay fechas futuras en asistencia (lo rechaza el servidor). **No** hay invitación por correo: el admin pone siempre la contraseña.
 - Varios roles por usuario; el alcance es la **unión** de todos.
 - Borrado permanente junto a la baja lógica, con recuento previo, confirmación escribiendo el nombre y auditoría.
