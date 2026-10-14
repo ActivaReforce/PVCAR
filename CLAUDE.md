@@ -66,9 +66,11 @@ Trampas de configuración que ya costaron tiempo:
 
 ## Dónde estamos
 
+**Cursos por disciplina en producción (PR #20, 2026-10-14):** cada disciplina marca sus cursos y la inscripción solo ofrece las del curso elegido.
+
 **Si pregunta "¿en qué nos quedamos?": corte del 2026-10-12 en `Roadmap.md` §1**, con la lista de trabajo numerada. Novedades (puntos 8 y 9) cerrado y en producción (PR #16, 2026-10-13). Arreglos de Inscripción en producción (PR #17 y #18, 2026-10-13): siempre en claro, sin pantalla negra, cuenta detectada también por correo. Lo siguiente: el respaldo de prod y las pruebas en pantalla de las Fases 9–14.
 
-**Bases:** migraciones `0001`–`0037` aplicadas y verificadas por MCP en dev y prod. `0004_seed_dev.sql` (catálogos) también está en prod; lo de prueba que traía ya se quitó. Dev lo usa el cliente para simular; prod tiene datos reales: **inscripciones abiertas al público desde el 2026-10-14**; las pruebas se borraron ese día y desde la inscripción 4 todo es real. **No hay SQL pendiente.**
+**Bases:** migraciones `0001`–`0039` aplicadas y verificadas por MCP en dev y prod. `0004_seed_dev.sql` (catálogos) también está en prod; lo de prueba que traía ya se quitó. Dev lo usa el cliente para simular; prod tiene datos reales: **inscripciones abiertas al público desde el 2026-10-14**; las pruebas se borraron ese día y desde la inscripción 4 todo es real. **No hay SQL pendiente.**
 
 **Decisiones esperando respuesta del cliente:** ninguna. Mobak se revisa al probar la Fase 12. (Ficha y contrato: uno por colegio, hecho el 2026-10-13, `0035` + `0036`.)
 
