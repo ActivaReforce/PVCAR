@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useGradosDisciplina } from '@/hooks/useDisciplinas';
 import { cursoCorto } from '@/lib/cursos';
@@ -10,52 +9,55 @@ interface Props {
 }
 
 /**
- * Para qué cursos es la disciplina. El formulario público solo se la ofrece
- * a los alumnos de esos cursos.
+ * Para qué cursos es la disciplina, con botones como los días. El formulario
+ * público solo se la ofrece a los alumnos de esos cursos. Siempre hay al
+ * menos uno: no hay "ninguno".
  */
 const CursosSelector = ({ value, onChange }: Props) => {
   const grados = useGradosDisciplina();
   const todos = (grados.data ?? []).map((g) => g.catninograd_id);
+  const estanTodos = todos.length > 0 && todos.every((id) => value.includes(id));
 
-  const alternar = (id: number, marcado: boolean) =>
-    onChange(marcado ? [...value, id].sort((a, b) => a - b) : value.filter((g) => g !== id));
+  const alternar = (id: number) =>
+    onChange(
+      value.includes(id) ? value.filter((g) => g !== id) : [...value, id].sort((a, b) => a - b),
+    );
 
   return (
-    <fieldset className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <legend className="text-sm font-medium">Cursos *</legend>
-        <div className="flex gap-1">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label>Cursos *</Label>
+        {!estanTodos && (
           <Button type="button" variant="ghost" size="sm" onClick={() => onChange(todos)}>
-            Todos
+            Marcar todos
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])}>
-            Ninguno
-          </Button>
-        </div>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {(grados.data ?? []).map((g) => {
+          const activo = value.includes(g.catninograd_id);
+          return (
+            <button
+              key={g.catninograd_id}
+              type="button"
+              onClick={() => alternar(g.catninograd_id)}
+              aria-pressed={activo}
+              title={g.catninograd_nombre}
+              className={`min-h-11 rounded-md border px-3 py-2 text-sm transition-colors ${
+                activo
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-input bg-background hover:bg-accent hover:text-accent-foreground'
+              }`}
+            >
+              {cursoCorto(g.catninograd_nombre)}
+            </button>
+          );
+        })}
       </div>
       <p className="text-xs text-muted-foreground">
         En la inscripción solo se ofrece a los alumnos de los cursos marcados.
       </p>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-        {(grados.data ?? []).map((g) => {
-          const id = `curso-${g.catninograd_id}`;
-          return (
-            <Label
-              key={g.catninograd_id}
-              htmlFor={id}
-              className="flex min-h-11 cursor-pointer items-center gap-2 font-normal sm:min-h-9"
-            >
-              <Checkbox
-                id={id}
-                checked={value.includes(g.catninograd_id)}
-                onCheckedChange={(v) => alternar(g.catninograd_id, v === true)}
-              />
-              <span title={g.catninograd_nombre}>{cursoCorto(g.catninograd_nombre)}</span>
-            </Label>
-          );
-        })}
-      </div>
-    </fieldset>
+    </div>
   );
 };
 
