@@ -74,6 +74,7 @@ Trampas de configuración que ya costaron tiempo:
 
 **Decisiones cerradas, no reabrir:**
 - Publicar una encuesta **no** manda correo; le aparece al representante cuando entra.
+- (2026-10-13) Solo hay representantes **ecuatorianos que hablan español**: la cédula es de 10 números (sin pasaporte) y la página va sin traductor.
 - (2026-10-12) El reporte de Alumnos **sí** saca la información de salud (con casilla y auditoría). **No** hay fechas futuras en asistencia (lo rechaza el servidor). **No** hay invitación por correo: el admin pone siempre la contraseña.
 - Varios roles por usuario; el alcance es la **unión** de todos.
 - Borrado permanente junto a la baja lógica, con recuento previo, confirmación escribiendo el nombre y auditoría.
