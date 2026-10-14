@@ -444,8 +444,8 @@ export const inscripcionesApi = {
     api.post<EnvioRecibido>('/inscripcion', envio, { sinSesion: !conSesion }),
   cotizar: (ninos: Array<{ col_id: number; disciplinas: number[]; nino_id: number | null }>, conSesion: boolean) =>
     api.post<Cobro>('/inscripcion/cotizacion', { ninos }, { sinSesion: !conSesion }),
-  identificar: (cedula: string) =>
-    api.post<Identificacion>('/inscripcion/identificar', { cedula }, { sinSesion: true }),
+  identificar: (cedula: string, correo?: string) =>
+    api.post<Identificacion>('/inscripcion/identificar', { cedula, correo }, { sinSesion: true }),
   misDatos: () => api.get<MisDatos>('/inscripcion/mis-datos'),
 
   listar: (filtros: { estado?: EstadoInscripcion; buscar?: string; colegio?: number; page?: number }) => {

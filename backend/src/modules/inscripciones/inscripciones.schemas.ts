@@ -323,8 +323,12 @@ export const cuentaBancariaSchema = z.object({
 /** Tope de disciplinas por alumno en el formulario público (1 a 10). */
 export const maxDisciplinasSchema = z.object({ maximo: z.number().int().min(1).max(10) });
 
-/** "Ya inscribí antes": solo la cédula. Responde si hay cuenta, nada más. */
-export const identificarSchema = z.object({ cedula: cedulaRepresentante });
+/**
+ * "Ya inscribí antes": la cédula. Responde si hay cuenta, nada más.
+ * En "Tus datos" va también el correo: una cuenta creada por el admin puede
+ * no tener cédula, y sin esto se enteraba al final, al enviar.
+ */
+export const identificarSchema = z.object({ cedula: cedulaRepresentante, correo: correo.optional() });
 
 /**
  * Al aprobar: para cada alumno nuevo que coincide con uno existente (nombre,

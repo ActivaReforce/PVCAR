@@ -82,8 +82,8 @@ inscripcionPublicaRouter.post(
   identificarLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { cedula } = identificarSchema.parse(req.body);
-      res.json({ data: await service.identificar(cedula), error: null });
+      const { cedula, correo } = identificarSchema.parse(req.body);
+      res.json({ data: await service.identificar(cedula, correo), error: null });
     } catch (err) {
       next(err);
     }
