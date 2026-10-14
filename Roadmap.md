@@ -96,10 +96,12 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 2. ~~**Punto 9 — aviso automático de ausencia**~~ — ✅ cerrado el 2026-10-12, aprobado por el cliente.
 3. ~~**Pasar a `main`**~~ — ✅ **PR #16 mergeado el 2026-10-13**: Novedades, ausencias, correos del tablero y ficha/contrato por colegio en producción; `0028`–`0036` en prod. CRISFE Carcelén debe publicar su ficha y su contrato antes de abrir inscripciones.
 3b. ~~**Arreglos de Inscripción en prod**~~ — ✅ **PR #17 y #18 (2026-10-13)**: `/inscripcion` siempre en claro; sin traductor automático ni pantalla negra al reventar (`ErrorBoundary`); "Tus datos" detecta la cuenta también por correo (una cuenta sin cédula ya no llena todo para que la rechacen al enviar). Detalle en `docs/fase14b-contratos.md` §9. Sin SQL.
+3c. ~~**Inscripciones abiertas al público y cursos por disciplina**~~ — ✅ **2026-10-14**: pruebas borradas de prod (desde la inscripción 4 todo es real); Vercel Analytics (PR #19); `0037` (la asignación no nace con fecha de baja); **cursos por disciplina** (PR #20, `0038` + `0039`): cada disciplina marca sus cursos y el formulario público solo ofrece las del curso elegido (el backend lo comprueba; en la ficha de una pendiente, aviso sin bloquear).
 4. **Respaldo de prod:** ya hay datos reales y el plan gratuito de Supabase no hace copias automáticas. `pg_dump` programado o plan Pro.
 5. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
-6. **Pagos mensuales** — esperar a que el cliente lo cuente.
-7. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
+6. **Reportes — pedido del cliente (2026-10-14):** añadir la tarjeta de **Inscripciones** y la de **Encuestas**, y **reordenar las tarjetas**. El orden nuevo, preguntárselo al cliente al empezar.
+7. **Pagos mensuales** — esperar a que el cliente lo cuente.
+8. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
 
 **Decididas por el cliente el 2026-10-12:**
 
