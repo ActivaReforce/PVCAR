@@ -5,7 +5,7 @@ import {
   listarDisciplinasSchema,
 } from './disciplinas.schemas.js';
 
-const base = { col_id: 11, act_id: 24 };
+const base = { col_id: 11, act_id: 24, grados: [6, 7] };
 const franja = { dia_id: 1, inicio: '15:00', fin: '16:00' };
 
 describe('crearDisciplinaSchema', () => {
@@ -20,6 +20,16 @@ describe('crearDisciplinaSchema', () => {
   it('rechaza el mismo dia dos veces', () => {
     const r = crearDisciplinaSchema.safeParse({ ...base, horarios: [franja, franja] });
     expect(r.success).toBe(false);
+  });
+
+  it('exige al menos un curso', () => {
+    const r = crearDisciplinaSchema.safeParse({ ...base, grados: [], horarios: [franja] });
+    expect(r.success).toBe(false);
+  });
+
+  it('quita cursos repetidos y los ordena', () => {
+    const r = crearDisciplinaSchema.parse({ ...base, grados: [7, 6, 7], horarios: [franja] });
+    expect(r.grados).toEqual([6, 7]);
   });
 
   it('exige al menos un horario', () => {

@@ -13,6 +13,7 @@ const {
   firmaDeImagenValida,
   pistaDeCorreo,
   problemasDeDisciplinas,
+  fueraDeCurso,
 } = await import('./inscripciones.service.js');
 const { rellenar } = await import('./inscripciones.documentos.js');
 const { envioSchema, problemasDeEnvio } = await import('./inscripciones.schemas.js');
@@ -35,6 +36,30 @@ const disciplina = (id: number, col: number, est = 1, dias: number[] = [id], ini
   categoria: null,
   horarios: dias.map((d) => ({ dia_id: d, dia_nombre: DIAS[d]!, inicio, fin })),
   horario: 'x',
+  grados: [] as number[],
+});
+
+describe('fueraDeCurso', () => {
+  const sub12 = { ...disciplina(1, 10), actividad: 'Futbol Sub 12', grados: [6, 7] };
+  const libre = disciplina(2, 10);
+  const encontradas = new Map([
+    [1, sub12],
+    [2, libre],
+  ]);
+
+  it('acepta la disciplina de su curso', () => {
+    expect(fueraDeCurso([{ nombre: 'A', grado: 7, disciplinas: [1] }], encontradas)).toEqual([]);
+  });
+
+  it('rechaza la de otro curso y dice cual', () => {
+    const problemas = fueraDeCurso([{ nombre: 'A', grado: 4, disciplinas: [1, 2] }], encontradas);
+    expect(problemas).toHaveLength(1);
+    expect(problemas[0]).toContain('Futbol Sub 12');
+  });
+
+  it('una disciplina sin cursos marcados vale para todos', () => {
+    expect(fueraDeCurso([{ nombre: 'A', grado: 13, disciplinas: [2] }], encontradas)).toEqual([]);
+  });
 });
 
 describe('problemasDeDisciplinas', () => {

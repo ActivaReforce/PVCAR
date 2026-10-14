@@ -34,6 +34,8 @@ export interface DisciplinaListada {
   alumnos: number;
   /** Evaluaciones asignadas a esta disciplina. */
   evaluaciones: number;
+  /** Cursos para los que es (catninograd_id). Vacío = para todos (0038). */
+  grados: number[];
   /**
    * Solo para un representante: cuáles de SUS hijos van a esta disciplina
    * (2026-10-07). Vacío para el personal: nunca lleva alumnos ajenos.
@@ -114,7 +116,10 @@ const COLUMNAS = `
         d.colacthor_fecha_creacion,
         COALESCE(ent.lista, '[]'::json) AS entrenadores,
         COALESCE(al.n, 0)::int AS alumnos,
-        COALESCE(ev.n, 0)::int AS evaluaciones
+        COALESCE(ev.n, 0)::int AS evaluaciones,
+        COALESCE((SELECT json_agg(dg.catninograd_id ORDER BY dg.catninograd_id)
+                    FROM public.disciplina_grado dg
+                   WHERE dg.colacthor_id = d.colacthor_id), '[]'::json) AS grados
 `;
 
 const DESDE = `
@@ -296,6 +301,22 @@ export async function reemplazarHorarios(
   );
 }
 
+/** Los cursos de la disciplina: reemplaza la lista entera. Ids que no existen se ignoran. */
+export async function reemplazarGrados(
+  client: PoolClient,
+  colacthorId: number,
+  grados: number[],
+): Promise<void> {
+  await client.query('DELETE FROM public.disciplina_grado WHERE colacthor_id = $1', [colacthorId]);
+  await client.query(
+    `INSERT INTO public.disciplina_grado (colacthor_id, catninograd_id)
+     SELECT $1, g.catninograd_id
+       FROM public.categoria_nino_grado g
+      WHERE g.catninograd_id = ANY($2::int[])`,
+    [colacthorId, grados],
+  );
+}
+
 export async function actualizarDisciplina(
   client: PoolClient,
   colacthorId: number,
@@ -425,6 +446,18 @@ export interface Dia {
 export async function listarDias(): Promise<Dia[]> {
   const { rows } = await getPool().query<Dia>(
     'SELECT dia_id, dia_nombre FROM public.dia ORDER BY dia_id',
+  );
+  return rows;
+}
+
+export interface Grado {
+  catninograd_id: number;
+  catninograd_nombre: string;
+}
+
+export async function listarGrados(): Promise<Grado[]> {
+  const { rows } = await getPool().query<Grado>(
+    'SELECT catninograd_id, catninograd_nombre FROM public.categoria_nino_grado ORDER BY catninograd_id',
   );
   return rows;
 }

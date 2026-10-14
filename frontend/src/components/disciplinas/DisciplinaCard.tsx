@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   CalendarDays,
   GraduationCap,
   Pencil,
@@ -13,7 +14,9 @@ import MenuAcciones from '@/components/ui/menu-acciones';
 import TarjetaDesplegable from '@/components/comun/TarjetaDesplegable';
 import AsignarEntrenadorRapido from './AsignarEntrenadorRapido';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useGradosDisciplina } from '@/hooks/useDisciplinas';
 import type { Disciplina } from '@/api/disciplinas';
+import { textoCursos } from '@/lib/cursos';
 
 interface Props {
   disciplina: Disciplina;
@@ -35,6 +38,7 @@ interface Props {
  */
 const DisciplinaCard = ({ disciplina, diaId, onEdit, onBaja, onReactivar, onEliminar }: Props) => {
   const { canEdit } = usePermissions();
+  const grados = useGradosDisciplina();
   const activa = disciplina.est_id === 1;
   const sinEntrenador = activa && disciplina.entrenadores.length === 0;
   const hoy = disciplina.horarios.find((h) => h.dia_id === diaId);
@@ -103,6 +107,10 @@ const DisciplinaCard = ({ disciplina, diaId, onEdit, onBaja, onReactivar, onElim
       <p className="flex items-center gap-1.5">
         <CalendarDays className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
         <span className="break-words">{disciplina.horario_texto ?? 'Sin horario'}</span>
+      </p>
+      <p className="flex items-center gap-1.5">
+        <BookOpen className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+        <span className="break-words">{textoCursos(disciplina.grados, grados.data ?? [])}</span>
       </p>
       <p className="flex items-start gap-1.5">
         <UserCog className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />

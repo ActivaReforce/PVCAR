@@ -104,6 +104,7 @@ export async function crear(
       actId: input.act_id,
     });
     await repo.reemplazarHorarios(client, nuevo, input.horarios);
+    await repo.reemplazarGrados(client, nuevo, input.grados);
     await exigirSinSolape(client, nuevo);
 
     await auditar(
@@ -112,7 +113,12 @@ export async function crear(
         accion: 'crear',
         entidad: 'disciplina',
         entidadId: nuevo,
-        detalle: { col_id: input.col_id, act_id: input.act_id, horarios: input.horarios },
+        detalle: {
+          col_id: input.col_id,
+          act_id: input.act_id,
+          horarios: input.horarios,
+          grados: input.grados,
+        },
       },
       client,
     );
@@ -217,6 +223,9 @@ export async function actualizar(
       await repo.reemplazarHorarios(client, colacthorId, input.horarios);
       await exigirSinCrucesDeGente(client, colacthorId);
     }
+    // Cambiar los cursos no toca a los ya inscritos: solo decide qué ofrece
+    // desde ahora el formulario público.
+    if (input.grados) await repo.reemplazarGrados(client, colacthorId, input.grados);
     if (antes.est_id === ESTADO.ACTIVO) await exigirSinSolape(client, colacthorId);
 
     await auditar(
@@ -384,4 +393,8 @@ export async function eliminar(
 
 export async function dias(): Promise<repo.Dia[]> {
   return repo.listarDias();
+}
+
+export async function grados(): Promise<repo.Grado[]> {
+  return repo.listarGrados();
 }

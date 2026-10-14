@@ -42,6 +42,8 @@ export interface Disciplina {
   entrenadores: EntrenadorDeDisciplina[];
   alumnos: number;
   evaluaciones: number;
+  /** Cursos para los que es (catninograd_id). Vacío = para todos. */
+  grados: number[];
   /** Solo para un representante: cuáles de sus hijos van a esta disciplina. */
   hijos?: Array<{ nino_id: number; nino_nombre: string }>;
 }
@@ -87,6 +89,7 @@ export interface DatosNuevaDisciplina {
   col_id: number;
   act_id: number;
   horarios: Franja[];
+  grados: number[];
 }
 
 /** `horarios` reemplaza la lista entera. */
@@ -94,6 +97,8 @@ export interface DatosDisciplina {
   col_id?: number;
   act_id?: number;
   horarios?: Franja[];
+  /** Reemplaza la lista entera. */
+  grados?: number[];
 }
 
 export interface PrevioBaja {
@@ -110,6 +115,11 @@ export interface ImpactoDisciplina {
 export interface Dia {
   dia_id: number;
   dia_nombre: string;
+}
+
+export interface Grado {
+  catninograd_id: number;
+  catninograd_nombre: string;
 }
 
 function queryString(filtros: FiltrosDisciplinas): string {
@@ -131,6 +141,8 @@ export const disciplinasApi = {
     api.get<PaginaDisciplinas>(`/disciplinas${queryString(filtros)}`),
 
   dias: () => api.get<Dia[]>('/disciplinas/dias'),
+
+  grados: () => api.get<Grado[]>('/disciplinas/grados'),
 
   obtener: (id: number) => api.get<Disciplina>(`/disciplinas/${id}`),
 

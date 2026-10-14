@@ -126,6 +126,29 @@ export function problemasDeDisciplinas(
   return problemas;
 }
 
+/**
+ * Disciplinas elegidas que no son para el curso del alumno (0038). Una
+ * disciplina sin cursos marcados vale para todos. El formulario público ya
+ * solo ofrece las de su curso; esto lo comprueba el backend al enviar y lo
+ * avisa en la ficha de una pendiente (sin bloquear: el personal decide).
+ */
+export function fueraDeCurso(
+  ninos: Array<{ nombre: string; grado: number | null; disciplinas: number[] }>,
+  encontradas: Map<number, { actividad: string; horarios: HorarioDisciplina[]; grados: number[] }>,
+): string[] {
+  const problemas: string[] = [];
+  for (const nino of ninos) {
+    if (nino.grado === null) continue;
+    for (const id of nino.disciplinas) {
+      const d = encontradas.get(id);
+      if (d && d.grados.length > 0 && !d.grados.includes(nino.grado)) {
+        problemas.push(`${nino.nombre}: ${describirDisciplina(d)} no es para su curso`);
+      }
+    }
+  }
+  return problemas;
+}
+
 /** Los primeros bytes del archivo tienen que decir lo mismo que el tipo declarado. */
 export function firmaDeImagenValida(contenido: Buffer, mime: string): boolean {
   if (mime === 'image/jpeg') {
@@ -619,6 +642,15 @@ export async function enviar(
     input.ninos.map((n, i) => ({ ...n, activas: contexto.activas[i] })),
     contexto.externos,
   );
+  const fuera = fueraDeCurso(
+    input.ninos.map((n) => ({ nombre: n.nombre, grado: n.catninograd_id, disciplinas: n.disciplinas })),
+    encontradas,
+  );
+  if (fuera.length > 0) {
+    throw new ApiError(409, 'Alguna disciplina elegida no es para el curso del alumno. Recarga la página.', {
+      problemas: fuera,
+    });
+  }
 
   const comprobante = Buffer.from(input.comprobante.base64, 'base64');
   if (comprobante.length > 2 * 1024 * 1024) {
@@ -815,6 +847,8 @@ export interface InscripcionDetalle extends Omit<repo.InscripcionFila, 'ins_comp
   cuenta: CuentaPrevia | null;
   /** Lo que impide aprobar ahora mismo, en frases para el admin. Vacio si se puede. */
   bloqueos: string[];
+  /** Lo que conviene revisar pero no impide aprobar (disciplina de otro curso). */
+  avisos: string[];
 }
 
 /**
@@ -949,6 +983,17 @@ export async function detalle(actor: AuthUser, insId: number): Promise<Inscripci
           }
         : null,
     bloqueos,
+    avisos:
+      personal && pendiente
+        ? fueraDeCurso(
+            ninos.map((n) => ({
+              nombre: n.insnino_datos.nombre,
+              grado: n.insnino_datos.catninograd_id ?? null,
+              disciplinas: n.insnino_disciplinas,
+            })),
+            porId,
+          )
+        : [],
     ninos: ninos.map((n, i) => {
       const propias = n.insnino_disciplinas.map((id) => porId.get(id));
       return {

@@ -35,6 +35,7 @@ import {
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { diaDeCruce, horarioLargo } from '@/lib/horarios';
+import { esParaCurso } from '@/lib/cursos';
 import { compressImage } from '@/lib/imageCompression';
 import {
   dinero,
@@ -1016,14 +1017,31 @@ const FichaAlumno = ({
   const id = (campo: string) => `alumno-${alumno.clave}-${campo}`;
   const colegio = formulario.colegios.find((c) => String(c.col_id) === alumno.col_id);
 
-  /** Agrupadas por actividad: "Fútbol" con sus grupos, cada uno con sus días. */
+  const curso = alumno.catninograd_id ? Number(alumno.catninograd_id) : null;
+
+  /**
+   * Las de su curso, agrupadas por actividad: "Fútbol" con sus grupos, cada
+   * uno con sus días. Sin curso elegido no se enseña ninguna.
+   */
   const porActividad = useMemo(() => {
     const grupos = new Map<string, DisciplinaOfertada[]>();
+    if (curso === null) return [];
     for (const d of colegio?.disciplinas ?? []) {
+      if (!esParaCurso(d.grados, curso)) continue;
       grupos.set(d.actividad, [...(grupos.get(d.actividad) ?? []), d]);
     }
     return [...grupos.entries()];
-  }, [colegio]);
+  }, [colegio, curso]);
+
+  /** Al cambiar de curso se sueltan las elegidas que no son para el nuevo. */
+  const cambiarCurso = (v: string) =>
+    onChange({
+      catninograd_id: v,
+      disciplinas: alumno.disciplinas.filter((id) => {
+        const d = colegio?.disciplinas.find((x) => x.colacthor_id === id);
+        return !d || esParaCurso(d.grados, Number(v));
+      }),
+    });
 
   const maximo = formulario.max_disciplinas;
   // Las que ya tiene activas cuentan para el máximo y para los cruces (§9).
@@ -1121,7 +1139,7 @@ const FichaAlumno = ({
           </Select>
         </Campo>
         <Campo id={id('grado')} etiqueta="Curso">
-          <Select value={alumno.catninograd_id} onValueChange={(v) => onChange({ catninograd_id: v })}>
+          <Select value={alumno.catninograd_id} onValueChange={cambiarCurso}>
             <SelectTrigger id={id('grado')} className="h-11">
               <SelectValue placeholder="Elige el curso" />
             </SelectTrigger>
@@ -1136,7 +1154,13 @@ const FichaAlumno = ({
         </Campo>
       </div>
 
-      {colegio && (
+      {colegio && curso === null && (
+        <p className="border-t pt-5 text-sm text-muted-foreground">
+          Elige el curso para ver las disciplinas disponibles.
+        </p>
+      )}
+
+      {colegio && curso !== null && (
         <section className="space-y-3 border-t pt-5">
           <h2 className="font-semibold">
             Disciplina contratada{' '}
@@ -1148,6 +1172,11 @@ const FichaAlumno = ({
             Puedes elegir hasta {maximo} {maximo === 1 ? 'disciplina' : 'disciplinas'}, sin que sus
             horarios se crucen. Cada una incluye todos sus días.
           </p>
+          {porActividad.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No hay disciplinas para este curso en {colegio.col_nombre}.
+            </p>
+          )}
           {porActividad.map(([actividad, horarios]) => (
             <div key={actividad} className="rounded-md bg-muted/40 p-3">
               <p className="mb-2 text-sm font-medium">{actividad}</p>

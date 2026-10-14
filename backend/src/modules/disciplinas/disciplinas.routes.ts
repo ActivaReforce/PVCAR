@@ -47,6 +47,19 @@ disciplinasRouter.get(
   },
 );
 
+/** GET /api/v1/disciplinas/grados — catalogo de cursos. Va antes de /:id. */
+disciplinasRouter.get(
+  '/grados',
+  requirePermission('disciplinas', 'ver'),
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.grados(), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 disciplinasRouter.get(
   '/:id',
   requirePermission('disciplinas', 'ver'),

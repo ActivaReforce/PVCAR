@@ -12,6 +12,7 @@ import {
 const CLAVE = {
   lista: (filtros: FiltrosDisciplinas) => ['disciplinas', 'lista', filtros] as const,
   dias: ['disciplinas', 'dias'] as const,
+  grados: ['disciplinas', 'grados'] as const,
   previoBaja: (id: number) => ['disciplinas', 'previo-baja', id] as const,
   impacto: (id: number) => ['disciplinas', 'impacto', id] as const,
 };
@@ -30,6 +31,15 @@ export function useDias() {
     queryKey: CLAVE.dias,
     queryFn: () => disciplinasApi.dias(),
     staleTime: Infinity, // los siete días de la semana no cambian
+  });
+}
+
+/** El catálogo de cursos, para marcar a quién va cada disciplina. */
+export function useGradosDisciplina() {
+  return useQuery({
+    queryKey: CLAVE.grados,
+    queryFn: () => disciplinasApi.grados(),
+    staleTime: Infinity,
   });
 }
 

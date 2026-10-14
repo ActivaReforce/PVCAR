@@ -46,6 +46,13 @@ const horarios = z
 
 export type Franja = z.infer<typeof franja>;
 
+/** Cursos para los que es la disciplina (0038): al menos uno y sin repetir. */
+const grados = z
+  .array(z.number().int().positive())
+  .min(1, 'Marca al menos un curso')
+  .max(30)
+  .transform((lista) => [...new Set(lista)].sort((a, b) => a - b));
+
 /**
  * Varios ids separados por coma (?colegio=11,14). La pantalla vieja dejaba
  * marcar varios colegios y se mantiene.
@@ -88,6 +95,7 @@ export const crearDisciplinaSchema = z.object({
   col_id: z.number().int().positive(),
   act_id: z.number().int().positive(),
   horarios,
+  grados,
 });
 
 export type CrearDisciplinaInput = z.infer<typeof crearDisciplinaSchema>;
@@ -98,6 +106,7 @@ export const actualizarDisciplinaSchema = z
     col_id: z.number().int().positive().optional(),
     act_id: z.number().int().positive().optional(),
     horarios: horarios.optional(),
+    grados: grados.optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'No hay nada que actualizar');
 

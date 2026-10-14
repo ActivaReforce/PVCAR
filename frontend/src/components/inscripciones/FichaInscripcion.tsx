@@ -278,6 +278,24 @@ const Contenido = ({
         </div>
       )}
 
+      {datos.avisos.length > 0 && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <p className="mb-1 flex items-center gap-2 font-medium">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Revisa antes de
+            aprobar
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            {datos.avisos.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+          <p className="mt-1 text-muted-foreground">
+            Se puede aprobar igual. Si fue un error, recházala y pide al representante que la envíe
+            de nuevo con la disciplina de su curso.
+          </p>
+        </div>
+      )}
+
       {datos.cuenta && (
         <div className="rounded-md border border-sky-600/40 bg-sky-600/5 p-3 text-sm">
           <p className="flex items-center gap-2 font-medium">

@@ -401,6 +401,8 @@ export interface DisciplinaOfertada {
   horarios: HorarioDisciplina[];
   /** "Lun y Mié 15:00–16:00". */
   horario: string;
+  /** Cursos para los que es (0038). Vacío = para todos. */
+  grados: number[];
 }
 
 export interface ColegioOfertado {
@@ -435,7 +437,10 @@ export async function ofertaPublica(): Promise<ColegioOfertado[]> {
                 'actividad',    act.act_nombre,
                 'categoria',    cat.cat_nombre,
                 'horarios',     ${horariosJson('d')},
-                'horario',      ${horarioTexto('d')}
+                'horario',      ${horarioTexto('d')},
+                'grados',       COALESCE((SELECT json_agg(dg.catninograd_id ORDER BY dg.catninograd_id)
+                            FROM public.disciplina_grado dg
+                           WHERE dg.colacthor_id = d.colacthor_id), '[]'::json)
             ) ORDER BY act.act_nombre, ${primerHorario('d')}) AS disciplinas
        FROM public.colegio_actividad_horario d
        JOIN public.colegio   col ON col.col_id = d.col_id
@@ -481,7 +486,10 @@ export async function disciplinasPorId(
     `SELECT d.colacthor_id, d.col_id, d.est_id, col.col_nombre,
             act.act_nombre AS actividad, cat.cat_nombre AS categoria,
             ${horariosJson('d')} AS horarios,
-            ${horarioTexto('d')} AS horario
+            ${horarioTexto('d')} AS horario,
+            COALESCE((SELECT json_agg(dg.catninograd_id ORDER BY dg.catninograd_id)
+                            FROM public.disciplina_grado dg
+                           WHERE dg.colacthor_id = d.colacthor_id), '[]'::json) AS grados
        FROM public.colegio_actividad_horario d
        JOIN public.colegio   col ON col.col_id = d.col_id
        JOIN public.actividad act ON act.act_id = d.act_id

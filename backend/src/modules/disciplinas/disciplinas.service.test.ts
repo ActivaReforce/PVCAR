@@ -121,6 +121,7 @@ describe('alcance', () => {
         col_id: 12,
         act_id: 24,
         horarios: [{ dia_id: 1, inicio: '15:00', fin: '16:00' }],
+        grados: [6, 7],
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
   });
@@ -139,6 +140,7 @@ describe('horarios que chocan', () => {
         col_id: 14,
         act_id: 24,
         horarios: [{ dia_id: 1, inicio: '15:30', fin: '16:30' }],
+        grados: [6, 7],
       }),
     ).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('15:30') });
   });
@@ -151,6 +153,7 @@ describe('horarios que chocan', () => {
         { dia_id: 1, inicio: '15:00', fin: '16:00' },
         { dia_id: 3, inicio: '16:00', fin: '17:00' },
       ],
+      grados: [6, 7],
     });
     expect(d.colacthor_id).toBe(80);
   });
