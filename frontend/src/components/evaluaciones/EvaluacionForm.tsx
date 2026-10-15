@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import { METODO, type FichaEvaluacion, type ParametroInput } from '@/api/evaluaciones';
 import {
   useActualizarEvaluacion,
@@ -11,7 +12,7 @@ import {
   useCrearEvaluacion,
   useGuardarParametros,
 } from '@/hooks/useEvaluaciones';
-import ParametroCampos from './ParametroCampos';
+import ParametroCampos, { validarRango } from './ParametroCampos';
 
 interface Props {
   /** Null al crear. */
@@ -36,18 +37,16 @@ const parametroVacio = (): ParametroInput => ({
  *
  * El sistema viejo lo partía en dos pasos —detalles y después parámetros— con
  * un asistente que impedía volver atrás sin perder lo escrito. Aquí es una
- * pantalla: los detalles arriba, los parámetros debajo, y el puntaje total se
- * ve actualizarse según se escribe.
- *
- * **El puntaje total no se escribe:** es la suma de los parámetros y la
- * mantiene `trigger_update_evaluacion_puntaje_total` en la base. Lo que se
- * enseña aquí es la previsión de lo que quedará al guardar.
+ * pantalla: los detalles arriba, los parámetros debajo, y **"Añadir
+ * parámetro" al final de la lista** como en Encuestas (pedido del cliente,
+ * 2026-10-15). El puntaje total lo mantiene el trigger de la base.
  */
 const EvaluacionForm = ({ ficha, onListo, onCancelar }: Props) => {
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [categoria, setCategoria] = useState('');
   const [parametros, setParametros] = useState<ParametroInput[]>([parametroVacio()]);
+  const { toast } = useToast();
 
   const categorias = useCategoriasEvaluacion();
   const crear = useCrearEvaluacion();
@@ -100,7 +99,46 @@ const EvaluacionForm = ({ ficha, onListo, onCancelar }: Props) => {
 
   const guardando = crear.isPending || actualizar.isPending || guardarParametros.isPending;
 
+  /**
+   * Valida cada parámetro antes de pedir nada al servidor: umbrales de
+   * tiempo que apuntan al mismo lado, escala con máximo <= mínimo, intentos
+   * o puntaje a cero. Devuelve el primer problema encontrado, o null.
+   */
+  function validarParametros(): string | null {
+    for (let i = 0; i < parametros.length; i += 1) {
+      const p = parametros[i]!;
+      const prefijo = `Parámetro ${i + 1}${p.evaparam_nombre.trim() ? ` (${p.evaparam_nombre.trim()})` : ''}`;
+      if (p.evaparam_intentos < 1) {
+        return `${prefijo}: los intentos deben ser al menos 1.`;
+      }
+      if (p.evaparam_puntaje < 1) {
+        return `${prefijo}: el puntaje debe ser al menos 1.`;
+      }
+      if (p.evatipometo_id === METODO.ESCALA) {
+        const min = p.evaparam_escala_min ?? 0;
+        const max = p.evaparam_escala_max ?? 0;
+        if (max <= min) {
+          return `${prefijo}: el máximo de la escala debe ser mayor que el mínimo.`;
+        }
+      }
+      if (p.evatipometo_id === METODO.TIEMPO) {
+        if (!p.rango) {
+          return `${prefijo}: los umbrales de tiempo son obligatorios.`;
+        }
+        const err = validarRango(p.rango);
+        if (err) return `${prefijo}: ${err}`;
+      }
+    }
+    return null;
+  }
+
   const guardar = async () => {
+    const error = validarParametros();
+    if (error) {
+      toast({ title: 'Revisa los parámetros', description: error, variant: 'destructive' });
+      return;
+    }
+
     const detalles = {
       eva_titulo: titulo.trim(),
       eva_descripcion: descripcion.trim(),
@@ -159,7 +197,6 @@ const EvaluacionForm = ({ ficha, onListo, onCancelar }: Props) => {
             placeholder="8 y 9 años de edad"
             className="h-11 sm:h-10"
           />
-          {/* Texto libre, pero con lo ya usado a mano: sin esto salen "S17", "s17" y "Sub 17". */}
           <datalist id="categorias-evaluacion">
             {(categorias.data ?? []).map((c) => (
               <option key={c.categoria} value={c.categoria} />
@@ -169,23 +206,12 @@ const EvaluacionForm = ({ ficha, onListo, onCancelar }: Props) => {
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="font-medium">
-            Parámetros{' '}
-            <span className="text-sm font-normal text-muted-foreground">
-              · total previsto {totalPrevisto} pts
-            </span>
-          </h3>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 sm:h-10"
-            onClick={() => setParametros((p) => [...p, parametroVacio()])}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Añadir
-          </Button>
-        </div>
+        <h3 className="font-medium">
+          Parámetros{' '}
+          <span className="text-sm font-normal text-muted-foreground">
+            · total previsto {totalPrevisto} pts
+          </span>
+        </h3>
 
         {parametros.length === 0 && (
           <p className="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
@@ -203,6 +229,18 @@ const EvaluacionForm = ({ ficha, onListo, onCancelar }: Props) => {
             onBorrar={borrarParametro}
           />
         ))}
+
+        {/* "Añadir parámetro" vive abajo, como en Encuestas (2026-10-15):
+            se añade justo después del último que estás configurando. */}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-full sm:h-10"
+          onClick={() => setParametros((p) => [...p, parametroVacio()])}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Añadir parámetro
+        </Button>
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
