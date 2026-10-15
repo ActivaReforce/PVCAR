@@ -180,6 +180,19 @@ describe('el catalogo', () => {
     const sinUsuarios = actorCon(['encuestas', 'inscripciones'], [ROL.PROPIETARIO]);
     expect(service.catalogo(sinUsuarios).map((r) => r.id)).not.toContain('representantes');
   });
+
+  /**
+   * Inscripciones lleva montos de recaudación: aunque Admin tenga el permiso,
+   * el reporte es solo para Propietario (decidido el 2026-10-15).
+   */
+  it('Inscripciones es solo Propietario aunque Admin tenga el permiso', async () => {
+    const admin = actorCon(['inscripciones'], [ROL.ADMIN]);
+    expect(service.catalogo(admin).map((r) => r.id)).not.toContain('inscripciones');
+    await expect(
+      service.ejecutar(admin, 'inscripciones', { page: 1, limit: 50 }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(service.catalogo(TODO).map((r) => r.id)).toContain('inscripciones');
+  });
 });
 
 describe('puertas', () => {

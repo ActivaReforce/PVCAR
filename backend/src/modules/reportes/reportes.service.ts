@@ -53,7 +53,14 @@ function accionDe(definicion: Definicion): string {
 
 function puedeVer(actor: AuthUser, definicion: Definicion): boolean {
   const accion = accionDe(definicion);
-  return actor.permisos.some((p) => p.modulo === definicion.modulo && p.accion === accion);
+  const conPermiso = actor.permisos.some(
+    (p) => p.modulo === definicion.modulo && p.accion === accion,
+  );
+  if (!conPermiso) return false;
+  if (definicion.soloRoles && definicion.soloRoles.length > 0) {
+    return actor.usuario.roles.some((r) => definicion.soloRoles!.includes(r.rol_id));
+  }
+  return true;
 }
 
 /**

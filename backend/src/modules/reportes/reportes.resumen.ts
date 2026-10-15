@@ -510,6 +510,7 @@ const representantes: Constructor = (filas) => {
 
 const inscripciones: Constructor = (filas) => {
   const porColegio = expandir(filas, '_colegios', 'Sin colegio');
+  const totalRecaudado = filas.reduce((s, f) => s + numero(f.valor), 0);
   return [
     {
       titulo: 'Totales',
@@ -519,15 +520,10 @@ const inscripciones: Constructor = (filas) => {
         ['Pendientes', filas.filter((f) => texto(f.estado) === 'Pendiente').length],
         ['Aprobadas', filas.filter((f) => texto(f.estado) === 'Aprobada').length],
         ['Hijos (total)', filas.reduce((s, f) => s + numero(f.cantidad_hijos), 0)],
+        ['Total recaudado ($)', Math.round(totalRecaudado * 100) / 100],
       ],
       destacadas: [],
     },
-    agrupar(
-      'Por estado',
-      filas,
-      [{ cabecera: 'Estado', de: campo('estado') }],
-      [cuenta('Inscripciones'), suma('Hijos', 'cantidad_hijos')],
-    ),
     agrupar(
       'Por colegio',
       porColegio,
@@ -536,8 +532,15 @@ const inscripciones: Constructor = (filas) => {
         cuenta('Inscripciones'),
         cuantos('Pendientes', (f) => texto(f.estado) === 'Pendiente'),
         cuantos('Aprobadas', (f) => texto(f.estado) === 'Aprobada'),
+        {
+          cabecera: 'Recaudado ($)',
+          calc: (g) => Math.round(g.reduce((s, f) => s + numero(f.valor), 0) * 100) / 100,
+        },
       ],
-      { nota: 'Una inscripción con hijos en varios colegios cuenta en cada uno.', total: false },
+      {
+        nota: 'Una inscripción con hijos en varios colegios cuenta y suma su valor en cada uno; "Totales" lo cuenta una sola vez.',
+        total: false,
+      },
     ),
   ];
 };

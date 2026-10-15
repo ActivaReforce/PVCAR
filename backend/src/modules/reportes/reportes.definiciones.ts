@@ -1,4 +1,4 @@
-import { ESTADO } from '../../lib/constants.js';
+import { ESTADO, ROL } from '../../lib/constants.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import { HOY_EC, diaEc, textoEc } from '../../lib/fecha.js';
@@ -122,6 +122,12 @@ export interface Definicion {
    * eliminadas, que es justo lo que da ese permiso en el módulo.
    */
   accion?: 'ver' | 'eliminar';
+  /**
+   * Si está, además del permiso del módulo exige alguno de estos roles.
+   * Inscripciones (2026-10-15): solo Propietario; el reporte lleva montos de
+   * recaudación y no se abre a nadie más aunque herede `inscripciones:ver`.
+   */
+  soloRoles?: number[];
   /** Sin rango de fechas el reporte no significa nada: se exige. */
   exigeRango: boolean;
   filtros: FiltrosDisponibles;
@@ -767,7 +773,6 @@ const representantes: Definicion = {
     { clave: 'usu_cedula', cabecera: 'Cédula', ancho: 14 },
     { clave: 'usu_correo', cabecera: 'Correo', ancho: 32 },
     { clave: 'usu_telefono', cabecera: 'Teléfono', ancho: 14 },
-    { clave: 'sector', cabecera: 'Sector', ancho: 20 },
     { clave: 'hijos_activos', cabecera: 'Hijos activos', ancho: 12 },
     { clave: 'hijos', cabecera: 'Hijos', ancho: 48 },
     { clave: 'colegios', cabecera: 'Colegios', ancho: 32 },
@@ -787,7 +792,6 @@ const representantes: Definicion = {
              COALESCE(u.usu_cedula, '')                           AS usu_cedula,
              u.usu_correo,
              COALESCE(u.usu_telefono, '')                         AS usu_telefono,
-             COALESCE(p.padre_sector_residencia, '')              AS sector,
              (SELECT count(DISTINCT np.nino_id)
                 FROM public.nino_padre np
                 JOIN public.nino n ON n.nino_id = np.nino_id
@@ -856,6 +860,8 @@ const inscripciones: Definicion = {
   titulo: 'Inscripciones',
   descripcion: 'Envíos del formulario público, pendientes y aprobadas.',
   modulo: 'inscripciones',
+  // Lleva montos: solo Propietario (decidido por el cliente, 2026-10-15).
+  soloRoles: [ROL.PROPIETARIO],
   exigeRango: false,
   filtros: {
     colegio: false,
@@ -881,6 +887,7 @@ const inscripciones: Definicion = {
     { clave: 'cantidad_hijos', cabecera: 'N° hijos', ancho: 10 },
     { clave: 'colegios', cabecera: 'Colegios', ancho: 30 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
+    { clave: 'valor', cabecera: 'Valor ($)', ancho: 12 },
     { clave: 'aprobada_por', cabecera: 'Aprobada por', ancho: 28 },
     { clave: 'fecha_aprobacion', cabecera: 'Aprobada el', ancho: 14 },
   ],
@@ -940,6 +947,7 @@ const inscripciones: Definicion = {
                  JOIN public.actividad a ON a.act_id = cah.act_id
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS disciplinas,
+             COALESCE(i.ins_total, 0)::float8                         AS valor,
              COALESCE(ap.usu_nombre, '')                              AS aprobada_por,
              COALESCE(${textoEc('i.ins_fecha_aprobacion', 'DD/MM/YYYY')}, '') AS fecha_aprobacion
         FROM public.inscripcion i
