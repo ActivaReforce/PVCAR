@@ -13,6 +13,7 @@ import {
   type Definicion,
   type FiltrosDisponibles,
   type FiltrosReporte,
+  type TotalPantalla,
 } from './reportes.definiciones.js';
 import { GRAFICAS, type DefinicionGrafica, type FormaGrafica, type SerieGrafica } from './reportes.analisis.js';
 import type { ConsultaQuery, FiltrosQuery } from './reportes.schemas.js';
@@ -142,6 +143,10 @@ function proyectar(fila: Record<string, unknown>, columnas: Columna[]): Record<s
   return salida;
 }
 
+export interface TotalEnPantalla extends TotalPantalla {
+  valor: number;
+}
+
 export interface PaginaReporte {
   id: string;
   titulo: string;
@@ -151,6 +156,8 @@ export interface PaginaReporte {
   page: number;
   limit: number;
   totalPages: number;
+  /** Cifras agregadas para pintar encima de la tabla; `undefined` si el reporte no las declara. */
+  totales?: TotalEnPantalla[];
 }
 
 export async function ejecutar(
@@ -165,16 +172,31 @@ export async function ejecutar(
   const offset = (query.page - 1) * query.limit;
   const n = params.length;
 
-  const [pagina, cuenta] = await Promise.all([
+  const totalesDef = definicion.totales?.(filtros, await contextoDe(actor));
+
+  const [pagina, cuenta, agregados] = await Promise.all([
     getPool().query<Record<string, unknown>>(
       `SELECT * FROM (${sql}) r LIMIT $${n + 1} OFFSET $${n + 2}`,
       [...params, query.limit, offset],
     ),
     getPool().query<{ total: string }>(`SELECT count(*) AS total FROM (${sql}) r`, params),
+    totalesDef
+      ? getPool().query<Record<string, unknown>>(
+          totalesDef.consulta.sql,
+          totalesDef.consulta.params,
+        )
+      : Promise.resolve(null),
   ]);
 
   const total = Number(cuenta.rows[0]?.total ?? 0);
   const columnas = columnasVisibles(definicion, query.incluirSensibles === true);
+
+  const totales: TotalEnPantalla[] | undefined = totalesDef
+    ? totalesDef.formato.map((t) => ({
+        ...t,
+        valor: Number(agregados?.rows[0]?.[t.clave] ?? 0),
+      }))
+    : undefined;
 
   return {
     id: definicion.id,
@@ -185,6 +207,7 @@ export async function ejecutar(
     page: query.page,
     limit: query.limit,
     totalPages: total === 0 ? 0 : Math.ceil(total / query.limit),
+    ...(totales ? { totales } : {}),
   };
 }
 

@@ -111,6 +111,18 @@ export interface ConsultaReporte {
   params: unknown[];
 }
 
+export interface TotalPantalla {
+  clave: string;
+  etiqueta: string;
+  /** Se formatea como moneda ($ con dos decimales). Por defecto, número plano. */
+  moneda?: boolean;
+}
+
+export interface Totales {
+  consulta: ConsultaReporte;
+  formato: TotalPantalla[];
+}
+
 export interface Definicion {
   id: string;
   titulo: string;
@@ -142,6 +154,13 @@ export interface Definicion {
    */
   columnasSensibles?: string[];
   construir: (f: FiltrosReporte, ctx: ContextoReporte) => ConsultaReporte;
+  /**
+   * Un conjunto de cifras agregadas que se pinta encima de la tabla en
+   * pantalla, con los mismos filtros que el detalle. Pensado para los
+   * reportes donde el total importa de un vistazo —Inscripciones y su
+   * total recaudado—. En el Excel sigue viviendo en la hoja Resumen.
+   */
+  totales?: (f: FiltrosReporte, ctx: ContextoReporte) => Totales;
   /**
    * Una hoja más en el Excel, detrás del detalle, con parte de las mismas
    * filas y sus propias columnas (que la consulta trae además de las suyas).
@@ -963,6 +982,32 @@ const inscripciones: Definicion = {
               OR ($4 = 2 AND i.ins_estado = 'aprobada'))
        ORDER BY i.ins_fecha DESC`,
     params: [oNulo(f.desde), oNulo(f.hasta), textoONulo(f.buscar), oNulo(f.estado)],
+  }),
+  totales: (f) => ({
+    consulta: {
+      sql: `
+        SELECT count(*)::int                                              AS inscripciones,
+               count(*) FILTER (WHERE i.ins_estado = 'pendiente')::int    AS pendientes,
+               count(*) FILTER (WHERE i.ins_estado = 'aprobada')::int     AS aprobadas,
+               COALESCE(SUM(i.ins_total), 0)::float8                      AS recaudado
+          FROM public.inscripcion i
+         WHERE ($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
+           AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
+           AND ($3::text IS NULL
+                OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
+                OR ${contieneSinTildes("COALESCE(i.ins_representante->>'cedula','')", '$3')}
+                OR ${contieneSinTildes("COALESCE(i.ins_representante->>'correo','')", '$3')})
+           AND ($4::int IS NULL
+                OR ($4 = 1 AND i.ins_estado = 'pendiente')
+                OR ($4 = 2 AND i.ins_estado = 'aprobada'))`,
+      params: [oNulo(f.desde), oNulo(f.hasta), textoONulo(f.buscar), oNulo(f.estado)],
+    },
+    formato: [
+      { clave: 'inscripciones', etiqueta: 'Inscripciones' },
+      { clave: 'pendientes', etiqueta: 'Pendientes' },
+      { clave: 'aprobadas', etiqueta: 'Aprobadas' },
+      { clave: 'recaudado', etiqueta: 'Total recaudado', moneda: true },
+    ],
   }),
 };
 

@@ -44,9 +44,15 @@ interface UserTableProps {
   onSort?: (key: string) => void;
 }
 
-/** Misma rejilla en la cabecera y en cada fila: si cambia, cambia en un sitio. */
+/**
+ * Rejilla con dos escalones (2026-10-15): en móvil, tarjeta apilada; de 768
+ * a 1023 px, 4 columnas (Usuario · Roles · Estado · Acciones); de 1024 en
+ * adelante, aparecen "Creado" como quinta columna. Antes a 900 px los
+ * nombres largos se superponían a los correos del siguiente carril.
+ */
 const REJILLA =
-  'grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.6fr)_7rem_7rem_11rem] md:items-center md:gap-4';
+  'grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.6fr)_7rem_11rem] md:items-center md:gap-4 ' +
+  'lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.6fr)_7rem_7rem_11rem]';
 
 const COLUMNAS_ORDENABLES = [
   { clave: 'nombre', etiqueta: 'Usuario' },
@@ -182,6 +188,7 @@ const UserTable = ({
             sortKey={sortKey}
             sortDirection={sortDirection}
             onSort={onSort}
+            className="hidden lg:flex"
           >
             Creado
           </Cabecera>
@@ -235,9 +242,9 @@ const UserTable = ({
                   </div>
                 </div>
 
-                {/* La fecha de creacion solo desde md: en 360 px se comia una
-                    linea entera para un dato que casi nunca se mira. */}
-                <div className="hidden text-sm text-muted-foreground md:block">
+                {/* La fecha de creación solo desde lg (2026-10-15): a 900 px
+                    apretaba la rejilla y las columnas se montaban. */}
+                <div className="hidden text-sm text-muted-foreground lg:block">
                   {fechaDia(user.usu_fecha_creacion)}
                 </div>
 

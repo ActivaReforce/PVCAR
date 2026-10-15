@@ -17,9 +17,15 @@ interface Props {
   onOrdenar: (clave: Orden) => void;
 }
 
-/** Columnas desde md, las mismas en la cabecera y en cada fila. */
+/**
+ * Columnas con dos escalones (2026-10-15): en md, 4 columnas con los datos
+ * identitarios; en lg, aparecen "Cédula · teléfono" y "Estado". A 900 px
+ * los seis carriles chocaban: los nombres de colegios se montaban sobre
+ * las disciplinas del siguiente.
+ */
 const COLUMNAS_MD =
-  'md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1.8fr)_8rem_6rem_5.5rem] md:items-center md:gap-4';
+  'md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.8fr)_8rem_5.5rem] md:items-center md:gap-4 ' +
+  'lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1.8fr)_8rem_6rem_5.5rem]';
 const REJILLA = `grid ${COLUMNAS_MD}`;
 /** En el teléfono: nombre y acciones en una línea, el resto debajo. */
 const FILA = `grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 ${COLUMNAS_MD}`;
@@ -83,12 +89,12 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
         <Cabecera clave="nombre" orden={orden} dir={dir} onOrdenar={onOrdenar}>
           Entrenador
         </Cabecera>
-        <div className="font-medium">Cédula · teléfono</div>
+        <div className="hidden font-medium lg:block">Cédula · teléfono</div>
         <div className="font-medium">Colegios</div>
         <Cabecera clave="disciplinas" orden={orden} dir={dir} onOrdenar={onOrdenar}>
           Disciplinas
         </Cabecera>
-        <div className="font-medium">Estado</div>
+        <div className="hidden font-medium lg:block">Estado</div>
         <div className="font-medium">Acciones</div>
       </div>
 
@@ -125,9 +131,11 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
               </div>
 
               {/* En el teléfono todo esto va en una línea compacta bajo el nombre;
-                  desde md, `contents` lo disuelve y cada dato vuelve a su columna. */}
+                  desde md, `contents` lo disuelve y cada dato vuelve a su columna.
+                  Cédula · teléfono y Estado se ocultan en md para que la rejilla
+                  no colisione; vuelven en lg (2026-10-15). */}
               <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs md:contents md:text-sm">
-                <div className="min-w-0 text-muted-foreground">
+                <div className="min-w-0 text-muted-foreground md:hidden lg:block">
                   <span className="md:block md:truncate">{e.usu_cedula ?? 'Sin cédula'}</span>
                   <span className="md:hidden"> · </span>
                   <span className="md:block md:truncate">{e.usu_telefono ?? 'Sin teléfono'}</span>
@@ -162,7 +170,7 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
                   </span>
                 </div>
 
-                <div>
+                <div className="md:hidden lg:block">
                   <Badge variant={activo ? 'default' : 'secondary'} className="text-xs">
                     {activo ? 'Activo' : 'Inactivo'}
                   </Badge>

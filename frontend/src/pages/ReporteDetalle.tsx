@@ -363,8 +363,34 @@ const ReporteDetalle = () => {
   );
 
   function TablaDelReporte() {
+    const totales = reporte.data?.totales;
     return (
       <>
+        {/*
+          Cifras agregadas en pantalla (hoy solo Inscripciones): el total
+          recaudado y el reparto por estado se calculan sobre TODAS las filas
+          filtradas, no sobre la página.
+        */}
+        {totales && totales.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {totales.map((t) => (
+              <div key={t.clave} className="rounded-lg border bg-card p-3">
+                <div className="text-xs text-muted-foreground">{t.etiqueta}</div>
+                <div className="mt-0.5 text-lg font-semibold text-foreground">
+                  {t.moneda
+                    ? new Intl.NumberFormat('es-EC', {
+                        style: 'currency',
+                        currency: 'USD',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(t.valor)
+                    : new Intl.NumberFormat('es-EC').format(t.valor)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* La tabla desborda en horizontal a propósito: un reporte tiene las
             columnas que tiene, y en el teléfono se mira desplazándose. */}
           <div className="overflow-x-auto rounded-lg border">

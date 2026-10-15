@@ -78,6 +78,14 @@ export interface Grafica {
   datos: Array<Record<string, unknown>>;
 }
 
+export interface TotalEnPantalla {
+  clave: string;
+  etiqueta: string;
+  valor: number;
+  /** Se formatea como moneda ($) con dos decimales si true. */
+  moneda?: boolean;
+}
+
 export interface PaginaReporte {
   id: string;
   titulo: string;
@@ -87,6 +95,8 @@ export interface PaginaReporte {
   page: number;
   limit: number;
   totalPages: number;
+  /** Cifras agregadas que algunos reportes muestran encima de la tabla. */
+  totales?: TotalEnPantalla[];
 }
 
 export interface FiltrosReporte {
