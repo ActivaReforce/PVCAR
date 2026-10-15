@@ -13,8 +13,9 @@ interface Props {
  * ningún `.filter().length`. Es la regla del checklist: contar en SQL, mostrar
  * en el navegador.
  *
- * "Sin marcar" sale siempre, aunque sea 0, porque es el único número que dice
- * si la sesión está terminada.
+ * **Oculto en móvil** (pedido del cliente, 2026-10-15): las cinco tarjetas
+ * ocupaban demasiado espacio arriba. "Sin marcar" ya sale en la barra de
+ * guardado, que sí vive en móvil. Desde `sm` (640 px) vuelve a enseñarse.
  */
 const ResumenAsistencia = ({ resumen }: Props) => {
   const celdas = [
@@ -29,7 +30,7 @@ const ResumenAsistencia = ({ resumen }: Props) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+    <div className="hidden gap-2 sm:grid sm:grid-cols-5">
       {celdas.map(({ clave, valor, pinta }) => (
         <div key={clave} className="rounded-lg border px-3 py-2">
           <div className={`text-xl font-semibold ${pinta.texto}`}>{valor}</div>
@@ -37,7 +38,7 @@ const ResumenAsistencia = ({ resumen }: Props) => {
         </div>
       ))}
 
-      <div className="col-span-2 rounded-lg border px-3 py-2 sm:col-span-1">
+      <div className="rounded-lg border px-3 py-2">
         <div
           className={`text-xl font-semibold ${
             resumen.sinMarcar > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'
