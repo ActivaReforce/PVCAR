@@ -369,27 +369,64 @@ const ReporteDetalle = () => {
         {/*
           Cifras agregadas en pantalla (hoy solo Inscripciones): el total
           recaudado y el reparto por estado se calculan sobre TODAS las filas
-          filtradas, no sobre la página.
+          filtradas, no sobre la página. La(s) moneda(s) van en un card
+          destacado para que no se pierdan entre los conteos.
         */}
-        {totales && totales.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {totales.map((t) => (
-              <div key={t.clave} className="rounded-lg border bg-card p-3">
-                <div className="text-xs text-muted-foreground">{t.etiqueta}</div>
-                <div className="mt-0.5 text-lg font-semibold text-foreground">
-                  {t.moneda
-                    ? new Intl.NumberFormat('es-EC', {
-                        style: 'currency',
-                        currency: 'USD',
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }).format(t.valor)
-                    : new Intl.NumberFormat('es-EC').format(t.valor)}
-                </div>
+        {totales && totales.length > 0 &&
+          (() => {
+            const monedas = totales.filter((t) => t.moneda);
+            const conteos = totales.filter((t) => !t.moneda);
+            const formatearMoneda = (v: number) =>
+              new Intl.NumberFormat('es-EC', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }).format(v);
+            const formatearNumero = (v: number) =>
+              new Intl.NumberFormat('es-EC').format(v);
+            return (
+              <div className="space-y-3">
+                {monedas.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {monedas.map((t) => (
+                      <div
+                        key={t.clave}
+                        className="rounded-lg border-2 border-primary/40 bg-primary/5 p-4"
+                      >
+                        <div className="text-sm font-medium text-muted-foreground">
+                          {t.etiqueta}
+                        </div>
+                        <div className="mt-1 text-2xl font-bold tracking-tight text-primary sm:text-3xl">
+                          {formatearMoneda(t.valor)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {conteos.length > 0 && (
+                  <div
+                    className={`grid gap-2 ${
+                      conteos.length === 2
+                        ? 'grid-cols-2'
+                        : conteos.length === 3
+                          ? 'grid-cols-3'
+                          : 'grid-cols-2 sm:grid-cols-4'
+                    }`}
+                  >
+                    {conteos.map((t) => (
+                      <div key={t.clave} className="rounded-lg border bg-card p-3">
+                        <div className="text-xs text-muted-foreground">{t.etiqueta}</div>
+                        <div className="mt-0.5 text-lg font-semibold text-foreground">
+                          {formatearNumero(t.valor)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })()}
 
         {/* La tabla desborda en horizontal a propósito: un reporte tiene las
             columnas que tiene, y en el teléfono se mira desplazándose. */}

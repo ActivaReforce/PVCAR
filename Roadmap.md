@@ -8,7 +8,7 @@
 
 > **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
 
-**Corte de este documento: 2026-10-12 (lanzamiento hecho en `activareforce.com`, plataforma anterior borrada y **módulo Novedades cerrado** —puntos 8 y 9, probados y aprobados por el cliente—; siguiente: pasar a `main` con `0033`/`0034` en prod y el respaldo de prod).**
+**Corte de este documento: 2026-10-15 (Reportes reordenados + nuevos de Representantes, Inscripciones y Encuestas; totales en pantalla; listas de /estudiantes, /usuarios y /entrenadores sin colisión en tamaños intermedios).**
 
 ---
 
@@ -74,6 +74,32 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 2. **Lo anterior está en el esquema `archivo`** de la misma base, solo lectura, para consultarlo en **Reportes → "Data anterior"**. Migración `0013_archivo.sql`, verificada en dev y prod el 2026-10-02: 35 tablas, 20 620 filas, **sin** contraseñas, información de salud, cédula de alumnos ni fotos. Las cédulas, teléfonos, correos y direcciones de los usuarios **sí** se quedan, a petición del cliente.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
+
+### Corte de sesión — 2026-10-15
+
+**Hecho hoy (todo en `dev`, sin SQL):**
+
+- **Reportes reordenados** y tres **nuevos** (Representantes, Inscripciones, Encuestas). Orden: Usuarios · Colegios · Actividades · Disciplinas · Entrenadores · Alumnos · Evaluaciones · Asistencia de alumnos · Asistencia de entrenadores · Representantes · Inscripciones · Encuestas · Novedades. Data anterior sigue como la tarjeta final, sin tocar.
+  - **Representantes** (`modulo: usuarios`): nombre, cédula, correo, teléfono, hijos activos, lista de hijos con grado, colegios y disciplinas de los hijos. Alcance: Propietario/Admin ven todos; coordinador, los representantes con al menos un hijo en sus colegios. Resumen con totales, por estado, por colegio y lista de representantes sin hijos activos.
+  - **Inscripciones** (`modulo: inscripciones`, **solo Propietario**): envíos del formulario público (fecha, estado, representante con cédula/correo/teléfono, hijos, colegios, disciplinas, valor y aprobador). Filtros de fechas, estado (Pendiente / Aprobada) y texto. **Valor por fila (`$`)** y hoja Resumen con **Total recaudado** y **Recaudado por colegio**. Fuera el bloque "Por estado" del resumen.
+  - **Encuestas** (`modulo: encuestas`): una fila por encuesta con estado, preguntas, respondidas y fecha de creación. Resumen por estado y lista de encuestas sin respuestas. Lo más limpio posible: preguntas y respuestas viven en la pantalla de la encuesta.
+- **Totales en pantalla** (nueva prop opcional `Definicion.totales` con su propio SQL). Hoy solo Inscripciones: encima de la tabla, el **Total recaudado** sale en un card destacado (borde brand, texto grande) y los conteos de Inscripciones, Pendientes y Aprobadas en tres cards pequeños. Se calculan sobre **todas** las filas filtradas, no sobre la página. En el Excel sigue viviendo en la hoja Resumen.
+- **soloRoles** en la Definicion: Inscripciones queda cerrado al Propietario aunque Admin herede `inscripciones:ver`. Chequeado en `puedeVer` y en `exigirDefinicion`.
+- **Fix /reportes/representantes 500**: `padre_sector_residencia` ya no existe (la borró la `0017`); fuera del SELECT y de la lista de columnas.
+- **Listas con rejilla densa** (/estudiantes, /usuarios, /entrenadores) con **dos escalones**:
+  - móvil (<768 px): tarjeta apilada como antes;
+  - md (768–1023 px): columnas identitarias + acciones (Estudiantes esconde Grado y Estado; Usuarios esconde Creado; Entrenadores esconde Cédula·teléfono y Estado);
+  - lg (≥1024 px): todas las columnas como antes.
+  Decidido con el cliente: ocultar lo secundario antes que amontonar.
+- **Respaldo de prod** marcado como **no necesario como tarea** (decidido por el cliente): se hace a mano cuando lo pida.
+- 638/638 tests de backend, 7/7 de frontend; lint y build limpios.
+
+**Al retomar — lista de trabajo, uno por uno:**
+
+1. **Mergear a `main` cuando el cliente pruebe** `/reportes/*` y las listas en una pantalla intermedia.
+2. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
+3. **Pagos mensuales** — esperar a que el cliente lo cuente.
+4. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
 
 ### Corte de sesión — 2026-10-12
 
