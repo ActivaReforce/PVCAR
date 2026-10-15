@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, HeartPulse, UserMinus, UserPlus, Users } from 'lucide-react';
+import { AlertTriangle, Check, Clock, HeartPulse, UserMinus, UserPlus, Users, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -27,23 +37,35 @@ interface Props {
   ninoId: number;
 }
 
+interface RepALiberar {
+  ninopadreId: number;
+  nombre: string;
+}
+
 const fecha = fechaDia;
 
 /**
- * Ficha del estudiante: datos sensibles, inscripciones y representantes.
+ * Ficha del estudiante: datos personales, inscripciones y representantes.
+ *
+ * Reestructurada el 2026-10-15 (pedido del cliente):
+ *   1. Datos del niño y transporte, con los **tres permisos de imagen** en
+ *      el orden del formulario público (verde si los dio, rojo si no).
+ *   2. Información de salud, en ámbar.
+ *   3. Representante del contrato, contacto de emergencia y persona
+ *      autorizada para retirar.
+ *   4. Inscribir o dar de baja (una sola lista con casillas).
+ *   5. Representantes atados, con confirmación al soltar.
  *
  * Las inscripciones se editan **marcando casillas** sobre las disciplinas de
  * su colegio y guardando una vez: el backend calcula la diferencia e inscribe
- * o da de baja en una transacción. El sistema viejo hacía un insert o un
- * update por cada clic, sin transacción y sin comprobar que la disciplina
- * fuera de su colegio.
+ * o da de baja en una transacción.
  */
 const EstudianteFicha = ({ ninoId }: Props) => {
-  const [historial, setHistorial] = useState(false);
   const [seleccion, setSeleccion] = useState<number[] | null>(null);
   const [candidato, setCandidato] = useState('');
+  const [aSoltar, setASoltar] = useState<RepALiberar | null>(null);
 
-  const ficha = useFichaEstudiante(ninoId, historial);
+  const ficha = useFichaEstudiante(ninoId, false);
   const disponibles = useDisponiblesEstudiante(ninoId);
   const candidatos = useCandidatosRepresentante(true);
   const guardar = useGuardarInscripciones();
@@ -93,25 +115,49 @@ const EstudianteFicha = ({ ninoId }: Props) => {
     );
   };
 
+  const confirmarSoltar = async () => {
+    if (!aSoltar) return;
+    try {
+      await soltar.mutateAsync({ id: ninoId, ninopadreId: aSoltar.ninopadreId });
+      setASoltar(null);
+    } catch {
+      // El hook ya enseña el toast.
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <Badge variant={estudiante.est_id === 1 ? 'default' : 'secondary'}>
-          {estudiante.est_id === 1 ? 'Activo' : 'Inactivo'}
-        </Badge>
-        <span className="text-muted-foreground">
-          {estudiante.col_nombre}
-          {estudiante.catninograd_nombre && ` · ${estudiante.catninograd_nombre}`}
-          {estudiante.nino_edad && ` · ${estudiante.nino_edad} años`}
-        </span>
-        {estudiante.nino_modalidad_salida && (
-          <Badge variant="outline">
-            {estudiante.nino_modalidad_salida === 'escolar' ? 'Transporte escolar' : 'Transporte privado'}
+      {/* 1. Datos del alumno */}
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <Badge variant={estudiante.est_id === 1 ? 'default' : 'secondary'}>
+            {estudiante.est_id === 1 ? 'Activo' : 'Inactivo'}
           </Badge>
-        )}
-        <PermisosDeImagen e={estudiante} />
-      </div>
+        </div>
 
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+          <Dato etiqueta="Colegio" valor={estudiante.col_nombre} />
+          <Dato etiqueta="Grado" valor={estudiante.catninograd_nombre} />
+          <Dato
+            etiqueta="Edad"
+            valor={estudiante.nino_edad != null ? `${estudiante.nino_edad} años` : null}
+          />
+          <Dato
+            etiqueta="Transporte"
+            valor={
+              estudiante.nino_modalidad_salida === 'escolar'
+                ? 'Escolar'
+                : estudiante.nino_modalidad_salida === 'privado'
+                  ? 'Privado'
+                  : null
+            }
+          />
+        </dl>
+
+        <PermisosDeImagen e={estudiante} />
+      </section>
+
+      {/* 2. Salud en ámbar */}
       {estudiante.nino_info_salud && (
         <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
           <HeartPulse className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
@@ -122,87 +168,49 @@ const EstudianteFicha = ({ ninoId }: Props) => {
         </div>
       )}
 
+      {/* 3. Representante del contrato · emergencia · retiro */}
       {(estudiante.contacto_emergencia || estudiante.contacto_retiro || estudiante.nino_detalle_retiro) && (
-        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-          {estudiante.contacto_emergencia && (
-            <div className="min-w-0">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Contacto de emergencia
-              </dt>
-              <dd className="break-words">
-                {estudiante.contacto_emergencia.nombre} ({estudiante.contacto_emergencia.relacion}) ·{' '}
-                {estudiante.contacto_emergencia.telefono}
-              </dd>
-            </div>
-          )}
-          {estudiante.contacto_retiro && (
-            <div className="min-w-0">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Autorizado para retirarlo
-              </dt>
-              <dd className="break-words">
-                {estudiante.contacto_retiro.nombre} ({estudiante.contacto_retiro.relacion}) · C.C.{' '}
-                {estudiante.contacto_retiro.cedula} · {estudiante.contacto_retiro.telefono}
-              </dd>
-            </div>
-          )}
-          {estudiante.nino_detalle_retiro && (
-            <div className="min-w-0 sm:col-span-2">
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Instrucciones de retiro
-              </dt>
-              <dd className="break-words">{estudiante.nino_detalle_retiro}</dd>
-            </div>
-          )}
-        </dl>
+        <section className="space-y-2">
+          <h3 className="font-semibold">Contactos</h3>
+          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+            {estudiante.contacto_emergencia && (
+              <div className="min-w-0">
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Contacto de emergencia
+                </dt>
+                <dd className="break-words">
+                  {estudiante.contacto_emergencia.nombre} ({estudiante.contacto_emergencia.relacion}) ·{' '}
+                  {estudiante.contacto_emergencia.telefono}
+                </dd>
+              </div>
+            )}
+            {estudiante.contacto_retiro && (
+              <div className="min-w-0">
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Autorizado para retirarlo
+                </dt>
+                <dd className="break-words">
+                  {estudiante.contacto_retiro.nombre} ({estudiante.contacto_retiro.relacion}) · C.C.{' '}
+                  {estudiante.contacto_retiro.cedula} · {estudiante.contacto_retiro.telefono}
+                </dd>
+              </div>
+            )}
+            {estudiante.nino_detalle_retiro && (
+              <div className="min-w-0 sm:col-span-2">
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Instrucciones de retiro
+                </dt>
+                <dd className="break-words">{estudiante.nino_detalle_retiro}</dd>
+              </div>
+            )}
+          </dl>
+        </section>
       )}
 
-      {/* Inscripciones */}
+      {/* 4. Inscribir o dar de baja */}
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold">Disciplinas</h3>
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-h-11 sm:min-h-9"
-            onClick={() => setHistorial((v) => !v)}
-          >
-            {historial ? 'Ver solo las activas' : 'Ver historial completo'}
-          </Button>
-        </div>
+        <h3 className="font-semibold">Disciplinas</h3>
 
-        {inscripciones.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No está inscrito en ninguna disciplina.</p>
-        ) : (
-          <ul className="space-y-2">
-            {inscripciones.map((i) => {
-              const cerrada = i.est_id !== 1;
-              return (
-                <li
-                  key={i.ninoasig_id}
-                  className={`rounded-lg border p-3 ${cerrada ? 'border-dashed bg-muted/40' : ''}`}
-                >
-                  <p className="break-words font-medium">{i.act_nombre}</p>
-                  <p className="break-words text-sm text-muted-foreground">
-                    {i.horario_texto} · {i.entrenador ?? 'sin entrenador'}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Inscrito el {fecha(i.ninoasig_fecha_inscripcion)}
-                    {cerrada && ` · baja el ${fecha(i.ninoasig_fecha_baja)}`}
-                  </p>
-                  {i.disciplina_est_id !== 1 && !cerrada && (
-                    <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
-                      <AlertTriangle className="h-3 w-3" />
-                      La disciplina está dada de baja
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {/* Editar inscripciones: casillas sobre las disciplinas de su colegio */}
         <ConditionalAction module="estudiantes" action="editar">
           <div className="space-y-2 rounded-lg border p-3">
             <p className="text-sm font-medium">Inscribir o dar de baja</p>
@@ -289,7 +297,7 @@ const EstudianteFicha = ({ ninoId }: Props) => {
         </ConditionalAction>
       </section>
 
-      {/* Representantes */}
+      {/* 5. Representantes */}
       <section className="space-y-3">
         <h3 className="flex items-center gap-2 font-semibold">
           <Users className="h-4 w-4" />
@@ -324,7 +332,9 @@ const EstudianteFicha = ({ ninoId }: Props) => {
                     size="sm"
                     className="min-h-11 w-full flex-shrink-0 text-destructive hover:text-destructive sm:w-auto"
                     disabled={soltar.isPending}
-                    onClick={() => soltar.mutate({ id: ninoId, ninopadreId: r.ninopadre_id })}
+                    onClick={() =>
+                      setASoltar({ ninopadreId: r.ninopadre_id, nombre: r.usu_nombre })
+                    }
                   >
                     <UserMinus className="mr-2 h-4 w-4" />
                     Soltar
@@ -367,7 +377,7 @@ const EstudianteFicha = ({ ninoId }: Props) => {
         {candidatos.data && candidatos.data.length === 0 && (
           <p className="text-xs text-muted-foreground">
             No hay representantes dados de alta. Se crean desde Usuarios, con el rol de
-            Representante. Hoy no hay ninguno en el sistema.
+            Representante.
           </p>
         )}
       </section>
@@ -378,34 +388,76 @@ const EstudianteFicha = ({ ninoId }: Props) => {
         {estudiante.nino_fecha_modificacion &&
           ` · modificado el ${fecha(estudiante.nino_fecha_modificacion)}`}
       </p>
+
+      <AlertDialog
+        open={aSoltar !== null}
+        onOpenChange={(v) => (!v ? setASoltar(null) : undefined)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Soltar a {aSoltar?.nombre}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dejará de ser representante de este alumno. Sus datos de usuario se quedan intactos;
+              para volver a atarlo, elígelo abajo y pulsa "Atar".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={soltar.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmarSoltar}
+              disabled={soltar.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {soltar.isPending ? 'Soltando…' : 'Soltar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
 
+const Dato = ({ etiqueta, valor }: { etiqueta: string; valor: string | null | undefined }) => (
+  <div className="flex min-w-0 flex-wrap gap-x-2">
+    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      {etiqueta}
+    </dt>
+    <dd className="break-words">{valor && valor.trim() !== '' ? valor : '—'}</dd>
+  </div>
+);
+
+const PERMISOS_IMAGEN = [
+  ['nino_imagen_familias', 'Compartir con las familias del grupo'],
+  ['nino_imagen_redes', 'Publicar en redes sociales de ACTIVA'],
+  ['nino_imagen_promocional', 'Material institucional o promocional'],
+] as const;
 
 /**
- * Lo que el entrenador tiene que saber antes de sacar una foto. Sin
- * respuesta (alta manual o anterior a la inscripción en línea) se dice así,
- * no se da por permitido.
+ * Los tres permisos de imagen, en el orden del formulario público. Verde con
+ * check cuando lo autorizó, rojo con X cuando no (sin respuesta se trata
+ * como no, para no asumir permisos). Pedido del cliente (2026-10-15).
  */
-const PermisosDeImagen = ({ e }: { e: EstudianteDetalle }) => {
-  const permisos = [
-    ['familias', e.nino_imagen_familias],
-    ['redes', e.nino_imagen_redes],
-    ['promocional', e.nino_imagen_promocional],
-  ] as const;
-  if (permisos.every(([, v]) => v === null)) {
-    return <Badge variant="outline">Fotos: sin respuesta</Badge>;
-  }
-  const si = permisos.filter(([, v]) => v === true).map(([k]) => k);
-  if (si.length === 0) {
-    return (
-      <Badge variant="outline" className="border-destructive/50 text-destructive">
-        Sin permiso de fotos
-      </Badge>
-    );
-  }
-  return <Badge variant="outline">Fotos: {si.join(', ')}</Badge>;
-};
+const PermisosDeImagen = ({ e }: { e: EstudianteDetalle }) => (
+  <div className="space-y-1.5">
+    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      Permisos de imagen
+    </p>
+    <ul className="space-y-1">
+      {PERMISOS_IMAGEN.map(([clave, texto]) => {
+        const si = e[clave] === true;
+        return (
+          <li key={clave} className="flex items-start gap-2 text-sm">
+            {si ? (
+              <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <X className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+            )}
+            <span className={si ? '' : 'text-destructive'}>{texto}</span>
+          </li>
+        );
+      })}
+    </ul>
+  </div>
+);
 
 export default EstudianteFicha;

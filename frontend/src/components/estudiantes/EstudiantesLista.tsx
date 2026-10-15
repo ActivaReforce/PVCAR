@@ -102,72 +102,80 @@ const EstudiantesLista = ({
                 {e.catninograd_nombre ?? '—'}
               </div>
 
-              <div className="text-sm">
-                {e.disciplinas > 0 ? (
-                  <span>
-                    <strong>{e.disciplinas}</strong> inscrito{e.disciplinas === 1 ? '' : 's'}
-                  </span>
-                ) : (
-                  <span className="text-amber-700 dark:text-amber-400">Sin disciplinas</span>
-                )}
-              </div>
+              {/*
+                En móvil, Disciplinas y Acciones comparten línea (pedido del
+                cliente, 2026-10-15): la tarjeta queda más estrecha y los
+                botones se alcanzan sin bajar. `md:contents` disuelve el
+                wrapper en md y cada hijo vuelve a su columna de la rejilla.
+              */}
+              <div className="flex items-center justify-between gap-2 md:contents">
+                <div className="text-sm">
+                  {e.disciplinas > 0 ? (
+                    <span>
+                      <strong>{e.disciplinas}</strong> inscrito{e.disciplinas === 1 ? '' : 's'}
+                    </span>
+                  ) : (
+                    <span className="text-amber-700 dark:text-amber-400">Sin disciplinas</span>
+                  )}
+                </div>
 
-              <div className="hidden lg:block">
-                <Badge variant={activo ? 'default' : 'secondary'}>
-                  {activo ? 'Activo' : 'Inactivo'}
-                </Badge>
-              </div>
+                <div className="hidden lg:block">
+                  <Badge variant={activo ? 'default' : 'secondary'}>
+                    {activo ? 'Activo' : 'Inactivo'}
+                  </Badge>
+                </div>
 
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-11 w-11 md:h-9 md:w-9"
-                  onClick={() => onVer(e)}
-                  title="Ver ficha"
-                  aria-label={`Ver ficha de ${e.nino_nombre}`}
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 md:h-9 md:w-9"
+                    onClick={() => onVer(e)}
+                    title="Ver ficha"
+                    aria-label={`Ver ficha de ${e.nino_nombre}`}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
 
-                <MenuAcciones
-                  nombre={e.nino_nombre}
-                  acciones={[
-                    {
-                      etiqueta: 'Editar',
-                      icono: Pencil,
-                      onSelect: () => onEditar(e),
-                      modulo: 'estudiantes',
-                      accion: 'editar',
-                    },
-                    {
-                      etiqueta: 'Reactivar',
-                      icono: RotateCcw,
-                      onSelect: () => onReactivar(e),
-                      modulo: 'estudiantes',
-                      accion: 'editar',
-                      visible: !activo,
-                    },
-                    {
-                      etiqueta: 'Dar de baja',
-                      icono: UserX,
-                      onSelect: () => onBaja(e),
-                      modulo: 'estudiantes',
-                      accion: 'editar',
-                      destructivo: true,
-                      visible: activo,
-                    },
-                    {
-                      etiqueta: 'Eliminar',
-                      icono: Trash2,
-                      onSelect: () => onEliminar(e),
-                      modulo: 'estudiantes',
-                      accion: 'eliminar',
-                      destructivo: true,
-                      visible: !activo,
-                    },
-                  ]}
-                />
+                  <MenuAcciones
+                    nombre={e.nino_nombre}
+                    acciones={[
+                      {
+                        etiqueta: 'Editar',
+                        icono: Pencil,
+                        onSelect: () => onEditar(e),
+                        modulo: 'estudiantes',
+                        accion: 'editar',
+                      },
+                      {
+                        etiqueta: 'Reactivar',
+                        icono: RotateCcw,
+                        onSelect: () => onReactivar(e),
+                        modulo: 'estudiantes',
+                        accion: 'editar',
+                        visible: !activo,
+                      },
+                      {
+                        etiqueta: 'Dar de baja',
+                        icono: UserX,
+                        onSelect: () => onBaja(e),
+                        modulo: 'estudiantes',
+                        accion: 'editar',
+                        destructivo: true,
+                        visible: activo,
+                      },
+                      {
+                        etiqueta: 'Eliminar',
+                        icono: Trash2,
+                        onSelect: () => onEliminar(e),
+                        modulo: 'estudiantes',
+                        accion: 'eliminar',
+                        destructivo: true,
+                        visible: !activo,
+                      },
+                    ]}
+                  />
+                </div>
               </div>
             </li>
           );

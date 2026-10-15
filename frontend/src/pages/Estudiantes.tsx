@@ -62,6 +62,7 @@ const Estudiantes = () => {
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [viendoId, setViendoId] = useState<number | null>(null);
   const [aDarDeBaja, setADarDeBaja] = useState<Estudiante | null>(null);
+  const [aReactivar, setAReactivar] = useState<Estudiante | null>(null);
   const [aEliminar, setAEliminar] = useState<Estudiante | null>(null);
 
   const colegios = useColegiosVisibles();
@@ -197,7 +198,7 @@ const Estudiantes = () => {
         onVer={(e) => setViendoId(e.nino_id)}
         onEditar={(e) => setEditandoId(e.nino_id)}
         onBaja={setADarDeBaja}
-        onReactivar={(e) => reactivar.mutate(e.nino_id)}
+        onReactivar={setAReactivar}
         onEliminar={setAEliminar}
       />
 
@@ -284,6 +285,34 @@ const Estudiantes = () => {
               }}
             >
               Dar de baja
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reactivación con confirmación (2026-10-15). */}
+      <AlertDialog
+        open={aReactivar !== null}
+        onOpenChange={(abierto) => !abierto && setAReactivar(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reactivar al alumno</AlertDialogTitle>
+            <AlertDialogDescription className="break-words">
+              <strong>{aReactivar?.nino_nombre}</strong> volverá a estar activo. Sus inscripciones
+              anteriores no se reabren: hay que inscribirlo de nuevo en las disciplinas que vaya a
+              tomar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-0">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (aReactivar) reactivar.mutate(aReactivar.nino_id);
+                setAReactivar(null);
+              }}
+            >
+              Reactivar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
