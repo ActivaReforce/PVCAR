@@ -26,6 +26,7 @@ import EvaluacionesLista from '@/components/evaluaciones/EvaluacionesLista';
 import EvaluacionForm from '@/components/evaluaciones/EvaluacionForm';
 import EvaluarAlumnos from '@/components/evaluaciones/EvaluarAlumnos';
 import EliminarEvaluacionDialog from '@/components/evaluaciones/EliminarEvaluacionDialog';
+import PrevisualizarEvaluacionDialog from '@/components/evaluaciones/PrevisualizarEvaluacionDialog';
 import VincularDisciplinasDialog from '@/components/evaluaciones/VincularDisciplinasDialog';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
@@ -34,6 +35,7 @@ import {
   useEvaluaciones,
   useFichaEvaluacion,
   useReactivarEvaluacion,
+  useResetearEvaluados,
 } from '@/hooks/useEvaluaciones';
 import type { Evaluacion, FiltrosEvaluaciones } from '@/api/evaluaciones';
 
@@ -65,9 +67,13 @@ const Evaluaciones = () => {
 
   const [creando, setCreando] = useState(false);
   const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [previsualizandoId, setPrevisualizandoId] = useState<number | null>(null);
   const [vinculando, setVinculando] = useState<Evaluacion | null>(null);
   const [aDarDeBaja, setADarDeBaja] = useState<Evaluacion | null>(null);
   const [aEliminar, setAEliminar] = useState<Evaluacion | null>(null);
+  const [aEditarConNotas, setAEditarConNotas] = useState<Evaluacion | null>(null);
+  const [confirmandoReseteo, setConfirmandoReseteo] = useState(false);
+  const resetear = useResetearEvaluados();
 
   const categorias = useCategoriasEvaluacion();
   const baja = useDarDeBajaEvaluacion();
@@ -189,7 +195,10 @@ const Evaluaciones = () => {
 
           <EvaluacionesLista
             evaluaciones={evaluaciones}
-            onEditar={(e) => setEditandoId(e.eva_id)}
+            onPrevisualizar={(e) => setPrevisualizandoId(e.eva_id)}
+            onEditar={(e) =>
+              e.evaluados > 0 ? setAEditarConNotas(e) : setEditandoId(e.eva_id)
+            }
             onVincular={setVinculando}
             onBaja={setADarDeBaja}
             onReactivar={(e) => reactivar.mutate(e.eva_id)}
@@ -239,6 +248,11 @@ const Evaluaciones = () => {
         </DialogContent>
       </Dialog>
 
+      <PrevisualizarEvaluacionDialog
+        evaId={previsualizandoId}
+        onClose={() => setPrevisualizandoId(null)}
+      />
+
       <VincularDisciplinasDialog evaluacion={vinculando} onClose={() => setVinculando(null)} />
 
       <AlertDialog
@@ -270,6 +284,78 @@ const Evaluaciones = () => {
       </AlertDialog>
 
       <EliminarEvaluacionDialog evaluacion={aEliminar} onClose={() => setAEliminar(null)} />
+
+      {/*
+        Bloqueo al editar una plantilla con alumnos evaluados (pedido del
+        cliente, 2026-10-15). Primero avisa; para desbloquear hay que borrar
+        las notas de todos (segunda confirmación) y volver a evaluarlos.
+      */}
+      <AlertDialog
+        open={aEditarConNotas !== null && !confirmandoReseteo}
+        onOpenChange={(a) => (!a ? setAEditarConNotas(null) : undefined)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No se puede editar con notas puestas</AlertDialogTitle>
+            <AlertDialogDescription className="break-words">
+              <strong>{aEditarConNotas?.eva_titulo}</strong> tiene{' '}
+              <strong>{aEditarConNotas?.evaluados ?? 0}</strong> alumno(s) evaluado(s). Cambiar
+              los parámetros ahora dejaría las notas puestas con un método que ya no coincide. Si
+              quieres editar, antes hay que borrar todas las notas; después tendrás que volver a
+              evaluar a esos alumnos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-0">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                setConfirmandoReseteo(true);
+              }}
+            >
+              Borrar notas y editar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmandoReseteo}
+        onOpenChange={(a) => (!a ? setConfirmandoReseteo(false) : undefined)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Borrar las {aEditarConNotas?.evaluados ?? 0} notas?</AlertDialogTitle>
+            <AlertDialogDescription className="break-words">
+              Se borran los intentos registrados y los alumnos vuelven a <em>Por evaluar</em>.
+              Esta acción no se puede deshacer. Al terminar se abre el formulario para que puedas
+              editar la plantilla.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-0">
+            <AlertDialogCancel disabled={resetear.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={resetear.isPending}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!aEditarConNotas) return;
+                try {
+                  await resetear.mutateAsync(aEditarConNotas.eva_id);
+                  setEditandoId(aEditarConNotas.eva_id);
+                  setAEditarConNotas(null);
+                  setConfirmandoReseteo(false);
+                } catch {
+                  // El hook ya enseña el motivo.
+                }
+              }}
+            >
+              {resetear.isPending ? 'Borrando…' : 'Sí, borrar y editar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

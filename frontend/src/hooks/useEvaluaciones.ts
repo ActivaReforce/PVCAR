@@ -159,6 +159,14 @@ export function useReactivarEvaluacion() {
   return useMutacion((id: number) => evaluacionesApi.reactivar(id), 'Evaluación reactivada');
 }
 
+/** Devuelve a pendiente a los alumnos evaluados; se usa antes de editar. */
+export function useResetearEvaluados() {
+  return useMutacion(
+    (id: number) => evaluacionesApi.resetearEvaluados(id),
+    'Evaluaciones de alumnos borradas',
+  );
+}
+
 export function useEliminarEvaluacion() {
   return useMutacion(
     ({ id, confirmacion }: { id: number; confirmacion: string }) =>

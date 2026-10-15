@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Eye, Plus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +19,7 @@ import {
   useGuardarParametros,
 } from '@/hooks/useEvaluaciones';
 import ParametroCampos, { validarRango } from './ParametroCampos';
+import EvaluacionPreview from './EvaluacionPreview';
 
 interface Props {
   /** Null al crear. */
@@ -46,6 +53,7 @@ const EvaluacionForm = ({ ficha, onListo, onCancelar }: Props) => {
   const [descripcion, setDescripcion] = useState('');
   const [categoria, setCategoria] = useState('');
   const [parametros, setParametros] = useState<ParametroInput[]>([parametroVacio()]);
+  const [visualizando, setVisualizando] = useState(false);
   const { toast } = useToast();
 
   const categorias = useCategoriasEvaluacion();
@@ -249,6 +257,16 @@ const EvaluacionForm = ({ ficha, onListo, onCancelar }: Props) => {
         </Button>
         <Button
           type="button"
+          variant="outline"
+          className="h-11 sm:h-10"
+          onClick={() => setVisualizando(true)}
+          disabled={titulo.trim().length === 0 && parametros.length === 0}
+        >
+          <Eye className="mr-2 h-4 w-4" />
+          Visualizar
+        </Button>
+        <Button
+          type="button"
           variant="brand"
           className="h-11 sm:h-10"
           onClick={guardar}
@@ -257,6 +275,21 @@ const EvaluacionForm = ({ ficha, onListo, onCancelar }: Props) => {
           {guardando ? 'Guardando…' : ficha ? 'Guardar cambios' : 'Crear evaluación'}
         </Button>
       </div>
+
+      {/* Vista previa del borrador en memoria (2026-10-15). */}
+      <Dialog open={visualizando} onOpenChange={(v) => (!v ? setVisualizando(false) : undefined)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Vista previa</DialogTitle>
+          </DialogHeader>
+          <EvaluacionPreview
+            titulo={titulo}
+            descripcion={descripcion}
+            categoria={categoria}
+            parametros={parametros}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
