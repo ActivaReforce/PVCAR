@@ -476,6 +476,96 @@ const evaluaciones: Constructor = (filas) => {
   ];
 };
 
+const representantes: Constructor = (filas) => {
+  const porColegio = expandir(filas, '_colegios', 'Sin colegio');
+  const sinHijos = filas.filter((f) => numero(f.hijos_activos) === 0).map((f) => texto(f.usu_nombre));
+  const bloques: Bloque[] = [
+    {
+      titulo: 'Totales',
+      cabeceras: ['Concepto', 'Cantidad'],
+      filas: [
+        ['Representantes', filas.length],
+        ['Hijos activos (contados sin repetir por representante)', filas.reduce((s, f) => s + numero(f.hijos_activos), 0)],
+        ['Representantes sin hijos activos', sinHijos.length],
+      ],
+      destacadas: [],
+    },
+    agrupar(
+      'Por estado',
+      filas,
+      [{ cabecera: 'Estado', de: campo('estado') }],
+      [cuenta('Representantes'), suma('Hijos activos', 'hijos_activos')],
+    ),
+    agrupar(
+      'Por colegio',
+      porColegio,
+      [{ cabecera: 'Colegio', de: campo('_k') }],
+      [cuenta('Representantes'), suma('Hijos activos', 'hijos_activos')],
+      { nota: 'Quien tiene hijos en varios colegios cuenta en cada uno.', total: false },
+    ),
+  ];
+  if (sinHijos.length > 0) bloques.push(lista('Representantes sin hijos activos', 'Representante', sinHijos));
+  return bloques;
+};
+
+const inscripciones: Constructor = (filas) => {
+  const porColegio = expandir(filas, '_colegios', 'Sin colegio');
+  return [
+    {
+      titulo: 'Totales',
+      cabeceras: ['Concepto', 'Cantidad'],
+      filas: [
+        ['Inscripciones', filas.length],
+        ['Pendientes', filas.filter((f) => texto(f.estado) === 'Pendiente').length],
+        ['Aprobadas', filas.filter((f) => texto(f.estado) === 'Aprobada').length],
+        ['Hijos (total)', filas.reduce((s, f) => s + numero(f.cantidad_hijos), 0)],
+      ],
+      destacadas: [],
+    },
+    agrupar(
+      'Por estado',
+      filas,
+      [{ cabecera: 'Estado', de: campo('estado') }],
+      [cuenta('Inscripciones'), suma('Hijos', 'cantidad_hijos')],
+    ),
+    agrupar(
+      'Por colegio',
+      porColegio,
+      [{ cabecera: 'Colegio', de: campo('_k') }],
+      [
+        cuenta('Inscripciones'),
+        cuantos('Pendientes', (f) => texto(f.estado) === 'Pendiente'),
+        cuantos('Aprobadas', (f) => texto(f.estado) === 'Aprobada'),
+      ],
+      { nota: 'Una inscripción con hijos en varios colegios cuenta en cada uno.', total: false },
+    ),
+  ];
+};
+
+const encuestas: Constructor = (filas) => {
+  const sinRespuestas = filas.filter((f) => numero(f.respondidas) === 0).map((f) => texto(f.encu_titulo));
+  const bloques: Bloque[] = [
+    {
+      titulo: 'Totales',
+      cabeceras: ['Concepto', 'Cantidad'],
+      filas: [
+        ['Encuestas', filas.length],
+        ['Preguntas (total)', filas.reduce((s, f) => s + numero(f.preguntas), 0)],
+        ['Respuestas recibidas (total)', filas.reduce((s, f) => s + numero(f.respondidas), 0)],
+      ],
+      destacadas: [],
+    },
+    agrupar(
+      'Por estado',
+      filas,
+      [{ cabecera: 'Estado', de: campo('estado') }],
+      [cuenta('Encuestas'), suma('Preguntas', 'preguntas'), suma('Respuestas', 'respondidas')],
+    ),
+  ];
+  if (sinRespuestas.length > 0) bloques.push(lista('Encuestas sin respuestas', 'Encuesta', sinRespuestas));
+  return bloques;
+};
+
 const novedades: Constructor = (filas) => {
   // Solo el total: en pantalla / eliminadas no le servía al cliente (2026-10-12).
   const medidas = (): Medida[] => [cuenta('Novedades')];
@@ -495,6 +585,9 @@ const RESUMENES: Record<string, Constructor> = {
   'asistencias-alumnos': asistenciasAlumnos,
   'asistencias-entrenadores': asistenciasEntrenadores,
   evaluaciones,
+  representantes,
+  inscripciones,
+  encuestas,
   novedades,
 };
 

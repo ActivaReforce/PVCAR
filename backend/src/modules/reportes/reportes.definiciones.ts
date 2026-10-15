@@ -754,6 +754,257 @@ const evaluaciones: Definicion = {
   }),
 };
 
+const representantes: Definicion = {
+  id: 'representantes',
+  titulo: 'Representantes',
+  descripcion: 'Padres y madres con sus datos y la lista de hijos activos.',
+  modulo: 'usuarios',
+  exigeRango: false,
+  filtros: { colegio: true, disciplina: false, estado: ACTIVO_INACTIVO(), fechas: false },
+  columnas: [
+    { clave: 'padre_id', cabecera: 'ID', ancho: 8 },
+    { clave: 'usu_nombre', cabecera: 'Nombre', ancho: 34 },
+    { clave: 'usu_cedula', cabecera: 'Cédula', ancho: 14 },
+    { clave: 'usu_correo', cabecera: 'Correo', ancho: 32 },
+    { clave: 'usu_telefono', cabecera: 'Teléfono', ancho: 14 },
+    { clave: 'sector', cabecera: 'Sector', ancho: 20 },
+    { clave: 'hijos_activos', cabecera: 'Hijos activos', ancho: 12 },
+    { clave: 'hijos', cabecera: 'Hijos', ancho: 48 },
+    { clave: 'colegios', cabecera: 'Colegios', ancho: 32 },
+    { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 36 },
+    { clave: 'estado', cabecera: 'Estado', ancho: 12 },
+  ],
+  /**
+   * Propietario y Admin ven todos; el coordinador ve a los representantes
+   * con al menos un hijo (activo o no) en sus colegios. Un representante sin
+   * ningún hijo queda fuera del alcance del coordinador: ya existe la casilla
+   * de "sin hijos activos" en el resumen para que no se pierdan en global.
+   */
+  construir: (f, ctx) => ({
+    sql: `
+      SELECT p.padre_id,
+             u.usu_nombre,
+             COALESCE(u.usu_cedula, '')                           AS usu_cedula,
+             u.usu_correo,
+             COALESCE(u.usu_telefono, '')                         AS usu_telefono,
+             COALESCE(p.padre_sector_residencia, '')              AS sector,
+             (SELECT count(DISTINCT np.nino_id)
+                FROM public.nino_padre np
+                JOIN public.nino n ON n.nino_id = np.nino_id
+               WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO})::int AS hijos_activos,
+             COALESCE((
+               SELECT string_agg(
+                        n.nino_nombre || COALESCE(' (' || g.catninograd_nombre || ')', ''),
+                        ', ' ORDER BY n.nino_nombre)
+                 FROM public.nino_padre np
+                 JOIN public.nino n ON n.nino_id = np.nino_id
+                 LEFT JOIN public.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id
+                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
+             ), '')                                               AS hijos,
+             COALESCE((
+               SELECT string_agg(DISTINCT c.col_nombre, ', ' ORDER BY c.col_nombre)
+                 FROM public.nino_padre np
+                 JOIN public.nino n ON n.nino_id = np.nino_id
+                 JOIN public.colegio c ON c.col_id = n.col_id
+                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
+             ), '')                                               AS colegios,
+             ARRAY(
+               SELECT DISTINCT c.col_nombre
+                 FROM public.nino_padre np
+                 JOIN public.nino n ON n.nino_id = np.nino_id
+                 JOIN public.colegio c ON c.col_id = n.col_id
+                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
+             )                                                     AS _colegios,
+             COALESCE((
+               SELECT string_agg(DISTINCT a.act_nombre, ', ' ORDER BY a.act_nombre)
+                 FROM public.nino_padre np
+                 JOIN public.nino n       ON n.nino_id = np.nino_id
+                 JOIN public.nino_asignacion na
+                     ON na.nino_id = n.nino_id AND na.est_id = ${ESTADO.ACTIVO}
+                 JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = na.colacthor_id
+                 JOIN public.actividad a ON a.act_id = cah.act_id
+                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
+             ), '')                                               AS disciplinas,
+             e.est_nombre                                         AS estado
+        FROM public.padre p
+        JOIN public.usuario u ON u.usu_id = p.usu_id
+        JOIN public.estado e  ON e.est_id = u.est_id
+       WHERE ($1::boolean
+              OR EXISTS (
+                SELECT 1 FROM public.nino_padre np
+                  JOIN public.nino n ON n.nino_id = np.nino_id
+                 WHERE np.padre_id = p.padre_id AND n.col_id = ANY($2::int[])
+              ))
+         AND ($3::text IS NULL
+              OR ${contieneSinTildes('u.usu_nombre', '$3')}
+              OR ${contieneSinTildes("COALESCE(u.usu_cedula,'')", '$3')}
+              OR ${contieneSinTildes('u.usu_correo', '$3')})
+         AND ($4::int[] IS NULL
+              OR EXISTS (
+                SELECT 1 FROM public.nino_padre np
+                  JOIN public.nino n ON n.nino_id = np.nino_id
+                 WHERE np.padre_id = p.padre_id AND n.col_id = ANY($4::int[])
+              ))
+         AND ($5::int IS NULL OR u.est_id = $5)
+       ORDER BY u.usu_nombre`,
+    params: [ctx.global, ctx.colegios, textoONulo(f.buscar), oNulo(f.colegio), oNulo(f.estado)],
+  }),
+};
+
+const inscripciones: Definicion = {
+  id: 'inscripciones',
+  titulo: 'Inscripciones',
+  descripcion: 'Envíos del formulario público, pendientes y aprobadas.',
+  modulo: 'inscripciones',
+  exigeRango: false,
+  filtros: {
+    colegio: false,
+    disciplina: false,
+    estado: {
+      etiqueta: 'Estado',
+      opciones: [
+        { id: 1, nombre: 'Pendiente' },
+        { id: 2, nombre: 'Aprobada' },
+      ],
+    },
+    fechas: true,
+  },
+  columnas: [
+    { clave: 'ins_id', cabecera: 'Nº', ancho: 8 },
+    { clave: 'fecha', cabecera: 'Fecha', ancho: 17 },
+    { clave: 'estado', cabecera: 'Estado', ancho: 12 },
+    { clave: 'representante', cabecera: 'Representante', ancho: 32 },
+    { clave: 'cedula', cabecera: 'Cédula', ancho: 14 },
+    { clave: 'correo', cabecera: 'Correo', ancho: 30 },
+    { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
+    { clave: 'hijos', cabecera: 'Hijos', ancho: 40 },
+    { clave: 'cantidad_hijos', cabecera: 'N° hijos', ancho: 10 },
+    { clave: 'colegios', cabecera: 'Colegios', ancho: 30 },
+    { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
+    { clave: 'aprobada_por', cabecera: 'Aprobada por', ancho: 28 },
+    { clave: 'fecha_aprobacion', cabecera: 'Aprobada el', ancho: 14 },
+  ],
+  /**
+   * Sin alcance por colegio: el módulo de Inscripciones es solo Propietario y
+   * Admin, y la del `insnino_datos` es texto suelto (el formulario público lo
+   * guarda tal cual). Si en el futuro se añaden más roles, se cuela aquí la
+   * misma lógica que en Representantes.
+   *
+   * El estado se filtra como id (1=Pendiente, 2=Aprobada) para encajar con el
+   * desplegable estándar del resto de reportes.
+   */
+  construir: (f) => ({
+    sql: `
+      SELECT i.ins_id,
+             ${textoEc('i.ins_fecha', 'DD/MM/YYYY HH24:MI')}        AS fecha,
+             CASE i.ins_estado
+               WHEN 'pendiente' THEN 'Pendiente'
+               WHEN 'aprobada'  THEN 'Aprobada'
+             END                                                     AS estado,
+             COALESCE(i.ins_representante->>'nombre', '')            AS representante,
+             COALESCE(i.ins_representante->>'cedula', '')            AS cedula,
+             COALESCE(i.ins_representante->>'correo', '')            AS correo,
+             COALESCE(i.ins_representante->>'telefono', '')          AS telefono,
+             COALESCE((
+               SELECT string_agg(
+                        btrim(
+                          COALESCE(inn.insnino_datos->>'nombres', inn.insnino_datos->>'nombre', '') ||
+                          ' ' || COALESCE(inn.insnino_datos->>'apellidos', '')
+                        ),
+                        ', ' ORDER BY inn.insnino_orden)
+                 FROM public.inscripcion_nino inn
+                WHERE inn.ins_id = i.ins_id
+             ), '')                                                   AS hijos,
+             (SELECT count(*) FROM public.inscripcion_nino WHERE ins_id = i.ins_id)::int AS cantidad_hijos,
+             COALESCE((
+               SELECT string_agg(DISTINCT c.col_nombre, ', ' ORDER BY c.col_nombre)
+                 FROM public.inscripcion_nino inn
+                 CROSS JOIN LATERAL unnest(inn.insnino_disciplinas) AS cid
+                 JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+                 JOIN public.colegio c ON c.col_id = cah.col_id
+                WHERE inn.ins_id = i.ins_id
+             ), '')                                                   AS colegios,
+             ARRAY(
+               SELECT DISTINCT c.col_nombre
+                 FROM public.inscripcion_nino inn
+                 CROSS JOIN LATERAL unnest(inn.insnino_disciplinas) AS cid
+                 JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+                 JOIN public.colegio c ON c.col_id = cah.col_id
+                WHERE inn.ins_id = i.ins_id
+             )                                                        AS _colegios,
+             COALESCE((
+               SELECT string_agg(DISTINCT a.act_nombre, ', ' ORDER BY a.act_nombre)
+                 FROM public.inscripcion_nino inn
+                 CROSS JOIN LATERAL unnest(inn.insnino_disciplinas) AS cid
+                 JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+                 JOIN public.actividad a ON a.act_id = cah.act_id
+                WHERE inn.ins_id = i.ins_id
+             ), '')                                                   AS disciplinas,
+             COALESCE(ap.usu_nombre, '')                              AS aprobada_por,
+             COALESCE(${textoEc('i.ins_fecha_aprobacion', 'DD/MM/YYYY')}, '') AS fecha_aprobacion
+        FROM public.inscripcion i
+        LEFT JOIN public.usuario ap ON ap.usu_id = i.ins_aprobada_por
+       WHERE ($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
+         AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
+         AND ($3::text IS NULL
+              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
+              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'cedula','')", '$3')}
+              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'correo','')", '$3')})
+         AND ($4::int IS NULL
+              OR ($4 = 1 AND i.ins_estado = 'pendiente')
+              OR ($4 = 2 AND i.ins_estado = 'aprobada'))
+       ORDER BY i.ins_fecha DESC`,
+    params: [oNulo(f.desde), oNulo(f.hasta), textoONulo(f.buscar), oNulo(f.estado)],
+  }),
+};
+
+const encuestas: Definicion = {
+  id: 'encuestas',
+  titulo: 'Encuestas',
+  descripcion: 'Encuestas creadas: estado, cuántas preguntas tienen y cuántos las respondieron.',
+  modulo: 'encuestas',
+  exigeRango: false,
+  filtros: {
+    colegio: false,
+    disciplina: false,
+    estado: {
+      etiqueta: 'Estado',
+      opciones: [
+        { id: ESTADO.BORRADOR, nombre: 'Borrador' },
+        { id: ESTADO.FINALIZADO, nombre: 'Finalizado' },
+        { id: ESTADO.PUBLICADO, nombre: 'Publicado' },
+      ],
+    },
+    fechas: false,
+  },
+  columnas: [
+    { clave: 'encu_id', cabecera: 'ID', ancho: 8 },
+    { clave: 'encu_titulo', cabecera: 'Encuesta', ancho: 40 },
+    { clave: 'estado', cabecera: 'Estado', ancho: 14 },
+    { clave: 'preguntas', cabecera: 'Preguntas', ancho: 11 },
+    { clave: 'respondidas', cabecera: 'Respondidas', ancho: 13 },
+    { clave: 'encu_fecha_creacion', cabecera: 'Creada', ancho: 14 },
+  ],
+  /** Catálogo global sin alcance por colegio: una encuesta no vive en un colegio. */
+  construir: (f) => ({
+    sql: `
+      SELECT e.encu_id,
+             e.encu_titulo,
+             est.est_nombre                                         AS estado,
+             (SELECT count(*) FROM public.encuesta_pregunta
+               WHERE encu_id = e.encu_id)::int                      AS preguntas,
+             (SELECT count(*) FROM public.encuesta_respondida
+               WHERE encu_id = e.encu_id)::int                      AS respondidas,
+             ${textoEc('e.encu_fecha_creacion', 'DD/MM/YYYY')}      AS encu_fecha_creacion
+        FROM public.encuesta e
+        JOIN public.estado est ON est.est_id = e.est_id
+       WHERE ($1::text IS NULL OR ${contieneSinTildes('e.encu_titulo', '$1')})
+         AND ($2::int IS NULL OR e.est_id = $2)
+       ORDER BY e.encu_fecha_creacion DESC, e.encu_titulo`,
+    params: [textoONulo(f.buscar), oNulo(f.estado)],
+  }),
+};
+
 const novedades: Definicion = {
   id: 'novedades',
   titulo: 'Novedades',
@@ -887,11 +1138,9 @@ const novedades: Definicion = {
 };
 
 /**
- * Encuestas no está.
- *
- * Tiene **cero filas en producción** —encuesta, sus preguntas y sus respuestas
- * están vacías— y su módulo se rehace entero en la Fase 14. Un reporte de una
- * tabla vacía no es un reporte, es una pantalla que miente.
+ * Orden de las tarjetas en Reportes, decidido por el cliente el 2026-10-15.
+ * Encuestas, Representantes e Inscripciones entraron ese día con el pedido
+ * de reordenar: antes no estaban porque sus tablas se usaban poco o nada.
  */
 export const DEFINICIONES: Definicion[] = [
   usuarios,
@@ -900,9 +1149,12 @@ export const DEFINICIONES: Definicion[] = [
   disciplinas,
   entrenadores,
   estudiantes,
+  evaluaciones,
   asistenciasAlumnos,
   asistenciasEntrenadores,
-  evaluaciones,
+  representantes,
+  inscripciones,
+  encuestas,
   novedades,
 ];
 

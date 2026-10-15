@@ -77,8 +77,32 @@ beforeEach(() => {
 });
 
 describe('el catalogo', () => {
-  it('trae los diez reportes a quien tiene todos los permisos', () => {
-    expect(service.catalogo(TODO)).toHaveLength(10);
+  it('trae los trece reportes a quien tiene todos los permisos', () => {
+    expect(service.catalogo(TODO)).toHaveLength(13);
+  });
+
+  /**
+   * Orden decidido por el cliente el 2026-10-15. Primero las entidades
+   * (quién, dónde, qué, cuándo), luego las acciones diarias (asistencia
+   * de alumnos y de entrenadores), luego los flujos de familia
+   * (representantes, inscripciones, encuestas) y al final las novedades.
+   */
+  it('respeta el orden de las tarjetas pedido por el cliente', () => {
+    expect(service.catalogo(TODO).map((r) => r.id)).toEqual([
+      'usuarios',
+      'colegios',
+      'actividades',
+      'disciplinas',
+      'entrenadores',
+      'estudiantes',
+      'evaluaciones',
+      'asistencias-alumnos',
+      'asistencias-entrenadores',
+      'representantes',
+      'inscripciones',
+      'encuestas',
+      'novedades',
+    ]);
   });
 
   /**
@@ -147,8 +171,14 @@ describe('el catalogo', () => {
     expect(asistencias?.columnas.length).toBeGreaterThan(5);
   });
 
-  it('encuestas no esta: tiene cero filas y se rehace en la Fase 14', () => {
-    expect(service.catalogo(TODO).map((r) => r.id)).not.toContain('encuestas');
+  /** Decididos el 2026-10-15: Representantes, Inscripciones y Encuestas. */
+  it('ofrece Representantes, Inscripciones y Encuestas con los permisos de su módulo', () => {
+    expect(service.catalogo(TODO).map((r) => r.id)).toEqual(
+      expect.arrayContaining(['representantes', 'inscripciones', 'encuestas']),
+    );
+    // Representantes vive bajo el módulo usuarios: quien no lo tenga, nada.
+    const sinUsuarios = actorCon(['encuestas', 'inscripciones'], [ROL.PROPIETARIO]);
+    expect(service.catalogo(sinUsuarios).map((r) => r.id)).not.toContain('representantes');
   });
 });
 
