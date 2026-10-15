@@ -218,7 +218,9 @@ export async function listarEstudiantes(
  * Conteos de la pantalla. Como en Usuarios, cada uno ignora a proposito el
  * filtro que el mismo gobierna:
  *   activos / inactivos / total   ignoran el filtro de estado
- *   sinAsignar                    ignora el filtro de disciplina
+ *   sinAsignar                    ignora el filtro de disciplina y cuenta
+ *                                 solo los activos (los inactivos no van a
+ *                                 clase; pedido del cliente, 2026-10-15).
  * La busqueda, el colegio, el grado y el alcance los respetan todos.
  */
 export interface ConteosEstudiantes {
@@ -241,7 +243,8 @@ export async function contarEstudiantes(
     SELECT count(*)                                            AS total,
            count(*) FILTER (WHERE est_id = ${ESTADO.ACTIVO})   AS activos,
            count(*) FILTER (WHERE est_id <> ${ESTADO.ACTIVO})  AS inactivos,
-           count(*) FILTER (WHERE inscripciones = 0)           AS sin_asignar
+           count(*) FILTER (WHERE inscripciones = 0
+                              AND est_id = ${ESTADO.ACTIVO})   AS sin_asignar
     FROM base
   `;
 

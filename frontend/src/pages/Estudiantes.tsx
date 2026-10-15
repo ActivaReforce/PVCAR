@@ -64,6 +64,7 @@ const Estudiantes = () => {
   const [aDarDeBaja, setADarDeBaja] = useState<Estudiante | null>(null);
   const [aReactivar, setAReactivar] = useState<Estudiante | null>(null);
   const [aEliminar, setAEliminar] = useState<Estudiante | null>(null);
+  const [avisoAlta, setAvisoAlta] = useState(false);
 
   const colegios = useColegiosVisibles();
   const grados = useGrados();
@@ -128,7 +129,7 @@ const Estudiantes = () => {
         </div>
 
         {canCreate('estudiantes') && (
-          <Button variant="brand" className="w-full sm:w-auto" onClick={() => setCreando(true)}>
+          <Button variant="brand" className="w-full sm:w-auto" onClick={() => setAvisoAlta(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Alumno
           </Button>
@@ -285,6 +286,47 @@ const Estudiantes = () => {
               }}
             >
               Dar de baja
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/*
+        Aviso antes de abrir el alta manual (pedido del cliente, 2026-10-15):
+        un alumno dado de alta a mano no pasa por el formulario público, así
+        que no se guarda contrato, no se registran aceptaciones de documentos
+        (política de datos, autorización de imagen, ficha médica) ni queda
+        pago asociado. Para los alumnos "legacy" tiene sentido; conviene
+        avisar para que no se confunda con una inscripción real.
+      */}
+      <AlertDialog open={avisoAlta} onOpenChange={(v) => (!v ? setAvisoAlta(false) : undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Alta manual, sin inscripción firmada</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-left">
+                <p>Al crear al alumno desde aquí <strong>no se guarda</strong>:</p>
+                <ul className="ml-4 list-disc space-y-1">
+                  <li>el contrato ni la ficha de matrícula en PDF,</li>
+                  <li>la aceptación de la política de datos ni del tratamiento de imagen,</li>
+                  <li>el pago de inscripción.</li>
+                </ul>
+                <p className="text-muted-foreground">
+                  Para que todo eso quede registrado, el representante debe inscribirlo desde
+                  el formulario público. Esta vía es para altas internas (migraciones, cortesías).
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-0">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setAvisoAlta(false);
+                setCreando(true);
+              }}
+            >
+              Entendido, continuar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
