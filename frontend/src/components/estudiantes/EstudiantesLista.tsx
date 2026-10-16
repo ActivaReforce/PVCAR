@@ -15,14 +15,12 @@ interface Props {
 }
 
 /**
- * Rejilla con dos escalones (2026-10-15): en móvil, tarjeta apilada; de 768
- * a 1023 px, 4 columnas (Estudiante · Colegio · Disciplinas · Acciones); de
- * 1024 px en adelante, las 6. Grado y Estado se ocultan en el escalón del
- * medio antes que apretarlos: los nombres largos los sacaban del carril.
+ * Dos modos (2026-10-15): hasta 1024 px tarjeta apilada; desde 1024 px, las
+ * 6 columnas con Grado y Estado visibles. El escalón intermedio se quita
+ * porque antes amontonaba columnas en pantallas de ~900 px.
  */
 const REJILLA =
-  'grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_6rem_11rem] md:items-center md:gap-4 ' +
-  'lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_8rem_6rem_6rem_11rem]';
+  'grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_8rem_6rem_6rem_11rem] lg:items-center lg:gap-4';
 
 const iniciales = (nombre: string) =>
   nombre
@@ -64,13 +62,13 @@ const EstudiantesLista = ({
   return (
     <div className="overflow-hidden rounded-lg border">
       <div
-        className={`${REJILLA} hidden bg-muted/50 px-4 py-2 text-sm font-medium text-muted-foreground md:grid`}
+        className={`${REJILLA} hidden bg-muted/50 px-4 py-2 text-sm font-medium text-muted-foreground lg:grid`}
       >
         <div>Estudiante</div>
         <div>Colegio</div>
-        <div className="hidden lg:block">Grado</div>
+        <div className="lg:block">Grado</div>
         <div>Disciplinas</div>
-        <div className="hidden lg:block">Estado</div>
+        <div className="lg:block">Estado</div>
         <div>Acciones</div>
       </div>
 
@@ -105,10 +103,10 @@ const EstudiantesLista = ({
               {/*
                 En móvil, Disciplinas y Acciones comparten línea (pedido del
                 cliente, 2026-10-15): la tarjeta queda más estrecha y los
-                botones se alcanzan sin bajar. `md:contents` disuelve el
+                botones se alcanzan sin bajar. `lg:contents` disuelve el
                 wrapper en md y cada hijo vuelve a su columna de la rejilla.
               */}
-              <div className="flex items-center justify-between gap-2 md:contents">
+              <div className="flex items-center justify-between gap-2 lg:contents">
                 <div className="text-sm">
                   {e.disciplinas > 0 ? (
                     <span>
@@ -119,7 +117,7 @@ const EstudiantesLista = ({
                   )}
                 </div>
 
-                <div className="hidden lg:block">
+                <div className="lg:block">
                   <Badge variant={activo ? 'default' : 'secondary'}>
                     {activo ? 'Activo' : 'Inactivo'}
                   </Badge>
@@ -129,7 +127,7 @@ const EstudiantesLista = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-11 w-11 md:h-9 md:w-9"
+                    className="h-11 w-11 lg:h-9 lg:w-9"
                     onClick={() => onVer(e)}
                     title="Ver ficha"
                     aria-label={`Ver ficha de ${e.nino_nombre}`}
