@@ -19,55 +19,31 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { usePermissions } from '@/hooks/usePermissions';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { METODO, type IntentoInput, type Parametro } from '@/api/evaluaciones';
+import { type IntentoInput, type Parametro } from '@/api/evaluaciones';
 import {
   useBorrarEvaluacionDeAlumno,
   useFichaDeAlumno,
   useGuardarIntentos,
 } from '@/hooks/useEvaluaciones';
 import {
-  brutoMobak,
+  aIntentoVivo,
   enMinutos,
-  esMobak,
+  estaRegistrado,
   puntajeDeParametro,
-  topeMobak,
+  vacio,
   type IntentoVivo,
+  type Registro,
 } from './metodos';
+import CamposIntento from './CamposIntento';
 
 interface Props {
   evaninopenId: number | null;
   onClose: () => void;
 }
 
-/** Lo registrado para un intento, antes de mandarlo. */
-interface Registro {
-  tiempo: string;
-  logro: boolean | null;
-  escala: number | null;
-  mobak: number | null;
-}
-
-const vacio = (): Registro => ({ tiempo: '', logro: null, escala: null, mobak: null });
-
 const clave = (evaparamId: number, intento: number) => `${evaparamId}:${intento}`;
-
-/** "1:30" o "90" → 90 segundos. */
-function aSegundos(texto: string): number | null {
-  const limpio = texto.trim();
-  if (!limpio) return null;
-  if (limpio.includes(':')) {
-    const [m, s] = limpio.split(':');
-    const minutos = Number(m);
-    const segundos = Number(s);
-    if (Number.isNaN(minutos) || Number.isNaN(segundos)) return null;
-    return minutos * 60 + segundos;
-  }
-  const n = Number(limpio);
-  return Number.isNaN(n) ? null : n;
-}
 
 /**
  * Evaluar a un alumno.
@@ -76,11 +52,9 @@ function aSegundos(texto: string): number | null {
  * que pintaban los 30 campos de golpe: con un parámetro de 12 intentos, en un
  * teléfono, había que hacer scroll a ciegas sin saber cuánto faltaba.
  *
- * **El puntaje no se calcula aquí.** Lo que se ve tras guardar es lo que
- * devolvió el servidor, no una segunda implementación del mismo cálculo — que
- * es exactamente lo que hacía el sistema viejo, con las tablas Mobak y la
- * interpolación de tiempo escritas en el navegador. Mientras se registra se ve
- * el valor tal cual; la nota aparece al guardar.
+ * **Puntaje en vivo** con el cálculo de `metodos.ts`, copia del backend; al
+ * guardar, el que vale es el del servidor. Los controles de cada intento
+ * viven en `CamposIntento`, compartidos con la vista previa.
  */
 const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
   // Sin `calificaciones:editar` se ve lo registrado, pero no se guarda ni se borra.
@@ -132,13 +106,8 @@ const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
   };
 
   /** Un intento cuenta como registrado si su método tiene valor. */
-  const registrado = (p: Parametro, intento: number): boolean => {
-    const r = registro(p.evaparam_id, intento);
-    if (p.evatipometo_id === METODO.TIEMPO) return aSegundos(r.tiempo) !== null;
-    if (p.evatipometo_id === METODO.LOGRO) return r.logro !== null;
-    if (p.evatipometo_id === METODO.ESCALA) return r.escala !== null;
-    return r.mobak !== null;
-  };
+  const registrado = (p: Parametro, intento: number): boolean =>
+    estaRegistrado(p, registro(p.evaparam_id, intento));
 
   const totalIntentos = parametros.reduce((s, p) => s + p.evaparam_intentos, 0);
   const hechos = parametros.reduce(
@@ -154,15 +123,9 @@ const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
    * guardar, el servidor es quien manda.
    */
   const intentosVivos = (p: Parametro): IntentoVivo[] =>
-    Array.from({ length: p.evaparam_intentos }, (_, i) => i + 1).map((n) => {
-      const r = registro(p.evaparam_id, n);
-      return {
-        tiempo: p.evatipometo_id === METODO.TIEMPO ? aSegundos(r.tiempo) : null,
-        logro: p.evatipometo_id === METODO.LOGRO ? r.logro : null,
-        escala: p.evatipometo_id === METODO.ESCALA ? r.escala : null,
-        mobak: esMobak(p.evatipometo_id) ? r.mobak : null,
-      };
-    });
+    Array.from({ length: p.evaparam_intentos }, (_, i) => i + 1).map((n) =>
+      aIntentoVivo(p, registro(p.evaparam_id, n)),
+    );
 
   const parametroCompleto = (p: Parametro): boolean =>
     Array.from({ length: p.evaparam_intentos }, (_, i) => i + 1).every((n) => registrado(p, n));
@@ -177,14 +140,10 @@ const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
     for (const p of parametros) {
       for (let n = 1; n <= p.evaparam_intentos; n += 1) {
         if (!registrado(p, n)) continue;
-        const r = registro(p.evaparam_id, n);
         salida.push({
           evaparam_id: p.evaparam_id,
           evaint_intento: n,
-          tiempo: p.evatipometo_id === METODO.TIEMPO ? aSegundos(r.tiempo) : null,
-          logro: p.evatipometo_id === METODO.LOGRO ? r.logro : null,
-          escala: p.evatipometo_id === METODO.ESCALA ? r.escala : null,
-          mobak: esMobak(p.evatipometo_id) ? r.mobak : null,
+          ...aIntentoVivo(p, registro(p.evaparam_id, n)),
         });
       }
     }
@@ -294,116 +253,12 @@ const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
                         )}
                       </div>
 
-                      {parametro.evatipometo_id === METODO.TIEMPO && (
-                        <div className="space-y-1">
-                          <Input
-                            value={r.tiempo}
-                            onChange={(e) =>
-                              cambiar(parametro.evaparam_id, n, { tiempo: e.target.value })
-                            }
-                            placeholder="1:30 o 90"
-                            inputMode="numeric"
-                            className="h-11 sm:h-10"
-                            aria-label={`Tiempo del intento ${n}`}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Minutos:segundos, o segundos a secas.
-                            {parametro.rango && (
-                              <>
-                                {' '}
-                                0 puntos si {parametro.rango.evatieran_op_cero}{' '}
-                                {parametro.rango.evatieran_tiempo_cero}s; completo si{' '}
-                                {parametro.rango.evatieran_op_full}{' '}
-                                {parametro.rango.evatieran_tiempo_full}s.
-                              </>
-                            )}
-                          </p>
-                        </div>
-                      )}
-
-                      {parametro.evatipometo_id === METODO.LOGRO && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            type="button"
-                            variant={r.logro === true ? 'default' : 'outline'}
-                            className="h-11 sm:h-10"
-                            onClick={() => cambiar(parametro.evaparam_id, n, { logro: true })}
-                          >
-                            Lo consiguió
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={r.logro === false ? 'default' : 'outline'}
-                            className="h-11 sm:h-10"
-                            onClick={() => cambiar(parametro.evaparam_id, n, { logro: false })}
-                          >
-                            No
-                          </Button>
-                        </div>
-                      )}
-
-                      {parametro.evatipometo_id === METODO.ESCALA && (
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap gap-2">
-                            {Array.from(
-                              {
-                                length:
-                                  (parametro.evaparam_escala_max ?? 5) -
-                                  (parametro.evaparam_escala_min ?? 0) +
-                                  1,
-                              },
-                              (_, i) => (parametro.evaparam_escala_min ?? 0) + i,
-                            ).map((valor) => (
-                              <Button
-                                key={valor}
-                                type="button"
-                                variant={r.escala === valor ? 'default' : 'outline'}
-                                className="h-11 w-11 p-0 sm:h-10 sm:w-10"
-                                onClick={() => cambiar(parametro.evaparam_id, n, { escala: valor })}
-                              >
-                                {valor}
-                              </Button>
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            De {parametro.evaparam_escala_min ?? 0} a{' '}
-                            {parametro.evaparam_escala_max ?? 5}.
-                          </p>
-                        </div>
-                      )}
-
-                      {esMobak(parametro.evatipometo_id) && (
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap gap-2">
-                            {Array.from(
-                              { length: topeMobak(parametro.evatipometo_id) + 1 },
-                              (_, valor) => valor,
-                            ).map((valor) => (
-                              <Button
-                                key={valor}
-                                type="button"
-                                variant={r.mobak === valor ? 'default' : 'outline'}
-                                className="h-11 w-11 p-0 sm:h-10 sm:w-10"
-                                onClick={() => cambiar(parametro.evaparam_id, n, { mobak: valor })}
-                              >
-                                {valor}
-                              </Button>
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {parametro.evatipometo_id === METODO.MOBAK_6
-                              ? '0-2 → nada · 3-4 → la mitad · 5-6 → todo'
-                              : '0 → nada · 1 → la mitad · 2 → todo'}
-                            {r.mobak !== null && (
-                              <>
-                                {' '}
-                                · has marcado {r.mobak} (
-                                {brutoMobak(parametro.evatipometo_id, r.mobak)} de 2)
-                              </>
-                            )}
-                          </p>
-                        </div>
-                      )}
+                      <CamposIntento
+                        parametro={parametro}
+                        intento={n}
+                        registro={r}
+                        onCambiar={(cambios) => cambiar(parametro.evaparam_id, n, cambios)}
+                      />
                     </div>
                   );
                 })}

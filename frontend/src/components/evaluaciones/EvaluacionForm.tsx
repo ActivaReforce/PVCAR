@@ -287,6 +287,7 @@ const EvaluacionForm = ({ ficha, onListo, onCancelar }: Props) => {
             descripcion={descripcion}
             categoria={categoria}
             parametros={parametros}
+            onCerrar={() => setVisualizando(false)}
           />
         </DialogContent>
       </Dialog>

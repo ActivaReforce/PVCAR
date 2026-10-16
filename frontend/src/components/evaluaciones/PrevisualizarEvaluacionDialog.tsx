@@ -12,7 +12,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** Vista previa readonly desde la card: trae la ficha + sus disciplinas vinculadas. */
+/** Vista previa desde la card: trae la ficha + sus disciplinas vinculadas. */
 const PrevisualizarEvaluacionDialog = ({ evaId, onClose }: Props) => {
   const ficha = useFichaEvaluacion(evaId);
 
@@ -32,6 +32,7 @@ const PrevisualizarEvaluacionDialog = ({ evaId, onClose }: Props) => {
             categoria={ficha.data.evaluacion.eva_categoria ?? ''}
             parametros={parametrosDeFicha(ficha.data)}
             evaId={ficha.data.evaluacion.eva_id}
+            onCerrar={onClose}
           />
         )}
       </DialogContent>
