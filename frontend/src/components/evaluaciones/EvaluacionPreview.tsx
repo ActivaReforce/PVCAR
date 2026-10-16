@@ -50,8 +50,8 @@ const numeros = (n: number) => Array.from({ length: Math.max(0, n) }, (_, i) => 
  *
  * Se usa en dos sitios:
  *   - Dentro del formulario de crear/editar, con el borrador en memoria.
- *   - En la card de la lista (ojo), con la evaluación ya guardada y una
- *     sección más con sus disciplinas vinculadas.
+ *   - En la card de la lista (ojo), con la evaluación ya guardada y, arriba
+ *     del todo, sus disciplinas vinculadas.
  */
 const EvaluacionPreview = ({
   titulo,
@@ -92,11 +92,63 @@ const EvaluacionPreview = ({
   // El borrador puede perder parámetros mientras la vista previa está cerrada.
   const actual = Math.min(paso, Math.max(0, parametros.length - 1));
   const parametro = parametros[actual];
+  const conDisciplinas = evaId !== undefined && evaId !== null;
 
   return (
     <div className="space-y-5">
+      {conDisciplinas && (
+        <section className="space-y-2">
+          <h4 className="text-sm font-semibold">Disciplinas vinculadas</h4>
+          {vinculadas.isLoading && (
+            <p className="text-sm text-muted-foreground">Cargando disciplinas…</p>
+          )}
+          {vinculadas.data &&
+            (vinculadas.data.vinculadas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no está vinculada a ninguna disciplina.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {vinculadas.data.vinculadas.map((d) => (
+                  <li key={d.colacthor_id} className="rounded-lg border p-3 text-sm">
+                    <p className="break-words font-medium">{d.act_nombre}</p>
+                    <p className="text-xs text-muted-foreground">{d.col_nombre}</p>
+                    <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      {d.horario_texto && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {d.horario_texto}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <GraduationCap className="h-3 w-3" />
+                        {d.alumnos} alumno{d.alumnos === 1 ? '' : 's'}
+                      </span>
+                      {d.evaluados > 0 && (
+                        <span className="text-emerald-700 dark:text-emerald-400">
+                          {d.evaluados} evaluado{d.evaluados === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ))}
+        </section>
+      )}
+
+      <h4
+        className={
+          conDisciplinas
+            ? 'border-t-2 border-foreground/20 pt-5 text-lg font-bold'
+            : 'text-lg font-bold'
+        }
+      >
+        Así se ve al evaluar:
+      </h4>
+
       <div className="space-y-1">
-        <h3 className="break-words text-lg font-semibold">{titulo || 'Sin título'}</h3>
+        <h3 className="break-words font-semibold">{titulo || 'Sin título'}</h3>
         {categoria && (
           <Badge variant="outline" className="text-xs">
             {categoria}
@@ -111,7 +163,7 @@ const EvaluacionPreview = ({
 
       <p className="flex items-start gap-2 rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
         <Eye className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        Así la verá quien evalúe. Puedes marcar para probar el puntaje; nada se guarda.
+        Puedes marcar para probar el puntaje; nada se guarda.
       </p>
 
       {!parametro ? (
@@ -213,46 +265,6 @@ const EvaluacionPreview = ({
         </section>
       )}
 
-      {evaId !== undefined && evaId !== null && (
-        <section className="space-y-2">
-          <h4 className="text-sm font-semibold">Disciplinas vinculadas</h4>
-          {vinculadas.isLoading && (
-            <p className="text-sm text-muted-foreground">Cargando disciplinas…</p>
-          )}
-          {vinculadas.data &&
-            (vinculadas.data.vinculadas.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aún no está vinculada a ninguna disciplina.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {vinculadas.data.vinculadas.map((d) => (
-                  <li key={d.colacthor_id} className="rounded-lg border p-3 text-sm">
-                    <p className="break-words font-medium">{d.act_nombre}</p>
-                    <p className="text-xs text-muted-foreground">{d.col_nombre}</p>
-                    <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      {d.horario_texto && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {d.horario_texto}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <GraduationCap className="h-3 w-3" />
-                        {d.alumnos} alumno{d.alumnos === 1 ? '' : 's'}
-                      </span>
-                      {d.evaluados > 0 && (
-                        <span className="text-emerald-700 dark:text-emerald-400">
-                          {d.evaluados} evaluado{d.evaluados === 1 ? '' : 's'}
-                        </span>
-                      )}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ))}
-        </section>
-      )}
     </div>
   );
 };
