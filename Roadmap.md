@@ -8,7 +8,7 @@
 
 > **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
 
-**Corte de este documento: 2026-10-16 (Fase 12 cerrada en código: Evaluaciones con Visualizar, agrupar por colegios, bloqueo con notas, puntaje en vivo, umbrales con palabras, permisos; listas apiladas hasta 1024 px; aviso al dar de alta un alumno manual; "sin disciplinas" cuenta solo activos).**
+**Corte de este documento: 2026-10-16 (Fase 12 cerrada y aprobada por el cliente; vista previa de evaluaciones igual que evaluar. Antes: Evaluaciones con Visualizar, agrupar por colegios, bloqueo con notas, puntaje en vivo, umbrales con palabras, permisos; listas apiladas hasta 1024 px; aviso al dar de alta un alumno manual; "sin disciplinas" cuenta solo activos).**
 
 ---
 
@@ -46,12 +46,12 @@
 | **9 — Entrenadores** | 🟡 construida el 2026-09-16, en `dev`. **Los dos prerrequisitos, hechos el 2026-10-06:** auxiliar con varios titulares (selector "de quién ver" + "Todos") y bloqueo de choque de horario del entrenador. Solo falta probarla |
 | **10 — Estudiantes** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
 | **11 — Asistencias** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
-| **12 — Evaluaciones** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
+| **12 — Evaluaciones** | ✅ **cerrada el 2026-10-16**: probada en pantalla y aprobada por el cliente. En `main` desde el PR #21; la vista previa igual que evaluar, en `dev` |
 | **13 — Tablero y Reportes** | 🟡 construida el 2026-09-17, en `dev`. 4 tableros, 9 reportes y 14 gráficas. **+ Data anterior** (2026-10-02): 15 conjuntos, 8 gráficas y Excel de todo; pruebas en `docs/data-anterior.md`. **La exportación a Excel de Reportes fallaba siempre** — arreglada el 2026-10-02. Solo falta probarla |
 | **14 — Encuestas y Representantes** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
 | **14B — Inscripciones** (nuevo, 2026-10-01) | 🟡 **rehecha el 2026-10-05 y en `dev`** con los seis documentos del cliente (4 generales + ficha y contrato por colegio), constancia por documento, PDF por alumno con membrete, IVA fijo 15 %, apertura general y por colegio, cuenta bancaria. `0014`–`0019` aplicadas en dev y prod. **El cobro por disciplina quedó resuelto el 2026-10-06** con Disciplinas v2 (una disciplina = una tarifa, máximo configurable por alumno, sin cruces). **Representante con cuenta previa hecho y probado el 2026-10-07**, en `main` desde el PR #11. Estado vigente en `docs/fase14b-contratos.md`. Solo Propietario |
 | **Novedades** (puntos 8 y 9, fuera de fase) | ✅ **cerrado el 2026-10-12**: probado y aprobado por el cliente en `dev`. Novedades a mano (general, personal, representantes, alumnos), ausencias y correcciones automáticas al pasar lista, correos configurables, número en el menú, baja lógica y reporte con hoja Ausencias. En producción desde el PR #16 (2026-10-13) |
-| **15 — Endurecimiento y QA** | 🟡 en marcha desde el 2026-09-17. Hecho todo lo que no necesita la aplicación en marcha. SMTP de Resend puesto en prod y dev (2026-10-07). Falta la auditoría de fugas con token por rol, los e2e, el repaso de accesibilidad y **el respaldo de prod** |
+| **15 — Endurecimiento y QA** | 🟡 en marcha desde el 2026-09-17. Hecho todo lo que no necesita la aplicación en marcha. SMTP de Resend puesto en prod y dev (2026-10-07). Falta la auditoría de fugas con token por rol, los e2e y el repaso de accesibilidad (el respaldo de prod se hace a mano cuando lo pida) |
 | **16 — Lanzamiento** | ✅ **2026-10-12**: `activareforce.com` en producción. Prod limpia de lo de prueba y con datos reales cargados por el cliente |
 | **17 — Cierre del proyecto** | 🟡 plataforma anterior borrada el 2026-10-12; faltan los PAT, el repo privado y la limpieza final |
 
@@ -77,7 +77,7 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 
 ### Corte de sesión — 2026-10-16
 
-**Hecho hoy (todo en `dev`, pendiente PR a `main`):**
+**Hecho hoy (en `main` desde el PR #21, salvo la vista previa del final, que está en `dev`):**
 
 - **Fase 12 cerrada en código** tras las pruebas en pantalla del cliente, tres bloques:
   - **Form de evaluación** reescrito: umbrales de Por tiempo con palabras ("menor que", "menor o igual que"...), sufijo "s", inputs numéricos que ya dejan borrar completo (se normalizan al perder foco), validación inline + toast al guardar si los umbrales van en el mismo sentido o la escala tiene máximo ≤ mínimo, y botón "Añadir parámetro" al final de la lista.
@@ -91,10 +91,13 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 - **Conteo "sin disciplinas"** del encabezado de Alumnos: cuenta solo los **activos**. Un inactivo no está pidiendo asignación.
 - **Listas** de Alumnos, Entrenadores y Usuarios: hasta 1024 px tarjeta apilada; desde 1024 px columnas completas. Se quitó el escalón intermedio md que seguía amontonando columnas con nombres largos.
 - 638/638 tests de backend, 7/7 de frontend; typecheck, lint y build limpios. **Sin SQL en toda la Fase 12.**
+- **Vista previa igual que evaluar** (en `dev`, `eb0c41b` + `bde8b86`): arriba, las disciplinas vinculadas; luego el separador **"Así se ve al evaluar:"** y la pantalla de evaluar tal cual (un parámetro por pantalla, todos sus intentos con los controles de su método, avance y puntaje en vivo). Se puede marcar para probar; solo Limpiar y Cerrar, nada se guarda. Los controles de un intento viven en `CamposIntento`, compartido con la pantalla de evaluar; los umbrales de tiempo se leen con palabras en las dos.
+- **Fase 12 aprobada por el cliente** el 2026-10-16: ✅ cerrada.
 
 **Al retomar — lista de trabajo, uno por uno:**
 
-1. **Pruebas en pantalla** de las Fases 13 y 14 (Reportes y Encuestas/Representantes) y 14B (Inscripciones). `docs/checklist-modulos.md`.
+0. **Pasar a `main`** la vista previa de evaluaciones (sin SQL) cuando el cliente lo pida.
+1. **Pruebas en pantalla** de las Fases 9–11, 13 y 14 (Reportes y Encuestas/Representantes) y 14B (Inscripciones). `docs/checklist-modulos.md`.
 2. **Pagos mensuales** — esperar a que el cliente lo cuente.
 3. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
 
@@ -964,7 +967,7 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 - [ ] **Auditoría de fugas con un token de cada rol.** El repaso estático dice que el alcance se aplica en el **servicio**, no en el SQL del repositorio: cada módulo que toca datos de menores tiene su guarda (`exigirVisible`, `exigirPendienteVisible`, `exigirSesion`, `exigirAlcance`…) que resuelve el alcance y devuelve 403. Es el diseño correcto, pero eso no se da por bueno leyendo código: se prueba con un token por rol contra todos los endpoints, y eso necesita el API en marcha.
 - [ ] Tests e2e por módulo + prueba de carga en dev con el volumen real.
 - [ ] Repaso de accesibilidad y responsive de las 14 pantallas, en los dos temas, en los tres anchos.
-- [ ] **Respaldo de prod.** Ya tiene datos reales y el plan gratuito de Supabase no hace copias automáticas: `pg_dump` programado o plan Pro.
+- [x] ~~**Respaldo de prod.**~~ **No necesario como tarea** (cliente, 2026-10-15): se hace a mano, puntual, cuando lo pida. Antes de cualquier operación destructiva en prod se le avisa.
 
 ---
 
