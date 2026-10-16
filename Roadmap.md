@@ -990,7 +990,7 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 - [ ] **Rotar los dos PAT de Supabase** que están en texto plano en `.mcp.json` (riesgo asumido por el cliente).
 - [ ] Borrar `CLAUDE.md` y `Roadmap.md` del repo (están solo para trabajar desde otro equipo).
 - [ ] Pasar el repo `PVCAR` a **privado**.
-- [ ] El workspace sale de la carpeta `Flowward`.
+- [x] ~~El workspace sale de la carpeta `Flowward`.~~ Cerrado el 2026-10-16: la carpeta se queda en `Flowward` para siempre (decisión del cliente).
 
 ---
 
