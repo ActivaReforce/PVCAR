@@ -8,7 +8,7 @@
 
 > **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
 
-**Corte de este documento: 2026-10-15 (Reportes reordenados + nuevos de Representantes, Inscripciones y Encuestas; totales en pantalla; listas de /estudiantes, /usuarios y /entrenadores sin colisión en tamaños intermedios).**
+**Corte de este documento: 2026-10-16 (Fase 12 cerrada en código: Evaluaciones con Visualizar, agrupar por colegios, bloqueo con notas, puntaje en vivo, umbrales con palabras, permisos; listas apiladas hasta 1024 px; aviso al dar de alta un alumno manual; "sin disciplinas" cuenta solo activos).**
 
 ---
 
@@ -74,6 +74,29 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 2. **Lo anterior está en el esquema `archivo`** de la misma base, solo lectura, para consultarlo en **Reportes → "Data anterior"**. Migración `0013_archivo.sql`, verificada en dev y prod el 2026-10-02: 35 tablas, 20 620 filas, **sin** contraseñas, información de salud, cédula de alumnos ni fotos. Las cédulas, teléfonos, correos y direcciones de los usuarios **sí** se quedan, a petición del cliente.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
+
+### Corte de sesión — 2026-10-16
+
+**Hecho hoy (todo en `dev`, pendiente PR a `main`):**
+
+- **Fase 12 cerrada en código** tras las pruebas en pantalla del cliente, tres bloques:
+  - **Form de evaluación** reescrito: umbrales de Por tiempo con palabras ("menor que", "menor o igual que"...), sufijo "s", inputs numéricos que ya dejan borrar completo (se normalizan al perder foco), validación inline + toast al guardar si los umbrales van en el mismo sentido o la escala tiene máximo ≤ mínimo, y botón "Añadir parámetro" al final de la lista.
+  - **Vista previa readonly** (nuevo `EvaluacionPreview` + `PrevisualizarEvaluacionDialog`): botón "Visualizar" en el formulario (borrador en memoria) y botón ojo en la card de la lista (ficha + sección de disciplinas vinculadas con horario y conteos). El menú de la fila queda solo con Editar, Reactivar, Baja y Eliminar.
+  - **Vincular disciplinas** agrupado por colegio con cabecera cuando hay varios en el alcance.
+  - **Permisos del listado**: quien tiene `evaluaciones:crear` ve todas; el resto solo las que creó él mismo o las vinculadas a disciplinas de su alcance.
+  - **Bloqueo al editar con alumnos evaluados**: AlertDialog explica + opción "Borrar notas y editar" con segunda confirmación → `POST /evaluaciones/:id/resetear-evaluados` (endpoint nuevo, sin SQL: borra intentos y marca a los evaluados como pendientes en una transacción, auditado) y abre el editor.
+  - **Pantalla de evaluar al alumno**: la barra avanza por parámetros completos (no por intentos), con **puntaje en vivo** por parámetro y acumulado / total posible arriba. El cálculo replica el `scoring.ts` del backend; al guardar manda el servidor.
+- **Resumen de asistencias en móvil**: ocultas las cinco tarjetas de Presentes/Ausentes/Tarde/Justificado/Sin marcar en pantallas pequeñas (ocupaban demasiado); desde `sm` vuelven. "Sin marcar" sigue en la barra de guardado.
+- **Alta manual de alumno**: antes de abrir el formulario sale un AlertDialog recordando que **no se guarda contrato, aceptación de política de datos ni pago** (eso solo se registra con el formulario público).
+- **Conteo "sin disciplinas"** del encabezado de Alumnos: cuenta solo los **activos**. Un inactivo no está pidiendo asignación.
+- **Listas** de Alumnos, Entrenadores y Usuarios: hasta 1024 px tarjeta apilada; desde 1024 px columnas completas. Se quitó el escalón intermedio md que seguía amontonando columnas con nombres largos.
+- 638/638 tests de backend, 7/7 de frontend; typecheck, lint y build limpios. **Sin SQL en toda la Fase 12.**
+
+**Al retomar — lista de trabajo, uno por uno:**
+
+1. **Pruebas en pantalla** de las Fases 13 y 14 (Reportes y Encuestas/Representantes) y 14B (Inscripciones). `docs/checklist-modulos.md`.
+2. **Pagos mensuales** — esperar a que el cliente lo cuente.
+3. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
 
 ### Corte de sesión — 2026-10-15
 
