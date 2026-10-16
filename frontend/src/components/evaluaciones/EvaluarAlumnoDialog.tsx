@@ -28,7 +28,14 @@ import {
   useFichaDeAlumno,
   useGuardarIntentos,
 } from '@/hooks/useEvaluaciones';
-import { brutoMobak, enMinutos, esMobak, topeMobak } from './metodos';
+import {
+  brutoMobak,
+  enMinutos,
+  esMobak,
+  puntajeDeParametro,
+  topeMobak,
+  type IntentoVivo,
+} from './metodos';
 
 interface Props {
   evaninopenId: number | null;
@@ -140,6 +147,31 @@ const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
     0,
   );
 
+  /**
+   * Puntaje en vivo (2026-10-15). Un parámetro cuenta como "completo" cuando
+   * TODOS sus intentos están registrados: la barra avanza así, por parámetros,
+   * no por intentos. El cálculo replica el `scoring.ts` del backend; al
+   * guardar, el servidor es quien manda.
+   */
+  const intentosVivos = (p: Parametro): IntentoVivo[] =>
+    Array.from({ length: p.evaparam_intentos }, (_, i) => i + 1).map((n) => {
+      const r = registro(p.evaparam_id, n);
+      return {
+        tiempo: p.evatipometo_id === METODO.TIEMPO ? aSegundos(r.tiempo) : null,
+        logro: p.evatipometo_id === METODO.LOGRO ? r.logro : null,
+        escala: p.evatipometo_id === METODO.ESCALA ? r.escala : null,
+        mobak: esMobak(p.evatipometo_id) ? r.mobak : null,
+      };
+    });
+
+  const parametroCompleto = (p: Parametro): boolean =>
+    Array.from({ length: p.evaparam_intentos }, (_, i) => i + 1).every((n) => registrado(p, n));
+
+  const parametrosCompletos = parametros.filter(parametroCompleto).length;
+  const puntajeParametro = (p: Parametro) => puntajeDeParametro(p, intentosVivos(p));
+  const puntajeAcumulado = parametros.reduce((s, p) => s + puntajeParametro(p), 0);
+  const totalPosible = parametros.reduce((s, p) => s + p.evaparam_puntaje, 0);
+
   const aEnviar = (): IntentoInput[] => {
     const salida: IntentoInput[] = [];
     for (const p of parametros) {
@@ -213,23 +245,27 @@ const EvaluarAlumnoDialog = ({ evaninopenId, onClose }: Props) => {
           {parametro && (
             <>
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">
                     Parámetro {paso + 1} de {parametros.length}
                   </span>
-                  <span>
-                    {hechos} de {totalIntentos} intentos
+                  <span className="font-medium">
+                    {puntajeAcumulado} / {totalPosible} pts
                   </span>
                 </div>
-                <Progress value={(hechos / Math.max(1, totalIntentos)) * 100} />
+                <Progress value={(parametrosCompletos / Math.max(1, parametros.length)) * 100} />
               </div>
 
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-2">
                 <div>
-                  <h3 className="break-words font-medium">{parametro.evaparam_nombre}</h3>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <h3 className="break-words font-medium">{parametro.evaparam_nombre}</h3>
+                    <span className="text-sm font-semibold">
+                      {puntajeParametro(parametro)} / {parametro.evaparam_puntaje} pts
+                    </span>
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    {parametro.evatipometo_nombre} · {parametro.evaparam_puntaje} pts entre{' '}
-                    {parametro.evaparam_intentos} intento
+                    {parametro.evatipometo_nombre} · {parametro.evaparam_intentos} intento
                     {parametro.evaparam_intentos === 1 ? '' : 's'}
                   </p>
                   {parametro.evaparam_nota && (

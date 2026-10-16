@@ -133,9 +133,21 @@ export async function listar(
 ): Promise<ListaEvaluaciones> {
   const alcance = await alcanceDe(actor.usuario);
 
+  /**
+   * Quien puede crear evaluaciones ve todas (pedido del cliente, 2026-10-15):
+   * Propietario, Admin y Coordinador. Quien no, solo las que creó él mismo
+   * (poco común, hace falta `evaluaciones:editar` sin `crear`) y las que
+   * están vinculadas a disciplinas de su alcance — es decir, el Entrenador
+   * sigue viendo las de sus clases.
+   */
+  const puedeCrear = actor.permisos.some(
+    (p) => p.modulo === 'evaluaciones' && p.accion === 'crear',
+  );
+  const alcanceEfectivo = puedeCrear ? { ...alcance, global: true } : alcance;
+
   const [pagina, conteos] = await Promise.all([
-    repo.listarEvaluaciones(query, alcance, actor.usuario.usu_id),
-    repo.contarEvaluaciones(alcance, actor.usuario.usu_id),
+    repo.listarEvaluaciones(query, alcanceEfectivo, actor.usuario.usu_id),
+    repo.contarEvaluaciones(alcanceEfectivo, actor.usuario.usu_id),
   ]);
 
   return { ...pagina, conteos };
@@ -700,6 +712,42 @@ export async function guardarIntentos(
  * bundle y un id cualquiera se podian borrar notas desde fuera de la
  * aplicacion. La RPC sigue existiendo en el esquema pero ya no es el camino.
  */
+/**
+ * Devuelve a pendiente a todos los alumnos ya evaluados de una evaluación y
+ * borra sus intentos (pedido del cliente, 2026-10-15). Se usa cuando se
+ * quiere editar la plantilla y hay notas puestas: una plantilla cambiada
+ * con intentos ya no coincide con el método con que se puntuaron.
+ */
+export async function resetearEvaluados(
+  actor: AuthUser,
+  evaId: number,
+): Promise<{ alumnos: number; intentos: number }> {
+  const { evaluacion } = await exigirEditable(actor, evaId);
+
+  const resultado = await enTransaccion(async (client) => {
+    const r = await repo.resetearEvaluados(client, evaId);
+    if (r.alumnos > 0) {
+      await auditar(
+        {
+          actor,
+          accion: 'eliminar',
+          entidad: 'evaluacion_resetear',
+          entidadId: evaId,
+          detalle: {
+            evaluacion: evaluacion.eva_titulo,
+            alumnos: r.alumnos,
+            intentos: r.intentos,
+          },
+        },
+        client,
+      );
+    }
+    return r;
+  });
+
+  return resultado;
+}
+
 export async function borrarEvaluacionDeAlumno(
   actor: AuthUser,
   evaninopenId: number,

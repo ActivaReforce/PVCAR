@@ -17,12 +17,20 @@ interface Props {
   onOrdenar: (clave: Orden) => void;
 }
 
-/** Columnas desde md, las mismas en la cabecera y en cada fila. */
-const COLUMNAS_MD =
-  'md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1.8fr)_8rem_6rem_5.5rem] md:items-center md:gap-4';
-const REJILLA = `grid ${COLUMNAS_MD}`;
+/**
+ * Dos modos (2026-10-15): hasta 1024 px, tarjeta con nombre y acciones arriba
+ * y el resto en una línea compacta; desde 1024 px, las 5 columnas con Estado
+ * visible. Se quitó el escalón intermedio porque a 900 px los nombres de
+ * colegios chocaban con las disciplinas de la siguiente columna.
+ *
+ * Cédula y teléfono salieron de la lista (pedido del cliente, 2026-10-15):
+ * son datos de ficha, no de resumen.
+ */
+const COLUMNAS_LG =
+  'lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.8fr)_8rem_6rem_5.5rem] lg:items-center lg:gap-4';
+const REJILLA = `grid ${COLUMNAS_LG}`;
 /** En el teléfono: nombre y acciones en una línea, el resto debajo. */
-const FILA = `grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 ${COLUMNAS_MD}`;
+const FILA = `grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 ${COLUMNAS_LG}`;
 
 const iniciales = (nombre: string) =>
   nombre
@@ -79,11 +87,10 @@ function Cabecera({
 const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar }: Props) => {
   return (
     <div className="min-w-0 space-y-2">
-      <div className={`${REJILLA} hidden px-4 py-1 text-sm text-muted-foreground md:grid`}>
+      <div className={`${REJILLA} hidden px-4 py-1 text-sm text-muted-foreground lg:grid`}>
         <Cabecera clave="nombre" orden={orden} dir={dir} onOrdenar={onOrdenar}>
           Entrenador
         </Cabecera>
-        <div className="font-medium">Cédula · teléfono</div>
         <div className="font-medium">Colegios</div>
         <Cabecera clave="disciplinas" orden={orden} dir={dir} onOrdenar={onOrdenar}>
           Disciplinas
@@ -101,13 +108,13 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
               key={e.ent_id}
               className={cn(
                 FILA,
-                'rounded-lg border bg-card px-3 py-2.5 md:px-4 md:py-3',
+                'rounded-lg border bg-card px-3 py-2.5 lg:px-4 lg:py-3',
                 sinDisciplinas && 'border-2 border-amber-500 dark:border-amber-400',
                 !activo && 'border-dashed bg-muted/40',
               )}
             >
               <div className="flex min-w-0 items-center gap-3">
-                <Avatar className="h-9 w-9 flex-shrink-0 md:h-10 md:w-10">
+                <Avatar className="h-9 w-9 flex-shrink-0 lg:h-10 lg:w-10">
                   <AvatarImage src={e.usu_foto_url ?? undefined} alt="" />
                   <AvatarFallback>{iniciales(e.usu_nombre)}</AvatarFallback>
                 </Avatar>
@@ -116,7 +123,7 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
                     {e.usu_nombre}
                   </div>
                   <div
-                    className="truncate text-xs text-muted-foreground md:text-sm"
+                    className="truncate text-xs text-muted-foreground lg:text-sm"
                     title={e.usu_correo}
                   >
                     {e.usu_correo}
@@ -125,14 +132,8 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
               </div>
 
               {/* En el teléfono todo esto va en una línea compacta bajo el nombre;
-                  desde md, `contents` lo disuelve y cada dato vuelve a su columna. */}
-              <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs md:contents md:text-sm">
-                <div className="min-w-0 text-muted-foreground">
-                  <span className="md:block md:truncate">{e.usu_cedula ?? 'Sin cédula'}</span>
-                  <span className="md:hidden"> · </span>
-                  <span className="md:block md:truncate">{e.usu_telefono ?? 'Sin teléfono'}</span>
-                </div>
-
+                  desde lg, `contents` lo disuelve y cada dato vuelve a su columna. */}
+              <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs lg:contents lg:text-sm">
                 <div className="flex min-w-0 flex-wrap gap-1">
                   {e.colegios.length > 0 ? (
                     e.colegios.map((c) => (
@@ -156,7 +157,7 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
                 <div>
                   <strong>{e.disciplinas}</strong>
                   <span className="text-muted-foreground">
-                    <span className="md:hidden"> disc.</span> · {e.alumnos} alumnos
+                    <span className="lg:hidden"> disc.</span> · {e.alumnos} alumnos
                     {e.auxiliares > 0 &&
                       ` · ${e.auxiliares} ${e.auxiliares === 1 ? 'auxiliar' : 'auxiliares'}`}
                   </span>
@@ -170,11 +171,11 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
               </div>
 
               {/* Acciones: arriba a la derecha en el teléfono, última columna en md. */}
-              <div className="col-start-2 row-start-1 flex items-center gap-0.5 md:col-start-auto md:row-start-auto">
+              <div className="col-start-2 row-start-1 flex items-center gap-0.5 lg:col-start-auto lg:row-start-auto">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 md:h-9 md:w-9"
+                  className="h-10 w-10 lg:h-9 lg:w-9"
                   onClick={() => onVer(e)}
                   title="Ver ficha"
                   aria-label={`Ver ficha de ${e.usu_nombre}`}
@@ -186,7 +187,7 @@ const EntrenadorTable = ({ entrenadores, onVer, onAsignar, orden, dir, onOrdenar
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-10 w-10 md:h-9 md:w-9"
+                      className="h-10 w-10 lg:h-9 lg:w-9"
                       onClick={() => onAsignar(e)}
                       title="Asignar disciplinas"
                       aria-label={`Asignar disciplinas a ${e.usu_nombre}`}

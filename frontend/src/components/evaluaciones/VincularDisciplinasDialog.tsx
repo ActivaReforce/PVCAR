@@ -90,6 +90,20 @@ const VincularDisciplinasDialog = ({ evaluacion, onClose }: Props) => {
     );
   }, [todas, busqueda]);
 
+  /**
+   * Agrupadas por colegio (pedido del cliente, 2026-10-15): cuando una
+   * evaluación es "para los sextos", quien la configura busca el colegio y
+   * marca de un vistazo las disciplinas de ese bloque.
+   */
+  const porColegio = useMemo(() => {
+    const mapa = new Map<string, typeof todas>();
+    for (const d of filtradas) {
+      mapa.set(d.col_nombre, [...(mapa.get(d.col_nombre) ?? []), d]);
+    }
+    return [...mapa.entries()].sort(([a], [b]) => a.localeCompare(b, 'es'));
+  }, [filtradas]);
+  const variosColegios = porColegio.length > 1;
+
   const originales = new Set((datos.data?.vinculadas ?? []).map((v) => v.colacthor_id));
 
   /** Lo que cambia, para poder avisar antes de guardar. */
@@ -158,35 +172,50 @@ const VincularDisciplinasDialog = ({ evaluacion, onClose }: Props) => {
             </p>
           )}
 
-          <ul className="divide-y">
-            {filtradas.map((d) => (
-              <li key={d.colacthor_id} className="flex items-start gap-3 py-3">
-                <Checkbox
-                  id={`disc-${d.colacthor_id}`}
-                  checked={elegidas.has(d.colacthor_id)}
-                  onCheckedChange={() => alternar(d.colacthor_id)}
-                  className="mt-1"
-                />
-                <label htmlFor={`disc-${d.colacthor_id}`} className="min-w-0 flex-1 cursor-pointer">
-                  <div className="truncate font-medium">{d.act_nombre}</div>
-                  <div className="truncate text-sm text-muted-foreground">
-                    {d.col_nombre} · {d.horario ?? ''} · {d.alumnos} alumno
-                    {d.alumnos === 1 ? '' : 's'}
-                  </div>
-                  {d.evaluados > 0 && (
-                    <div className="text-xs text-emerald-700 dark:text-emerald-400">
-                      {d.evaluados} ya evaluado{d.evaluados === 1 ? '' : 's'}
-                    </div>
-                  )}
-                  {d.estuvo && (
-                    <div className="text-xs text-muted-foreground">
-                      Estuvo vinculada: al marcarla se reactiva
-                    </div>
-                  )}
-                </label>
-              </li>
+          <div className="space-y-4">
+            {porColegio.map(([colegio, lista]) => (
+              <section key={colegio} className="space-y-1">
+                {variosColegios && (
+                  <h3 className="sticky top-0 z-10 bg-background py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {colegio} · {lista.length}
+                  </h3>
+                )}
+                <ul className="divide-y">
+                  {lista.map((d) => (
+                    <li key={d.colacthor_id} className="flex items-start gap-3 py-3">
+                      <Checkbox
+                        id={`disc-${d.colacthor_id}`}
+                        checked={elegidas.has(d.colacthor_id)}
+                        onCheckedChange={() => alternar(d.colacthor_id)}
+                        className="mt-1"
+                      />
+                      <label
+                        htmlFor={`disc-${d.colacthor_id}`}
+                        className="min-w-0 flex-1 cursor-pointer"
+                      >
+                        <div className="truncate font-medium">{d.act_nombre}</div>
+                        <div className="truncate text-sm text-muted-foreground">
+                          {!variosColegios && `${d.col_nombre} · `}
+                          {d.horario ?? ''} · {d.alumnos} alumno
+                          {d.alumnos === 1 ? '' : 's'}
+                        </div>
+                        {d.evaluados > 0 && (
+                          <div className="text-xs text-emerald-700 dark:text-emerald-400">
+                            {d.evaluados} ya evaluado{d.evaluados === 1 ? '' : 's'}
+                          </div>
+                        )}
+                        {d.estuvo && (
+                          <div className="text-xs text-muted-foreground">
+                            Estuvo vinculada: al marcarla se reactiva
+                          </div>
+                        )}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         </div>
 
         {(aVincular.length > 0 || aDesvincular.length > 0) && (

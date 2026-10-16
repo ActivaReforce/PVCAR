@@ -255,6 +255,10 @@ export const evaluacionesApi = {
 
   reactivar: (id: number) => api.post<FichaEvaluacion>(`/evaluaciones/${id}/reactivar`),
 
+  /** Devuelve a pendiente a los alumnos evaluados y borra sus intentos. */
+  resetearEvaluados: (id: number) =>
+    api.post<{ alumnos: number; intentos: number }>(`/evaluaciones/${id}/resetear-evaluados`),
+
   impacto: (id: number) => api.get<ImpactoEvaluacion>(`/evaluaciones/${id}/impacto`),
 
   eliminar: (id: number, confirmacion: string) =>

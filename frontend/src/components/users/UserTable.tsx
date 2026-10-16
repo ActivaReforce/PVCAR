@@ -44,9 +44,13 @@ interface UserTableProps {
   onSort?: (key: string) => void;
 }
 
-/** Misma rejilla en la cabecera y en cada fila: si cambia, cambia en un sitio. */
+/**
+ * Dos modos (2026-10-15): hasta 1024 px tarjeta apilada; desde 1024 px, las 5
+ * columnas. Se quitó el escalón intermedio porque a 900 px los nombres largos
+ * se superponían a los correos del siguiente carril.
+ */
 const REJILLA =
-  'grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.6fr)_7rem_7rem_11rem] md:items-center md:gap-4';
+  'grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.6fr)_7rem_7rem_11rem] lg:items-center lg:gap-4';
 
 const COLUMNAS_ORDENABLES = [
   { clave: 'nombre', etiqueta: 'Usuario' },
@@ -125,7 +129,7 @@ const UserTable = ({
       {/* Ordenar en el telefono: las cabeceras de columna no existen ahi, y
           sin esto la lista solo se podia ordenar desde el escritorio. */}
       {onSort && (
-        <div className="flex items-center gap-2 md:hidden">
+        <div className="flex items-center gap-2 lg:hidden">
           <Select value={sortKey ?? 'nombre'} onValueChange={(valor) => onSort(valor)}>
             <SelectTrigger className="h-11 flex-1 min-w-0">
               <SelectValue placeholder="Ordenar por" />
@@ -158,7 +162,7 @@ const UserTable = ({
       <div className="rounded-lg border overflow-hidden">
         {/* Cabecera: solo desde md. En el telefono cada fila se lee sola. */}
         <div
-          className={`${REJILLA} hidden md:grid bg-muted/50 px-4 py-2 text-sm text-muted-foreground`}
+          className={`${REJILLA} hidden lg:grid bg-muted/50 px-4 py-2 text-sm text-muted-foreground`}
         >
           <Cabecera
             clave="nombre"
@@ -182,6 +186,7 @@ const UserTable = ({
             sortKey={sortKey}
             sortDirection={sortDirection}
             onSort={onSort}
+            className="hidden lg:flex"
           >
             Creado
           </Cabecera>
@@ -216,7 +221,7 @@ const UserTable = ({
                     En el telefono comparten una sola linea; desde md el
                     `contents` disuelve este contenedor y cada uno vuelve a ser
                     su columna de la rejilla. Un solo markup, sin copias. */}
-                <div className="flex min-w-0 flex-wrap items-center gap-2 md:contents">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 lg:contents">
                   <div className="flex min-w-0 flex-wrap gap-1">
                     {user.roles.length > 0 ? (
                       user.roles.map((rol) => (
@@ -235,9 +240,9 @@ const UserTable = ({
                   </div>
                 </div>
 
-                {/* La fecha de creacion solo desde md: en 360 px se comia una
-                    linea entera para un dato que casi nunca se mira. */}
-                <div className="hidden text-sm text-muted-foreground md:block">
+                {/* La fecha de creación solo desde lg (2026-10-15): a 900 px
+                    apretaba la rejilla y las columnas se montaban. */}
+                <div className="hidden text-sm text-muted-foreground lg:block">
                   {fechaDia(user.usu_fecha_creacion)}
                 </div>
 
@@ -247,7 +252,7 @@ const UserTable = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-11 w-11 md:h-9 md:w-9"
+                    className="h-11 w-11 lg:h-9 lg:w-9"
                     onClick={() => onView(user)}
                     title="Ver detalles"
                     aria-label={`Ver detalles de ${user.usu_nombre}`}

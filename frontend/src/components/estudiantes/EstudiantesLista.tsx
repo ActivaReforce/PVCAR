@@ -14,9 +14,13 @@ interface Props {
   onEliminar: (e: Estudiante) => void;
 }
 
-/** Misma rejilla en la cabecera y en cada fila. */
+/**
+ * Dos modos (2026-10-15): hasta 1024 px tarjeta apilada; desde 1024 px, las
+ * 6 columnas con Grado y Estado visibles. El escalón intermedio se quita
+ * porque antes amontonaba columnas en pantallas de ~900 px.
+ */
 const REJILLA =
-  'grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_8rem_6rem_6rem_11rem] md:items-center md:gap-4';
+  'grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_8rem_6rem_6rem_11rem] lg:items-center lg:gap-4';
 
 const iniciales = (nombre: string) =>
   nombre
@@ -58,13 +62,13 @@ const EstudiantesLista = ({
   return (
     <div className="overflow-hidden rounded-lg border">
       <div
-        className={`${REJILLA} hidden bg-muted/50 px-4 py-2 text-sm font-medium text-muted-foreground md:grid`}
+        className={`${REJILLA} hidden bg-muted/50 px-4 py-2 text-sm font-medium text-muted-foreground lg:grid`}
       >
         <div>Estudiante</div>
         <div>Colegio</div>
-        <div>Grado</div>
+        <div className="lg:block">Grado</div>
         <div>Disciplinas</div>
-        <div>Estado</div>
+        <div className="lg:block">Estado</div>
         <div>Acciones</div>
       </div>
 
@@ -92,76 +96,84 @@ const EstudiantesLista = ({
                 {e.col_nombre}
               </div>
 
-              <div className="text-sm text-muted-foreground">
+              <div className="hidden text-sm text-muted-foreground lg:block">
                 {e.catninograd_nombre ?? '—'}
               </div>
 
-              <div className="text-sm">
-                {e.disciplinas > 0 ? (
-                  <span>
-                    <strong>{e.disciplinas}</strong> inscrito{e.disciplinas === 1 ? '' : 's'}
-                  </span>
-                ) : (
-                  <span className="text-amber-700 dark:text-amber-400">Sin disciplinas</span>
-                )}
-              </div>
+              {/*
+                En móvil, Disciplinas y Acciones comparten línea (pedido del
+                cliente, 2026-10-15): la tarjeta queda más estrecha y los
+                botones se alcanzan sin bajar. `lg:contents` disuelve el
+                wrapper en md y cada hijo vuelve a su columna de la rejilla.
+              */}
+              <div className="flex items-center justify-between gap-2 lg:contents">
+                <div className="text-sm">
+                  {e.disciplinas > 0 ? (
+                    <span>
+                      <strong>{e.disciplinas}</strong> inscrito{e.disciplinas === 1 ? '' : 's'}
+                    </span>
+                  ) : (
+                    <span className="text-amber-700 dark:text-amber-400">Sin disciplinas</span>
+                  )}
+                </div>
 
-              <div>
-                <Badge variant={activo ? 'default' : 'secondary'}>
-                  {activo ? 'Activo' : 'Inactivo'}
-                </Badge>
-              </div>
+                <div className="lg:block">
+                  <Badge variant={activo ? 'default' : 'secondary'}>
+                    {activo ? 'Activo' : 'Inactivo'}
+                  </Badge>
+                </div>
 
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-11 w-11 md:h-9 md:w-9"
-                  onClick={() => onVer(e)}
-                  title="Ver ficha"
-                  aria-label={`Ver ficha de ${e.nino_nombre}`}
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 lg:h-9 lg:w-9"
+                    onClick={() => onVer(e)}
+                    title="Ver ficha"
+                    aria-label={`Ver ficha de ${e.nino_nombre}`}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
 
-                <MenuAcciones
-                  nombre={e.nino_nombre}
-                  acciones={[
-                    {
-                      etiqueta: 'Editar',
-                      icono: Pencil,
-                      onSelect: () => onEditar(e),
-                      modulo: 'estudiantes',
-                      accion: 'editar',
-                    },
-                    {
-                      etiqueta: 'Reactivar',
-                      icono: RotateCcw,
-                      onSelect: () => onReactivar(e),
-                      modulo: 'estudiantes',
-                      accion: 'editar',
-                      visible: !activo,
-                    },
-                    {
-                      etiqueta: 'Dar de baja',
-                      icono: UserX,
-                      onSelect: () => onBaja(e),
-                      modulo: 'estudiantes',
-                      accion: 'editar',
-                      destructivo: true,
-                      visible: activo,
-                    },
-                    {
-                      etiqueta: 'Eliminar',
-                      icono: Trash2,
-                      onSelect: () => onEliminar(e),
-                      modulo: 'estudiantes',
-                      accion: 'eliminar',
-                      destructivo: true,
-                      visible: !activo,
-                    },
-                  ]}
-                />
+                  <MenuAcciones
+                    nombre={e.nino_nombre}
+                    acciones={[
+                      {
+                        etiqueta: 'Editar',
+                        icono: Pencil,
+                        onSelect: () => onEditar(e),
+                        modulo: 'estudiantes',
+                        accion: 'editar',
+                      },
+                      {
+                        etiqueta: 'Reactivar',
+                        icono: RotateCcw,
+                        onSelect: () => onReactivar(e),
+                        modulo: 'estudiantes',
+                        accion: 'editar',
+                        visible: !activo,
+                      },
+                      {
+                        etiqueta: 'Dar de baja',
+                        icono: UserX,
+                        onSelect: () => onBaja(e),
+                        modulo: 'estudiantes',
+                        accion: 'editar',
+                        destructivo: true,
+                        visible: activo,
+                      },
+                      {
+                        etiqueta: 'Eliminar',
+                        icono: Trash2,
+                        onSelect: () => onEliminar(e),
+                        modulo: 'estudiantes',
+                        accion: 'eliminar',
+                        destructivo: true,
+                        visible: !activo,
+                      },
+                    ]}
+                  />
+                </div>
               </div>
             </li>
           );

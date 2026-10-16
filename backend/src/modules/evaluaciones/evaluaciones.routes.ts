@@ -265,6 +265,20 @@ evaluacionesRouter.post(
   },
 );
 
+/** Devuelve a pendiente a todos los alumnos evaluados y borra sus intentos. */
+evaluacionesRouter.post(
+  '/:id/resetear-evaluados',
+  requirePermission('evaluaciones', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      res.json({ data: await service.resetearEvaluados(actor(req), id), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 /** Borrado permanente y en cascada. Exige escribir el titulo. */
 evaluacionesRouter.delete(
   '/:id',

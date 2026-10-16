@@ -77,6 +77,96 @@ export function enMinutos(segundos: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// ---------------------------------------------------------------------------
+// Puntaje en vivo (2026-10-15)
+//
+// Mismo cálculo que el backend (`modules/evaluaciones/evaluaciones.scoring.ts`):
+// `aDosDecimales`, interpolación lineal con los umbrales, Mobak agrupado, etc.
+// Se replica aquí para enseñar el puntaje mientras se evalúa; al guardar, el
+// servidor es el que vale.
+
+function aDos(v: number): number {
+  return Math.round(v * 100) / 100;
+}
+
+function cumple(valor: number, op: string, umbral: number): boolean {
+  if (op === '>') return valor > umbral;
+  if (op === '>=') return valor >= umbral;
+  if (op === '<') return valor < umbral;
+  if (op === '<=') return valor <= umbral;
+  return false;
+}
+
+export interface ParametroVivo {
+  evatipometo_id: number;
+  evaparam_intentos: number;
+  evaparam_puntaje: number;
+  evaparam_escala_min: number | null;
+  evaparam_escala_max: number | null;
+  rango: {
+    evatieran_op_cero: string;
+    evatieran_tiempo_cero: number;
+    evatieran_op_full: string;
+    evatieran_tiempo_full: number;
+  } | null;
+}
+
+export interface IntentoVivo {
+  tiempo: number | null;
+  logro: boolean | null;
+  escala: number | null;
+  mobak: number | null;
+}
+
+/** Lo que vale un intento como máximo. */
+export function puntajePorIntento(p: ParametroVivo): number {
+  return p.evaparam_puntaje / Math.max(1, p.evaparam_intentos);
+}
+
+/** Puntaje de un intento ya registrado. Null si falta el valor del método. */
+export function puntuarIntento(p: ParametroVivo, i: IntentoVivo): number | null {
+  const maximo = puntajePorIntento(p);
+  if (p.evatipometo_id === METODO.TIEMPO) {
+    if (i.tiempo === null || !p.rango) return null;
+    const r = p.rango;
+    if (cumple(i.tiempo, r.evatieran_op_cero, r.evatieran_tiempo_cero)) return 0;
+    if (cumple(i.tiempo, r.evatieran_op_full, r.evatieran_tiempo_full)) return aDos(maximo);
+    const cero = r.evatieran_tiempo_cero;
+    const full = r.evatieran_tiempo_full;
+    if (cero === full) return 0;
+    const proporcion = (i.tiempo - cero) / (full - cero);
+    return aDos(Math.max(0, Math.min(1, proporcion)) * maximo);
+  }
+  if (p.evatipometo_id === METODO.LOGRO) {
+    if (i.logro === null) return null;
+    return i.logro ? aDos(maximo) : 0;
+  }
+  if (p.evatipometo_id === METODO.ESCALA) {
+    if (i.escala === null) return null;
+    const min = p.evaparam_escala_min ?? 0;
+    const max = p.evaparam_escala_max;
+    if (max === null || max <= min) return null;
+    const prop = (i.escala - min) / (max - min);
+    return aDos(Math.max(0, Math.min(1, prop)) * maximo);
+  }
+  if (esMobak(p.evatipometo_id)) {
+    if (i.mobak === null) return null;
+    const bruto = brutoMobak(p.evatipometo_id, i.mobak);
+    return aDos((bruto / 2) * maximo);
+  }
+  return null;
+}
+
+/** Suma de los intentos puntuables de un parámetro. */
+export function puntajeDeParametro(p: ParametroVivo, intentos: IntentoVivo[]): number {
+  let total = 0;
+  for (const i of intentos) {
+    const n = puntuarIntento(p, i);
+    if (n !== null) total += n;
+  }
+  return aDos(total);
+}
+
 export const iniciales = (nombre: string) =>
   nombre
     .split(' ')

@@ -8,7 +8,7 @@
 
 > **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
 
-**Corte de este documento: 2026-10-12 (lanzamiento hecho en `activareforce.com`, plataforma anterior borrada y **módulo Novedades cerrado** —puntos 8 y 9, probados y aprobados por el cliente—; siguiente: pasar a `main` con `0033`/`0034` en prod y el respaldo de prod).**
+**Corte de este documento: 2026-10-16 (Fase 12 cerrada en código: Evaluaciones con Visualizar, agrupar por colegios, bloqueo con notas, puntaje en vivo, umbrales con palabras, permisos; listas apiladas hasta 1024 px; aviso al dar de alta un alumno manual; "sin disciplinas" cuenta solo activos).**
 
 ---
 
@@ -75,6 +75,55 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
 
+### Corte de sesión — 2026-10-16
+
+**Hecho hoy (todo en `dev`, pendiente PR a `main`):**
+
+- **Fase 12 cerrada en código** tras las pruebas en pantalla del cliente, tres bloques:
+  - **Form de evaluación** reescrito: umbrales de Por tiempo con palabras ("menor que", "menor o igual que"...), sufijo "s", inputs numéricos que ya dejan borrar completo (se normalizan al perder foco), validación inline + toast al guardar si los umbrales van en el mismo sentido o la escala tiene máximo ≤ mínimo, y botón "Añadir parámetro" al final de la lista.
+  - **Vista previa readonly** (nuevo `EvaluacionPreview` + `PrevisualizarEvaluacionDialog`): botón "Visualizar" en el formulario (borrador en memoria) y botón ojo en la card de la lista (ficha + sección de disciplinas vinculadas con horario y conteos). El menú de la fila queda solo con Editar, Reactivar, Baja y Eliminar.
+  - **Vincular disciplinas** agrupado por colegio con cabecera cuando hay varios en el alcance.
+  - **Permisos del listado**: quien tiene `evaluaciones:crear` ve todas; el resto solo las que creó él mismo o las vinculadas a disciplinas de su alcance.
+  - **Bloqueo al editar con alumnos evaluados**: AlertDialog explica + opción "Borrar notas y editar" con segunda confirmación → `POST /evaluaciones/:id/resetear-evaluados` (endpoint nuevo, sin SQL: borra intentos y marca a los evaluados como pendientes en una transacción, auditado) y abre el editor.
+  - **Pantalla de evaluar al alumno**: la barra avanza por parámetros completos (no por intentos), con **puntaje en vivo** por parámetro y acumulado / total posible arriba. El cálculo replica el `scoring.ts` del backend; al guardar manda el servidor.
+- **Resumen de asistencias en móvil**: ocultas las cinco tarjetas de Presentes/Ausentes/Tarde/Justificado/Sin marcar en pantallas pequeñas (ocupaban demasiado); desde `sm` vuelven. "Sin marcar" sigue en la barra de guardado.
+- **Alta manual de alumno**: antes de abrir el formulario sale un AlertDialog recordando que **no se guarda contrato, aceptación de política de datos ni pago** (eso solo se registra con el formulario público).
+- **Conteo "sin disciplinas"** del encabezado de Alumnos: cuenta solo los **activos**. Un inactivo no está pidiendo asignación.
+- **Listas** de Alumnos, Entrenadores y Usuarios: hasta 1024 px tarjeta apilada; desde 1024 px columnas completas. Se quitó el escalón intermedio md que seguía amontonando columnas con nombres largos.
+- 638/638 tests de backend, 7/7 de frontend; typecheck, lint y build limpios. **Sin SQL en toda la Fase 12.**
+
+**Al retomar — lista de trabajo, uno por uno:**
+
+1. **Pruebas en pantalla** de las Fases 13 y 14 (Reportes y Encuestas/Representantes) y 14B (Inscripciones). `docs/checklist-modulos.md`.
+2. **Pagos mensuales** — esperar a que el cliente lo cuente.
+3. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
+
+### Corte de sesión — 2026-10-15
+
+**Hecho hoy (todo en `dev`, sin SQL):**
+
+- **Reportes reordenados** y tres **nuevos** (Representantes, Inscripciones, Encuestas). Orden: Usuarios · Colegios · Actividades · Disciplinas · Entrenadores · Alumnos · Evaluaciones · Asistencia de alumnos · Asistencia de entrenadores · Representantes · Inscripciones · Encuestas · Novedades. Data anterior sigue como la tarjeta final, sin tocar.
+  - **Representantes** (`modulo: usuarios`): nombre, cédula, correo, teléfono, hijos activos, lista de hijos con grado, colegios y disciplinas de los hijos. Alcance: Propietario/Admin ven todos; coordinador, los representantes con al menos un hijo en sus colegios. Resumen con totales, por estado, por colegio y lista de representantes sin hijos activos.
+  - **Inscripciones** (`modulo: inscripciones`, **solo Propietario**): envíos del formulario público (fecha, estado, representante con cédula/correo/teléfono, hijos, colegios, disciplinas, valor y aprobador). Filtros de fechas, estado (Pendiente / Aprobada) y texto. **Valor por fila (`$`)** y hoja Resumen con **Total recaudado** y **Recaudado por colegio**. Fuera el bloque "Por estado" del resumen.
+  - **Encuestas** (`modulo: encuestas`): una fila por encuesta con estado, preguntas, respondidas y fecha de creación. Resumen por estado y lista de encuestas sin respuestas. Lo más limpio posible: preguntas y respuestas viven en la pantalla de la encuesta.
+- **Totales en pantalla** (nueva prop opcional `Definicion.totales` con su propio SQL). Hoy solo Inscripciones: encima de la tabla, el **Total recaudado** sale en un card destacado (borde brand, texto grande) y los conteos de Inscripciones, Pendientes y Aprobadas en tres cards pequeños. Se calculan sobre **todas** las filas filtradas, no sobre la página. En el Excel sigue viviendo en la hoja Resumen.
+- **soloRoles** en la Definicion: Inscripciones queda cerrado al Propietario aunque Admin herede `inscripciones:ver`. Chequeado en `puedeVer` y en `exigirDefinicion`.
+- **Fix /reportes/representantes 500**: `padre_sector_residencia` ya no existe (la borró la `0017`); fuera del SELECT y de la lista de columnas.
+- **Listas con rejilla densa** (/estudiantes, /usuarios, /entrenadores) con **dos escalones**:
+  - móvil (<768 px): tarjeta apilada como antes;
+  - md (768–1023 px): columnas identitarias + acciones (Estudiantes esconde Grado y Estado; Usuarios esconde Creado; Entrenadores esconde Cédula·teléfono y Estado);
+  - lg (≥1024 px): todas las columnas como antes.
+  Decidido con el cliente: ocultar lo secundario antes que amontonar.
+- **Respaldo de prod** marcado como **no necesario como tarea** (decidido por el cliente): se hace a mano cuando lo pida.
+- 638/638 tests de backend, 7/7 de frontend; lint y build limpios.
+
+**Al retomar — lista de trabajo, uno por uno:**
+
+1. **Mergear a `main` cuando el cliente pruebe** `/reportes/*` y las listas en una pantalla intermedia.
+2. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
+3. **Pagos mensuales** — esperar a que el cliente lo cuente.
+4. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
+
 ### Corte de sesión — 2026-10-12
 
 **Hecho:**
@@ -96,10 +145,12 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 2. ~~**Punto 9 — aviso automático de ausencia**~~ — ✅ cerrado el 2026-10-12, aprobado por el cliente.
 3. ~~**Pasar a `main`**~~ — ✅ **PR #16 mergeado el 2026-10-13**: Novedades, ausencias, correos del tablero y ficha/contrato por colegio en producción; `0028`–`0036` en prod. CRISFE Carcelén debe publicar su ficha y su contrato antes de abrir inscripciones.
 3b. ~~**Arreglos de Inscripción en prod**~~ — ✅ **PR #17 y #18 (2026-10-13)**: `/inscripcion` siempre en claro; sin traductor automático ni pantalla negra al reventar (`ErrorBoundary`); "Tus datos" detecta la cuenta también por correo (una cuenta sin cédula ya no llena todo para que la rechacen al enviar). Detalle en `docs/fase14b-contratos.md` §9. Sin SQL.
-4. **Respaldo de prod:** ya hay datos reales y el plan gratuito de Supabase no hace copias automáticas. `pg_dump` programado o plan Pro.
+3c. ~~**Inscripciones abiertas al público y cursos por disciplina**~~ — ✅ **2026-10-14**: pruebas borradas de prod (desde la inscripción 4 todo es real); Vercel Analytics (PR #19); `0037` (la asignación no nace con fecha de baja); **cursos por disciplina** (PR #20, `0038` + `0039`): cada disciplina marca sus cursos y el formulario público solo ofrece las del curso elegido (el backend lo comprueba; en la ficha de una pendiente, aviso sin bloquear).
+4. ~~**Respaldo de prod**~~ — **no necesario como tarea** (decidido por el cliente el 2026-10-15): se hará a mano, puntual, cuando lo pida. Se le avisa antes de cualquier operación destructiva en prod.
 5. **Pruebas en pantalla** de las Fases 9–14 (`docs/checklist-modulos.md`).
-6. **Pagos mensuales** — esperar a que el cliente lo cuente.
-7. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
+6. **Reportes — pedido del cliente (2026-10-14, orden decidido el 2026-10-15):** tarjetas en este orden: Usuarios, Colegios, Actividades, Disciplinas, Entrenadores, Alumnos, Evaluaciones, Asistencias de alumnos, Asistencias de entrenadores, **Representantes** (nueva: resumen + lista con toda su información y vinculación con hijos), **Inscripciones** (nueva: resumen + detalle), **Encuestas** (nueva: lo más limpio posible, solo información necesaria), Novedades, Data anterior (al final, no se toca).
+7. **Pagos mensuales** — esperar a que el cliente lo cuente.
+8. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
 
 **Decididas por el cliente el 2026-10-12:**
 

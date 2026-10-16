@@ -1,10 +1,13 @@
-import { Link2, Pencil, RotateCcw, Trash2, XCircle } from 'lucide-react';
+import { Eye, Link2, Pencil, RotateCcw, Trash2, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ConditionalAction } from '@/components/ui/conditional-actions';
 import MenuAcciones from '@/components/ui/menu-acciones';
 import type { Evaluacion } from '@/api/evaluaciones';
 
 interface Props {
   evaluaciones: Evaluacion[];
+  onPrevisualizar: (e: Evaluacion) => void;
   onEditar: (e: Evaluacion) => void;
   onVincular: (e: Evaluacion) => void;
   onBaja: (e: Evaluacion) => void;
@@ -28,6 +31,7 @@ const REJILLA =
  */
 const EvaluacionesLista = ({
   evaluaciones,
+  onPrevisualizar,
   onEditar,
   onVincular,
   onBaja,
@@ -112,50 +116,73 @@ const EvaluacionesLista = ({
                 )}
               </div>
 
-              <MenuAcciones
-                nombre={e.eva_titulo}
-                acciones={[
-                  {
-                    etiqueta: 'Editar y parámetros',
-                    icono: Pencil,
-                    onSelect: () => onEditar(e),
-                    modulo: 'evaluaciones',
-                    accion: 'editar',
-                  },
-                  {
-                    etiqueta: 'Vincular a disciplinas',
-                    icono: Link2,
-                    onSelect: () => onVincular(e),
-                    modulo: 'evaluaciones',
-                    accion: 'editar',
-                  },
-                  {
-                    etiqueta: 'Reactivar',
-                    icono: RotateCcw,
-                    onSelect: () => onReactivar(e),
-                    modulo: 'evaluaciones',
-                    accion: 'editar',
-                    visible: !activa,
-                  },
-                  {
-                    etiqueta: 'Dar de baja',
-                    icono: XCircle,
-                    onSelect: () => onBaja(e),
-                    modulo: 'evaluaciones',
-                    accion: 'editar',
-                    destructivo: true,
-                    visible: activa,
-                  },
-                  {
-                    etiqueta: 'Eliminar',
-                    icono: Trash2,
-                    onSelect: () => onEliminar(e),
-                    modulo: 'evaluaciones',
-                    accion: 'eliminar',
-                    destructivo: true,
-                  },
-                ]}
-              />
+              {/*
+                Acciones visibles al pie de la fila (pedido del cliente, 2026-10-15):
+                primero el ojo (previsualizar readonly con disciplinas vinculadas),
+                luego vincular, y por último el menú con el resto (editar, baja,
+                reactivar, eliminar).
+              */}
+              <div className="flex flex-shrink-0 items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 lg:h-9 lg:w-9"
+                  onClick={() => onPrevisualizar(e)}
+                  title="Ver detalle"
+                  aria-label={`Ver detalle de ${e.eva_titulo}`}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <ConditionalAction module="evaluaciones" action="editar">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 lg:h-9 lg:w-9"
+                    onClick={() => onVincular(e)}
+                    title="Vincular a disciplinas"
+                    aria-label={`Vincular ${e.eva_titulo} a disciplinas`}
+                  >
+                    <Link2 className="h-4 w-4" />
+                  </Button>
+                </ConditionalAction>
+                <MenuAcciones
+                  nombre={e.eva_titulo}
+                  acciones={[
+                    {
+                      etiqueta: 'Editar y parámetros',
+                      icono: Pencil,
+                      onSelect: () => onEditar(e),
+                      modulo: 'evaluaciones',
+                      accion: 'editar',
+                    },
+                    {
+                      etiqueta: 'Reactivar',
+                      icono: RotateCcw,
+                      onSelect: () => onReactivar(e),
+                      modulo: 'evaluaciones',
+                      accion: 'editar',
+                      visible: !activa,
+                    },
+                    {
+                      etiqueta: 'Dar de baja',
+                      icono: XCircle,
+                      onSelect: () => onBaja(e),
+                      modulo: 'evaluaciones',
+                      accion: 'editar',
+                      destructivo: true,
+                      visible: activa,
+                    },
+                    {
+                      etiqueta: 'Eliminar',
+                      icono: Trash2,
+                      onSelect: () => onEliminar(e),
+                      modulo: 'evaluaciones',
+                      accion: 'eliminar',
+                      destructivo: true,
+                    },
+                  ]}
+                />
+              </div>
             </li>
           );
         })}

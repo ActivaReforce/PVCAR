@@ -788,6 +788,34 @@ export async function obtenerPendiente(evaninopenId: number): Promise<FichaPendi
   return rows[0] ?? null;
 }
 
+/**
+ * Devuelve a pendiente a todos los alumnos de una evaluación y borra sus
+ * intentos (pedido del cliente, 2026-10-15). Se usa cuando se quiere editar
+ * una plantilla que ya tiene notas puestas: hay que resetearlas primero.
+ */
+export async function resetearEvaluados(
+  client: PoolClient,
+  evaId: number,
+): Promise<{ alumnos: number; intentos: number }> {
+  const { rows: afectados } = await client.query<{ evaninopen_id: number }>(
+    `UPDATE public.evaluacion_nino_pendiente
+        SET est_id = ${ESTADO.PENDIENTE},
+            evaninopen_fecha_finalizacion = NULL,
+            usu_id_registrador = NULL
+      WHERE eva_id = $1 AND est_id = ${ESTADO.EVALUADO}
+    RETURNING evaninopen_id`,
+    [evaId],
+  );
+  if (afectados.length === 0) return { alumnos: 0, intentos: 0 };
+
+  const ids = afectados.map((r) => r.evaninopen_id);
+  const { rowCount } = await client.query(
+    `DELETE FROM public.evaluacion_intento WHERE evaninopen_id = ANY($1::int[])`,
+    [ids],
+  );
+  return { alumnos: ids.length, intentos: rowCount ?? 0 };
+}
+
 export async function listarIntentos(evaninopenId: number): Promise<IntentoGuardado[]> {
   const { rows } = await getPool().query<IntentoGuardado>(
     `SELECT evaint_id, evaparam_id, evaint_intento, evaint_tiempo, evaint_logro,
