@@ -784,8 +784,18 @@ export interface ListaInscripciones extends Pagina<repo.InscripcionListada> {
  * permiso de verlas (un representante) solo ve las suyas: las que le dieron
  * de alta, con sus hijos (decisión del cliente, 2026-10-05).
  */
-export async function avisoDelMenu(): Promise<{ pendientes: number; abiertas: boolean }> {
+export async function avisoDelMenu(actor: AuthUser): Promise<{ pendientes: number; abiertas: boolean }> {
+  if (!veAvisoDelMenu(actor)) return { pendientes: 0, abiertas: false };
   return repo.avisoDelMenu();
+}
+
+/**
+ * El número rojo del menú es solo del Propietario (pedido del cliente,
+ * 2026-10-20). El representante también tiene inscripciones:editar —para las
+ * suyas— y veía el total de pendientes de todos.
+ */
+export function veAvisoDelMenu(actor: AuthUser): boolean {
+  return actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO);
 }
 
 export function esPersonal(actor: AuthUser): boolean {

@@ -14,6 +14,7 @@ const {
   pistaDeCorreo,
   problemasDeDisciplinas,
   fueraDeCurso,
+  veAvisoDelMenu,
 } = await import('./inscripciones.service.js');
 const { rellenar } = await import('./inscripciones.documentos.js');
 const { envioSchema, problemasDeEnvio } = await import('./inscripciones.schemas.js');
@@ -611,5 +612,17 @@ describe('ficha y contrato de cada colegio (0036)', () => {
 describe('nombreDeDescarga', () => {
   it('ActivaReforce_ y el nombre sin tildes ni espacios', () => {
     expect(nombreDeDescarga('Martín José Pérez Ñuñez')).toBe('ActivaReforce_Martin_Jose_Perez_Nunez.pdf');
+  });
+});
+
+describe('veAvisoDelMenu', () => {
+  const con = (...roles: number[]) =>
+    ({ usuario: { roles: roles.map((rol_id) => ({ rol_id })) } }) as never;
+
+  it('solo el Propietario ve el número de pendientes', () => {
+    expect(veAvisoDelMenu(con(1))).toBe(true);
+    expect(veAvisoDelMenu(con(4, 1))).toBe(true);
+    expect(veAvisoDelMenu(con(4))).toBe(false);
+    expect(veAvisoDelMenu(con(5))).toBe(false);
   });
 });

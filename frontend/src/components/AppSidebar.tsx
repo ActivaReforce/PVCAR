@@ -39,7 +39,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { inscripcionesApi } from "@/api/inscripciones";
 import { useAvisoNovedades } from "@/hooks/useNovedades";
-import { ROLES_GLOBALES } from "@/hooks/useUserForm";
+import { ROL, ROLES_GLOBALES } from "@/hooks/useUserForm";
 
 export function AppSidebar() {
   const navigate = useNavigate();
@@ -49,13 +49,16 @@ export function AppSidebar() {
 
   /**
    * Inscripciones pendientes de aprobar: un número rojo en el menú (pedido
-   * del cliente, 2026-10-07). Solo se consulta para quien puede aprobar; para
+   * del cliente, 2026-10-07). Solo para el Propietario (2026-10-20: el
+   * representante también tiene editar, para las suyas, y no debe verlo); para
    * el resto no hay ni una llamada. Se repite cada minuto **solo mientras las
    * inscripciones están abiertas** (cerradas no llegan nuevas; las que queden
    * pendientes se ven igual). La clave empieza por 'inscripciones', así que
    * aprobar o rechazar la refresca al momento.
    */
-  const puedeAprobar = hasPermission("inscripciones", "editar");
+  const puedeAprobar =
+    hasPermission("inscripciones", "editar") &&
+    (user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false);
   const aviso = useQuery({
     queryKey: ["inscripciones", "aviso-menu"],
     queryFn: () => inscripcionesApi.aviso(),

@@ -298,15 +298,16 @@ inscripcionesRouter.get(
 
 /**
  * GET /inscripciones/aviso — pendientes y si están abiertas, para el número
- * rojo del menú. Solo para quien aprueba; el menú solo repite la consulta
- * mientras están abiertas.
+ * rojo del menú. Solo el Propietario recibe el número; el menú solo repite la
+ * consulta mientras están abiertas.
  */
 inscripcionesRouter.get(
   '/aviso',
   requirePermission('inscripciones', 'editar'),
-  async (_req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      res.json({ data: await service.avisoDelMenu(), error: null });
+      if (!req.user) throw new ApiError(401, 'No autenticado');
+      res.json({ data: await service.avisoDelMenu(req.user), error: null });
     } catch (err) {
       next(err);
     }
