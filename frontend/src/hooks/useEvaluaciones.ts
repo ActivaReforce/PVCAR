@@ -19,6 +19,7 @@ const CLAVE = {
   pendientes: (evaluacion: number, disciplina: number, estado?: number, buscar?: string) =>
     ['evaluaciones', 'pendientes', evaluacion, disciplina, estado, buscar] as const,
   alumno: (id: number) => ['evaluaciones', 'alumno', id] as const,
+  misHijos: ['evaluaciones', 'mis-hijos'] as const,
 };
 
 function mensajeDe(error: unknown): string {
@@ -27,11 +28,21 @@ function mensajeDe(error: unknown): string {
   return 'Error inesperado';
 }
 
-export function useEvaluaciones(filtros: FiltrosEvaluaciones) {
+export function useEvaluaciones(filtros: FiltrosEvaluaciones, enabled = true) {
   return useQuery({
     queryKey: CLAVE.lista(filtros),
     queryFn: () => evaluacionesApi.listar(filtros),
     placeholderData: (anterior) => anterior,
+    enabled,
+  });
+}
+
+/** Las notas de los hijos del representante (pestaña "Mis hijos"). */
+export function useEvaluacionesDeMisHijos(enabled: boolean) {
+  return useQuery({
+    queryKey: CLAVE.misHijos,
+    queryFn: () => evaluacionesApi.deMisHijos(),
+    enabled,
   });
 }
 

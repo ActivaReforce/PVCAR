@@ -190,6 +190,38 @@ export interface IntentoGuardado {
   evaint_puntaje_obtenido: number;
 }
 
+/** Un intento ya puntuado, tal como lo ve el representante. */
+export type IntentoDeHijo = Omit<IntentoGuardado, 'evaint_id' | 'evaparam_id'>;
+
+export interface ParametroDeHijo {
+  evaparam_id: number;
+  evaparam_nombre: string;
+  evatipometo_id: number;
+  evaparam_intentos: number;
+  evaparam_puntaje: number;
+  evaparam_escala_min: number | null;
+  evaparam_escala_max: number | null;
+  intentos: IntentoDeHijo[];
+}
+
+/** Una evaluación de un hijo del representante (2026-10-20). */
+export interface EvaluacionDeHijo {
+  evaninopen_id: number;
+  nino_id: number;
+  nino_nombre: string;
+  eva_titulo: string;
+  eva_descripcion: string | null;
+  act_nombre: string;
+  col_nombre: string;
+  est_id: number;
+  evaninopen_fecha_finalizacion: string | null;
+  evaluado_por: string | null;
+  eva_puntaje_total: number;
+  puntaje: number;
+  /** Vacío mientras está pendiente. */
+  parametros: ParametroDeHijo[];
+}
+
 export interface FichaDeEvaluacion {
   pendiente: {
     evaninopen_id: number;
@@ -283,6 +315,9 @@ export const evaluacionesApi = {
 
   guardarIntentos: (evaninopenId: number, intentos: IntentoInput[]) =>
     api.put<FichaDeEvaluacion>(`/evaluaciones/pendientes/${evaninopenId}/intentos`, { intentos }),
+
+  /** Las notas de los hijos del representante, con el detalle de cada una. */
+  deMisHijos: () => api.get<EvaluacionDeHijo[]>('/evaluaciones/mis-hijos'),
 
   borrarEvaluacionDeAlumno: (evaninopenId: number) =>
     api.delete<FichaDeEvaluacion>(`/evaluaciones/pendientes/${evaninopenId}`),

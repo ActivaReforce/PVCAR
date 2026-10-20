@@ -28,11 +28,14 @@ import EvaluarAlumnos from '@/components/evaluaciones/EvaluarAlumnos';
 import EliminarEvaluacionDialog from '@/components/evaluaciones/EliminarEvaluacionDialog';
 import PrevisualizarEvaluacionDialog from '@/components/evaluaciones/PrevisualizarEvaluacionDialog';
 import VincularDisciplinasDialog from '@/components/evaluaciones/VincularDisciplinasDialog';
+import EvaluacionesDeHijos from '@/components/evaluaciones/EvaluacionesDeHijos';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
   useCategoriasEvaluacion,
   useDarDeBajaEvaluacion,
   useEvaluaciones,
+  useEvaluacionesDeMisHijos,
   useFichaEvaluacion,
   useReactivarEvaluacion,
   useResetearEvaluados,
@@ -41,6 +44,22 @@ import type { Evaluacion, FiltrosEvaluaciones } from '@/api/evaluaciones';
 
 const POR_PAGINA = 20;
 const TODOS = 'todos';
+const ROL_REPRESENTANTE = 4;
+
+/** Las notas de los hijos, con sus estados de carga. */
+const MisHijos = ({ consulta }: { consulta: ReturnType<typeof useEvaluacionesDeMisHijos> }) => {
+  if (consulta.isLoading) {
+    return <p className="py-8 text-center text-muted-foreground">Cargando evaluaciones…</p>;
+  }
+  if (consulta.isError) {
+    return (
+      <p className="text-destructive">
+        No se pudieron cargar las evaluaciones: {(consulta.error as Error).message}
+      </p>
+    );
+  }
+  return <EvaluacionesDeHijos evaluaciones={consulta.data ?? []} />;
+};
 
 /**
  * Evaluaciones.
@@ -57,8 +76,20 @@ const TODOS = 'todos';
  */
 const Evaluaciones = () => {
   const { canCreate, hasPermission } = usePermissions();
+  const { user } = useAuth();
   // Calificar es su propio módulo desde la 0026: ver notas y pendientes.
   const veCalificaciones = hasPermission('calificaciones', 'ver');
+
+  /**
+   * El representante con la casilla Ver ve las notas de sus hijos, no las
+   * plantillas (2026-10-20). Si además tiene un rol de personal, le sale
+   * como una pestaña más.
+   */
+  const roles = user?.roles ?? [];
+  const esRepresentante = roles.some((r) => r.rol_id === ROL_REPRESENTANTE);
+  const esPersonal = roles.some((r) => r.rol_id !== ROL_REPRESENTANTE);
+  const misHijos = useEvaluacionesDeMisHijos(esRepresentante);
+  const pestanas = 1 + (veCalificaciones ? 1 : 0) + (esRepresentante ? 1 : 0);
 
   const [page, setPage] = useState(1);
   const [busqueda, setBusqueda] = useState('');
@@ -89,7 +120,7 @@ const Evaluaciones = () => {
     orden: 'creacion',
   };
 
-  const lista = useEvaluaciones(filtros);
+  const lista = useEvaluaciones(filtros, esPersonal);
   const evaluaciones = lista.data?.items ?? [];
   const conteos = lista.data?.conteos;
   const totalItems = lista.data?.total ?? 0;
@@ -104,6 +135,18 @@ const Evaluaciones = () => {
     setCreando(false);
     setEditandoId(null);
   };
+
+  if (!esPersonal) {
+    return (
+      <div className="container mx-auto min-w-0 space-y-6 p-4 lg:p-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Evaluaciones</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Las notas de tus representados.</p>
+        </div>
+        <MisHijos consulta={misHijos} />
+      </div>
+    );
+  }
 
   if (lista.isLoading && !lista.data) {
     return (
@@ -153,9 +196,14 @@ const Evaluaciones = () => {
       </div>
 
       <Tabs defaultValue="gestion">
-        <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-flex">
+        <TabsList
+          className={`grid w-full sm:inline-flex sm:w-auto ${
+            pestanas === 3 ? 'grid-cols-3' : pestanas === 2 ? 'grid-cols-2' : 'grid-cols-1'
+          }`}
+        >
           <TabsTrigger value="gestion">Gestión</TabsTrigger>
           {veCalificaciones && <TabsTrigger value="evaluar">Evaluar alumnos</TabsTrigger>}
+          {esRepresentante && <TabsTrigger value="mis-hijos">Mis hijos</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="gestion" className="mt-4 space-y-4">
@@ -223,6 +271,12 @@ const Evaluaciones = () => {
         <TabsContent value="evaluar" className="mt-4">
           <EvaluarAlumnos evaluaciones={evaluaciones} />
         </TabsContent>
+
+        {esRepresentante && (
+          <TabsContent value="mis-hijos" className="mt-4">
+            <MisHijos consulta={misHijos} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <Dialog

@@ -1,5 +1,5 @@
 import type { HorarioDisciplina } from '@/api/disciplinas';
-import { api } from '@/lib/api';
+import { api, apiFetch } from '@/lib/api';
 
 /**
  * Cliente de Inscripciones (Fase 14B).
@@ -447,8 +447,16 @@ export interface DocumentoDeRepresentante {
 export const inscripcionesApi = {
   formulario: () => api.get<Formulario>('/inscripcion/formulario'),
   /** `conSesion`: solo si entró en el propio formulario (§9); si no, va como anónimo. */
-  enviar: (envio: Envio, conSesion: boolean) =>
-    api.post<EnvioRecibido>('/inscripcion', envio, { sinSesion: !conSesion }),
+  /**
+   * `clave` es la misma en todos los intentos de un envío: si se reintenta
+   * tras un corte, el servidor no lo procesa dos veces (backend/lib/unaVez.ts).
+   */
+  enviar: (envio: Envio, conSesion: boolean, clave: string) =>
+    apiFetch<EnvioRecibido>(
+      '/inscripcion',
+      { method: 'POST', body: JSON.stringify(envio), headers: { 'Idempotency-Key': clave } },
+      { sinSesion: !conSesion },
+    ),
   cotizar: (ninos: Array<{ col_id: number; disciplinas: number[]; nino_id: number | null }>, conSesion: boolean) =>
     api.post<Cobro>('/inscripcion/cotizacion', { ninos }, { sinSesion: !conSesion }),
   identificar: (cedula: string, correo?: string) =>

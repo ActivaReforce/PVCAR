@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/requirePermission.js';
 import { ApiError } from '../../middleware/error.js';
+import { claveValida, unaVez } from '../../lib/unaVez.js';
 import * as service from './inscripciones.service.js';
 import {
   borradorDocumentoSchema,
@@ -141,7 +142,10 @@ inscripcionPublicaRouter.post(
       }
       const input = validado.data;
       const navegador = req.get('user-agent')?.slice(0, 300) ?? null;
-      const recibido = await service.enviar(input, { ip: req.ip ?? null, navegador }, req.user ?? null);
+      // El formulario reintenta si falla la conexión: misma clave, mismo envío (lib/unaVez.ts).
+      const recibido = await unaVez(claveValida(req.get('idempotency-key')), () =>
+        service.enviar(input, { ip: req.ip ?? null, navegador }, req.user ?? null),
+      );
       res.status(201).json({ data: recibido, error: null });
     } catch (err) {
       next(err);

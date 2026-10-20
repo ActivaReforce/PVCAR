@@ -79,6 +79,19 @@ evaluacionesRouter.get(
   },
 );
 
+/** Las notas de los hijos del representante. Va antes de /:id. */
+evaluacionesRouter.get(
+  '/mis-hijos',
+  requirePermission('evaluaciones', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.deMisHijos(actor(req)), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Evaluar alumnos. Van antes de /:id para que 'pendientes' no se lea como un id.
 

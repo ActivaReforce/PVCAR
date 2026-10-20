@@ -88,7 +88,7 @@ const AYUDA: Record<string, { acciones: Partial<Record<Accion, string>>; nota?: 
   },
   evaluaciones: {
     acciones: {
-      ver: 'las plantillas.',
+      ver: 'las plantillas; al representante, las notas de sus hijos.',
       crear: 'nueva plantilla.',
       editar: 'parámetros, disciplinas y baja.',
       eliminar: 'borrarla.',

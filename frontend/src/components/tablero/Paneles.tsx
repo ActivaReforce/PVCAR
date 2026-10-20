@@ -18,6 +18,7 @@ import type {
   TableroGeneral,
   TableroRepresentante,
 } from '@/api/tablero';
+import EvaluacionesDeHijos from '@/components/evaluaciones/EvaluacionesDeHijos';
 import TarjetaAsistencia from './TarjetaAsistencia';
 import TarjetaCifra from './TarjetaCifra';
 
@@ -304,5 +305,20 @@ export const PanelRepresentante = ({ datos }: { datos: TableroRepresentante }) =
         </CardContent>
       </Card>
     ))}
+
+    {/* Las notas con su detalle, de todos los hijos (2026-10-20). */}
+    {datos.evaluaciones && datos.hijos.length > 0 && (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ClipboardList className="h-4 w-4" />
+            Evaluaciones
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EvaluacionesDeHijos evaluaciones={datos.evaluaciones} />
+        </CardContent>
+      </Card>
+    )}
   </div>
 );

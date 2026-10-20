@@ -2,6 +2,7 @@ import { getPool } from '../../config/db.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
 import { HOY_EC, textoEc } from '../../lib/fecha.js';
+import { evaluacionesDeHijosDe, type EvaluacionDeHijo } from '../evaluaciones/evaluaciones.repository.js';
 
 /**
  * Consultas del Tablero.
@@ -237,6 +238,8 @@ export interface HijoDelRepresentante {
 
 export interface TableroRepresentante {
   hijos: HijoDelRepresentante[];
+  /** Las notas de los hijos con su detalle (2026-10-20). */
+  evaluaciones: EvaluacionDeHijo[];
 }
 
 export async function tableroRepresentante(
@@ -291,7 +294,7 @@ export async function tableroRepresentante(
     ), '[]'::json) AS hijos`,
     [desde, hasta, usuId],
   );
-  return { hijos: rows[0]?.hijos ?? [] };
+  return { hijos: rows[0]?.hijos ?? [], evaluaciones: await evaluacionesDeHijosDe(usuId) };
 }
 
 export interface PuntoTendencia {
