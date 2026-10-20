@@ -126,6 +126,7 @@ interface Alumno {
   salud_detalle: string;
   salud_autoriza: boolean;
   imagen: PermisosImagen;
+  observacion_extra: string;
 }
 
 let siguienteClave = 1;
@@ -149,6 +150,7 @@ const alumnoVacio = (): Alumno => ({
   salud_detalle: '',
   salud_autoriza: false,
   imagen: { familias: false, redes: false, promocional: false },
+  observacion_extra: '',
 });
 
 /** Un hijo que ya existe, con sus datos llenos para revisarlos. */
@@ -626,6 +628,7 @@ const Inscripcion = () => {
             autoriza: a.salud_autoriza,
           },
           imagen: a.imagen,
+          observacion_extra: a.observacion_extra.trim() || null,
         })),
         ...documentosLeidos(datos, alumnos),
         acepta: Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, true])) as Record<TipoDocumento, true>,
@@ -1328,6 +1331,18 @@ const FichaAlumno = ({
             value={alumno.detalle_retiro}
             onChange={(e) => onChange({ detalle_retiro: e.target.value })}
             maxLength={500}
+          />
+        </Campo>
+      </section>
+
+      <section className="space-y-3 border-t pt-5">
+        <h2 className="font-semibold">Observaciones extra (opcional)</h2>
+        <Campo id={id('observacion')} etiqueta="Cualquier cosa que debamos saber del alumno y no esté arriba">
+          <Textarea
+            id={id('observacion')}
+            value={alumno.observacion_extra}
+            onChange={(e) => onChange({ observacion_extra: e.target.value })}
+            maxLength={1000}
           />
         </Campo>
       </section>

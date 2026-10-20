@@ -1251,6 +1251,7 @@ export async function aprobar(
             tocarFoto: false,
           });
           await repo.marcarSaludAutorizada(client, destino, d.salud.autoriza);
+          await estudiantesRepo.sumarObservacion(client, destino, d.observacion_extra ?? null);
           await estudiantesRepo.guardarContacto(client, destino, 'emergencia', { ...d.emergencia, cedula: null });
           await estudiantesRepo.guardarContacto(client, destino, 'retiro', d.retiro);
           await repo.atarConParentesco(client, destino, padreId, d.parentesco);
@@ -1277,6 +1278,7 @@ export async function aprobar(
           foto: null,
         });
         await repo.marcarSaludAutorizada(client, ninoId, d.salud.autoriza);
+        await estudiantesRepo.sumarObservacion(client, ninoId, d.observacion_extra ?? null);
         await estudiantesRepo.guardarContacto(client, ninoId, 'emergencia', { ...d.emergencia, cedula: null });
         await estudiantesRepo.guardarContacto(client, ninoId, 'retiro', d.retiro);
         await repo.atarConParentesco(client, ninoId, padreId, d.parentesco);
@@ -1615,6 +1617,7 @@ export const NINO_DE_EJEMPLO: repo.NinoGuardado = {
   detalle_retiro: 'Instrucciones de retiro',
   salud: { tiene: false, detalle: null, autoriza: true },
   imagen: { familias: true, redes: false, promocional: false },
+  observacion_extra: null,
   documento: {
     colegio: {
       sede: 'Colegio de ejemplo',

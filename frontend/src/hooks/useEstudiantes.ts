@@ -117,6 +117,14 @@ export function useActualizarEstudiante() {
   );
 }
 
+export function useGuardarObservacion() {
+  return useMutacion(
+    ({ id, observacion }: { id: number; observacion: string | null }) =>
+      estudiantesApi.observacion(id, observacion),
+    'Observaciones guardadas',
+  );
+}
+
 export function useGuardarInscripciones() {
   return useMutacion(
     ({ id, colacthorIds }: { id: number; colacthorIds: number[] }) =>

@@ -32,8 +32,10 @@ const ESTUDIANTE = {
   nino_imagen_promocional: null,
   contacto_emergencia: null,
   contacto_retiro: null,
+  nino_observacion_extra: null,
   disciplinas: 4,
   representantes: 0,
+  con_observacion: false,
 };
 
 let estudianteActual = ESTUDIANTE;
@@ -267,5 +269,20 @@ describe('representantes', () => {
       statusCode: 400,
       message: expect.stringContaining('Representante'),
     });
+  });
+});
+
+describe('observaciones extra', () => {
+  const con = (rol_id: number) =>
+    ({ authUserId: 'a', usuario: { usu_id: 9, roles: [{ rol_id }], permisos: [] }, permisos: [] }) as never;
+
+  it('solo el Propietario las edita', () => {
+    expect(service.puedeEditarObservacion(con(ROL.PROPIETARIO))).toBe(true);
+    expect(service.puedeEditarObservacion(con(ROL.ADMIN))).toBe(false);
+    expect(service.puedeEditarObservacion(con(ROL.COORDINADOR))).toBe(false);
+  });
+
+  it('a otro rol se le niega aunque tenga editar', async () => {
+    await expect(service.cambiarObservacion(coordinadora, 173, 'x')).rejects.toMatchObject({ statusCode: 403 });
   });
 });

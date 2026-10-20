@@ -278,6 +278,14 @@ describe('envioSchema', () => {
     expect(r.representante.correo).toBe('ana@x.co');
   });
 
+  it('las observaciones extra son opcionales: vacias o ausentes quedan en null', () => {
+    expect(envioSchema.parse(valido).ninos[0]!.observacion_extra).toBeNull();
+    const conEspacios = { ...valido.ninos[0]!, observacion_extra: '   ' };
+    expect(envioSchema.parse({ ...valido, ninos: [conEspacios] }).ninos[0]!.observacion_extra).toBeNull();
+    const conTexto = { ...valido.ninos[0]!, observacion_extra: ' Es zurdo ' };
+    expect(envioSchema.parse({ ...valido, ninos: [conTexto] }).ninos[0]!.observacion_extra).toBe('Es zurdo');
+  });
+
   it('exige aceptar los seis documentos', () => {
     expect(() =>
       envioSchema.parse({ ...valido, acepta: { ...valido.acepta, politica: false } }),

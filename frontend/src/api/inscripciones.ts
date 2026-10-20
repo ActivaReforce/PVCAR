@@ -154,6 +154,8 @@ export interface NinoEnvio {
   detalle_retiro: string | null;
   salud: Salud;
   imagen: PermisosImagen;
+  /** Opcional y libre; al aprobar pasa a la ficha del alumno. */
+  observacion_extra: string | null;
 }
 
 export interface ColegioDocumento {
@@ -166,7 +168,9 @@ export interface ColegioDocumento {
 }
 
 /** Lo que se guarda de cada alumno: lo enviado y lo que el sistema puso en sus documentos. */
-export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id'> {
+export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id' | 'observacion_extra'> {
+  /** Falta en las inscripciones de antes del 2026-10-20. */
+  observacion_extra?: string | null;
   documento: {
     colegio: ColegioDocumento;
     curso: string | null;
@@ -210,6 +214,8 @@ export interface InscripcionListada {
   colegios: string[];
   total: number | null;
   usuario_existente: boolean;
+  /** Algún alumno trae observaciones extra. Opcional: Vercel publica antes que Railway. */
+  con_observacion?: boolean;
 }
 
 export interface ListaInscripciones {

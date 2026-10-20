@@ -7,6 +7,7 @@ import {
   Mail,
   MessageCircle,
   Phone,
+  StickyNote,
   UserCheck,
 } from 'lucide-react';
 import {
@@ -507,6 +508,14 @@ const FichaNino = ({
           </Button>
         )}
       </div>
+      {d.observacion_extra && (
+        <div className="rounded-md border-2 border-amber-500 bg-amber-500/5 p-3 dark:border-amber-400">
+          <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+            <StickyNote className="h-4 w-4 flex-shrink-0" /> Observaciones extra
+          </p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm">{d.observacion_extra}</p>
+        </div>
+      )}
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Fila etiqueta="Nacimiento">{fechaNacimiento(d.fecha_nacimiento)}</Fila>
         <Fila etiqueta="Parentesco">{d.parentesco}</Fila>
