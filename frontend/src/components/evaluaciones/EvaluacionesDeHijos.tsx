@@ -1,7 +1,14 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, ClipboardList } from 'lucide-react';
+import { ClipboardList, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { METODO, type EvaluacionDeHijo, type IntentoDeHijo, type ParametroDeHijo } from '@/api/evaluaciones';
 import { fechaDia } from '@/lib/fecha';
@@ -12,7 +19,8 @@ import { enMinutos, esMobak, topeMobak } from './metodos';
  *
  * La misma vista en el tablero (card "Evaluaciones") y en la pestaña "Mis
  * hijos" de Evaluaciones. Solo pinta: qué evaluaciones entran y la nota de
- * cada intento salen del servidor.
+ * cada intento salen del servidor. El detalle se abre en un modal para no
+ * estirar la página (pedido del cliente, 2026-10-20).
  */
 
 const ESTADO_EVALUADO = 7;
@@ -41,7 +49,7 @@ function registrado(p: ParametroDeHijo, i: IntentoDeHijo): string {
 }
 
 const Detalle = ({ parametros }: { parametros: ParametroDeHijo[] }) => (
-  <ul className="mt-3 divide-y rounded-md border">
+  <ul className="divide-y rounded-md border">
     {parametros.map((p) => {
       const obtenido = p.intentos.reduce((t, i) => t + i.evaint_puntaje_obtenido, 0);
       return (
@@ -112,19 +120,37 @@ const Fila = ({ e }: { e: EvaluacionDeHijo }) => {
                 variant="ghost"
                 size="sm"
                 className="h-9"
-                aria-expanded={abierta}
-                onClick={() => setAbierta((v) => !v)}
+                onClick={() => setAbierta(true)}
               >
-                {abierta ? (
-                  <ChevronUp className="mr-1 h-4 w-4" />
-                ) : (
-                  <ChevronDown className="mr-1 h-4 w-4" />
-                )}
-                {abierta ? 'Ocultar detalle' : 'Ver detalle'}
+                <Eye className="mr-1 h-4 w-4" />
+                Ver detalle
               </Button>
             )}
           </div>
-          {abierta && <Detalle parametros={e.parametros} />}
+          <Dialog open={abierta} onOpenChange={setAbierta}>
+            <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="break-words pr-6">{e.eva_titulo}</DialogTitle>
+                <DialogDescription className="break-words">
+                  {e.nino_nombre} · {e.act_nombre} · {e.col_nombre} ·{' '}
+                  {fechaDia(e.evaninopen_fecha_finalizacion)}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <div className="text-lg font-semibold tabular-nums">
+                  {numero(e.puntaje)} / {numero(e.eva_puntaje_total)}
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">{pct}%</span>
+                </div>
+                <Progress value={pct} className="h-2" aria-label={`${pct}% del puntaje`} />
+                {e.evaluado_por && (
+                  <div className="text-xs text-muted-foreground">Evaluó: {e.evaluado_por}</div>
+                )}
+              </div>
+              <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+                <Detalle parametros={e.parametros} />
+              </div>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </li>
