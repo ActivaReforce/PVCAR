@@ -75,6 +75,27 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
 
+### Corte de sesión — 2026-10-20
+
+**Hecho hoy (en producción desde el PR #22, con `0040` en dev y prod):** notas de los hijos para el representante (card en el tablero + pestaña "Mis hijos" con Evaluaciones → Ver; detalle en modal), observaciones extra por alumno (formulario → ficha y borde ámbar en /inscripciones → `nino_observacion_extra`, editable solo por el Propietario en /estudiantes, con filo ámbar en la lista), número rojo de Inscripciones solo para el Propietario, y la inscripción reintenta sola si se corta la conexión (`Idempotency-Key`).
+
+**Pendiente — marcas de color en la lista de Alumnos** (pedido del cliente, 2026-10-20; **solo registrado, no empezar sin que lo pida**):
+
+Que la lista diga de un vistazo qué tiene cada alumno que hay que leer en su ficha, como ya hace el filo ámbar de las observaciones extra.
+
+- **Qué marcar.** Las tres que pidió el cliente: **salud** (`nino_info_salud`), **instrucciones de retiro** (`nino_detalle_retiro`) y **observación extra** (ya hecha). Otras que propongo, todas salen de columnas que ya existen, sin SQL:
+  - **Sin permiso de imagen**: alguna de las tres casillas en No. Le sirve al entrenador que saca fotos en clase.
+  - **Nadie autorizado para retirarlo** (`contacto_retiro` vacío).
+  - **Sin contacto de emergencia.**
+  - **Sin representante** (`representantes = 0`): típico del alta manual.
+- **Varias a la vez.** Un solo filo no puede llevar varios colores sin volverse ilegible, y rojo/ámbar/verde no se distinguen bajo daltonismo (la misma lección que en la paleta de asistencia, `graficas/paleta.ts`). Propuesta:
+  - **Iconos pequeños junto al nombre**, uno por marca, cada uno con su forma, su color y su texto para lector de pantalla: corazón (salud), ruta (retiro), nota (observación), cámara tachada (imagen). La forma es la que informa; el color solo ayuda.
+  - **Un solo filo de color**, el de la marca más importante: salud, luego retiro, luego observación.
+  - Una **leyenda** corta encima de la lista y un **filtro** "Con salud / Con retiro / Con observación".
+  - Antes de decidir los colores, pasarlos por el validador de `dataviz`.
+- **Dónde más.** Donde de verdad hace falta es en **pasar lista** (Asistencias / Mi día): el entrenador está con el niño y necesita saber de la salud y de quién lo retira. Proponerlo al cliente con el mismo diseño.
+- **Ojo:** la lista no debe llevar el texto de salud, solo la marca, igual que hoy la ficha es la única que lo trae.
+
 ### Corte de sesión — 2026-10-16
 
 **Hecho hoy (en `main` desde el PR #21, salvo la vista previa del final, que está en `dev`):**
