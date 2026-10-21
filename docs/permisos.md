@@ -13,7 +13,7 @@ Vigente desde la migración `0026_permisos_crud.sql` (2026-10-07). Sale de las r
 | Disciplinas | Lista y horarios | Crear | Horario, dar de baja o reactivar | Borrar |
 | Entrenadores | Lista y fichas | *(se crean en Usuarios)* | Asignar disciplinas y auxiliares | *(no existe)* |
 | Alumnos | Lista y fichas | Crear | Datos, foto, inscribir en disciplinas, representantes, baja | Borrar |
-| Evaluaciones (plantillas) | Ver las plantillas | Crear plantilla | Datos, parámetros, vincular a disciplinas, baja | Borrar |
+| Evaluaciones (plantillas) | Ver las plantillas; el representante, las notas de sus hijos con su detalle (pestaña Mis hijos) | Crear plantilla | Datos, parámetros, vincular a disciplinas, baja | Borrar |
 | Calificar evaluaciones | Notas y pendientes de los alumnos | — | Calificar y quitar la pendiente de un alumno | — |
 | Asistencia de alumnos | Consultar listas e historial | — | Pasar lista | — |
 | Asistencia de personal | Consultar listas | — | Pasar lista | — |

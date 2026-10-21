@@ -1,4 +1,4 @@
-import { METODO } from '@/api/evaluaciones';
+import { METODO, type RangoTiempo } from '@/api/evaluaciones';
 
 /**
  * Los cinco métodos, con lo que hay que saber de cada uno para pintarlo.
@@ -69,6 +69,14 @@ export function brutoMobak(metodoId: number, puntuacion: number): number {
   }
   return Math.max(0, Math.min(2, puntuacion));
 }
+
+/** Operador de un umbral de tiempo, dicho con palabras. */
+export const etiquetaOperador = (op: string): string => {
+  if (op === '<') return 'menor que';
+  if (op === '<=') return 'menor o igual que';
+  if (op === '>') return 'mayor que';
+  return 'mayor o igual que';
+};
 
 /** Segundos → "m:ss", que es como se lee un tiempo de prueba física. */
 export function enMinutos(segundos: number): string {
@@ -165,6 +173,61 @@ export function puntajeDeParametro(p: ParametroVivo, intentos: IntentoVivo[]): n
     if (n !== null) total += n;
   }
   return aDos(total);
+}
+
+// ---------------------------------------------------------------------------
+// Lo que se registra en cada intento (2026-10-16), compartido por la pantalla
+// de evaluar y la vista previa.
+
+/** Lo registrado para un intento, antes de mandarlo. */
+export interface Registro {
+  tiempo: string;
+  logro: boolean | null;
+  escala: number | null;
+  mobak: number | null;
+}
+
+export const vacio = (): Registro => ({ tiempo: '', logro: null, escala: null, mobak: null });
+
+/** Lo que hace falta de un parámetro para pintar sus controles. */
+export interface ParametroCampos {
+  evatipometo_id: number;
+  evaparam_escala_min?: number | null;
+  evaparam_escala_max?: number | null;
+  rango?: RangoTiempo | null;
+}
+
+/** "1:30" o "90" → 90 segundos. */
+export function aSegundos(texto: string): number | null {
+  const limpio = texto.trim();
+  if (!limpio) return null;
+  if (limpio.includes(':')) {
+    const [m, s] = limpio.split(':');
+    const minutos = Number(m);
+    const segundos = Number(s);
+    if (Number.isNaN(minutos) || Number.isNaN(segundos)) return null;
+    return minutos * 60 + segundos;
+  }
+  const n = Number(limpio);
+  return Number.isNaN(n) ? null : n;
+}
+
+/** Un intento cuenta como registrado si su método tiene valor. */
+export function estaRegistrado(p: ParametroCampos, r: Registro): boolean {
+  if (p.evatipometo_id === METODO.TIEMPO) return aSegundos(r.tiempo) !== null;
+  if (p.evatipometo_id === METODO.LOGRO) return r.logro !== null;
+  if (p.evatipometo_id === METODO.ESCALA) return r.escala !== null;
+  return r.mobak !== null;
+}
+
+/** El registro, solo con el valor de su método, listo para puntuar o mandar. */
+export function aIntentoVivo(p: ParametroCampos, r: Registro): IntentoVivo {
+  return {
+    tiempo: p.evatipometo_id === METODO.TIEMPO ? aSegundos(r.tiempo) : null,
+    logro: p.evatipometo_id === METODO.LOGRO ? r.logro : null,
+    escala: p.evatipometo_id === METODO.ESCALA ? r.escala : null,
+    mobak: esMobak(p.evatipometo_id) ? r.mobak : null,
+  };
 }
 
 export const iniciales = (nombre: string) =>

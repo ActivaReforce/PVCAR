@@ -135,6 +135,16 @@ export const inscripcionesSchema = z.object({
     .refine((ids) => new Set(ids).size === ids.length, 'Hay disciplinas repetidas'),
 });
 
+/** Observaciones extra (0040). Vacío la quita. */
+export const observacionSchema = z.object({
+  observacion: z
+    .string()
+    .trim()
+    .max(2000, 'Máximo 2000 caracteres')
+    .nullable()
+    .transform((v) => (v && v.length > 0 ? v : null)),
+});
+
 export const representanteSchema = z.object({
   usu_id: z.number().int().positive(),
 });

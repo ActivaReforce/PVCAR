@@ -126,6 +126,7 @@ interface Alumno {
   salud_detalle: string;
   salud_autoriza: boolean;
   imagen: PermisosImagen;
+  observacion_extra: string;
 }
 
 let siguienteClave = 1;
@@ -149,6 +150,7 @@ const alumnoVacio = (): Alumno => ({
   salud_detalle: '',
   salud_autoriza: false,
   imagen: { familias: false, redes: false, promocional: false },
+  observacion_extra: '',
 });
 
 /** Un hijo que ya existe, con sus datos llenos para revisarlos. */
@@ -292,6 +294,38 @@ function erroresSalud(alumnos: Alumno[]): string[] {
   return e;
 }
 
+/** Una clave por envío, la misma en todos sus intentos (backend/lib/unaVez.ts). */
+function nuevaClave(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  const azar = () => Math.random().toString(36).slice(2);
+  return `${Date.now().toString(36)}-${azar()}-${azar()}`;
+}
+
+const esperar = (ms: number) => new Promise((resolver) => setTimeout(resolver, ms));
+
+/**
+ * Reintenta el envío si no llegó respuesta (2026-10-20). En el móvil la
+ * conexión se cae un momento —al volver de la app del banco, por ejemplo— y
+ * el envío no sale; antes se le pedía revisar la conexión y el papá
+ * recargaba y lo llenaba todo otra vez. Un error que sí manda el servidor
+ * (faltan datos, ya tiene cuenta) no se repite: volvería a decir lo mismo.
+ * Los 502–504 sí: son Railway mientras se reinicia.
+ */
+async function conReintentos<T>(hacer: () => Promise<T>): Promise<T> {
+  const pausas = [1500, 3000];
+  for (let intento = 0; ; intento++) {
+    try {
+      return await hacer();
+    } catch (err) {
+      const reintentable = !(err instanceof ApiError) || [502, 503, 504].includes(err.status);
+      if (!reintentable || intento >= pausas.length) throw err;
+      await esperar(pausas[intento]);
+    }
+  }
+}
+
 function aBase64(archivo: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const lector = new FileReader();
@@ -422,6 +456,7 @@ const Inscripcion = () => {
   const [errores, setErrores] = useState<string[]>([]);
   const [resultado, setResultado] = useState<EnvioRecibido | null>(null);
   const arriba = useRef<HTMLDivElement>(null);
+  const claveEnvio = useRef(nuevaClave());
 
   const misDatos = useQuery({
     queryKey: ['inscripcion-publica', 'mis-datos', user?.usu_id],
@@ -560,7 +595,7 @@ const Inscripcion = () => {
     setEnviando(true);
     setErrores([]);
     try {
-      const recibido = await inscripcionesApi.enviar({
+      const envio: Envio = {
         representante: {
           nombre: rep.nombre.trim(),
           cedula: rep.cedula.trim(),
@@ -593,11 +628,16 @@ const Inscripcion = () => {
             autoriza: a.salud_autoriza,
           },
           imagen: a.imagen,
+          observacion_extra: a.observacion_extra.trim() || null,
         })),
         ...documentosLeidos(datos, alumnos),
         acepta: Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, true])) as Record<TipoDocumento, true>,
         comprobante: { mime, base64: await aBase64(comprobante) },
-      }, conSesion);
+      };
+      const recibido = await conReintentos(() =>
+        inscripcionesApi.enviar(envio, conSesion, claveEnvio.current),
+      );
+      claveEnvio.current = nuevaClave();
       setResultado(recibido);
       subir();
     } catch (err) {
@@ -625,7 +665,9 @@ const Inscripcion = () => {
         const problemas = (err.details as { problemas?: string[] } | undefined)?.problemas ?? [];
         setErrores(problemas.length > 0 ? problemas : [err.message]);
       } else {
-        setErrores(['No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.']);
+        setErrores([
+          'No salió el envío: parece que se cortó la conexión. No recargues la página, tus datos siguen aquí. Revisa tu señal y vuelve a pulsar Enviar.',
+        ]);
       }
       subir();
     } finally {
@@ -1289,6 +1331,18 @@ const FichaAlumno = ({
             value={alumno.detalle_retiro}
             onChange={(e) => onChange({ detalle_retiro: e.target.value })}
             maxLength={500}
+          />
+        </Campo>
+      </section>
+
+      <section className="space-y-3 border-t pt-5">
+        <h2 className="font-semibold">Observaciones extra (opcional)</h2>
+        <Campo id={id('observacion')} etiqueta="Cualquier cosa que debamos saber del alumno y no esté arriba">
+          <Textarea
+            id={id('observacion')}
+            value={alumno.observacion_extra}
+            onChange={(e) => onChange({ observacion_extra: e.target.value })}
+            maxLength={1000}
           />
         </Campo>
       </section>

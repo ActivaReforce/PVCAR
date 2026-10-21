@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import type { EvaluacionDeHijo } from '@/api/evaluaciones';
 
 /**
  * Cliente del Tablero.
@@ -83,6 +84,11 @@ export interface HijoDelRepresentante {
 
 export interface TableroRepresentante {
   hijos: HijoDelRepresentante[];
+  /**
+   * Las notas con su detalle (2026-10-20). Opcional: Vercel publica antes que
+   * Railway y durante unos minutos el backend viejo no lo manda.
+   */
+  evaluaciones?: EvaluacionDeHijo[];
 }
 
 export interface PuntoTendencia {

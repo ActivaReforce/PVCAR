@@ -141,6 +141,8 @@ export const ninoSchema = z
       redes: z.boolean(),
       promocional: z.boolean(),
     }),
+    /** Opcional y libre; al aprobar pasa a la ficha del alumno (0040). */
+    observacion_extra: textoOpcional(1000),
   })
   .refine((n) => !n.salud.tiene || (n.salud.detalle !== null && n.salud.detalle.length > 0), {
     message: 'Si hay alguna condición de salud, especifícala',
@@ -237,6 +239,7 @@ const CAMPO: Record<string, string> = {
   disciplinas: 'disciplinas',
   modalidad_salida: 'modalidad de salida',
   detalle_retiro: 'detalle del recorrido',
+  observacion_extra: 'observaciones extra',
   detalle: 'especifique',
   autoriza: 'autorización',
   base64: 'imagen del comprobante',

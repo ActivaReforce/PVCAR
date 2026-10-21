@@ -13,6 +13,7 @@ import {
   idParamSchema,
   inscripcionesSchema,
   listarEstudiantesSchema,
+  observacionSchema,
   representanteSchema,
 } from './estudiantes.schemas.js';
 import * as service from './estudiantes.service.js';
@@ -145,6 +146,24 @@ estudiantesRouter.patch(
       const { id } = idParamSchema.parse(req.params);
       const input = actualizarEstudianteSchema.parse(req.body);
       res.json({ data: await service.actualizar(actor(req), id, input), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PUT /api/v1/estudiantes/:id/observacion — las observaciones extra. Solo el
+ * Propietario (lo comprueba el servicio).
+ */
+estudiantesRouter.put(
+  '/:id/observacion',
+  requirePermission('estudiantes', 'editar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      const { observacion } = observacionSchema.parse(req.body);
+      res.json({ data: await service.cambiarObservacion(actor(req), id, observacion), error: null });
     } catch (err) {
       next(err);
     }

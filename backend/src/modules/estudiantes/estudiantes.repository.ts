@@ -24,6 +24,8 @@ export interface EstudianteListado {
   /** Inscripciones activas. */
   disciplinas: number;
   representantes: number;
+  /** Tiene observaciones extra: la lista lo marca para que abran la ficha. */
+  con_observacion: boolean;
 }
 
 export type ModalidadSalida = 'escolar' | 'privado';
@@ -56,6 +58,8 @@ export interface EstudianteDetalle extends EstudianteListado {
   nino_imagen_promocional: boolean | null;
   contacto_emergencia: ContactoNino | null;
   contacto_retiro: ContactoNino | null;
+  /** Libre: la del representante al inscribirlo o la del Propietario (0040). */
+  nino_observacion_extra: string | null;
   nino_fecha_modificacion: string | null;
 }
 
@@ -166,7 +170,8 @@ const COLUMNAS = `
         n.est_id,
         n.nino_fecha_creacion,
         COALESCE(insc.n, 0)::int AS disciplinas,
-        COALESCE(rep.n, 0)::int  AS representantes
+        COALESCE(rep.n, 0)::int  AS representantes,
+        (n.nino_observacion_extra IS NOT NULL) AS con_observacion
 `;
 
 const DESDE = `
@@ -287,6 +292,7 @@ export async function obtenerEstudiante(
            n.nino_imagen_promocional,
            ${contacto('emergencia')} AS contacto_emergencia,
            ${contacto('retiro')} AS contacto_retiro,
+           n.nino_observacion_extra,
            n.nino_fecha_modificacion
     ${DESDE}
     WHERE n.nino_id = $1
@@ -515,6 +521,40 @@ export async function insertarEstudiante(
     ],
   );
   return rows[0]!.nino_id;
+}
+
+/**
+ * La observación que trae una inscripción al aprobarse. Si el alumno ya tenía
+ * una, la nueva va debajo: no se pisa lo que escribió el Propietario.
+ */
+export async function sumarObservacion(
+  client: PoolClient,
+  ninoId: number,
+  texto: string | null,
+): Promise<void> {
+  if (!texto) return;
+  await client.query(
+    `UPDATE public.nino
+        SET nino_observacion_extra = left(
+              CASE WHEN nino_observacion_extra IS NULL OR nino_observacion_extra = $2 THEN $2
+                   ELSE nino_observacion_extra || E'\n\n' || $2 END, 2000)
+      WHERE nino_id = $1`,
+    [ninoId, texto],
+  );
+}
+
+/** La edita el Propietario desde la ficha. null la quita. */
+export async function fijarObservacion(
+  client: PoolClient,
+  ninoId: number,
+  texto: string | null,
+): Promise<void> {
+  await client.query(
+    `UPDATE public.nino
+        SET nino_observacion_extra = $2, nino_fecha_modificacion = now()
+      WHERE nino_id = $1`,
+    [ninoId, texto],
+  );
 }
 
 export async function actualizarEstudiante(

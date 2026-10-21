@@ -891,3 +891,126 @@ export async function marcarEstadoPendiente(
     [evaninopenId, evaluado ? ESTADO.EVALUADO : ESTADO.PENDIENTE, evaluado ? registrador : null],
   );
 }
+
+// ---------------------------------------------------------------------------
+// Lo que ve el representante (2026-10-20)
+
+export interface IntentoDeHijo {
+  evaint_intento: number;
+  evaint_tiempo: number | null;
+  evaint_logro: boolean | null;
+  evaint_num: number | null;
+  evaint_mobak: number | null;
+  evaint_puntaje_obtenido: number;
+}
+
+export interface ParametroDeHijo {
+  evaparam_id: number;
+  evaparam_nombre: string;
+  evatipometo_id: number;
+  evaparam_intentos: number;
+  evaparam_puntaje: number;
+  evaparam_escala_min: number | null;
+  evaparam_escala_max: number | null;
+  intentos: IntentoDeHijo[];
+}
+
+export interface EvaluacionDeHijo {
+  evaninopen_id: number;
+  nino_id: number;
+  nino_nombre: string;
+  eva_titulo: string;
+  eva_descripcion: string | null;
+  act_nombre: string;
+  col_nombre: string;
+  est_id: number;
+  evaninopen_fecha_finalizacion: string | null;
+  evaluado_por: string | null;
+  eva_puntaje_total: number;
+  puntaje: number;
+  /** El detalle por parámetro. Vacío mientras está pendiente. */
+  parametros: ParametroDeHijo[];
+}
+
+/**
+ * Las evaluaciones de los hijos de un representante, con el detalle de cada
+ * nota. La usan el tablero del representante y la pestaña "Mis hijos".
+ *
+ * Los hijos salen de `padre.usu_id`, igual que el resto del tablero, y no de
+ * `alcanceDe`: ahí un Propietario que además es representante sale global y
+ * sin `ninos`.
+ *
+ * Qué entra:
+ * - **Evaluado**, siempre: es su nota aunque la disciplina ya no la use o la
+ *   plantilla esté de baja (desvincular no borra notas).
+ * - **Pendiente**, solo si la plantilla y la inscripción del niño siguen
+ *   activas; si no, ya nadie la va a pasar.
+ *
+ * Una pendiente con intentos a medias no enseña su detalle: una evaluación a
+ * medias no es una nota (ver `guardarIntentos`).
+ */
+export async function evaluacionesDeHijosDe(usuId: number): Promise<EvaluacionDeHijo[]> {
+  const { rows } = await getPool().query<EvaluacionDeHijo>(
+    `SELECT np.evaninopen_id,
+            n.nino_id,
+            n.nino_nombre,
+            e.eva_titulo,
+            e.eva_descripcion,
+            act.act_nombre,
+            c.col_nombre,
+            np.est_id,
+            np.evaninopen_fecha_finalizacion,
+            reg.usu_nombre AS evaluado_por,
+            e.eva_puntaje_total::float8 AS eva_puntaje_total,
+            COALESCE((
+                SELECT sum(i.evaint_puntaje_obtenido) FROM public.evaluacion_intento i
+                WHERE i.evaninopen_id = np.evaninopen_id
+            ), 0)::float8 AS puntaje,
+            CASE WHEN np.est_id = ${ESTADO.EVALUADO} THEN COALESCE((
+                SELECT json_agg(json_build_object(
+                    'evaparam_id',         p.evaparam_id,
+                    'evaparam_nombre',     p.evaparam_nombre,
+                    'evatipometo_id',      p.evatipometo_id,
+                    'evaparam_intentos',   p.evaparam_intentos,
+                    'evaparam_puntaje',    p.evaparam_puntaje::float8,
+                    'evaparam_escala_min', p.evaparam_escala_min,
+                    'evaparam_escala_max', p.evaparam_escala_max,
+                    'intentos', COALESCE((
+                        SELECT json_agg(json_build_object(
+                            'evaint_intento',          i.evaint_intento,
+                            'evaint_tiempo',           i.evaint_tiempo,
+                            'evaint_logro',            i.evaint_logro,
+                            'evaint_num',              i.evaint_num,
+                            'evaint_mobak',            i.evaint_mobak,
+                            'evaint_puntaje_obtenido', i.evaint_puntaje_obtenido::float8
+                        ) ORDER BY i.evaint_intento)
+                        FROM public.evaluacion_intento i
+                        WHERE i.evaninopen_id = np.evaninopen_id AND i.evaparam_id = p.evaparam_id
+                    ), '[]'::json)
+                ) ORDER BY p.evaparam_id)
+                FROM public.evaluacion_parametro p
+                WHERE p.eva_id = np.eva_id
+            ), '[]'::json) ELSE '[]'::json END AS parametros
+       FROM public.padre pa
+       JOIN public.nino_padre npa ON npa.padre_id = pa.padre_id
+       JOIN public.nino n ON n.nino_id = npa.nino_id
+       JOIN public.nino_asignacion na ON na.nino_id = n.nino_id
+       JOIN public.evaluacion_nino_pendiente np ON np.ninoasig_id = na.ninoasig_id
+       JOIN public.evaluacion e ON e.eva_id = np.eva_id
+       JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = na.colacthor_id
+       JOIN public.colegio c ON c.col_id = cah.col_id
+       JOIN public.actividad act ON act.act_id = cah.act_id
+       LEFT JOIN public.usuario reg ON reg.usu_id = np.usu_id_registrador
+      WHERE pa.usu_id = $1
+        AND (np.est_id = ${ESTADO.EVALUADO}
+             OR (np.est_id = ${ESTADO.PENDIENTE}
+                 AND e.est_id = ${ESTADO.ACTIVO}
+                 AND na.est_id = ${ESTADO.ACTIVO}))
+      ORDER BY n.nino_nombre,
+               (np.est_id = ${ESTADO.EVALUADO}) DESC,
+               np.evaninopen_fecha_finalizacion DESC NULLS LAST,
+               e.eva_titulo`,
+    [usuId],
+  );
+  return rows;
+}

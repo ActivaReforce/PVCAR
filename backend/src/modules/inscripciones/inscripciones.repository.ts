@@ -654,6 +654,8 @@ export interface InscripcionListada {
   total: number | null;
   /** Ya hay un usuario con ese correo o con esa cedula. */
   usuario_existente: boolean;
+  /** Algún alumno trae observaciones extra (borde amarillo en la lista). */
+  con_observacion: boolean;
 }
 
 const F_LISTA = `
@@ -703,6 +705,9 @@ export async function listar(
                        WHERE n.ins_id = i.ins_id), '[]'::json) AS colegios,
             i.ins_total::float8 AS total_cobro,
             (i.ins_estado = 'pendiente' AND ${USUARIO_EXISTENTE}) AS usuario_existente,
+            EXISTS (SELECT 1 FROM public.inscripcion_nino n
+                     WHERE n.ins_id = i.ins_id
+                       AND COALESCE(n.insnino_datos->>'observacion_extra', '') <> '') AS con_observacion,
             count(*) OVER() AS total
        FROM public.inscripcion i
       WHERE ${F_LISTA}

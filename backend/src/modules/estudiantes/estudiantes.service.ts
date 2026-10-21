@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { alcanceDe, alcanzaColegio, alcanzaDisciplina, type Alcance } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
-import { ESTADO } from '../../lib/constants.js';
+import { ESTADO, ROL } from '../../lib/constants.js';
 import { crucesEntre, describirCruce } from '../../lib/horarios.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { borrarFoto, firmarFoto, firmarFotos, rutaValida } from '../../lib/storage.js';
@@ -292,6 +292,43 @@ export async function actualizar(
 
   const despues = await repo.obtenerEstudiante(ninoId);
   return { ...despues!, nino_foto_url: await firmarFoto(despues!.nino_foto) };
+}
+
+/**
+ * Observaciones extra (pedido del cliente, 2026-10-20): las ve quien ve la
+ * ficha, pero solo el Propietario las escribe o las borra.
+ */
+export function puedeEditarObservacion(actor: AuthUser): boolean {
+  return actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO);
+}
+
+export async function cambiarObservacion(
+  actor: AuthUser,
+  ninoId: number,
+  observacion: string | null,
+): Promise<{ nino_observacion_extra: string | null }> {
+  if (!puedeEditarObservacion(actor)) {
+    throw new ApiError(403, 'Solo el Propietario edita las observaciones extra');
+  }
+  const antes = await exigirVisible(actor, ninoId);
+  await enTransaccion(async (client) => {
+    await repo.fijarObservacion(client, ninoId, observacion);
+    await auditar(
+      {
+        actor,
+        accion: 'editar',
+        entidad: 'estudiante',
+        entidadId: ninoId,
+        detalle: {
+          campos: ['nino_observacion_extra'],
+          antes: antes.nino_observacion_extra,
+          despues: observacion,
+        },
+      },
+      client,
+    );
+  });
+  return { nino_observacion_extra: observacion };
 }
 
 export async function disponibles(

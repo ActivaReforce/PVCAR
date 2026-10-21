@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { alcanceDe, alcanzaDisciplina, type Alcance } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
-import { ESTADO } from '../../lib/constants.js';
+import { ESTADO, ROL } from '../../lib/constants.js';
 import type { Pagina } from '../../lib/paginacion.js';
 import { firmarFoto, firmarFotos } from '../../lib/storage.js';
 import { enTransaccion } from '../../lib/tx.js';
@@ -571,6 +571,17 @@ export async function pendientes(
     },
     eva_puntaje_total: evaluacion.eva_puntaje_total,
   };
+}
+
+/**
+ * Las evaluaciones de los hijos del representante, con el detalle de cada
+ * nota (pedido del cliente, 2026-10-20). Solo sus hijos: el alcance del
+ * representante no abre plantillas ni a los compañeros de clase. Quien no es
+ * representante recibe una lista vacía aunque tenga la casilla.
+ */
+export async function deMisHijos(actor: AuthUser): Promise<repo.EvaluacionDeHijo[]> {
+  if (!actor.usuario.roles.some((r) => r.rol_id === ROL.REPRESENTANTE)) return [];
+  return repo.evaluacionesDeHijosDe(actor.usuario.usu_id);
 }
 
 export interface FichaDeEvaluacion {

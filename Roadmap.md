@@ -8,7 +8,7 @@
 
 > **Vive en el repo desde el 2026-10-07** (raíz de `ActivaReforce/PVCAR`) para poder seguir desde otro equipo con un `git pull`. Las rutas `PVCAR/...` son la raíz de este repo. `SQL/` y `.mcp.json` viven en la carpeta de trabajo, fuera del repo, y no se suben.
 
-**Corte de este documento: 2026-10-16 (Fase 12 cerrada en código: Evaluaciones con Visualizar, agrupar por colegios, bloqueo con notas, puntaje en vivo, umbrales con palabras, permisos; listas apiladas hasta 1024 px; aviso al dar de alta un alumno manual; "sin disciplinas" cuenta solo activos).**
+**Corte de este documento: 2026-10-16 (Fase 12 cerrada y aprobada por el cliente; vista previa de evaluaciones igual que evaluar. Antes: Evaluaciones con Visualizar, agrupar por colegios, bloqueo con notas, puntaje en vivo, umbrales con palabras, permisos; listas apiladas hasta 1024 px; aviso al dar de alta un alumno manual; "sin disciplinas" cuenta solo activos).**
 
 ---
 
@@ -44,14 +44,14 @@
 | **7 — Colegios** | ✅ **cerrada el 2026-09-18**: 13/13 pruebas contra `dev`, más dos arreglos |
 | **8 — Actividades y Disciplinas** | ✅ **cerrada el 2026-10-02**: 45 pruebas + 9 de repaso contra `dev`. Salieron 4 arreglos y un rediseño de tres pantallas pedido por el cliente (ver Fase 8 abajo). **Reabierta y cerrada otra vez el 2026-10-06: Disciplinas v2** (una disciplina con varios días, cada uno con su hora; `0021`) y **color por actividad** (`0022`/`0023`), probadas en pantalla por el cliente. Detalle en `docs/disciplinas-v2.md` |
 | **9 — Entrenadores** | 🟡 construida el 2026-09-16, en `dev`. **Los dos prerrequisitos, hechos el 2026-10-06:** auxiliar con varios titulares (selector "de quién ver" + "Todos") y bloqueo de choque de horario del entrenador. Solo falta probarla |
-| **10 — Estudiantes** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
-| **11 — Asistencias** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
-| **12 — Evaluaciones** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
+| **10 — Alumnos** | ✅ **cerrada el 2026-10-16**: probada en pantalla y aprobada por el cliente |
+| **11 — Asistencias** | ✅ **cerrada el 2026-10-16**: probada en pantalla y aprobada por el cliente |
+| **12 — Evaluaciones** | ✅ **cerrada el 2026-10-16**: probada en pantalla y aprobada por el cliente. En `main` desde el PR #21; la vista previa igual que evaluar, en `dev` |
 | **13 — Tablero y Reportes** | 🟡 construida el 2026-09-17, en `dev`. 4 tableros, 9 reportes y 14 gráficas. **+ Data anterior** (2026-10-02): 15 conjuntos, 8 gráficas y Excel de todo; pruebas en `docs/data-anterior.md`. **La exportación a Excel de Reportes fallaba siempre** — arreglada el 2026-10-02. Solo falta probarla |
 | **14 — Encuestas y Representantes** | 🟡 construida el 2026-09-17, en `dev`. Solo falta probarla |
-| **14B — Inscripciones** (nuevo, 2026-10-01) | 🟡 **rehecha el 2026-10-05 y en `dev`** con los seis documentos del cliente (4 generales + ficha y contrato por colegio), constancia por documento, PDF por alumno con membrete, IVA fijo 15 %, apertura general y por colegio, cuenta bancaria. `0014`–`0019` aplicadas en dev y prod. **El cobro por disciplina quedó resuelto el 2026-10-06** con Disciplinas v2 (una disciplina = una tarifa, máximo configurable por alumno, sin cruces). **Representante con cuenta previa hecho y probado el 2026-10-07**, en `main` desde el PR #11. Estado vigente en `docs/fase14b-contratos.md`. Solo Propietario |
+| **14B — Inscripciones** (nuevo, 2026-10-01) | ✅ **cerrada el 2026-10-16**: probada de punta a punta y aprobada por el cliente; en producción y abierta al público desde el 2026-10-14. Historia: **rehecha el 2026-10-05 y en `dev`** con los seis documentos del cliente (4 generales + ficha y contrato por colegio), constancia por documento, PDF por alumno con membrete, IVA fijo 15 %, apertura general y por colegio, cuenta bancaria. `0014`–`0019` aplicadas en dev y prod. **El cobro por disciplina quedó resuelto el 2026-10-06** con Disciplinas v2 (una disciplina = una tarifa, máximo configurable por alumno, sin cruces). **Representante con cuenta previa hecho y probado el 2026-10-07**, en `main` desde el PR #11. Estado vigente en `docs/fase14b-contratos.md`. Solo Propietario |
 | **Novedades** (puntos 8 y 9, fuera de fase) | ✅ **cerrado el 2026-10-12**: probado y aprobado por el cliente en `dev`. Novedades a mano (general, personal, representantes, alumnos), ausencias y correcciones automáticas al pasar lista, correos configurables, número en el menú, baja lógica y reporte con hoja Ausencias. En producción desde el PR #16 (2026-10-13) |
-| **15 — Endurecimiento y QA** | 🟡 en marcha desde el 2026-09-17. Hecho todo lo que no necesita la aplicación en marcha. SMTP de Resend puesto en prod y dev (2026-10-07). Falta la auditoría de fugas con token por rol, los e2e, el repaso de accesibilidad y **el respaldo de prod** |
+| **15 — Endurecimiento y QA** | 🟡 en marcha desde el 2026-09-17. Hecho todo lo que no necesita la aplicación en marcha. SMTP de Resend puesto en prod y dev (2026-10-07). Falta la auditoría de fugas con token por rol, los e2e y el repaso de accesibilidad (el respaldo de prod se hace a mano cuando lo pida; el alta de usuarios se queda con contraseña del admin) |
 | **16 — Lanzamiento** | ✅ **2026-10-12**: `activareforce.com` en producción. Prod limpia de lo de prueba y con datos reales cargados por el cliente |
 | **17 — Cierre del proyecto** | 🟡 plataforma anterior borrada el 2026-10-12; faltan los PAT, el repo privado y la limpieza final |
 
@@ -77,7 +77,7 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 
 ### Corte de sesión — 2026-10-16
 
-**Hecho hoy (todo en `dev`, pendiente PR a `main`):**
+**Hecho hoy (en `main` desde el PR #21, salvo la vista previa del final, que está en `dev`):**
 
 - **Fase 12 cerrada en código** tras las pruebas en pantalla del cliente, tres bloques:
   - **Form de evaluación** reescrito: umbrales de Por tiempo con palabras ("menor que", "menor o igual que"...), sufijo "s", inputs numéricos que ya dejan borrar completo (se normalizan al perder foco), validación inline + toast al guardar si los umbrales van en el mismo sentido o la escala tiene máximo ≤ mínimo, y botón "Añadir parámetro" al final de la lista.
@@ -91,10 +91,13 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 - **Conteo "sin disciplinas"** del encabezado de Alumnos: cuenta solo los **activos**. Un inactivo no está pidiendo asignación.
 - **Listas** de Alumnos, Entrenadores y Usuarios: hasta 1024 px tarjeta apilada; desde 1024 px columnas completas. Se quitó el escalón intermedio md que seguía amontonando columnas con nombres largos.
 - 638/638 tests de backend, 7/7 de frontend; typecheck, lint y build limpios. **Sin SQL en toda la Fase 12.**
+- **Vista previa igual que evaluar** (en `dev`, `eb0c41b` + `bde8b86`): arriba, las disciplinas vinculadas; luego el separador **"Así se ve al evaluar:"** y la pantalla de evaluar tal cual (un parámetro por pantalla, todos sus intentos con los controles de su método, avance y puntaje en vivo). Se puede marcar para probar; solo Limpiar y Cerrar, nada se guarda. Los controles de un intento viven en `CamposIntento`, compartido con la pantalla de evaluar; los umbrales de tiempo se leen con palabras en las dos.
+- **Fase 12 aprobada por el cliente** el 2026-10-16: ✅ cerrada.
 
 **Al retomar — lista de trabajo, uno por uno:**
 
-1. **Pruebas en pantalla** de las Fases 13 y 14 (Reportes y Encuestas/Representantes) y 14B (Inscripciones). `docs/checklist-modulos.md`.
+0. **Pasar a `main`** la vista previa de evaluaciones (sin SQL) cuando el cliente lo pida.
+1. **Pruebas en pantalla** de las Fases 9, 13 y 14 (10, 11, 12 y 14B cerradas y aprobadas el 2026-10-16) (Reportes y Encuestas/Representantes) y 14B (Inscripciones). `docs/checklist-modulos.md`.
 2. **Pagos mensuales** — esperar a que el cliente lo cuente.
 3. **Fase 15** (fugas con un token por rol, e2e, accesibilidad) y **Fase 17**.
 
@@ -692,7 +695,7 @@ Atar 3 disciplinas de una vez · quitar una y comprobar que queda con `fecha_fin
 
 ---
 
-### Fase 10 — Estudiantes
+### Fase 10 — Alumnos
 
 **Para qué sirve:** el registro de los 796 alumnos y de en qué disciplinas está cada uno. Es el módulo con más volumen de pantalla y el que más veces se usa.
 
@@ -954,7 +957,7 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 
 **Por qué solo hace falta una plantilla.** Verificado en `usuarios.service.ts` el 2026-09-17: crear un usuario llama a `admin.auth.admin.createUser` con la contraseña que **escribe el admin** y `email_confirm: true`, así que Supabase no manda nada. Reactivar a un inactivo hace lo mismo. Ni *Confirm signup* ni *Invite user* se disparan nunca: la primera necesitaría registro público, que no existe, y la segunda necesitaría que el código llamara a `inviteUserByEmail()`, que no lo hace. Las dos plantillas quedan escritas en `docs/correos/` por si el flujo cambia, pero **no van al dashboard**.
 
-- [ ] **Preguntarle a Activa Reforce si quieren cambiar el flujo de alta.** Hoy el admin crea al usuario **escribiendo él la contraseña**, así que **conoce la contraseña de todas las personas del sistema**. La alternativa es el flujo de invitación: el admin crea la cuenta sin contraseña, a la persona le llega un correo y la elige ella, sin que nadie más la sepa nunca. A favor: es mejor práctica y quita al admin de en medio. En contra: ata el alta al correo — si el SMTP falla o la dirección está mal, esa persona no puede entrar, mientras que hoy el admin le dice la contraseña y ya. **Es pregunta para ellos, no decisión técnica.** Resend ya funciona, así que se le puede preguntar. Si dicen que sí, las plantillas `invitacion.html` y `confirmar-correo.html` ya están escritas.
+- [x] ~~**Preguntarle a Activa Reforce si quieren cambiar el flujo de alta.**~~ **Cerrado el 2026-10-16: el admin sigue poniendo la contraseña, se queda así.** No hay invitación por correo. Lo de abajo es el razonamiento original. Hoy el admin crea al usuario **escribiendo él la contraseña**, así que **conoce la contraseña de todas las personas del sistema**. La alternativa es el flujo de invitación: el admin crea la cuenta sin contraseña, a la persona le llega un correo y la elige ella, sin que nadie más la sepa nunca. A favor: es mejor práctica y quita al admin de en medio. En contra: ata el alta al correo — si el SMTP falla o la dirección está mal, esa persona no puede entrar, mientras que hoy el admin le dice la contraseña y ya. **Es pregunta para ellos, no decisión técnica.** Resend ya funciona, así que se le puede preguntar. Si dicen que sí, las plantillas `invitacion.html` y `confirmar-correo.html` ya están escritas.
 - [x] **Revisión de alcance rol por rol (2026-10-05, estática, con los datos reales del esquema `archivo` para medir).** Tres fugas del mismo tipo, cerradas en `dev` (`448baa9`, `0b0853d`):
   1. **Entrenador y auxiliares veían el colegio entero.** `alcanceDe` les sumaba los colegios de sus disciplinas, y Estudiantes, los reportes y la tendencia del tablero filtran "colegio O disciplina". Un entrenador con 4 disciplinas veía 176 alumnos (con su salud) en vez de sus 37. Ahora `colegios` = solo `colegio_coordinador`.
   2. **Representante.** Su camino aportaba colegios y disciplinas de sus hijos al alcance del personal: con "ver" en Estudiantes o Asistencias habría visto el colegio y la clase entera. Ahora trae solo `ninos` y `disciplinasDeHijos`.
@@ -964,7 +967,7 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 - [ ] **Auditoría de fugas con un token de cada rol.** El repaso estático dice que el alcance se aplica en el **servicio**, no en el SQL del repositorio: cada módulo que toca datos de menores tiene su guarda (`exigirVisible`, `exigirPendienteVisible`, `exigirSesion`, `exigirAlcance`…) que resuelve el alcance y devuelve 403. Es el diseño correcto, pero eso no se da por bueno leyendo código: se prueba con un token por rol contra todos los endpoints, y eso necesita el API en marcha.
 - [ ] Tests e2e por módulo + prueba de carga en dev con el volumen real.
 - [ ] Repaso de accesibilidad y responsive de las 14 pantallas, en los dos temas, en los tres anchos.
-- [ ] **Respaldo de prod.** Ya tiene datos reales y el plan gratuito de Supabase no hace copias automáticas: `pg_dump` programado o plan Pro.
+- [x] ~~**Respaldo de prod.**~~ **No necesario como tarea** (cliente, 2026-10-15): se hace a mano, puntual, cuando lo pida. Antes de cualquier operación destructiva en prod se le avisa.
 
 ---
 
@@ -983,11 +986,11 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 ## 10. Fase 17 — Cierre del proyecto
 
 - [x] Borrar la plataforma anterior: hosting, Supabase, cuenta de Supabase y repo (2026-10-12, el cliente).
-- [x] Borrar la copia local de su código, `_ref/` y el respaldo local (2026-10-12, decisión del cliente).
+- [x] Borrar la copia local de su código, `_ref/` y el respaldo local (2026-10-12, decisión del cliente). El cliente confirmó el 2026-10-16 que la plataforma anterior ya no está en el workspace y que su repo y su base están eliminados.
 - [ ] **Rotar los dos PAT de Supabase** que están en texto plano en `.mcp.json` (riesgo asumido por el cliente).
 - [ ] Borrar `CLAUDE.md` y `Roadmap.md` del repo (están solo para trabajar desde otro equipo).
 - [ ] Pasar el repo `PVCAR` a **privado**.
-- [ ] El workspace sale de la carpeta `Flowward`.
+- [x] ~~El workspace sale de la carpeta `Flowward`.~~ Cerrado el 2026-10-16: la carpeta se queda en `Flowward` para siempre (decisión del cliente).
 
 ---
 
@@ -1037,13 +1040,13 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 - [x] Fase 7 — Colegios — cerrada 2026-09-18, 13/13 pruebas contra dev
 - [x] Fase 8 — Actividades y Disciplinas — cerrada 2026-10-02; Disciplinas v2 probada el 2026-10-06
 - [ ] Fase 9 — Entrenadores — construida; **solo faltan las pruebas**
-- [ ] Fase 10 — Estudiantes — construida; **solo faltan las pruebas**
-- [ ] Fase 11 — Asistencias — construida; **solo faltan las pruebas**
-- [ ] Fase 12 — Evaluaciones — construida; **solo faltan las pruebas**
+- [x] Fase 10 — Alumnos — cerrada 2026-10-16, aprobada por el cliente
+- [x] Fase 11 — Asistencias — cerrada 2026-10-16, aprobada por el cliente
+- [x] Fase 12 — Evaluaciones — cerrada 2026-10-16, aprobada por el cliente
 - [ ] Fase 13 — Tablero y Reportes — construida; **solo faltan las pruebas**
 - [ ] Fase 14 — Encuestas y Representantes — construida; **solo faltan las pruebas**
-- [ ] Fase 14B — Inscripciones — construida; el cliente la va probando
-- [ ] Fase 15 — Endurecimiento y QA — en marcha; falta lo que necesita la app en marcha y el respaldo de prod
+- [x] Fase 14B — Inscripciones — cerrada 2026-10-16, probada de punta a punta por el cliente
+- [ ] Fase 15 — Endurecimiento y QA — en marcha; falta lo que necesita la app en marcha (fugas por rol, e2e, accesibilidad)
 - [x] Fase 16 — Lanzamiento — 2026-10-12, `activareforce.com`
 - [ ] Fase 17 — Cierre del proyecto — plataforma anterior borrada; faltan PAT, repo privado y limpieza
 
@@ -1052,6 +1055,6 @@ En marcha desde el 2026-09-17. Lo que se puede comprobar sin la aplicación en m
 | Riesgo | Mitigación |
 |---|---|
 | Dar un módulo por listo sin probarlo | La sección 3.5. Ya costó trece arreglos en la Fase 6 |
-| Free tier de Supabase sin backups automáticos | **Prod ya tiene datos reales desde el 2026-10-12.** `pg_dump` programado o plan Pro, cuanto antes |
+| Free tier de Supabase sin backups automáticos | **Prod tiene datos reales.** Decidido por el cliente (2026-10-15): respaldo a mano cuando lo pida; aviso antes de cualquier operación destructiva |
 | PAT en texto plano en `.mcp.json` | Decisión cerrada del cliente; se rotan en la Fase 17 |
 | Repo público | Decisión cerrada; pasa a privado en la Fase 17. este documento vive en el repo hasta la Fase 17 |

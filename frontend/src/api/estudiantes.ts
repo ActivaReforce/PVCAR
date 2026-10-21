@@ -26,6 +26,8 @@ export interface Estudiante {
   nino_fecha_creacion: string | null;
   disciplinas: number;
   representantes: number;
+  /** Tiene observaciones extra. Opcional: Vercel publica antes que Railway. */
+  con_observacion?: boolean;
 }
 
 export type ModalidadSalida = 'escolar' | 'privado';
@@ -56,6 +58,8 @@ export interface EstudianteDetalle extends Estudiante {
   nino_imagen_promocional: boolean | null;
   contacto_emergencia: ContactoNino | null;
   contacto_retiro: ContactoNino | null;
+  /** La del representante al inscribirlo o la del Propietario. Opcional, igual que con_observacion. */
+  nino_observacion_extra?: string | null;
   nino_fecha_modificacion: string | null;
 }
 
@@ -202,6 +206,10 @@ export const estudiantesApi = {
 
   actualizar: (id: number, datos: DatosEstudiante) =>
     api.patch<EstudianteDetalle>(`/estudiantes/${id}`, datos),
+
+  /** Observaciones extra: solo el Propietario. null la quita. */
+  observacion: (id: number, observacion: string | null) =>
+    api.put<{ nino_observacion_extra: string | null }>(`/estudiantes/${id}/observacion`, { observacion }),
 
   /** La lista completa de disciplinas activas que debe tener. */
   inscripciones: (id: number, colacthor_ids: number[]) =>

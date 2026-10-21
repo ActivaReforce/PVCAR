@@ -1,4 +1,4 @@
-import { Eye, Pencil, RotateCcw, Trash2, UserX } from 'lucide-react';
+import { Eye, Pencil, RotateCcw, StickyNote, Trash2, UserX } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -76,15 +76,29 @@ const EstudiantesLista = ({
         {estudiantes.map((e) => {
           const activo = e.est_id === 1;
           return (
-            <li key={e.nino_id} className={`${REJILLA} px-4 py-3`}>
+            <li
+              key={e.nino_id}
+              // Tiene observaciones extra: un filo ámbar a la izquierda, para abrir la ficha y leerlas.
+              className={`${REJILLA} px-4 py-3${e.con_observacion ? ' border-l-4 border-l-amber-500 pl-3 dark:border-l-amber-400' : ''}`}
+            >
               <div className="flex min-w-0 items-center gap-3">
                 <Avatar className="h-10 w-10 flex-shrink-0">
                   <AvatarImage src={e.nino_foto_url ?? undefined} alt="" />
                   <AvatarFallback>{iniciales(e.nino_nombre)}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <div className="truncate font-medium" title={e.nino_nombre}>
-                    {e.nino_nombre}
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate font-medium" title={e.nino_nombre}>
+                      {e.nino_nombre}
+                    </span>
+                    {e.con_observacion && (
+                      <StickyNote
+                        className="h-3.5 w-3.5 flex-shrink-0 text-amber-600 dark:text-amber-400"
+                        aria-label="Tiene observaciones extra"
+                      >
+                        <title>Tiene observaciones extra</title>
+                      </StickyNote>
+                    )}
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {e.nino_edad ? `${e.nino_edad} años` : 'Edad sin registrar'}

@@ -784,8 +784,18 @@ export interface ListaInscripciones extends Pagina<repo.InscripcionListada> {
  * permiso de verlas (un representante) solo ve las suyas: las que le dieron
  * de alta, con sus hijos (decisión del cliente, 2026-10-05).
  */
-export async function avisoDelMenu(): Promise<{ pendientes: number; abiertas: boolean }> {
+export async function avisoDelMenu(actor: AuthUser): Promise<{ pendientes: number; abiertas: boolean }> {
+  if (!veAvisoDelMenu(actor)) return { pendientes: 0, abiertas: false };
   return repo.avisoDelMenu();
+}
+
+/**
+ * El número rojo del menú es solo del Propietario (pedido del cliente,
+ * 2026-10-20). El representante también tiene inscripciones:editar —para las
+ * suyas— y veía el total de pendientes de todos.
+ */
+export function veAvisoDelMenu(actor: AuthUser): boolean {
+  return actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO);
 }
 
 export function esPersonal(actor: AuthUser): boolean {
@@ -1241,6 +1251,7 @@ export async function aprobar(
             tocarFoto: false,
           });
           await repo.marcarSaludAutorizada(client, destino, d.salud.autoriza);
+          await estudiantesRepo.sumarObservacion(client, destino, d.observacion_extra ?? null);
           await estudiantesRepo.guardarContacto(client, destino, 'emergencia', { ...d.emergencia, cedula: null });
           await estudiantesRepo.guardarContacto(client, destino, 'retiro', d.retiro);
           await repo.atarConParentesco(client, destino, padreId, d.parentesco);
@@ -1267,6 +1278,7 @@ export async function aprobar(
           foto: null,
         });
         await repo.marcarSaludAutorizada(client, ninoId, d.salud.autoriza);
+        await estudiantesRepo.sumarObservacion(client, ninoId, d.observacion_extra ?? null);
         await estudiantesRepo.guardarContacto(client, ninoId, 'emergencia', { ...d.emergencia, cedula: null });
         await estudiantesRepo.guardarContacto(client, ninoId, 'retiro', d.retiro);
         await repo.atarConParentesco(client, ninoId, padreId, d.parentesco);
@@ -1605,6 +1617,7 @@ export const NINO_DE_EJEMPLO: repo.NinoGuardado = {
   detalle_retiro: 'Instrucciones de retiro',
   salud: { tiene: false, detalle: null, autoriza: true },
   imagen: { familias: true, redes: false, promocional: false },
+  observacion_extra: null,
   documento: {
     colegio: {
       sede: 'Colegio de ejemplo',

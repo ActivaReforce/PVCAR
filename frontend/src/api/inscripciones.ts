@@ -1,5 +1,5 @@
 import type { HorarioDisciplina } from '@/api/disciplinas';
-import { api } from '@/lib/api';
+import { api, apiFetch } from '@/lib/api';
 
 /**
  * Cliente de Inscripciones (Fase 14B).
@@ -154,6 +154,8 @@ export interface NinoEnvio {
   detalle_retiro: string | null;
   salud: Salud;
   imagen: PermisosImagen;
+  /** Opcional y libre; al aprobar pasa a la ficha del alumno. */
+  observacion_extra: string | null;
 }
 
 export interface ColegioDocumento {
@@ -166,7 +168,9 @@ export interface ColegioDocumento {
 }
 
 /** Lo que se guarda de cada alumno: lo enviado y lo que el sistema puso en sus documentos. */
-export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id'> {
+export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id' | 'observacion_extra'> {
+  /** Falta en las inscripciones de antes del 2026-10-20. */
+  observacion_extra?: string | null;
   documento: {
     colegio: ColegioDocumento;
     curso: string | null;
@@ -210,6 +214,8 @@ export interface InscripcionListada {
   colegios: string[];
   total: number | null;
   usuario_existente: boolean;
+  /** Algún alumno trae observaciones extra. Opcional: Vercel publica antes que Railway. */
+  con_observacion?: boolean;
 }
 
 export interface ListaInscripciones {
@@ -447,8 +453,16 @@ export interface DocumentoDeRepresentante {
 export const inscripcionesApi = {
   formulario: () => api.get<Formulario>('/inscripcion/formulario'),
   /** `conSesion`: solo si entró en el propio formulario (§9); si no, va como anónimo. */
-  enviar: (envio: Envio, conSesion: boolean) =>
-    api.post<EnvioRecibido>('/inscripcion', envio, { sinSesion: !conSesion }),
+  /**
+   * `clave` es la misma en todos los intentos de un envío: si se reintenta
+   * tras un corte, el servidor no lo procesa dos veces (backend/lib/unaVez.ts).
+   */
+  enviar: (envio: Envio, conSesion: boolean, clave: string) =>
+    apiFetch<EnvioRecibido>(
+      '/inscripcion',
+      { method: 'POST', body: JSON.stringify(envio), headers: { 'Idempotency-Key': clave } },
+      { sinSesion: !conSesion },
+    ),
   cotizar: (ninos: Array<{ col_id: number; disciplinas: number[]; nino_id: number | null }>, conSesion: boolean) =>
     api.post<Cobro>('/inscripcion/cotizacion', { ninos }, { sinSesion: !conSesion }),
   identificar: (cedula: string, correo?: string) =>

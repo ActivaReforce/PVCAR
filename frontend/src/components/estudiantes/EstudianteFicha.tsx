@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, Clock, HeartPulse, UserMinus, UserPlus, Users, X } from 'lucide-react';
+import { AlertTriangle, Check, Clock, HeartPulse, Pencil, StickyNote, UserMinus, UserPlus, Users, X } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -28,8 +29,11 @@ import {
   useDisponiblesEstudiante,
   useFichaEstudiante,
   useGuardarInscripciones,
+  useGuardarObservacion,
   useSoltarRepresentante,
 } from '@/hooks/useEstudiantes';
+import { useAuth } from '@/contexts/AuthContext';
+import { ROL } from '@/hooks/useUserForm';
 import { primerCruce } from '@/lib/horarios';
 import { fechaDia } from '@/lib/fecha';
 
@@ -167,6 +171,8 @@ const EstudianteFicha = ({ ninoId }: Props) => {
           </div>
         </div>
       )}
+
+      <ObservacionExtra ninoId={ninoId} texto={estudiante.nino_observacion_extra ?? null} />
 
       {/* 3. Representante del contrato · emergencia · retiro */}
       {(estudiante.contacto_emergencia || estudiante.contacto_retiro || estudiante.nino_detalle_retiro) && (
@@ -459,5 +465,89 @@ const PermisosDeImagen = ({ e }: { e: EstudianteDetalle }) => (
     </ul>
   </div>
 );
+
+/**
+ * Observaciones extra (pedido del cliente, 2026-10-20): llegan del formulario
+ * de inscripción y el Propietario las edita, agrega o borra aquí. Los demás
+ * solo las leen; si no hay, no sale nada.
+ */
+const ObservacionExtra = ({ ninoId, texto }: { ninoId: number; texto: string | null }) => {
+  const { user } = useAuth();
+  const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
+  const guardar = useGuardarObservacion();
+  const [borrador, setBorrador] = useState<string | null>(null);
+
+  useEffect(() => {
+    setBorrador(null);
+  }, [ninoId]);
+
+  if (!texto && !esPropietario) return null;
+
+  const enviar = async () => {
+    if (borrador === null) return;
+    try {
+      await guardar.mutateAsync({ id: ninoId, observacion: borrador.trim() || null });
+      setBorrador(null);
+    } catch {
+      // El hook ya enseña el toast.
+    }
+  };
+
+  if (borrador !== null) {
+    return (
+      <section className="space-y-2 rounded-md border-2 border-amber-500 bg-amber-500/5 p-3 dark:border-amber-400">
+        <label htmlFor="observacion-extra" className="text-sm font-medium">
+          Observaciones extra
+        </label>
+        <Textarea
+          id="observacion-extra"
+          value={borrador}
+          onChange={(e) => setBorrador(e.target.value)}
+          maxLength={2000}
+          rows={4}
+          autoFocus
+        />
+        <p className="text-xs text-muted-foreground">Déjalo vacío y guarda para quitarla.</p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="outline" className="h-10" onClick={() => setBorrador(null)} disabled={guardar.isPending}>
+            Cancelar
+          </Button>
+          <Button className="h-10" onClick={enviar} disabled={guardar.isPending}>
+            {guardar.isPending ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
+  if (!texto) {
+    return (
+      <Button variant="outline" size="sm" className="h-10" onClick={() => setBorrador('')}>
+        <StickyNote className="mr-2 h-4 w-4" /> Agregar observación
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-2 rounded-md border-2 border-amber-500 bg-amber-500/5 p-3 text-sm dark:border-amber-400">
+      <StickyNote className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">Observaciones extra</p>
+        <p className="whitespace-pre-wrap break-words">{texto}</p>
+      </div>
+      {esPropietario && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 flex-shrink-0"
+          aria-label="Editar observaciones extra"
+          onClick={() => setBorrador(texto)}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  );
+};
 
 export default EstudianteFicha;

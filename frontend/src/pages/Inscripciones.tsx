@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, ClipboardList, Copy, UserCheck } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ChevronLeft, ChevronRight, ClipboardList, Copy, StickyNote, UserCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -176,7 +177,12 @@ const InscripcionesPersonal = () => {
                   <button
                     type="button"
                     onClick={() => setAbierta(i.ins_id)}
-                    className="flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none sm:flex-row sm:items-center"
+                    className={cn(
+                      'flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none sm:flex-row sm:items-center',
+                      // Como la disciplina sin entrenador: algún alumno trae
+                      // observaciones extra y hay que leerlas al aprobar.
+                      i.con_observacion && 'border-2 border-amber-500 dark:border-amber-400',
+                    )}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium" title={i.representante_nombre}>
@@ -191,6 +197,11 @@ const InscripcionesPersonal = () => {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0 sm:justify-end">
+                      {i.con_observacion && (
+                        <Badge variant="outline" className="gap-1 border-amber-500 text-amber-700 dark:border-amber-400 dark:text-amber-400">
+                          <StickyNote className="h-3 w-3" /> Observación
+                        </Badge>
+                      )}
                       {i.usuario_existente && (
                         <Badge variant="outline" className="gap-1">
                           <UserCheck className="h-3 w-3" /> Ya tiene cuenta

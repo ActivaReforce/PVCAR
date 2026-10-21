@@ -461,3 +461,29 @@ describe('baja y reactivacion', () => {
     await expect(service.reactivar(propietario, 43)).rejects.toMatchObject({ statusCode: 409 });
   });
 });
+
+describe('las notas de los hijos (Mis hijos)', () => {
+  const representante = {
+    authUserId: 'auth-128',
+    usuario: {
+      usu_id: 128,
+      usu_nombre: 'Representante',
+      usu_correo: 'rep@activareforce.com',
+      est_id: ESTADO.ACTIVO,
+      roles: [{ rol_id: ROL.REPRESENTANTE }],
+      permisos: [],
+    },
+    permisos: [],
+  } as never;
+
+  it('el representante las pide por su propio usu_id', async () => {
+    await service.deMisHijos(representante);
+    const llamada = query.mock.calls.find(([sql]) => sql.includes('FROM public.padre pa'));
+    expect(llamada?.[1]).toEqual([128]);
+  });
+
+  it('quien no es representante no recibe nada ni consulta', async () => {
+    await expect(service.deMisHijos(coordinadora)).resolves.toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+  });
+});
