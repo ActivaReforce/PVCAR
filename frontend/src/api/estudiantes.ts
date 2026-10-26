@@ -117,7 +117,6 @@ export interface FiltrosEstudiantes {
   buscar?: string;
   colegio?: number[];
   disciplina?: number;
-  sinAsignar?: boolean;
   grado?: number;
   estado?: number;
   orden?: 'nombre' | 'colegio' | 'grado' | 'edad' | 'creacion';

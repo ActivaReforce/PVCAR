@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -56,7 +56,6 @@ const Estudiantes = () => {
   const [colegio, setColegio] = useState(TODOS);
   const [grado, setGrado] = useState(TODOS);
   const [estado, setEstado] = useState('1');
-  const [sinAsignar, setSinAsignar] = useState(false);
 
   const [creando, setCreando] = useState(false);
   const [editandoId, setEditandoId] = useState<number | null>(null);
@@ -71,6 +70,8 @@ const Estudiantes = () => {
   const baja = useDarDeBajaEstudiante();
   const reactivar = useReactivarEstudiante();
   const fichaEdicion = useFichaEstudiante(editandoId, false);
+  // La misma consulta que pide la ficha por dentro: el nombre sale de la caché.
+  const fichaVista = useFichaEstudiante(viendoId, false);
 
   const filtros: FiltrosEstudiantes = {
     page,
@@ -79,7 +80,6 @@ const Estudiantes = () => {
     colegio: colegio === TODOS ? undefined : [Number(colegio)],
     grado: grado === TODOS ? undefined : Number(grado),
     estado: estado === TODOS ? undefined : Number(estado),
-    sinAsignar: sinAsignar || undefined,
     orden: 'nombre',
   };
 
@@ -141,7 +141,7 @@ const Estudiantes = () => {
           placeholder="Buscar por nombre o cédula..."
           value={busqueda}
           onChange={(texto) => cambiarFiltro(() => setBusqueda(texto))}
-          className="w-full xl:col-span-2"
+          className="w-full"
         />
 
         <Select value={colegio} onValueChange={(v) => cambiarFiltro(() => setColegio(v))}>
@@ -172,26 +172,16 @@ const Estudiantes = () => {
           </SelectContent>
         </Select>
 
-        <div className="grid grid-cols-2 gap-3 sm:col-span-2 xl:col-span-4 xl:w-96">
-          <Select value={estado} onValueChange={(v) => cambiarFiltro(() => setEstado(v))}>
-            <SelectTrigger className="h-11 sm:h-10">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">Activos</SelectItem>
-              <SelectItem value="2">Inactivos</SelectItem>
-              <SelectItem value={TODOS}>Todos</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant={sinAsignar ? 'default' : 'outline'}
-            className="h-11 sm:h-10"
-            onClick={() => cambiarFiltro(() => setSinAsignar((v) => !v))}
-          >
-            Sin disciplinas
-          </Button>
-        </div>
+        <Select value={estado} onValueChange={(v) => cambiarFiltro(() => setEstado(v))}>
+          <SelectTrigger className="h-11 sm:h-10">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1">Activos</SelectItem>
+            <SelectItem value="2">Inactivos</SelectItem>
+            <SelectItem value={TODOS}>Todos</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <EstudiantesLista
@@ -256,8 +246,9 @@ const Estudiantes = () => {
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="break-words text-lg sm:text-xl">
-              Ficha del alumno
+              {fichaVista.data?.estudiante.nino_nombre ?? 'Alumno'}
             </DialogTitle>
+            <DialogDescription>Ficha del alumno</DialogDescription>
           </DialogHeader>
           {viendoId !== null && <EstudianteFicha ninoId={viendoId} />}
         </DialogContent>
