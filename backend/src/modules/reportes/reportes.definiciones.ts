@@ -874,53 +874,109 @@ const representantes: Definicion = {
   }),
 };
 
-const inscripciones: Definicion = {
-  id: 'inscripciones',
-  titulo: 'Inscripciones',
-  descripcion: 'Envíos del formulario público, pendientes y aprobadas.',
-  modulo: 'inscripciones',
-  // Lleva montos: solo Propietario (decidido por el cliente, 2026-10-15).
-  soloRoles: [ROL.PROPIETARIO],
-  exigeRango: false,
-  filtros: {
-    colegio: false,
-    disciplina: false,
-    estado: {
-      etiqueta: 'Estado',
-      opciones: [
-        { id: 1, nombre: 'Pendiente' },
-        { id: 2, nombre: 'Aprobada' },
-      ],
-    },
-    fechas: true,
-  },
-  columnas: [
-    { clave: 'ins_id', cabecera: 'Nº', ancho: 8 },
-    { clave: 'fecha', cabecera: 'Fecha', ancho: 17 },
-    { clave: 'estado', cabecera: 'Estado', ancho: 12 },
-    { clave: 'representante', cabecera: 'Representante', ancho: 32 },
-    { clave: 'cedula', cabecera: 'Cédula', ancho: 14 },
-    { clave: 'correo', cabecera: 'Correo', ancho: 30 },
-    { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
-    { clave: 'hijos', cabecera: 'Hijos', ancho: 40 },
-    { clave: 'cantidad_hijos', cabecera: 'N° hijos', ancho: 10 },
-    { clave: 'colegios', cabecera: 'Colegios', ancho: 30 },
-    { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
-    { clave: 'valor', cabecera: 'Valor ($)', ancho: 12 },
-    { clave: 'aprobada_por', cabecera: 'Aprobada por', ancho: 28 },
-    { clave: 'fecha_aprobacion', cabecera: 'Aprobada el', ancho: 14 },
-  ],
-  /**
-   * Sin alcance por colegio: el módulo de Inscripciones es solo Propietario y
-   * Admin, y la del `insnino_datos` es texto suelto (el formulario público lo
-   * guarda tal cual). Si en el futuro se añaden más roles, se cuela aquí la
-   * misma lógica que en Representantes.
-   *
-   * El estado se filtra como id (1=Pendiente, 2=Aprobada) para encajar con el
-   * desplegable estándar del resto de reportes.
-   */
-  construir: (f) => ({
-    sql: `
+/**
+ * El hijo de `inn` estudia en alguno de los colegios de `$5`. El colegio no
+ * se guarda en la inscripción: sale de sus disciplinas (cada disciplina es de
+ * un colegio).
+ */
+const HIJO_EN_COLEGIO = `EXISTS (
+                SELECT 1
+                  FROM unnest(inn.insnino_disciplinas) AS cid
+                  JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+                 WHERE cah.col_id = ANY($5::int[])
+              )`;
+
+/** Filtros comunes al detalle y a los totales de Inscripciones. */
+const FILTRO_INSCRIPCION = `($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
+         AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
+         AND ($3::text IS NULL
+              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
+              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'cedula','')", '$3')}
+              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'correo','')", '$3')})
+         AND ($4::int IS NULL
+              OR ($4 = 1 AND i.ins_estado = 'pendiente')
+              OR ($4 = 2 AND i.ins_estado = 'aprobada'))
+         AND ($5::int[] IS NULL
+              OR EXISTS (
+                SELECT 1 FROM public.inscripcion_nino inn
+                 WHERE inn.ins_id = i.ins_id AND ${HIJO_EN_COLEGIO}
+              ))`;
+
+/**
+ * Lo pagado. Con filtro de colegio cuenta solo los hijos de ese colegio: una
+ * inscripción puede traer hermanos de colegios distintos y su `ins_total` los
+ * suma a todos. El precio de cada hijo (`total_con_iva`) cuadra con
+ * `ins_total` en las 84 de prod (comprobado el 2026-10-26).
+ */
+const VALOR_INSCRIPCION = `CASE WHEN $5::int[] IS NULL THEN COALESCE(i.ins_total, 0)
+               ELSE COALESCE((
+                 SELECT SUM((inn.insnino_precio->>'total_con_iva')::numeric)
+                   FROM public.inscripcion_nino inn
+                  WHERE inn.ins_id = i.ins_id AND ${HIJO_EN_COLEGIO}
+               ), 0)
+             END`;
+
+/*
+ * Las anuladas (2026-10-26). Al anular se borra la inscripción entera; lo que
+ * queda es su línea en la auditoría, con la foto de cómo estaba (ver
+ * `fotoDeAnulada` en Inscripciones). Salen aquí con su valor, pero no suman
+ * al recaudado.
+ */
+const FECHA_ANULADA = "(a.aud_detalle->>'ins_fecha')::timestamptz";
+const HIJOS_ANULADA = "jsonb_array_elements(COALESCE(a.aud_detalle->'hijos', '[]'::jsonb))";
+const HIJO_ANULADO_EN_COLEGIO = "($5::int[] IS NULL OR (h->>'col_id')::int = ANY($5::int[]))";
+
+const FILTRO_ANULADA = `a.aud_entidad = 'inscripcion' AND a.aud_accion = 'eliminar'
+         AND a.aud_detalle->>'anulada' = 'true'
+         AND ($1::date IS NULL OR ${diaEc(FECHA_ANULADA)} >= $1::date)
+         AND ($2::date IS NULL OR ${diaEc(FECHA_ANULADA)} <= $2::date)
+         AND ($3::text IS NULL
+              OR ${contieneSinTildes("COALESCE(a.aud_detalle->'representante'->>'nombre','')", '$3')}
+              OR ${contieneSinTildes("COALESCE(a.aud_detalle->'representante'->>'cedula','')", '$3')}
+              OR ${contieneSinTildes("COALESCE(a.aud_detalle->'representante'->>'correo','')", '$3')})
+         AND ($4::int IS NULL OR $4 = 3)
+         AND ($5::int[] IS NULL
+              OR EXISTS (SELECT 1 FROM ${HIJOS_ANULADA} h WHERE (h->>'col_id')::int = ANY($5::int[])))`;
+
+const SQL_ANULADAS = `
+      SELECT a.aud_entidad_id::int,
+             ${textoEc(FECHA_ANULADA, 'DD/MM/YYYY HH24:MI')},
+             'Anulada',
+             COALESCE(a.aud_detalle->'representante'->>'nombre', ''),
+             COALESCE(a.aud_detalle->'representante'->>'cedula', ''),
+             COALESCE(a.aud_detalle->'representante'->>'correo', ''),
+             COALESCE(a.aud_detalle->'representante'->>'telefono', ''),
+             COALESCE((SELECT string_agg(h->>'nombre', ', ') FROM ${HIJOS_ANULADA} h), ''),
+             jsonb_array_length(COALESCE(a.aud_detalle->'hijos', '[]'::jsonb)),
+             COALESCE((SELECT string_agg(DISTINCT h->>'colegio', ', ' ORDER BY h->>'colegio')
+                         FROM ${HIJOS_ANULADA} h
+                        WHERE h->>'colegio' IS NOT NULL AND ${HIJO_ANULADO_EN_COLEGIO}), ''),
+             ARRAY(SELECT DISTINCT h->>'colegio' FROM ${HIJOS_ANULADA} h
+                    WHERE h->>'colegio' IS NOT NULL AND ${HIJO_ANULADO_EN_COLEGIO}),
+             COALESCE((SELECT string_agg(DISTINCT d, ', ' ORDER BY d)
+                         FROM ${HIJOS_ANULADA} h
+                         CROSS JOIN LATERAL jsonb_array_elements_text(h->'disciplinas') AS d), ''),
+             (CASE WHEN $5::int[] IS NULL THEN COALESCE((a.aud_detalle->>'valor')::numeric, 0)
+                   ELSE COALESCE((SELECT SUM((h->>'valor')::numeric) FROM ${HIJOS_ANULADA} h
+                                   WHERE ${HIJO_ANULADO_EN_COLEGIO}), 0)
+              END)::float8,
+             COALESCE(a.aud_detalle->>'aprobada_por', ''),
+             COALESCE(${textoEc("(a.aud_detalle->>'ins_fecha_aprobacion')::timestamptz", 'DD/MM/YYYY')}, ''),
+             COALESCE(a.aud_detalle->>'anulada_por', a.aud_actor_correo, ''),
+             ${textoEc('a.aud_fecha', 'DD/MM/YYYY')},
+             ${FECHA_ANULADA}
+        FROM public.auditoria a
+       WHERE ${FILTRO_ANULADA}`;
+
+const paramsInscripcion = (f: FiltrosReporte) => [
+  oNulo(f.desde),
+  oNulo(f.hasta),
+  textoONulo(f.buscar),
+  oNulo(f.estado),
+  oNulo(f.colegio),
+];
+
+const SQL_INSCRIPCIONES = `
       SELECT i.ins_id,
              ${textoEc('i.ins_fecha', 'DD/MM/YYYY HH24:MI')}        AS fecha,
              CASE i.ins_estado
@@ -949,6 +1005,7 @@ const inscripciones: Definicion = {
                  JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
                  JOIN public.colegio c ON c.col_id = cah.col_id
                 WHERE inn.ins_id = i.ins_id
+                  AND ($5::int[] IS NULL OR c.col_id = ANY($5::int[]))
              ), '')                                                   AS colegios,
              ARRAY(
                SELECT DISTINCT c.col_nombre
@@ -957,6 +1014,7 @@ const inscripciones: Definicion = {
                  JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
                  JOIN public.colegio c ON c.col_id = cah.col_id
                 WHERE inn.ins_id = i.ins_id
+                  AND ($5::int[] IS NULL OR c.col_id = ANY($5::int[]))
              )                                                        AS _colegios,
              COALESCE((
                SELECT string_agg(DISTINCT a.act_nombre, ', ' ORDER BY a.act_nombre)
@@ -966,46 +1024,82 @@ const inscripciones: Definicion = {
                  JOIN public.actividad a ON a.act_id = cah.act_id
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS disciplinas,
-             COALESCE(i.ins_total, 0)::float8                         AS valor,
+             ${VALOR_INSCRIPCION}::float8                             AS valor,
              COALESCE(ap.usu_nombre, '')                              AS aprobada_por,
-             COALESCE(${textoEc('i.ins_fecha_aprobacion', 'DD/MM/YYYY')}, '') AS fecha_aprobacion
+             COALESCE(${textoEc('i.ins_fecha_aprobacion', 'DD/MM/YYYY')}, '') AS fecha_aprobacion,
+             ''                                                       AS anulada_por,
+             ''                                                       AS fecha_anulacion,
+             i.ins_fecha                                              AS _orden
         FROM public.inscripcion i
         LEFT JOIN public.usuario ap ON ap.usu_id = i.ins_aprobada_por
-       WHERE ($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
-         AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
-         AND ($3::text IS NULL
-              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
-              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'cedula','')", '$3')}
-              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'correo','')", '$3')})
-         AND ($4::int IS NULL
-              OR ($4 = 1 AND i.ins_estado = 'pendiente')
-              OR ($4 = 2 AND i.ins_estado = 'aprobada'))
-       ORDER BY i.ins_fecha DESC`,
-    params: [oNulo(f.desde), oNulo(f.hasta), textoONulo(f.buscar), oNulo(f.estado)],
-  }),
+       WHERE ${FILTRO_INSCRIPCION}
+      UNION ALL${SQL_ANULADAS}
+       ORDER BY _orden DESC`;
+
+const inscripciones: Definicion = {
+  id: 'inscripciones',
+  titulo: 'Inscripciones',
+  descripcion: 'Envíos del formulario público: pendientes, aprobadas y anuladas.',
+  modulo: 'inscripciones',
+  // Lleva montos: solo Propietario (decidido por el cliente, 2026-10-15).
+  soloRoles: [ROL.PROPIETARIO],
+  exigeRango: false,
+  filtros: {
+    colegio: true,
+    disciplina: false,
+    estado: {
+      etiqueta: 'Estado',
+      opciones: [
+        { id: 1, nombre: 'Pendiente' },
+        { id: 2, nombre: 'Aprobada' },
+        { id: 3, nombre: 'Anulada' },
+      ],
+    },
+    fechas: true,
+  },
+  columnas: [
+    { clave: 'ins_id', cabecera: 'Nº', ancho: 8 },
+    { clave: 'fecha', cabecera: 'Fecha', ancho: 17 },
+    { clave: 'estado', cabecera: 'Estado', ancho: 12 },
+    { clave: 'representante', cabecera: 'Representante', ancho: 32 },
+    { clave: 'cedula', cabecera: 'Cédula', ancho: 14 },
+    { clave: 'correo', cabecera: 'Correo', ancho: 30 },
+    { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
+    { clave: 'hijos', cabecera: 'Hijos', ancho: 40 },
+    { clave: 'cantidad_hijos', cabecera: 'N° hijos', ancho: 10 },
+    { clave: 'colegios', cabecera: 'Colegios', ancho: 30 },
+    { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
+    { clave: 'valor', cabecera: 'Valor ($)', ancho: 12 },
+    { clave: 'aprobada_por', cabecera: 'Aprobada por', ancho: 28 },
+    { clave: 'fecha_aprobacion', cabecera: 'Aprobada el', ancho: 14 },
+    { clave: 'anulada_por', cabecera: 'Anulada por', ancho: 28 },
+    { clave: 'fecha_anulacion', cabecera: 'Anulada el', ancho: 14 },
+  ],
+  /**
+   * Sin alcance por colegio: el reporte es solo Propietario. El filtro de
+   * colegio (2026-10-26) sale de las disciplinas de cada hijo, no del texto
+   * suelto de `insnino_datos`.
+   *
+   * El estado se filtra como id (1=Pendiente, 2=Aprobada, 3=Anulada) para
+   * encajar con el desplegable estándar del resto de reportes.
+   */
+  construir: (f) => ({ sql: SQL_INSCRIPCIONES, params: paramsInscripcion(f) }),
   totales: (f) => ({
     consulta: {
       sql: `
-        SELECT count(*)::int                                              AS inscripciones,
-               count(*) FILTER (WHERE i.ins_estado = 'pendiente')::int    AS pendientes,
-               count(*) FILTER (WHERE i.ins_estado = 'aprobada')::int     AS aprobadas,
-               COALESCE(SUM(i.ins_total), 0)::float8                      AS recaudado
-          FROM public.inscripcion i
-         WHERE ($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
-           AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
-           AND ($3::text IS NULL
-                OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
-                OR ${contieneSinTildes("COALESCE(i.ins_representante->>'cedula','')", '$3')}
-                OR ${contieneSinTildes("COALESCE(i.ins_representante->>'correo','')", '$3')})
-           AND ($4::int IS NULL
-                OR ($4 = 1 AND i.ins_estado = 'pendiente')
-                OR ($4 = 2 AND i.ins_estado = 'aprobada'))`,
-      params: [oNulo(f.desde), oNulo(f.hasta), textoONulo(f.buscar), oNulo(f.estado)],
+        SELECT count(*)::int                                       AS inscripciones,
+               count(*) FILTER (WHERE r.estado = 'Pendiente')::int AS pendientes,
+               count(*) FILTER (WHERE r.estado = 'Aprobada')::int  AS aprobadas,
+               count(*) FILTER (WHERE r.estado = 'Anulada')::int   AS anuladas,
+               COALESCE(SUM(r.valor) FILTER (WHERE r.estado <> 'Anulada'), 0)::float8 AS recaudado
+          FROM (${SQL_INSCRIPCIONES}) r`,
+      params: paramsInscripcion(f),
     },
     formato: [
       { clave: 'inscripciones', etiqueta: 'Inscripciones' },
       { clave: 'pendientes', etiqueta: 'Pendientes' },
       { clave: 'aprobadas', etiqueta: 'Aprobadas' },
+      { clave: 'anuladas', etiqueta: 'Anuladas' },
       { clave: 'recaudado', etiqueta: 'Total recaudado', moneda: true },
     ],
   }),

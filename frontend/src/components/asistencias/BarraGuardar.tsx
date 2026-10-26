@@ -12,16 +12,10 @@ interface Props {
   /** Presente a quien aún no tiene estado. No guarda. */
   onMarcarRestantes: () => void;
   onGuardar: () => void;
-  /**
-   * Barra arriba o abajo. Las dos acciones son las mismas: el entrenador que
-   * acaba de marcar al último no sube a buscar el botón, y el coordinador que
-   * abre la pantalla ve de un vistazo lo que queda sin cerrar.
-   */
-  posicion?: 'arriba' | 'abajo';
 }
 
 /**
- * La barra de acción.
+ * La barra de acción, al pie de la lista (una sola desde el 2026-10-26).
  *
  * Dice **por qué** no se puede guardar en vez de dejar el botón apagado sin
  * explicación, que es el peor estado de una interfaz.
@@ -44,11 +38,8 @@ const BarraGuardar = ({
   onDeshacer,
   onMarcarRestantes,
   onGuardar,
-  posicion = 'abajo',
 }: Props) => {
   const bloqueado = incompletas > 0 || cambios === 0 || guardando;
-
-  const base = posicion === 'arriba' ? 'top-0 border-b' : 'bottom-0 border-t mt-2';
 
   const textoMarcar =
     sinMarcar === total
@@ -57,7 +48,7 @@ const BarraGuardar = ({
 
   return (
     <div
-      className={`sticky z-10 -mx-4 bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:-mx-6 lg:px-6 ${base}`}
+      className="sticky bottom-0 z-10 -mx-4 mt-2 border-t bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:-mx-6 lg:px-6"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 text-sm text-muted-foreground">

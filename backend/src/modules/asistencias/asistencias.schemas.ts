@@ -181,29 +181,3 @@ export const guardarEntrenadoresSchema = z.object({
 
 export type GuardarEntrenadoresInput = z.infer<typeof guardarEntrenadoresSchema>;
 
-// ---------------------------------------------------------------------------
-// Historial
-
-/**
- * Historial por disciplina y rango.
- *
- * Existe porque hoy no hay forma de ver una fecha pasada sin rehacer los
- * cuatro filtros en cascada. El rango se limita a 180 dias: es un resumen para
- * mirar en pantalla, no una exportacion.
- */
-export const historialSchema = z
-  .object({
-    disciplina: z.coerce.number().int().positive(),
-    desde: fecha,
-    hasta: fecha,
-  })
-  .refine((q) => q.desde <= q.hasta, {
-    path: ['desde'],
-    message: 'La fecha inicial no puede ser posterior a la final',
-  })
-  .refine((q) => {
-    const dias = (Date.parse(q.hasta) - Date.parse(q.desde)) / 86_400_000;
-    return dias <= 180;
-  }, 'El rango no puede pasar de 180 dias');
-
-export type HistorialQuery = z.infer<typeof historialSchema>;

@@ -11,6 +11,7 @@ import { diaDeCruce, horarioLargo, type HorarioDisciplina } from '../../lib/hora
 import { enTransaccion } from '../../lib/tx.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { escaparHtml } from '../../lib/correo.js';
+import { borrarFoto } from '../../lib/storage.js';
 import { enviarComo } from '../correos/correos.service.js';
 import {
   MIME_COMPROBANTE,
@@ -1250,6 +1251,9 @@ export async function aprobar(
             foto: null,
             tocarFoto: false,
           });
+          // Si se dio de baja (p. ej. al anular una inscripción suya con
+          // historia) y vuelve, vuelve activo.
+          await estudiantesRepo.cambiarEstado(client, destino, ESTADO.ACTIVO);
           await repo.marcarSaludAutorizada(client, destino, d.salud.autoriza);
           await estudiantesRepo.sumarObservacion(client, destino, d.observacion_extra ?? null);
           await estudiantesRepo.guardarContacto(client, destino, 'emergencia', { ...d.emergencia, cedula: null });
@@ -1480,6 +1484,291 @@ export async function rechazar(actor: AuthUser, insId: number, confirmacion: str
   });
 
   await borrarArchivos(rutas);
+}
+
+// ---------------------------------------------------------------------------
+// Anular una aprobada (pedido del cliente, 2026-10-26)
+//
+// Es para que el representante vuelva a inscribirse desde cero: lo que trajo
+// la inscripción se borra para siempre, sin bajas. Solo se conserva, dado de
+// baja, lo que ya tiene historia que los reportes cuentan (asistencias,
+// evaluaciones con datos, novedades), y no se toca lo que ya existía antes de
+// ella. De la inscripción queda una línea en la auditoría, que el reporte de
+// Inscripciones enseña como "Anulada".
+
+export type DestinoAlumno = 'eliminar' | 'baja' | 'quitar' | 'ya_no_existe';
+export type DestinoCuenta = 'eliminar' | 'baja' | 'se_queda' | 'sin_cuenta';
+
+export interface DisciplinaAnulada {
+  ninoasig_id: number;
+  nombre: string;
+  /** `ya_cerrada`: tiene historia y ya estaba dada de baja; no se toca. */
+  accion: 'eliminar' | 'baja' | 'ya_cerrada';
+  asistencias: number;
+  evaluaciones: number;
+}
+
+export interface AlumnoAnulado {
+  insnino_id: number;
+  nino_id: number | null;
+  nombre: string;
+  destino: DestinoAlumno;
+  /** Por qué no se borra entero. Vacío si se borra. */
+  motivos: string[];
+  disciplinas: DisciplinaAnulada[];
+  /** Se suelta del representante (el vínculo lo creó esta inscripción). */
+  soltar_padre: boolean;
+}
+
+export interface CuentaAnulada {
+  usu_id: number | null;
+  nombre: string;
+  correo: string;
+  destino: DestinoCuenta;
+  motivos: string[];
+}
+
+export interface PlanAnulacion {
+  ins_id: number;
+  representante: string;
+  valor: number;
+  /** PDF de cada alumno más el comprobante. */
+  archivos: number;
+  alumnos: AlumnoAnulado[];
+  cuenta: CuentaAnulada;
+}
+
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+
+/** Historia que obliga a conservar: lo que leen Asistencias, Evaluaciones y Novedades. */
+function historiaDe(a: { asistencias: number; evaluaciones: number; novedades?: number }): string[] {
+  const motivos: string[] = [];
+  if (a.asistencias > 0) motivos.push(plural(a.asistencias, 'asistencia', 'asistencias'));
+  if (a.evaluaciones > 0) motivos.push(plural(a.evaluaciones, 'evaluación', 'evaluaciones'));
+  if ((a.novedades ?? 0) > 0) motivos.push(`sale en ${plural(a.novedades!, 'novedad', 'novedades')}`);
+  return motivos;
+}
+
+const BLOQUEO_DE_CUENTA: Record<string, (n: number) => string> = {
+  encuestas_respondidas: (n) => `respondió ${plural(n, 'encuesta', 'encuestas')}`,
+  novedades_sobre_el: (n) => `sale en ${plural(n, 'novedad', 'novedades')}`,
+  novedades_escritas: (n) => `escribió ${plural(n, 'novedad', 'novedades')}`,
+};
+
+/**
+ * Qué pasa con cada cosa al anular. Pura: la usan el panel (para enseñarlo)
+ * y `anular` (para hacerlo), dentro de la misma transacción que borra.
+ *
+ *   alumno que nació aquí, solo de este representante y sin historia → se borra
+ *   alumno que nació aquí con historia                               → baja
+ *   alumno que ya existía, de otro representante o de otra inscripción
+ *                                → se queda; solo se le quitan estas disciplinas
+ *
+ * En los que se quedan, cada disciplina sin historia se borra y la que tiene
+ * historia se da de baja. La cuenta se borra si la creó esta aprobación y no
+ * le queda nada; si le queda historia, baja; si ya existía o tiene otras
+ * cosas (otra inscripción, otros roles, otros hijos), se queda como está.
+ */
+export function planDeAnulacion(
+  fila: Pick<repo.InscripcionFila, 'ins_id' | 'ins_representante' | 'ins_total'>,
+  datos: { alumnos: repo.AlumnoAnulable[]; cuenta: repo.CuentaAnulable | null },
+  bloqueosDeCuenta: Record<string, number>,
+  actorId: number,
+): PlanAnulacion {
+  const c = datos.cuenta;
+  const motivosCuenta: string[] = [];
+  if (c) {
+    if (c.usu_id === actorId) motivosCuenta.push('es tu propia cuenta');
+    if (!c.nacio_aqui) motivosCuenta.push('ya existía antes de esta inscripción');
+    if (c.otras_inscripciones.length > 0) {
+      motivosCuenta.push(
+        `tiene otra${c.otras_inscripciones.length > 1 ? 's' : ''} inscripci${c.otras_inscripciones.length > 1 ? 'ones' : 'ón'} (Nº ${c.otras_inscripciones.join(', ')})`,
+      );
+    }
+    if (c.otros_roles.length > 0) motivosCuenta.push(`también es ${c.otros_roles.join(', ')}`);
+    if (c.hijos_fuera > 0) motivosCuenta.push(`tiene ${plural(c.hijos_fuera, 'hijo', 'hijos')} que no vienen en esta inscripción`);
+  }
+  const cuentaSeQueda = !c || motivosCuenta.length > 0;
+
+  const alumnos: AlumnoAnulado[] = datos.alumnos.map((a) => {
+    if (a.nino_id === null) {
+      return {
+        insnino_id: a.insnino_id,
+        nino_id: null,
+        nombre: a.nombre_enviado,
+        destino: 'ya_no_existe',
+        motivos: [],
+        disciplinas: [],
+        soltar_padre: false,
+      };
+    }
+    const ajeno: string[] = [];
+    if (!a.nacio_aqui) ajeno.push('ya existía antes de esta inscripción');
+    if (a.otros_representantes > 0) ajeno.push('tiene otro representante');
+    if (a.otras_inscripciones > 0) ajeno.push('sale en otra inscripción');
+    const historia = historiaDe(a);
+    const destino: DestinoAlumno = ajeno.length > 0 ? 'quitar' : historia.length > 0 ? 'baja' : 'eliminar';
+
+    const disciplinas: DisciplinaAnulada[] = a.asignaciones
+      .filter((s) => destino !== 'quitar' || s.de_esta)
+      .map((s) => ({
+        ninoasig_id: s.ninoasig_id,
+        nombre: describirDisciplina(s),
+        accion:
+          destino === 'eliminar' || s.asistencias + s.evaluaciones === 0
+            ? 'eliminar'
+            : s.est_id === ESTADO.ACTIVO
+              ? 'baja'
+              : 'ya_cerrada',
+        asistencias: s.asistencias,
+        evaluaciones: s.evaluaciones,
+      }));
+
+    return {
+      insnino_id: a.insnino_id,
+      nino_id: a.nino_id,
+      nombre: a.nombre ?? a.nombre_enviado,
+      destino,
+      motivos: destino === 'quitar' ? ajeno : destino === 'baja' ? historia : [],
+      disciplinas,
+      // Con una cuenta nueva el vínculo lo creó esta aprobación.
+      soltar_padre: destino === 'quitar' && !cuentaSeQueda && c !== null && c.nacio_aqui,
+    };
+  });
+
+  let cuenta: CuentaAnulada;
+  if (!c) {
+    cuenta = { usu_id: null, nombre: fila.ins_representante.nombre, correo: fila.ins_representante.correo, destino: 'sin_cuenta', motivos: [] };
+  } else if (cuentaSeQueda) {
+    cuenta = { usu_id: c.usu_id, nombre: c.usu_nombre, correo: c.usu_correo, destino: 'se_queda', motivos: motivosCuenta };
+  } else {
+    const motivos = alumnos
+      .filter((a) => a.destino === 'baja')
+      .map((a) => `${a.nombre} se queda con historia y sigue atado a la cuenta`);
+    for (const [clave, n] of Object.entries(bloqueosDeCuenta)) {
+      if (clave === 'estudiantes_vinculados' || n === 0) continue;
+      motivos.push(BLOQUEO_DE_CUENTA[clave]?.(n) ?? `${clave.replace(/_/g, ' ')}: ${n}`);
+    }
+    cuenta = {
+      usu_id: c.usu_id,
+      nombre: c.usu_nombre,
+      correo: c.usu_correo,
+      destino: motivos.length > 0 ? 'baja' : 'eliminar',
+      motivos,
+    };
+  }
+
+  return {
+    ins_id: fila.ins_id,
+    representante: fila.ins_representante.nombre,
+    valor: fila.ins_total ?? 0,
+    archivos: 1 + datos.alumnos.length,
+    alumnos,
+    cuenta,
+  };
+}
+
+function exigirPropietario(actor: AuthUser): void {
+  if (!actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO)) {
+    throw new ApiError(403, 'Solo el Propietario puede anular una inscripción aprobada');
+  }
+}
+
+async function planDe(actor: AuthUser, insId: number, client?: PoolClient): Promise<PlanAnulacion> {
+  const fila = await repo.obtener(insId, client, client !== undefined);
+  if (!fila) throw new ApiError(404, 'Inscripción no encontrada');
+  if (fila.ins_estado !== 'aprobada') {
+    throw new ApiError(409, 'Solo se anula una inscripción aprobada. Una pendiente se rechaza.');
+  }
+  const datos = await repo.anulables(insId, client);
+  const bloqueos = datos.cuenta ? (await usuariosRepo.calcularImpacto(datos.cuenta.usu_id)).bloqueos : {};
+  return planDeAnulacion(fila, datos, bloqueos, actor.usuario.usu_id);
+}
+
+/** Lo que enseña el panel antes de confirmar. */
+export async function previaDeAnulacion(actor: AuthUser, insId: number): Promise<PlanAnulacion> {
+  exigirPropietario(actor);
+  return planDe(actor, insId);
+}
+
+export async function anular(actor: AuthUser, insId: number, confirmacion: string): Promise<PlanAnulacion> {
+  exigirPropietario(actor);
+  const previa = await repo.obtener(insId);
+  if (!previa) throw new ApiError(404, 'Inscripción no encontrada');
+  if (normalizarNombre(confirmacion) !== normalizarNombre(previa.ins_representante.nombre)) {
+    throw new ApiError(400, 'El nombre escrito no coincide con el del representante');
+  }
+
+  const fotos: Array<string | null> = [];
+  let authBorrada: string | null = null;
+  const { plan, rutas } = await enTransaccion(async (client) => {
+    // Se recalcula con la fila bloqueada: lo que se hace es lo de este instante.
+    const plan = await planDe(actor, insId, client);
+    const foto = await repo.fotoDeAnulada(insId, client);
+    const { alumnos: datos, cuenta } = await repo.anulables(insId, client);
+
+    for (const a of plan.alumnos) {
+      if (a.nino_id === null) continue;
+      if (a.destino === 'eliminar') {
+        fotos.push(datos.find((d) => d.insnino_id === a.insnino_id)?.foto ?? null);
+        await estudiantesRepo.eliminarEstudiante(client, a.nino_id);
+        continue;
+      }
+      for (const d of a.disciplinas) {
+        if (d.accion === 'eliminar') await repo.borrarAsignacion(client, d.ninoasig_id);
+        else if (d.accion === 'baja') await estudiantesRepo.darDeBajaInscripcion(client, d.ninoasig_id);
+      }
+      if (a.destino === 'baja') {
+        await estudiantesRepo.cambiarEstado(client, a.nino_id, ESTADO.INACTIVO);
+      }
+      if (a.soltar_padre && cuenta?.padre_id) {
+        await repo.soltarDelPadre(client, a.nino_id, cuenta.padre_id);
+      }
+    }
+
+    const rutas = await repo.borrar(client, insId);
+
+    if (cuenta && plan.cuenta.destino === 'eliminar') {
+      fotos.push(cuenta.usu_foto);
+      authBorrada = cuenta.auth_user_id;
+      await usuariosRepo.eliminarUsuario(client, cuenta.usu_id);
+    } else if (cuenta && plan.cuenta.destino === 'baja') {
+      await usuariosRepo.cambiarEstado(client, cuenta.usu_id, ESTADO.INACTIVO);
+    }
+
+    await auditar(
+      {
+        actor,
+        accion: 'eliminar',
+        entidad: 'inscripcion',
+        entidadId: insId,
+        detalle: {
+          anulada: true,
+          anulada_por: actor.usuario.usu_nombre,
+          ...foto,
+          resultado: {
+            alumnos: plan.alumnos.map((a) => ({ nino_id: a.nino_id, nombre: a.nombre, destino: a.destino })),
+            cuenta: { usu_id: plan.cuenta.usu_id, destino: plan.cuenta.destino },
+          },
+        },
+      },
+      client,
+    );
+    return { plan, rutas };
+  });
+
+  await borrarArchivos(rutas);
+  for (const f of fotos) await borrarFoto(f);
+  if (authBorrada) {
+    try {
+      await getSupabaseAdmin().auth.admin.deleteUser(authBorrada);
+    } catch (err) {
+      // Como en Usuarios: la fila ya no existe; la cuenta de Auth viva solo
+      // impediría reutilizar el correo. Se registra para limpiarla a mano.
+      console.error(`Inscripción ${insId} anulada, pero la cuenta de Auth (${authBorrada}) sigue viva:`, err);
+    }
+  }
+  return plan;
 }
 
 // ---------------------------------------------------------------------------

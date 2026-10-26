@@ -15,8 +15,6 @@ const CLAVE = {
     ['asistencias', 'alumnos', disciplina, fecha] as const,
   entrenadores: (colegio: number, fecha: string) =>
     ['asistencias', 'entrenadores', colegio, fecha] as const,
-  historial: (disciplina: number, desde: string, hasta: string) =>
-    ['asistencias', 'historial', disciplina, desde, hasta] as const,
 };
 
 function mensajeDe(error: unknown): string {
@@ -70,19 +68,6 @@ export function useAsistenciaEntrenadores(colegio: number | null, fecha: string 
   });
 }
 
-export function useHistorialAsistencias(
-  disciplina: number | null,
-  desde: string,
-  hasta: string,
-  habilitado: boolean,
-) {
-  return useQuery({
-    queryKey: CLAVE.historial(disciplina ?? 0, desde, hasta),
-    queryFn: () => asistenciasApi.historial(disciplina as number, desde, hasta),
-    enabled: habilitado && disciplina !== null,
-  });
-}
-
 /**
  * El aviso que se enseña al guardar distingue altas de correcciones.
  *
@@ -119,7 +104,6 @@ export function useGuardarAsistenciaAlumnos() {
        * en una cancha con mala cobertura.
        */
       queryClient.setQueryData(CLAVE.alumnos(variables.colacthorId, variables.fecha), data);
-      await queryClient.invalidateQueries({ queryKey: ['asistencias', 'historial'] });
       toast({ title: 'Asistencia guardada', description: avisoDe(data.resultado) });
     },
 

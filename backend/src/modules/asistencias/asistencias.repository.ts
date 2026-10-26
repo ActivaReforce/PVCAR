@@ -73,15 +73,6 @@ export interface PersonaDeColegio {
   registrado_por: string | null;
 }
 
-export interface DiaDeHistorial {
-  fecha: string;
-  total: number;
-  presentes: number;
-  ausentes: number;
-  tardes: number;
-  justificados: number;
-}
-
 export async function listarEstados(): Promise<EstadoAsistencia[]> {
   const { rows } = await getPool().query<EstadoAsistencia>(
     `SELECT asisest_id, asisest_nombre FROM public.asistencia_estado ORDER BY asisest_id`,
@@ -267,28 +258,6 @@ export async function guardarMarcaAlumno(
     ],
   );
   return rows[0]?.nueva ? 'alta' : 'cambio';
-}
-
-export async function historialDeSesion(
-  colacthorId: number,
-  desde: string,
-  hasta: string,
-): Promise<DiaDeHistorial[]> {
-  const { rows } = await getPool().query<DiaDeHistorial>(
-    `SELECT to_char(an.asisnino_fecha, 'YYYY-MM-DD')      AS fecha,
-            count(*)::int                                 AS total,
-            count(*) FILTER (WHERE an.asisest_id = 1)::int AS presentes,
-            count(*) FILTER (WHERE an.asisest_id = 2)::int AS ausentes,
-            count(*) FILTER (WHERE an.asisest_id = 3)::int AS tardes,
-            count(*) FILTER (WHERE an.asisest_id = 4)::int AS justificados
-       FROM public.asistencia_nino an
-      WHERE an.colacthor_id = $1
-        AND an.asisnino_fecha BETWEEN $2::date AND $3::date
-      GROUP BY an.asisnino_fecha
-      ORDER BY an.asisnino_fecha DESC`,
-    [colacthorId, desde, hasta],
-  );
-  return rows;
 }
 
 // ---------------------------------------------------------------------------

@@ -14,7 +14,6 @@ import BarraGuardar from '@/components/asistencias/BarraGuardar';
 import MiDiaEntrenadores from '@/components/asistencias/MiDiaEntrenadores';
 import { usePermissions } from '@/hooks/usePermissions';
 import FilaAsistencia from '@/components/asistencias/FilaAsistencia';
-import ResumenAsistencia from '@/components/asistencias/ResumenAsistencia';
 import { useColegios } from '@/hooks/useColegios';
 import {
   useAsistenciaEntrenadores,
@@ -44,8 +43,8 @@ const sinTildes = (texto: string) =>
  *
  * Entrada en dos modos: **Mi día** (tarjetas por colegio del alcance, un tap
  * para entrar con fecha de hoy) y **Selects** (colegio + fecha, para repasar
- * fechas pasadas). Dentro de la lista, buscador siempre arriba, barra arriba
- * y abajo.
+ * fechas pasadas). Pantalla simple (2026-10-26): «← Hoy» arriba a la derecha,
+ * filtros, el colegio como separador, buscador, lista y una sola barra al pie.
  *
  * Sustituye a las 743 líneas de un solo archivo que tenía toda la lógica
  * dentro: dos cargas a Supabase por pantalla, el filtro por colegio del
@@ -145,13 +144,22 @@ const AsistenciasEntrenadores = () => {
 
   return (
     <div className="container mx-auto min-w-0 space-y-6 p-4 lg:p-6">
-      <div>
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
           Asistencia de Entrenadores
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Quien da clase en ese colegio ese día, con sus auxiliares.
-        </p>
+        {!mostrarMiDia && haVariosColegios && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-11 shrink-0 px-3 sm:h-10"
+            onClick={() => (colegio ? volverAMiDia() : setVistaInicio('mi-dia'))}
+            title="Volver a mis colegios de hoy"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Hoy
+          </Button>
+        )}
       </div>
 
       {mostrarMiDia && (
@@ -195,21 +203,6 @@ const AsistenciasEntrenadores = () => {
         </div>
       )}
 
-      {mostrarSelects && haVariosColegios && (
-        <div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setVistaInicio('mi-dia')}
-            className="h-9 px-2 text-muted-foreground"
-          >
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            Volver a mis colegios
-          </Button>
-        </div>
-      )}
-
       {!colegio && !mostrarMiDia && (
         <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
           <CalendarClock className="mx-auto mb-3 h-10 w-10 opacity-50" />
@@ -219,27 +212,11 @@ const AsistenciasEntrenadores = () => {
 
       {colegio && fecha && (
         <>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold">
-                {lista.data?.colegio.col_nombre ?? ''}
-              </h2>
-              <p className="text-sm text-muted-foreground">{enLetras(fecha)}</p>
-            </div>
-
-            {haVariosColegios && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-11 sm:h-10"
-                onClick={volverAMiDia}
-                title="Volver a mis colegios"
-              >
-                <ArrowLeft className="mr-1 h-4 w-4" />
-                Colegios
-              </Button>
-            )}
+          <div className="min-w-0 border-t pt-5">
+            <h2 className="truncate text-lg font-semibold">
+              {lista.data?.colegio.col_nombre ?? ''}
+            </h2>
+            <p className="text-sm text-muted-foreground">{enLetras(fecha)}</p>
           </div>
 
           {lista.isLoading && (
@@ -254,8 +231,6 @@ const AsistenciasEntrenadores = () => {
 
           {lista.data && (
             <>
-              <ResumenAsistencia resumen={lista.data.resumen} />
-
               {personas.length === 0 ? (
                 <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
                   <p className="text-lg">Nadie da clase en ese colegio ese día</p>
@@ -265,22 +240,6 @@ const AsistenciasEntrenadores = () => {
                 </div>
               ) : (
                 <>
-                  {puedePasarLista && (
-                    <BarraGuardar
-                      posicion="arriba"
-                      total={Object.keys(borrador.marcas).length}
-                      sinMarcar={
-                        Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length
-                      }
-                      cambios={borrador.sucias.length}
-                      incompletas={borrador.incompletas.length}
-                      guardando={guardar.isPending}
-                      onDeshacer={borrador.deshacer}
-                      onMarcarRestantes={borrador.presenteALosQueFaltan}
-                      onGuardar={enviar}
-                    />
-                  )}
-
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -349,7 +308,6 @@ const AsistenciasEntrenadores = () => {
 
               {puedePasarLista && personas.length > 0 && (
                 <BarraGuardar
-                  posicion="abajo"
                   total={Object.keys(borrador.marcas).length}
                   sinMarcar={
                     Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length

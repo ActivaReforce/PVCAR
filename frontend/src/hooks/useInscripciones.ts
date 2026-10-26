@@ -96,6 +96,24 @@ export function useRechazarInscripcion() {
   );
 }
 
+/** Lo que pasaría al anular. Sin caché: tiene que ser lo de este momento. */
+export function usePreviaAnulacion(id: number | null) {
+  return useQuery({
+    queryKey: ['inscripciones', 'anulacion', id ?? 0],
+    queryFn: () => inscripcionesApi.previaAnulacion(id as number),
+    enabled: id !== null,
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+export function useAnularInscripcion() {
+  return useMutacion(
+    ({ id, confirmacion }: { id: number; confirmacion: string }) => inscripcionesApi.anular(id, confirmacion),
+    'Inscripción anulada',
+  );
+}
+
 export function useGuardarBorrador() {
   return useMutacion((datos: DatosBorrador) => inscripcionesApi.guardarBorrador(datos), 'Borrador guardado');
 }

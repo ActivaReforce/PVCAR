@@ -3,7 +3,6 @@ import {
   ASISTENCIA,
   guardarAlumnosSchema,
   guardarEntrenadoresSchema,
-  historialSchema,
   listaAlumnosSchema,
 } from './asistencias.schemas.js';
 
@@ -106,26 +105,6 @@ describe('fechas', () => {
       false,
     );
     expect(listaAlumnosSchema.safeParse({ disciplina: 1, fecha: '2024-02-29' }).success).toBe(true);
-  });
-});
-
-describe('historial', () => {
-  it('rechaza el rango al reves', () => {
-    expect(
-      historialSchema.safeParse({ disciplina: 1, desde: '2026-07-16', hasta: '2026-01-01' })
-        .success,
-    ).toBe(false);
-  });
-
-  it('rechaza mas de 180 dias', () => {
-    expect(
-      historialSchema.safeParse({ disciplina: 1, desde: '2025-01-01', hasta: '2026-01-01' })
-        .success,
-    ).toBe(false);
-    expect(
-      historialSchema.safeParse({ disciplina: 1, desde: '2026-01-01', hasta: '2026-06-01' })
-        .success,
-    ).toBe(true);
   });
 });
 

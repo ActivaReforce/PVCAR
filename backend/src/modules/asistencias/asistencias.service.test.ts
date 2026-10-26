@@ -326,12 +326,7 @@ describe('guardado por lote de entrenadores y auxiliares', () => {
   });
 });
 
-describe('el resumen lo calcula el servidor', () => {
-  it('cuenta marcados y sin marcar', async () => {
-    const lista = await service.listaAlumnos(propietario, { disciplina: 135, fecha: JUEVES });
-    expect(lista.resumen).toMatchObject({ total: 1, marcados: 1, sinMarcar: 0, presentes: 1 });
-  });
-
+describe('la hora la pone el servidor', () => {
   it('propone la hora del servidor, no la del navegador', async () => {
     const lista = await service.listaAlumnos(propietario, { disciplina: 135, fecha: JUEVES });
     expect(lista.hora_servidor).toBe('16:35');

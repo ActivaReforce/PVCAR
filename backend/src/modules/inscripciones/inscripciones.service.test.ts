@@ -15,6 +15,7 @@ const {
   problemasDeDisciplinas,
   fueraDeCurso,
   veAvisoDelMenu,
+  planDeAnulacion,
 } = await import('./inscripciones.service.js');
 const { rellenar } = await import('./inscripciones.documentos.js');
 const { envioSchema, problemasDeEnvio } = await import('./inscripciones.schemas.js');
@@ -632,5 +633,119 @@ describe('veAvisoDelMenu', () => {
     expect(veAvisoDelMenu(con(4, 1))).toBe(true);
     expect(veAvisoDelMenu(con(4))).toBe(false);
     expect(veAvisoDelMenu(con(5))).toBe(false);
+  });
+});
+
+describe('planDeAnulacion', () => {
+  const fila = {
+    ins_id: 9,
+    ins_representante: { nombre: 'Ana Pérez', correo: 'ana@x.com' } as never,
+    ins_total: 40,
+  };
+  const asig = (id: number, extra: Record<string, unknown> = {}) => ({
+    ninoasig_id: id,
+    colacthor_id: id,
+    actividad: `Act${id}`,
+    horarios: [],
+    est_id: 1,
+    de_esta: true,
+    asistencias: 0,
+    evaluaciones: 0,
+    ...extra,
+  });
+  const alumno = (extra: Record<string, unknown> = {}) => ({
+    insnino_id: 1,
+    nombre_enviado: 'Luis',
+    nino_id: 50,
+    nombre: 'Luis',
+    est_id: 1,
+    foto: null,
+    nacio_aqui: true,
+    otras_inscripciones: 0,
+    otros_representantes: 0,
+    asistencias: 0,
+    evaluaciones: 0,
+    novedades: 0,
+    asignaciones: [asig(1)],
+    ...extra,
+  });
+  const cuenta = (extra: Record<string, unknown> = {}) => ({
+    usu_id: 7,
+    usu_nombre: 'Ana Pérez',
+    usu_correo: 'ana@x.com',
+    usu_foto: null,
+    auth_user_id: 'u',
+    est_id: 1,
+    padre_id: 3,
+    nacio_aqui: true,
+    otras_inscripciones: [] as number[],
+    otros_roles: [] as string[],
+    hijos_fuera: 0,
+    ...extra,
+  });
+  const plan = (a: Array<ReturnType<typeof alumno>>, c: ReturnType<typeof cuenta> | null = cuenta(), bloqueos = {}) =>
+    planDeAnulacion(fila, { alumnos: a as never, cuenta: c }, bloqueos, 1);
+
+  it('sin historia lo borra todo: alumno, disciplinas y cuenta', () => {
+    const p = plan([alumno()]);
+    expect(p.alumnos[0]!.destino).toBe('eliminar');
+    expect(p.alumnos[0]!.disciplinas.map((d) => d.accion)).toEqual(['eliminar']);
+    expect(p.cuenta.destino).toBe('eliminar');
+  });
+
+  it('con asistencias: el alumno pasa a baja y la cuenta también', () => {
+    const p = plan([alumno({ asistencias: 3, asignaciones: [asig(1, { asistencias: 3 }), asig(2)] })]);
+    expect(p.alumnos[0]!.destino).toBe('baja');
+    expect(p.alumnos[0]!.motivos).toEqual(['3 asistencias']);
+    // La disciplina sin historia se borra; la que la tiene, baja.
+    expect(p.alumnos[0]!.disciplinas.map((d) => d.accion)).toEqual(['baja', 'eliminar']);
+    expect(p.cuenta.destino).toBe('baja');
+  });
+
+  it('una novedad también es historia', () => {
+    expect(plan([alumno({ novedades: 1 })]).alumnos[0]!.destino).toBe('baja');
+  });
+
+  it('el alumno que ya existía se queda: solo pierde las disciplinas de esta inscripción', () => {
+    const p = plan(
+      [alumno({ nacio_aqui: false, asignaciones: [asig(1), asig(2, { de_esta: false })] })],
+      cuenta({ nacio_aqui: false }),
+    );
+    expect(p.alumnos[0]!.destino).toBe('quitar');
+    expect(p.alumnos[0]!.disciplinas.map((d) => d.ninoasig_id)).toEqual([1]);
+    expect(p.alumnos[0]!.soltar_padre).toBe(false);
+    expect(p.cuenta.destino).toBe('se_queda');
+    expect(p.cuenta.motivos).toContain('ya existía antes de esta inscripción');
+  });
+
+  it('el mismo niño de otro representante: se suelta de esta cuenta, que se borra', () => {
+    const p = plan([alumno({ nacio_aqui: false, otros_representantes: 1 })]);
+    expect(p.alumnos[0]!.destino).toBe('quitar');
+    expect(p.alumnos[0]!.soltar_padre).toBe(true);
+    expect(p.cuenta.destino).toBe('eliminar');
+  });
+
+  it('la cuenta se queda si tiene otra inscripción u otros roles', () => {
+    expect(plan([alumno()], cuenta({ otras_inscripciones: [12] })).cuenta).toMatchObject({
+      destino: 'se_queda',
+      motivos: ['tiene otra inscripción (Nº 12)'],
+    });
+    expect(plan([alumno()], cuenta({ otros_roles: ['Entrenador'] })).cuenta.destino).toBe('se_queda');
+  });
+
+  it('encuestas respondidas: la cuenta pasa a baja', () => {
+    const p = plan([alumno()], cuenta(), { encuestas_respondidas: 2, estudiantes_vinculados: 1 });
+    expect(p.cuenta).toMatchObject({ destino: 'baja', motivos: ['respondió 2 encuestas'] });
+  });
+
+  it('un alumno ya borrado en Estudiantes no estorba', () => {
+    const p = plan([alumno({ nino_id: null, nombre: null })]);
+    expect(p.alumnos[0]!.destino).toBe('ya_no_existe');
+    expect(p.cuenta.destino).toBe('eliminar');
+  });
+
+  it('nunca borra la cuenta de quien anula', () => {
+    const p = planDeAnulacion(fila, { alumnos: [alumno()] as never, cuenta: cuenta({ usu_id: 1 }) }, {}, 1);
+    expect(p.cuenta.destino).toBe('se_queda');
   });
 });

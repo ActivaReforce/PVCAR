@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CalendarClock, History, Search } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,13 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import BarraGuardar from '@/components/asistencias/BarraGuardar';
 import MiDiaAlumnos from '@/components/asistencias/MiDiaAlumnos';
 import { usePermissions } from '@/hooks/usePermissions';
 import FilaAsistencia from '@/components/asistencias/FilaAsistencia';
-import HistorialDisciplina from '@/components/asistencias/HistorialDisciplina';
-import ResumenAsistencia from '@/components/asistencias/ResumenAsistencia';
 import { useColegiosVisibles } from '@/hooks/useColegios';
 import { useDias, useDisciplinas } from '@/hooks/useDisciplinas';
 import {
@@ -74,8 +71,9 @@ const sinTildes = (texto: string) =>
  * del usuario: en cuanto hay disciplinas de hoy se le enseña Mi día y queda a
  * un botón de los selects.
  *
- * Dentro de la lista: buscador siempre arriba, barra de acción arriba y abajo,
- * y las reglas de siempre —fecha propuesta hacia atrás, lote en transacción,
+ * Pantalla simple (pedido del cliente, 2026-10-26): «← Hoy» arriba a la
+ * derecha, los filtros, la clase como separador, el buscador, la lista y una
+ * sola barra al pie. Sin tarjetas de resumen ni historial. Las reglas de siempre —fecha propuesta hacia atrás, lote en transacción,
  * alcance decidido en el servidor—.
  */
 const AsistenciasAlumnos = () => {
@@ -89,7 +87,6 @@ const AsistenciasAlumnos = () => {
   const [dia, setDia] = useState(TODOS);
   const [disciplina, setDisciplina] = useState('');
   const [fecha, setFecha] = useState('');
-  const [verHistorial, setVerHistorial] = useState(false);
   const [vistaInicio, setVistaInicio] = useState<'mi-dia' | 'selects'>('mi-dia');
   const [buscar, setBuscar] = useState('');
 
@@ -221,11 +218,20 @@ const AsistenciasAlumnos = () => {
 
   return (
     <div className="container mx-auto min-w-0 space-y-6 p-4 lg:p-6">
-      <div>
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Asistencia de Alumnos</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Elige la clase y la fecha, marca y guarda todo de una vez.
-        </p>
+        {!mostrarMiDia && (clasesHoy.data?.items?.length ?? 0) > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-11 shrink-0 px-3 sm:h-10"
+            onClick={volverAMiDia}
+            title="Volver a mis clases de hoy"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Hoy
+          </Button>
+        )}
       </div>
 
       {mostrarMiDia && diaHoy !== null && (
@@ -317,21 +323,6 @@ const AsistenciasAlumnos = () => {
         </div>
       )}
 
-      {mostrarSelects && (clasesHoy.data?.items?.length ?? 0) > 0 && !elegida && (
-        <div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setVistaInicio('mi-dia')}
-            className="h-9 px-2 text-muted-foreground"
-          >
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            Volver a mis clases de hoy
-          </Button>
-        </div>
-      )}
-
       {elegida && fecha !== '' && !fechaCuadra && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
           {elegida.act_nombre} es de los {susDiasTexto} y el {enLetras(fecha)} no lo es. Elige
@@ -353,41 +344,14 @@ const AsistenciasAlumnos = () => {
 
       {elegida && fechaCuadra && (
         <>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold">
-                {elegida.act_nombre} · {lista.data?.sesion.col_nombre ?? elegida.col_nombre}
+          <div className="min-w-0 border-t pt-5">
+            <h2 className="truncate text-lg font-semibold">
+              {elegida.act_nombre} · {lista.data?.sesion.col_nombre ?? elegida.col_nombre}
               </h2>
               <p className="text-sm text-muted-foreground">
                 {enLetras(fecha)}
                 {deEseDia && ` · ${deEseDia.inicio}–${deEseDia.fin}`}
               </p>
-            </div>
-
-            <div className="flex gap-2">
-              {(clasesHoy.data?.items?.length ?? 0) > 0 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-11 sm:h-10"
-                  onClick={volverAMiDia}
-                  title="Volver a mis clases de hoy"
-                >
-                  <ArrowLeft className="mr-1 h-4 w-4" />
-                  Hoy
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 sm:h-10"
-                onClick={() => setVerHistorial(true)}
-              >
-                <History className="mr-2 h-4 w-4" />
-                Historial
-              </Button>
-            </div>
           </div>
 
           {lista.isLoading && (
@@ -402,30 +366,12 @@ const AsistenciasAlumnos = () => {
 
           {lista.data && (
             <>
-              <ResumenAsistencia resumen={lista.data.resumen} />
-
               {alumnos.length === 0 ? (
                 <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
                   <p className="text-lg">No hay alumnos inscritos en esa fecha</p>
                 </div>
               ) : (
                 <>
-                  {puedePasarLista && (
-                    <BarraGuardar
-                      posicion="arriba"
-                      total={Object.keys(borrador.marcas).length}
-                      sinMarcar={
-                        Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length
-                      }
-                      cambios={borrador.sucias.length}
-                      incompletas={borrador.incompletas.length}
-                      guardando={guardar.isPending}
-                      onDeshacer={borrador.deshacer}
-                      onMarcarRestantes={borrador.presenteALosQueFaltan}
-                      onGuardar={enviar}
-                    />
-                  )}
-
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -486,7 +432,6 @@ const AsistenciasAlumnos = () => {
 
               {puedePasarLista && alumnos.length > 0 && (
                 <BarraGuardar
-                  posicion="abajo"
                   total={Object.keys(borrador.marcas).length}
                   sinMarcar={
                     Object.values(borrador.marcas).filter((m) => m.asisest_id === null).length
@@ -503,25 +448,6 @@ const AsistenciasAlumnos = () => {
           )}
         </>
       )}
-
-      <Dialog open={verHistorial} onOpenChange={setVerHistorial}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="break-words text-lg sm:text-xl">
-              Historial de {elegida?.act_nombre}
-            </DialogTitle>
-          </DialogHeader>
-          {elegida && (
-            <HistorialDisciplina
-              disciplina={elegida.colacthor_id}
-              onAbrirFecha={(f) => {
-                setFecha(f);
-                setVerHistorial(false);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

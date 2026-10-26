@@ -495,6 +495,35 @@ inscripcionesRouter.post(
   },
 );
 
+/** Anular una aprobada, paso 1: lo que pasaría, para el panel. Solo Propietario. */
+inscripcionesRouter.get(
+  '/:id/anulacion',
+  requirePermission('inscripciones', 'eliminar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      res.json({ data: await service.previaDeAnulacion(actor(req), id), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Anular una aprobada: borra lo que trajo. El cuerpo lleva el nombre escrito a mano. */
+inscripcionesRouter.post(
+  '/:id/anular',
+  requirePermission('inscripciones', 'eliminar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      const { confirmacion } = rechazarSchema.parse(req.body);
+      res.json({ data: await service.anular(actor(req), id, confirmacion), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 /** Rechazar: borrado permanente. El cuerpo lleva el nombre escrito a mano. */
 inscripcionesRouter.delete(
   '/:id',

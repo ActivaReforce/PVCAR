@@ -5,7 +5,6 @@ import { ApiError } from '../../middleware/error.js';
 import {
   guardarAlumnosSchema,
   guardarEntrenadoresSchema,
-  historialSchema,
   listaAlumnosSchema,
   listaEntrenadoresSchema,
 } from './asistencias.schemas.js';
@@ -15,7 +14,7 @@ import * as service from './asistencias.service.js';
  * Rutas de Asistencias.
  *
  * **Sobre los permisos** (desde la 0026, 2026-10-07): `ver` deja consultar
- * listas e historial; `editar` deja pasar lista. Hasta entonces solo existía
+ * las listas; `editar` deja pasar lista. Hasta entonces solo existía
  * `ver` y habilitaba también escribir. Quién puede marcar a quién lo sigue
  * limitando el **alcance** (lib/alcance.ts), que se comprueba en el servicio.
  */
@@ -89,19 +88,6 @@ asistenciasRouter.put(
     try {
       const input = guardarAlumnosSchema.parse(req.body);
       res.json({ data: await service.guardarAlumnos(actor(req), input), error: null });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-asistenciasRouter.get(
-  '/historial',
-  requirePermission(...VER_ALUMNOS),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const query = historialSchema.parse(req.query);
-      res.json({ data: await service.historial(actor(req), query), error: null });
     } catch (err) {
       next(err);
     }
