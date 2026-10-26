@@ -874,6 +874,56 @@ const representantes: Definicion = {
   }),
 };
 
+/**
+ * El hijo de `inn` estudia en alguno de los colegios de `$5`. El colegio no
+ * se guarda en la inscripción: sale de sus disciplinas (cada disciplina es de
+ * un colegio).
+ */
+const HIJO_EN_COLEGIO = `EXISTS (
+                SELECT 1
+                  FROM unnest(inn.insnino_disciplinas) AS cid
+                  JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+                 WHERE cah.col_id = ANY($5::int[])
+              )`;
+
+/** Filtros comunes al detalle y a los totales de Inscripciones. */
+const FILTRO_INSCRIPCION = `($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
+         AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
+         AND ($3::text IS NULL
+              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
+              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'cedula','')", '$3')}
+              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'correo','')", '$3')})
+         AND ($4::int IS NULL
+              OR ($4 = 1 AND i.ins_estado = 'pendiente')
+              OR ($4 = 2 AND i.ins_estado = 'aprobada'))
+         AND ($5::int[] IS NULL
+              OR EXISTS (
+                SELECT 1 FROM public.inscripcion_nino inn
+                 WHERE inn.ins_id = i.ins_id AND ${HIJO_EN_COLEGIO}
+              ))`;
+
+/**
+ * Lo pagado. Con filtro de colegio cuenta solo los hijos de ese colegio: una
+ * inscripción puede traer hermanos de colegios distintos y su `ins_total` los
+ * suma a todos. El precio de cada hijo (`total_con_iva`) cuadra con
+ * `ins_total` en las 84 de prod (comprobado el 2026-10-26).
+ */
+const VALOR_INSCRIPCION = `CASE WHEN $5::int[] IS NULL THEN COALESCE(i.ins_total, 0)
+               ELSE COALESCE((
+                 SELECT SUM((inn.insnino_precio->>'total_con_iva')::numeric)
+                   FROM public.inscripcion_nino inn
+                  WHERE inn.ins_id = i.ins_id AND ${HIJO_EN_COLEGIO}
+               ), 0)
+             END`;
+
+const paramsInscripcion = (f: FiltrosReporte) => [
+  oNulo(f.desde),
+  oNulo(f.hasta),
+  textoONulo(f.buscar),
+  oNulo(f.estado),
+  oNulo(f.colegio),
+];
+
 const inscripciones: Definicion = {
   id: 'inscripciones',
   titulo: 'Inscripciones',
@@ -883,7 +933,7 @@ const inscripciones: Definicion = {
   soloRoles: [ROL.PROPIETARIO],
   exigeRango: false,
   filtros: {
-    colegio: false,
+    colegio: true,
     disciplina: false,
     estado: {
       etiqueta: 'Estado',
@@ -911,10 +961,9 @@ const inscripciones: Definicion = {
     { clave: 'fecha_aprobacion', cabecera: 'Aprobada el', ancho: 14 },
   ],
   /**
-   * Sin alcance por colegio: el módulo de Inscripciones es solo Propietario y
-   * Admin, y la del `insnino_datos` es texto suelto (el formulario público lo
-   * guarda tal cual). Si en el futuro se añaden más roles, se cuela aquí la
-   * misma lógica que en Representantes.
+   * Sin alcance por colegio: el reporte es solo Propietario. El filtro de
+   * colegio (2026-10-26) sale de las disciplinas de cada hijo, no del texto
+   * suelto de `insnino_datos`.
    *
    * El estado se filtra como id (1=Pendiente, 2=Aprobada) para encajar con el
    * desplegable estándar del resto de reportes.
@@ -949,6 +998,7 @@ const inscripciones: Definicion = {
                  JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
                  JOIN public.colegio c ON c.col_id = cah.col_id
                 WHERE inn.ins_id = i.ins_id
+                  AND ($5::int[] IS NULL OR c.col_id = ANY($5::int[]))
              ), '')                                                   AS colegios,
              ARRAY(
                SELECT DISTINCT c.col_nombre
@@ -957,6 +1007,7 @@ const inscripciones: Definicion = {
                  JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
                  JOIN public.colegio c ON c.col_id = cah.col_id
                 WHERE inn.ins_id = i.ins_id
+                  AND ($5::int[] IS NULL OR c.col_id = ANY($5::int[]))
              )                                                        AS _colegios,
              COALESCE((
                SELECT string_agg(DISTINCT a.act_nombre, ', ' ORDER BY a.act_nombre)
@@ -966,22 +1017,14 @@ const inscripciones: Definicion = {
                  JOIN public.actividad a ON a.act_id = cah.act_id
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS disciplinas,
-             COALESCE(i.ins_total, 0)::float8                         AS valor,
+             ${VALOR_INSCRIPCION}::float8                             AS valor,
              COALESCE(ap.usu_nombre, '')                              AS aprobada_por,
              COALESCE(${textoEc('i.ins_fecha_aprobacion', 'DD/MM/YYYY')}, '') AS fecha_aprobacion
         FROM public.inscripcion i
         LEFT JOIN public.usuario ap ON ap.usu_id = i.ins_aprobada_por
-       WHERE ($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
-         AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
-         AND ($3::text IS NULL
-              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
-              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'cedula','')", '$3')}
-              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'correo','')", '$3')})
-         AND ($4::int IS NULL
-              OR ($4 = 1 AND i.ins_estado = 'pendiente')
-              OR ($4 = 2 AND i.ins_estado = 'aprobada'))
+       WHERE ${FILTRO_INSCRIPCION}
        ORDER BY i.ins_fecha DESC`,
-    params: [oNulo(f.desde), oNulo(f.hasta), textoONulo(f.buscar), oNulo(f.estado)],
+    params: paramsInscripcion(f),
   }),
   totales: (f) => ({
     consulta: {
@@ -989,18 +1032,10 @@ const inscripciones: Definicion = {
         SELECT count(*)::int                                              AS inscripciones,
                count(*) FILTER (WHERE i.ins_estado = 'pendiente')::int    AS pendientes,
                count(*) FILTER (WHERE i.ins_estado = 'aprobada')::int     AS aprobadas,
-               COALESCE(SUM(i.ins_total), 0)::float8                      AS recaudado
+               COALESCE(SUM(${VALOR_INSCRIPCION}), 0)::float8             AS recaudado
           FROM public.inscripcion i
-         WHERE ($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
-           AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
-           AND ($3::text IS NULL
-                OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
-                OR ${contieneSinTildes("COALESCE(i.ins_representante->>'cedula','')", '$3')}
-                OR ${contieneSinTildes("COALESCE(i.ins_representante->>'correo','')", '$3')})
-           AND ($4::int IS NULL
-                OR ($4 = 1 AND i.ins_estado = 'pendiente')
-                OR ($4 = 2 AND i.ins_estado = 'aprobada'))`,
-      params: [oNulo(f.desde), oNulo(f.hasta), textoONulo(f.buscar), oNulo(f.estado)],
+         WHERE ${FILTRO_INSCRIPCION}`,
+      params: paramsInscripcion(f),
     },
     formato: [
       { clave: 'inscripciones', etiqueta: 'Inscripciones' },
