@@ -348,6 +348,37 @@ export interface ResultadoAprobacion {
   correo_enviado: boolean;
 }
 
+/** Lo que pasa al anular una aprobada, cosa por cosa. Lo calcula el backend. */
+export interface PlanAnulacion {
+  ins_id: number;
+  representante: string;
+  valor: number;
+  archivos: number;
+  alumnos: Array<{
+    insnino_id: number;
+    nino_id: number | null;
+    nombre: string;
+    /** quitar: el alumno se queda y solo pierde las disciplinas de esta inscripción. */
+    destino: 'eliminar' | 'baja' | 'quitar' | 'ya_no_existe';
+    motivos: string[];
+    disciplinas: Array<{
+      ninoasig_id: number;
+      nombre: string;
+      accion: 'eliminar' | 'baja' | 'ya_cerrada';
+      asistencias: number;
+      evaluaciones: number;
+    }>;
+    soltar_padre: boolean;
+  }>;
+  cuenta: {
+    usu_id: number | null;
+    nombre: string;
+    correo: string;
+    destino: 'eliminar' | 'baja' | 'se_queda' | 'sin_cuenta';
+    motivos: string[];
+  };
+}
+
 export interface VersionDocumento {
   doc_id: number;
   doc_tipo: TipoDocumento;
@@ -488,6 +519,9 @@ export const inscripcionesApi = {
     api.post<ResultadoAprobacion>(`/inscripciones/${id}/aprobar`, { mismos }),
   rechazar: (id: number, confirmacion: string) =>
     api.delete<{ ins_id: number }>(`/inscripciones/${id}`, { confirmacion }),
+  previaAnulacion: (id: number) => api.get<PlanAnulacion>(`/inscripciones/${id}/anulacion`),
+  anular: (id: number, confirmacion: string) =>
+    api.post<PlanAnulacion>(`/inscripciones/${id}/anular`, { confirmacion }),
 
   documentos: () => api.get<Documentos>('/inscripciones/documentos'),
   documento: (id: number) => api.get<DocumentoLegal>(`/inscripciones/documentos/${id}`),

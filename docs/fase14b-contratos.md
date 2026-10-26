@@ -118,3 +118,14 @@ Si el envío no pasa la validación, el backend devuelve frases de lo que falta 
 - Se siguen bloqueando: la cédula de otra persona y el correo de otra cuenta.
 
 **Construido el 2026-10-06** (backend `c778a28` y frontend): `POST /inscripcion/identificar` (30/h por IP), `GET /inscripcion/mis-datos`, envío y cotización con sesión opcional, `nino_id` por alumno, `calcularCobro(…, externos)`, ficha con `cuenta` y `posibles` y `aprobar` con `{ mismos }`. El formulario no manda el token salvo que la persona haya elegido "Continuar con mi cuenta" o haya entrado en él (`sinSesion`): alguien del personal con la sesión abierta inscribe a otra persona como anónimo. Recorrido completo probado contra un Postgres local con almacenamiento y correo simulados. Sin migración: `inscripcion.usu_id` e `inscripcion_nino.nino_id` ya existían; ahora se llenan al enviar cuando hay cuenta o hijo.
+
+## 10. Anular una aprobada (pedido del cliente, 2026-10-26)
+
+Botón "Anular inscripción" al pie de la ficha de una aprobada, **solo Propietario** (el backend lo exige: `GET /inscripciones/:id/anulacion` para el panel, `POST /inscripciones/:id/anular` con el nombre escrito). Es para que el representante vuelva a inscribirse desde cero: **borrado definitivo, sin bajas**, salvo lo que tiene historia que los reportes cuentan. Sin correo al representante. El plan lo calcula `planDeAnulacion` (pura, con tests) y el panel lo enseña cosa por cosa.
+
+- **Qué trajo la inscripción:** lo creado al aprobar tiene `fecha_creacion` ≥ `ins_fecha_aprobacion` (en prod, 0,4–1,7 s después); lo que ya existía es anterior. Las disciplinas se reconocen por `nino_asignacion.insnino_id`.
+- **Alumno que nació aquí, solo de este representante y sin otra inscripción:** sin historia, se borra entero; con asistencias, evaluaciones con datos (intento o finalizada) o novedades, pasa a **baja** con sus disciplinas con historia de baja y las demás borradas.
+- **Alumno que ya existía, de otro representante o de otra inscripción:** se queda; solo pierde las disciplinas de esta inscripción (borradas o de baja si tienen historia). Sus datos actualizados no vuelven atrás. Si la cuenta se va, se suelta el vínculo.
+- **Cuenta:** se queda si ya existía, tiene otra inscripción, otros roles, otros hijos o es quien anula. Si no: borrada (con su acceso en Auth), o **baja** si le queda un hijo con historia o respondió encuestas / sale en novedades.
+- **La inscripción** se borra con sus PDF y el comprobante. Queda una línea en `auditoria` (`eliminar`, `inscripcion`, `anulada: true`) con la foto de la fila; el reporte de Inscripciones la saca como **Anulada** (estado 3), con su valor pero **sin sumar** al recaudado.
+- **Al volver:** la cuenta de baja se reactiva al aprobar (§9) y el alumno de baja se elige como "el mismo" y `aprobar` lo reactiva.

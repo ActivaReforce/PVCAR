@@ -1203,3 +1203,206 @@ export async function actualizarRepresentante(
     [usuId, datos.nombre, datos.telefono],
   );
 }
+
+// ---------------------------------------------------------------------------
+// Anular una aprobada (2026-10-26)
+
+/** Una disciplina que tiene el alumno, con lo que ya se registró en ella. */
+export interface AsignacionAnulable {
+  ninoasig_id: number;
+  colacthor_id: number;
+  actividad: string;
+  horarios: HorarioDisciplina[];
+  est_id: number;
+  /** La trajo esta inscripción (`nino_asignacion.insnino_id`). */
+  de_esta: boolean;
+  asistencias: number;
+  evaluaciones: number;
+}
+
+export interface AlumnoAnulable {
+  insnino_id: number;
+  /** El alumno tal como lo envió el representante. */
+  nombre_enviado: string;
+  /** Null si al alumno ya lo borraron en Estudiantes. */
+  nino_id: number | null;
+  nombre: string | null;
+  est_id: number | null;
+  foto: string | null;
+  /** Lo creó esta aprobación (y no lo tenía de antes). */
+  nacio_aqui: boolean;
+  /** Otras inscripciones en las que sale. */
+  otras_inscripciones: number;
+  /** Representantes que no son el de esta inscripción. */
+  otros_representantes: number;
+  asistencias: number;
+  /** Evaluaciones con algún intento o finalizadas: las vacías no son historia. */
+  evaluaciones: number;
+  /** Novedades en las que sale (su FK no deja borrarlo). */
+  novedades: number;
+  asignaciones: AsignacionAnulable[];
+}
+
+export interface CuentaAnulable {
+  usu_id: number;
+  usu_nombre: string;
+  usu_correo: string;
+  usu_foto: string | null;
+  auth_user_id: string | null;
+  est_id: number;
+  padre_id: number | null;
+  /** La creó esta aprobación. */
+  nacio_aqui: boolean;
+  /** Ids de otras inscripciones (pendientes o aprobadas) de esta cuenta. */
+  otras_inscripciones: number[];
+  /** Roles que no son Representante. */
+  otros_roles: string[];
+  /** Hijos atados a la cuenta que no vienen en esta inscripción. */
+  hijos_fuera: number;
+}
+
+/** Evaluación con algún intento o ya finalizada: una vacía no es historia. */
+const EVALUACION_CON_DATOS = `(e.evaninopen_fecha_finalizacion IS NOT NULL
+                 OR EXISTS (SELECT 1 FROM public.evaluacion_intento ei
+                             WHERE ei.evaninopen_id = e.evaninopen_id))`;
+
+/**
+ * Lo que trajo una inscripción aprobada, con lo necesario para decidir qué
+ * se borra y qué se queda. "Nació aquí" compara con la fecha de aprobación:
+ * lo que crea `aprobar` sale en la misma transacción, segundos después (en
+ * prod, entre 0,4 y 1,7 s); lo que ya existía es siempre anterior.
+ */
+export async function anulables(
+  insId: number,
+  client?: PoolClient,
+): Promise<{ alumnos: AlumnoAnulable[]; cuenta: CuentaAnulable | null }> {
+  const ejecutor = client ?? getPool();
+  const { rows: alumnos } = await ejecutor.query<AlumnoAnulable>(
+    `SELECT inn.insnino_id,
+            COALESCE(inn.insnino_datos->>'nombre', '') AS nombre_enviado,
+            n.nino_id, n.nino_nombre AS nombre, n.est_id, n.nino_foto AS foto,
+            COALESCE(n.nino_fecha_creacion >= i.ins_fecha_aprobacion, false) AS nacio_aqui,
+            (SELECT count(*) FROM public.inscripcion_nino o
+              WHERE o.nino_id = n.nino_id AND o.ins_id <> i.ins_id)::int AS otras_inscripciones,
+            (SELECT count(*) FROM public.nino_padre np
+               JOIN public.padre p ON p.padre_id = np.padre_id
+              WHERE np.nino_id = n.nino_id AND p.usu_id IS DISTINCT FROM i.usu_id)::int AS otros_representantes,
+            (SELECT count(*) FROM public.asistencia_nino a WHERE a.nino_id = n.nino_id)::int AS asistencias,
+            (SELECT count(*) FROM public.evaluacion_nino_pendiente e
+               JOIN public.nino_asignacion na ON na.ninoasig_id = e.ninoasig_id
+              WHERE na.nino_id = n.nino_id AND ${EVALUACION_CON_DATOS})::int AS evaluaciones,
+            (SELECT count(*) FROM public.novedad_alumno nv WHERE nv.nino_id = n.nino_id)::int AS novedades,
+            COALESCE((
+              SELECT json_agg(json_build_object(
+                       'ninoasig_id', na.ninoasig_id,
+                       'colacthor_id', na.colacthor_id,
+                       'actividad', act.act_nombre,
+                       'horarios', ${horariosJson('d')},
+                       'est_id', na.est_id,
+                       'de_esta', na.insnino_id IS NOT DISTINCT FROM inn.insnino_id,
+                       'asistencias', (SELECT count(*) FROM public.asistencia_nino a
+                                        WHERE a.nino_id = na.nino_id AND a.colacthor_id = na.colacthor_id),
+                       'evaluaciones', (SELECT count(*) FROM public.evaluacion_nino_pendiente e
+                                         WHERE e.ninoasig_id = na.ninoasig_id AND ${EVALUACION_CON_DATOS})
+                     ) ORDER BY act.act_nombre, na.ninoasig_id)
+                FROM public.nino_asignacion na
+                JOIN public.colegio_actividad_horario d ON d.colacthor_id = na.colacthor_id
+                JOIN public.actividad act ON act.act_id = d.act_id
+               WHERE na.nino_id = n.nino_id
+            ), '[]'::json) AS asignaciones
+       FROM public.inscripcion_nino inn
+       JOIN public.inscripcion i ON i.ins_id = inn.ins_id
+       LEFT JOIN public.nino n ON n.nino_id = inn.nino_id
+      WHERE inn.ins_id = $1
+      ORDER BY inn.insnino_orden`,
+    [insId],
+  );
+
+  const { rows: cuentas } = await ejecutor.query<CuentaAnulable>(
+    `SELECT u.usu_id, u.usu_nombre, u.usu_correo, u.usu_foto,
+            u.auth_user_id::text AS auth_user_id, u.est_id, p.padre_id,
+            u.usu_fecha_creacion >= i.ins_fecha_aprobacion AS nacio_aqui,
+            ARRAY(SELECT o.ins_id FROM public.inscripcion o
+                   WHERE o.usu_id = u.usu_id AND o.ins_id <> i.ins_id ORDER BY o.ins_id) AS otras_inscripciones,
+            ARRAY(SELECT r.rol_titulo FROM public.usuario_rol ur
+                    JOIN public.rol r ON r.rol_id = ur.rol_id
+                   WHERE ur.usu_id = u.usu_id AND ur.rol_id <> $2
+                   ORDER BY r.rol_id) AS otros_roles,
+            (SELECT count(*) FROM public.nino_padre np
+              WHERE np.padre_id = p.padre_id
+                AND NOT EXISTS (SELECT 1 FROM public.inscripcion_nino inn
+                                 WHERE inn.ins_id = i.ins_id AND inn.nino_id = np.nino_id))::int AS hijos_fuera
+       FROM public.inscripcion i
+       JOIN public.usuario u ON u.usu_id = i.usu_id
+       LEFT JOIN public.padre p ON p.usu_id = u.usu_id
+      WHERE i.ins_id = $1`,
+    [insId, ROL.REPRESENTANTE],
+  );
+
+  return { alumnos, cuenta: cuentas[0] ?? null };
+}
+
+/**
+ * Lo que la anulada deja en la auditoría para el reporte de Inscripciones:
+ * la misma fila que enseñaba mientras existía, más cada hijo con su colegio
+ * y su valor (para filtrar por colegio y sumar solo lo de ese colegio).
+ */
+export interface FotoDeAnulada {
+  ins_fecha: string;
+  representante: { nombre: string; cedula: string; correo: string; telefono: string };
+  hijos: Array<{ nombre: string; col_id: number | null; colegio: string | null; disciplinas: string[]; valor: number }>;
+  valor: number;
+  aprobada_por: string | null;
+  ins_fecha_aprobacion: string | null;
+}
+
+export async function fotoDeAnulada(insId: number, client: PoolClient): Promise<FotoDeAnulada> {
+  const { rows } = await client.query<FotoDeAnulada>(
+    `SELECT i.ins_fecha,
+            json_build_object(
+              'nombre',   COALESCE(i.ins_representante->>'nombre', ''),
+              'cedula',   COALESCE(i.ins_representante->>'cedula', ''),
+              'correo',   COALESCE(i.ins_representante->>'correo', ''),
+              'telefono', COALESCE(i.ins_representante->>'telefono', '')) AS representante,
+            COALESCE((
+              SELECT json_agg(json_build_object(
+                       'nombre', btrim(COALESCE(inn.insnino_datos->>'nombres', inn.insnino_datos->>'nombre', '') ||
+                                       ' ' || COALESCE(inn.insnino_datos->>'apellidos', '')),
+                       'col_id', c.col_id,
+                       'colegio', c.col_nombre,
+                       'disciplinas', ARRAY(
+                          SELECT act.act_nombre
+                            FROM unnest(inn.insnino_disciplinas) AS cid
+                            JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+                            JOIN public.actividad act ON act.act_id = cah.act_id
+                           ORDER BY act.act_nombre),
+                       'valor', COALESCE((inn.insnino_precio->>'total_con_iva')::numeric, 0)
+                     ) ORDER BY inn.insnino_orden)
+                FROM public.inscripcion_nino inn
+                LEFT JOIN LATERAL (
+                  SELECT c.col_id, c.col_nombre
+                    FROM unnest(inn.insnino_disciplinas) AS cid
+                    JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+                    JOIN public.colegio c ON c.col_id = cah.col_id
+                   LIMIT 1
+                ) c ON true
+               WHERE inn.ins_id = i.ins_id
+            ), '[]'::json) AS hijos,
+            COALESCE(i.ins_total, 0)::float8 AS valor,
+            ap.usu_nombre AS aprobada_por,
+            i.ins_fecha_aprobacion
+       FROM public.inscripcion i
+       LEFT JOIN public.usuario ap ON ap.usu_id = i.ins_aprobada_por
+      WHERE i.ins_id = $1`,
+    [insId],
+  );
+  return rows[0]!;
+}
+
+export async function borrarAsignacion(client: PoolClient, ninoasigId: number): Promise<void> {
+  await client.query('DELETE FROM public.nino_asignacion WHERE ninoasig_id = $1', [ninoasigId]);
+}
+
+export async function soltarDelPadre(client: PoolClient, ninoId: number, padreId: number): Promise<void> {
+  await client.query('DELETE FROM public.nino_padre WHERE nino_id = $1 AND padre_id = $2', [ninoId, padreId]);
+}

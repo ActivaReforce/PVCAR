@@ -40,6 +40,9 @@ import {
   type NinoDetalle,
 } from '@/api/inscripciones';
 import RechazarInscripcionDialog from './RechazarInscripcionDialog';
+import AnularInscripcionDialog from './AnularInscripcionDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { ROL } from '@/hooks/useUserForm';
 import { fechaCorta, fechaHora, fechaNacimiento, enlaceWhatsApp } from './formato';
 
 interface Props {
@@ -63,6 +66,10 @@ const FichaInscripcion = ({ id, onClose }: Props) => {
   const { toast } = useToast();
   const [confirmarAprobacion, setConfirmarAprobacion] = useState(false);
   const [rechazando, setRechazando] = useState(false);
+  const [anulando, setAnulando] = useState(false);
+  const { user } = useAuth();
+  // Anular una aprobada es solo del Propietario (el backend lo exige igual).
+  const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
   /** Los alumnos nuevos que el admin dice que son uno que ya existe: { insnino_id: nino_id }. */
   const [mismos, setMismos] = useState<Record<number, number>>({});
   useEffect(() => setMismos({}), [id]);
@@ -160,6 +167,17 @@ const FichaInscripcion = ({ id, onClose }: Props) => {
                   </ConditionalAction>
                 </>
               )}
+              {datos.ins_estado === 'aprobada' && esPropietario && (
+                <ConditionalAction module="inscripciones" action="eliminar">
+                  <Button
+                    variant="outline"
+                    className="h-11 border-destructive/50 text-destructive hover:bg-destructive/10 sm:h-10"
+                    onClick={() => setAnulando(true)}
+                  >
+                    Anular inscripción
+                  </Button>
+                </ConditionalAction>
+              )}
             </DialogFooter>
           )}
         </DialogContent>
@@ -181,6 +199,15 @@ const FichaInscripcion = ({ id, onClose }: Props) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AnularInscripcionDialog
+        inscripcion={anulando ? (datos ?? null) : null}
+        onClose={() => setAnulando(false)}
+        onAnulada={() => {
+          setAnulando(false);
+          onClose();
+        }}
+      />
 
       <RechazarInscripcionDialog
         inscripcion={rechazando ? (datos ?? null) : null}
@@ -240,7 +267,7 @@ const ResumenAprobacion = ({ datos, mismos }: { datos: InscripcionDetalle; mismo
           documentos en PDF.
         </li>
       </ul>
-      <p>No se puede deshacer desde aquí: para quitar a un alumno habrá que darlo de baja en Estudiantes.</p>
+      <p>Si luego hiciera falta, el Propietario puede anularla desde esta misma ficha.</p>
     </>
   );
 };
