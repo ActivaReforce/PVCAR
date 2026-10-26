@@ -9,10 +9,8 @@ import { ApiError } from '../../middleware/error.js';
 import * as repo from './asistencias.repository.js';
 import { enviarAvisos, registrarAvisos } from '../novedades/novedades.ausencias.js';
 import {
-  ASISTENCIA,
   type GuardarAlumnosInput,
   type GuardarEntrenadoresInput,
-  type HistorialQuery,
   type ListaAlumnosQuery,
   type ListaEntrenadoresQuery,
 } from './asistencias.schemas.js';
@@ -129,43 +127,12 @@ async function exigirColegio(actor: AuthUser, colId: number): Promise<repo.Coleg
 
 export type AlumnoConFoto = repo.AlumnoDeSesion & { nino_foto_url: string | null };
 
-export interface ResumenAsistencia {
-  total: number;
-  marcados: number;
-  sinMarcar: number;
-  presentes: number;
-  ausentes: number;
-  tardes: number;
-  justificados: number;
-}
-
 export interface ListaAlumnos {
   sesion: repo.Sesion;
   fecha: string;
   alumnos: AlumnoConFoto[];
-  resumen: ResumenAsistencia;
   /** Hora de Ecuador al abrir la pantalla, para proponerla al marcar Tarde. */
   hora_servidor: string;
-}
-
-/**
- * El resumen se calcula aqui, sobre la lista completa de la sesion, y no en el
- * navegador sobre lo que se ve. Es la misma regla del checklist: contar en el
- * servidor, sobre el conjunto entero.
- */
-function resumir(marcas: Array<{ asisest_id: number | null }>): ResumenAsistencia {
-  const cuenta = (estado: number) => marcas.filter((m) => m.asisest_id === estado).length;
-  const marcados = marcas.filter((m) => m.asisest_id !== null).length;
-
-  return {
-    total: marcas.length,
-    marcados,
-    sinMarcar: marcas.length - marcados,
-    presentes: cuenta(ASISTENCIA.PRESENTE),
-    ausentes: cuenta(ASISTENCIA.AUSENTE),
-    tardes: cuenta(ASISTENCIA.TARDE),
-    justificados: cuenta(ASISTENCIA.JUSTIFICADO),
-  };
 }
 
 async function conFotos(alumnos: repo.AlumnoDeSesion[]): Promise<AlumnoConFoto[]> {
@@ -191,7 +158,6 @@ export async function listaAlumnos(
     sesion,
     fecha: query.fecha,
     alumnos: await conFotos(alumnos),
-    resumen: resumir(alumnos),
     hora_servidor: hora,
   };
 }
@@ -301,21 +267,6 @@ export async function guardarAlumnos(
   };
 }
 
-export async function historial(
-  actor: AuthUser,
-  query: HistorialQuery,
-): Promise<{ sesion: repo.Sesion; dias: repo.DiaDeHistorial[] }> {
-  const sesion = await repo.obtenerSesion(query.disciplina);
-  if (!sesion) throw new ApiError(404, 'Esa disciplina no existe');
-
-  const alcance = await alcanceDe(actor.usuario);
-  if (!alcanzaDisciplina(alcance, query.disciplina)) {
-    throw new ApiError(403, 'Esa disciplina esta fuera de tu alcance');
-  }
-
-  return { sesion, dias: await repo.historialDeSesion(query.disciplina, query.desde, query.hasta) };
-}
-
 // ---------------------------------------------------------------------------
 // Entrenadores y auxiliares
 
@@ -326,7 +277,6 @@ export interface ListaEntrenadores {
   fecha: string;
   dia_id: number;
   personas: PersonaConFoto[];
-  resumen: ResumenAsistencia;
   hora_servidor: string;
 }
 
@@ -351,7 +301,6 @@ export async function listaEntrenadores(
       ...p,
       usu_foto_url: p.usu_foto ? (firmadas.get(p.usu_foto) ?? p.usu_foto) : null,
     })),
-    resumen: resumir(personas),
     hora_servidor: hora,
   };
 }

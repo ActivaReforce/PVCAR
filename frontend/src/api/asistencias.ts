@@ -43,16 +43,6 @@ export interface Sesion {
   entrenadores: string[];
 }
 
-export interface ResumenAsistencia {
-  total: number;
-  marcados: number;
-  sinMarcar: number;
-  presentes: number;
-  ausentes: number;
-  tardes: number;
-  justificados: number;
-}
-
 export interface AlumnoDeSesion {
   nino_id: number;
   nino_nombre: string;
@@ -71,7 +61,6 @@ export interface ListaAlumnos {
   sesion: Sesion;
   fecha: string;
   alumnos: AlumnoDeSesion[];
-  resumen: ResumenAsistencia;
   hora_servidor: string;
 }
 
@@ -95,7 +84,6 @@ export interface ListaEntrenadores {
   fecha: string;
   dia_id: number;
   personas: PersonaDeColegio[];
-  resumen: ResumenAsistencia;
   hora_servidor: string;
 }
 
@@ -119,20 +107,6 @@ export interface MarcaPersona {
   asisest_id: number;
   hora_tarde?: string | null;
   razon?: string | null;
-}
-
-export interface DiaDeHistorial {
-  fecha: string;
-  total: number;
-  presentes: number;
-  ausentes: number;
-  tardes: number;
-  justificados: number;
-}
-
-export interface Historial {
-  sesion: Sesion;
-  dias: DiaDeHistorial[];
 }
 
 export const asistenciasApi = {
@@ -159,9 +133,4 @@ export const asistenciasApi = {
       fecha,
       marcas,
     }),
-
-  historial: (disciplina: number, desde: string, hasta: string) =>
-    api.get<Historial>(
-      `/asistencias/historial?disciplina=${disciplina}&desde=${desde}&hasta=${hasta}`,
-    ),
 };

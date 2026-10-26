@@ -30,7 +30,6 @@ El registro diario y lo que más se usa del sistema: **13 202 marcas de alumnos,
 | Deshacer | Vuelve a lo que hay guardado |
 | Entrenador con disciplina ajena | **403** (probar con `curl` y un id de otra disciplina) |
 | Fecha pasada con alumnos ya dados de baja | Salen igual, con el aviso "ya no está inscrito" |
-| Historial | Abre el rango, lista las fechas con sus conteos y al pulsar una **abre esa sesión** |
 | **360 px** | Una tarjeta por alumno, los cuatro estados como botones de 44 px con inicial (P·A·T·J), "Guardar" fijo abajo |
 | Modo oscuro | Los cuatro colores de estado legibles, seleccionados y sin seleccionar |
 
@@ -65,9 +64,8 @@ Va en **las dos bases**, después de `0009`. Dos cosas:
 |---|---|---|
 | `GET /asistencias/estados` | `ver` de cualquiera de los dos módulos | Los cuatro estados |
 | `GET /asistencias/contexto` | idem | La fecha y la hora **de Ecuador según el servidor** |
-| `GET /asistencias/alumnos?disciplina&fecha` | `asistencias_estudiantes:ver` | La sesión, la lista y el resumen contado en SQL |
+| `GET /asistencias/alumnos?disciplina&fecha` | `asistencias_estudiantes:ver` | La sesión y la lista |
 | `PUT /asistencias/alumnos` | idem | Lote en una transacción |
-| `GET /asistencias/historial?disciplina&desde&hasta` | idem | Conteos por fecha, rango máximo 180 días |
 | `GET /asistencias/entrenadores?colegio&fecha` | `asistencias_entrenadores:ver` | Titulares vigentes ese día y sus auxiliares |
 | `PUT /asistencias/entrenadores` | idem | Lote con los dos tipos, cada uno a su tabla |
 
@@ -75,7 +73,7 @@ Va en **las dos bases**, después de `0009`. Dos cosas:
 
 ### Frontend
 
-`api/asistencias.ts`, `hooks/useAsistencias.ts`, `hooks/useBorradorAsistencia.ts`, dos páginas (`AsistenciasAlumnos`, `AsistenciasEntrenadores`) y cinco componentes en `components/asistencias/`: `FilaAsistencia`, `BarraGuardar`, `ResumenAsistencia`, `HistorialDisciplina` y `estados.ts`.
+`api/asistencias.ts`, `hooks/useAsistencias.ts`, `hooks/useBorradorAsistencia.ts`, dos páginas (`AsistenciasAlumnos`, `AsistenciasEntrenadores`) y los componentes de `components/asistencias/`: `FilaAsistencia`, `BarraGuardar`, `MiDiaAlumnos`, `MiDiaEntrenadores` y `estados.ts`. **2026-10-26 (pedido del cliente):** fuera las tarjetas de resumen por estado y el Historial (pantalla, endpoint y código); «← Hoy» arriba a la derecha, la clase como separador entre filtros y lista, y una sola barra de guardar al pie.
 
 **Borrado por inservible:** la carpeta `components/attendance/` entera (20 archivos, 2 400 líneas), `hooks/useAttendanceData.ts` (437), `hooks/useRequestQueue.ts`, `hooks/useTrainerContext.ts`, `pages/Asistencias.tsx` (envoltorio de una línea) y `pages/AsistenciasNinos.tsx` (463 líneas **que no estaban ni enrutadas**). De `TimezoneUtils.ts` sobrevive una función, movida a `lib/hora.ts`, que aún usa el informe de entrenadores (Fase 13).
 
@@ -94,7 +92,6 @@ Va en **las dos bases**, después de `0009`. Dos cosas:
 | El entrenador podía marcar disciplinas ajenas si conocía el id | Alcance en el servidor, 403 |
 | La lista filtraba por inscripción **activa hoy**, así que abrir una fecha pasada escondía registros | La lista es "inscritos esa fecha" ∪ "ya marcados esa fecha". En dev son **1 393 asistencias** que antes desaparecían |
 | "Aplicar Presente a todos" pisaba las correcciones ya hechas | Solo marca a quien no tiene estado |
-| No había forma de ver una fecha pasada sin rehacer los cuatro filtros | Historial por rango, y cada fecha abre su sesión |
 | Los estados se comparaban por nombre en minúsculas (`=== 'presente'`) en cinco archivos | Un solo mapa de estados, por id |
 | La pantalla de entrenadores eran 743 líneas en un archivo | Módulo con su servicio y componentes compartidos con la de alumnos |
 
