@@ -19,12 +19,16 @@ const fecha = z
     return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === texto;
   }, 'Esa fecha no existe');
 
+/*
+ * En la URL llega como texto ("3,5"); en el cuerpo de la exportación, como
+ * números ([3, 5]). Solo aceptar texto rompía el Excel con filtro de colegio.
+ */
 const listaDeIds = z
-  .union([z.string(), z.array(z.string())])
+  .union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))])
   .optional()
   .transform((valor) => {
     if (valor === undefined) return undefined;
-    const texto = Array.isArray(valor) ? valor.join(',') : valor;
+    const texto = Array.isArray(valor) ? valor.join(',') : String(valor);
     const ids = texto
       .split(',')
       .map((t) => Number(t.trim()))
