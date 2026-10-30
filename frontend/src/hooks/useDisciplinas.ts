@@ -70,19 +70,28 @@ function mensajeDe(error: unknown): string {
   return 'Error inesperado';
 }
 
-function useMutacion<TVars, TData>(fn: (vars: TVars) => Promise<TData>, exito: string) {
+interface Exito {
+  title: string;
+  description?: string;
+}
+
+function useMutacion<TVars, TData>(
+  fn: (vars: TVars) => Promise<TData>,
+  exito: string | ((data: TData) => Exito),
+) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: fn,
-    onSuccess: async () => {
+    onSuccess: async (data: TData) => {
       await queryClient.invalidateQueries({ queryKey: ['disciplinas'] });
       // Los conteos de disciplinas viven también en la tarjeta del colegio y
       // en la de la actividad.
       await queryClient.invalidateQueries({ queryKey: ['colegios'] });
       await queryClient.invalidateQueries({ queryKey: ['actividades'] });
-      toast({ title: exito });
+      // Un solo toast a la vez (TOAST_LIMIT = 1): el aviso va en el de éxito.
+      toast(typeof exito === 'string' ? { title: exito } : exito(data));
     },
     onError: (error: unknown) => {
       toast({
@@ -102,7 +111,13 @@ export function useActualizarDisciplina() {
   return useMutacion(
     ({ id, datos }: { id: number; datos: DatosDisciplina }) =>
       disciplinasApi.actualizar(id, datos),
-    'Disciplina actualizada',
+    (d) =>
+      d.entrenadores_cruzados?.length
+        ? {
+            title: 'Disciplina actualizada, con cruce de horario',
+            description: `Con este horario la dará a la vez que otra suya: ${d.entrenadores_cruzados.join('; ')}. Se guardó igual.`,
+          }
+        : { title: 'Disciplina actualizada' },
   );
 }
 

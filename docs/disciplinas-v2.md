@@ -101,8 +101,8 @@ Tamaño: unos 30 archivos leen el día o la hora de la disciplina. Es una reestr
 - **Reglas en el backend** (`lib/horarios.ts`): cruce = mismo día y horas que se pisan; 15–16 y 16–17 no se cruzan.
   - Estudiantes: no deja inscribir en dos que se crucen; **sin tope**.
   - Formulario público: tope `inscfg_max_disciplinas` y cruces; las opciones que no se pueden marcar salen desactivadas con el motivo. El tope se cambia en Inscripciones → Documentos → Configuración.
-  - Entrenadores: **sí** puede dar varias disciplinas a la misma hora, aunque sean de colegios distintos (cliente, 2026-10-30: Fútbol Sub 8 y Sub 10 juntas con un solo entrenador). Sin aviso ni bloqueo.
-  - Editar horarios: si el cambio cruza a un alumno, 409 con los nombres. A los entrenadores no se les mira.
+  - Entrenadores: **sí** puede dar varias disciplinas a la misma hora, aunque sean de colegios distintos (cliente, 2026-10-30: Fútbol Sub 8 y Sub 10 juntas con un solo entrenador). Sin bloqueo: al asignar sale un aviso (en la lista y al guardar) y se guarda igual.
+  - Editar horarios: si el cambio cruza a un alumno, 409 con los nombres. Si cruza a su entrenador, se guarda y avisa.
   - Misma actividad en el mismo colegio: dos grupos no pueden pisarse ningún día (sustituye al "duplicado exacto" y al "solape" de antes).
 - **Asistencias:** la fecha tiene que caer en uno de los días de la disciplina; la hora que se muestra es la de ese día. Reportes: "Día" de asistencias es el de la fecha.
 - **Auxiliar con varios titulares** (Fase 9 §1b): se puede atar a varios; `GET /me/titulares`; selector "de quién ver" en la cabecera con "Todos mis entrenadores", que viaja en `X-Titular` y solo **estrecha** el alcance.

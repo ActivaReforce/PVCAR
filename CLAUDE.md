@@ -83,7 +83,7 @@ Trampas de configuración que ya costaron tiempo:
 - (2026-10-13) Solo hay representantes **ecuatorianos que hablan español**: la cédula es de 10 números (sin pasaporte) y la página va sin traductor.
 - (2026-10-12) El reporte de Alumnos **sí** saca la información de salud (con casilla y auditoría). **No** hay fechas futuras en asistencia (lo rechaza el servidor). **No** hay invitación por correo: el admin pone siempre la contraseña.
 - Varios roles por usuario; el alcance es la **unión** de todos.
-- (2026-10-30) Un entrenador **puede** dar varias disciplinas a la misma hora el mismo día (p. ej. Fútbol Sub 8 y Sub 10 juntas). Sin aviso ni bloqueo. Los alumnos sí siguen sin poder cruzarse.
+- (2026-10-30) Un entrenador **puede** dar varias disciplinas a la misma hora el mismo día (p. ej. Fútbol Sub 8 y Sub 10 juntas). Sale un aviso del cruce (al asignar y al editar horarios) pero no bloquea. Los alumnos sí siguen sin poder cruzarse.
 - Borrado permanente junto a la baja lógica, con recuento previo, confirmación escribiendo el nombre y auditoría.
 - `padre` guarda también la facturación, que puede ser de otra persona; no se separa.
 - Repo público hasta la Fase 17, sin reescribir el historial.

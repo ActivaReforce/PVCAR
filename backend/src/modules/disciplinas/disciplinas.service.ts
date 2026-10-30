@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { alcanceDe, alcanzaColegio, alcanzaDisciplina, type Alcance } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
-import { alumnosCruzados } from '../../lib/horarios.js';
+import { alumnosCruzados, entrenadoresCruzados } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { enTransaccion } from '../../lib/tx.js';
@@ -163,13 +163,14 @@ async function exigirSinCrucesDeAlumnos(client: PoolClient, colacthorId: number)
  *
  * Los horarios se pueden cambiar aunque la disciplina tenga historia (a veces
  * el horario cambia de verdad): las asistencias guardan su fecha. Lo que no se
- * deja es que el cambio cruce a un alumno con su otra disciplina.
+ * deja es que el cambio cruce a un alumno con su otra disciplina. Si cruza a
+ * su entrenador con otra suya, se guarda igual y se devuelve el aviso.
  */
 export async function actualizar(
   actor: AuthUser,
   colacthorId: number,
   input: ActualizarDisciplinaInput,
-): Promise<repo.DisciplinaListada> {
+): Promise<repo.DisciplinaListada & { entrenadores_cruzados: string[] }> {
   const antes = await repo.obtenerDisciplina(colacthorId);
   if (!antes) throw new ApiError(404, 'Disciplina no encontrada');
 
@@ -204,6 +205,7 @@ export async function actualizar(
     exigirColegioEnAlcance(alcance, input.col_id);
   }
 
+  let entrenadores_cruzados: string[] = [];
   await enTransaccion(async (client) => {
     if (input.col_id && !(await repo.existeColegio(client, input.col_id))) {
       throw new ApiError(400, 'El colegio no existe');
@@ -219,6 +221,7 @@ export async function actualizar(
     if (input.horarios) {
       await repo.reemplazarHorarios(client, colacthorId, input.horarios);
       await exigirSinCrucesDeAlumnos(client, colacthorId);
+      entrenadores_cruzados = await entrenadoresCruzados(client, colacthorId);
     }
     // Cambiar los cursos no toca a los ya inscritos: solo decide qué ofrece
     // desde ahora el formulario público.
@@ -231,13 +234,13 @@ export async function actualizar(
         accion: 'editar',
         entidad: 'disciplina',
         entidadId: colacthorId,
-        detalle: { campos: Object.keys(input), antes: nombreDe(antes) },
+        detalle: { campos: Object.keys(input), antes: nombreDe(antes), entrenadores_cruzados },
       },
       client,
     );
   });
 
-  return (await repo.obtenerDisciplina(colacthorId))!;
+  return { ...(await repo.obtenerDisciplina(colacthorId))!, entrenadores_cruzados };
 }
 
 /** Lo que va a arrastrar la baja. La pantalla lo ensena antes de confirmar. */

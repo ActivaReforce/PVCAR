@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import { alcanceDe, alcanzaColegio } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
+import { crucesEntre, describirCruce, disciplinasAbiertasDeEntrenador } from '../../lib/horarios.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { firmarFoto, firmarFotos } from '../../lib/storage.js';
 import { enTransaccion } from '../../lib/tx.js';
@@ -17,6 +18,8 @@ export interface CambioDeAsignacion {
   asignaciones: repo.AsignacionListada[];
   /** Auxiliares que se quedaron sin titular: la pantalla los recuerda. */
   auxiliares_desvinculados: AuxiliarDesvinculado[];
+  /** Al asignar: con que otras suyas se cruza. Solo aviso, ya esta guardada. */
+  cruces_de_horario: string[];
 }
 
 /**
@@ -164,7 +167,7 @@ export async function asignar(
 
   const alcance = await alcanceDe(actor.usuario);
 
-  const auxiliares_desvinculados = await enTransaccion(async (client) => {
+  const resultado = await enTransaccion(async (client) => {
     const disciplina = await repo.disciplinaActiva(client, input.colacthor_id);
     if (!disciplina) throw new ApiError(400, 'La disciplina no existe');
     if (disciplina.est_id !== ESTADO.ACTIVO) {
@@ -198,9 +201,12 @@ export async function asignar(
       input.desde ?? null,
     );
 
-    // Sin control de cruce de horario: un entrenador puede dar varias
-    // disciplinas a la misma hora (Futbol Sub 8 y Sub 10 juntas en la cancha;
-    // cliente, 2026-10-30). Cada una guarda su asignacion y su historia.
+    // Un entrenador puede dar varias disciplinas a la misma hora (Futbol Sub 8
+    // y Sub 10 juntas en la cancha; cliente, 2026-10-30): el cruce no bloquea,
+    // solo se avisa. Cada una guarda su asignacion y su historia.
+    const cruces = (await crucesEntre(await disciplinasAbiertasDeEntrenador(entId, client), client))
+      .filter((c) => c.a === input.colacthor_id || c.b === input.colacthor_id)
+      .map(describirCruce);
 
     await auditar(
       {
@@ -213,14 +219,19 @@ export async function asignar(
           colacthor_id: input.colacthor_id,
           reemplazo_a: ocupada?.ent_id ?? null,
           auxiliares_desvinculados: sueltos,
+          cruces_de_horario: cruces,
         },
       },
       client,
     );
-    return sueltos;
+    return { sueltos, cruces };
   });
 
-  return { asignaciones: await repo.listarAsignaciones(entId, false), auxiliares_desvinculados };
+  return {
+    asignaciones: await repo.listarAsignaciones(entId, false),
+    auxiliares_desvinculados: resultado.sueltos,
+    cruces_de_horario: resultado.cruces,
+  };
 }
 
 /** Cerrar una asignacion: fecha de fin, no DELETE. */
@@ -267,7 +278,11 @@ export async function cerrar(
     return sueltos;
   });
 
-  return { asignaciones: await repo.listarAsignaciones(entId, false), auxiliares_desvinculados };
+  return {
+    asignaciones: await repo.listarAsignaciones(entId, false),
+    auxiliares_desvinculados,
+    cruces_de_horario: [],
+  };
 }
 
 // ---------------------------------------------------------------------------
