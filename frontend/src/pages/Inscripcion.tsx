@@ -1063,17 +1063,26 @@ const FichaAlumno = ({
 
   /**
    * Las de su curso, agrupadas por actividad: "Fútbol" con sus grupos, cada
-   * uno con sus días. Sin curso elegido no se enseña ninguna.
+   * uno con sus días. Sin curso elegido no se enseña ninguna. Las que ya
+   * tiene activas salen siempre, aunque ya no sean de su curso (se le cambió
+   * el curso o a la disciplina se le quitó): cuentan para el máximo y, si no
+   * se vieran, el tope no se entendería.
    */
   const porActividad = useMemo(() => {
     const grupos = new Map<string, DisciplinaOfertada[]>();
     if (curso === null) return [];
     for (const d of colegio?.disciplinas ?? []) {
-      if (!esParaCurso(d.grados, curso)) continue;
+      const activa = alumno.activas.some((a) => a.colacthor_id === d.colacthor_id);
+      if (!activa && !esParaCurso(d.grados, curso)) continue;
       grupos.set(d.actividad, [...(grupos.get(d.actividad) ?? []), d]);
     }
     return [...grupos.entries()];
-  }, [colegio, curso]);
+  }, [colegio, curso, alumno.activas]);
+
+  /** Activas que el colegio ya no ofrece: no tienen casilla, pero se nombran. */
+  const activasFuera = alumno.activas.filter(
+    (a) => !(colegio?.disciplinas ?? []).some((d) => d.colacthor_id === a.colacthor_id),
+  );
 
   /** Al cambiar de curso se sueltan las elegidas que no son para el nuevo. */
   const cambiarCurso = (v: string) =>
@@ -1214,6 +1223,12 @@ const FichaAlumno = ({
             Puedes elegir hasta {maximo} {maximo === 1 ? 'disciplina' : 'disciplinas'}, sin que sus
             horarios se crucen. Cada una incluye todos sus días.
           </p>
+          {activasFuera.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Ya inscrito en:{' '}
+              {activasFuera.map((a) => `${a.actividad} (${horarioLargo(a.horarios)})`).join(', ')}
+            </p>
+          )}
           {porActividad.length === 0 && (
             <p className="text-sm text-muted-foreground">
               No hay disciplinas para este curso en {colegio.col_nombre}.
