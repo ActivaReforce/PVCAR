@@ -20,6 +20,7 @@ import DocumentosLegales from '@/components/inscripciones/DocumentosLegales';
 import { EstadoGeneral } from '@/components/inscripciones/EstadoInscripciones';
 import { fechaHora } from '@/components/inscripciones/formato';
 import MisInscripciones from '@/components/inscripciones/MisInscripciones';
+import MensualidadesPersonal from '@/components/mensualidades/MensualidadesPersonal';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLES_GLOBALES } from '@/hooks/useUserForm';
 
@@ -94,6 +95,7 @@ const InscripcionesPersonal = () => {
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TabsList className="w-max">
             <TabsTrigger value="inscripciones">Inscripciones</TabsTrigger>
+            <TabsTrigger value="mensualidades">Mensualidades</TabsTrigger>
             <TabsTrigger value="documentos">Configuración</TabsTrigger>
           </TabsList>
         </div>
@@ -253,6 +255,10 @@ const InscripcionesPersonal = () => {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="mensualidades" className="pt-2">
+          <MensualidadesPersonal />
         </TabsContent>
 
         <TabsContent value="documentos" className="pt-2">

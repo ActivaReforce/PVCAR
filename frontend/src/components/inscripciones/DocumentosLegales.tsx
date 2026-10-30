@@ -64,6 +64,7 @@ import DatosColegio from './DatosColegio';
 import Membrete from './Membrete';
 import CuentaBancaria from './CuentaBancaria';
 import MaxDisciplinas from './MaxDisciplinas';
+import ConfigMensualidades from '@/components/mensualidades/ConfigMensualidades';
 import ConfigCorreo from '@/components/correos/ConfigCorreo';
 import { EstadoDelColegio } from './EstadoInscripciones';
 import { REGLAS, porcentaje, problemasDePlantilla, tarifa, type DatosDocumento } from './documento';
@@ -201,6 +202,7 @@ const DocumentosLegales = () => {
             descripcion="Sale al aprobar. Llega al representante con sus documentos aprobados."
           />
           <MaxDisciplinas />
+          <ConfigMensualidades />
           <Membrete />
         </TabsContent>
       </Tabs>

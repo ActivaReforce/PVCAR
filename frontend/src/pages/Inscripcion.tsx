@@ -37,6 +37,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { diaDeCruce, horarioLargo } from '@/lib/horarios';
 import { esParaCurso } from '@/lib/cursos';
 import { compressImage } from '@/lib/imageCompression';
+import PagarMensualidad from '@/components/mensualidades/PagarMensualidad';
 import {
   dinero,
   documentoPara,
@@ -428,10 +429,11 @@ const Inscripcion = () => {
 
   const { user } = useAuth();
   /**
-   * inicio: "primera vez" o "ya inscribí antes". nuevo: el formulario de
-   * siempre, sin sesión. cuenta: entró con su cuenta y se le rellena todo (§9).
+   * inicio: "primera vez", "ya inscribí antes" o "pagar mensualidad". nuevo:
+   * el formulario de siempre, sin sesión. cuenta: entró con su cuenta y se le
+   * rellena todo (§9). pagar: la mensualidad de sus hijos, con su sesión.
    */
-  const [modo, setModo] = useState<'inicio' | 'nuevo' | 'cuenta'>('inicio');
+  const [modo, setModo] = useState<'inicio' | 'nuevo' | 'cuenta' | 'pagar'>('inicio');
   const conSesion = modo === 'cuenta' && user !== null;
   /** Al continuar en "Tus datos", si la cédula ya tiene cuenta: que entre. */
   const [pistaCuenta, setPistaCuenta] = useState<string | null | undefined>(undefined);
@@ -692,20 +694,32 @@ const Inscripcion = () => {
         {formulario.isError && (
           <Aviso titulo="No se pudo abrir el formulario">Revisa tu conexión y recarga la página.</Aviso>
         )}
-        {formulario.data && !formulario.data.disponible && !resultado && (
+        {/* Cerradas, la puerta sigue para pagar la mensualidad. */}
+        {formulario.data && !formulario.data.disponible && !resultado && modo !== 'inicio' && modo !== 'pagar' && (
           <Aviso titulo="Las inscripciones no están abiertas">Vuelve a intentarlo más tarde o escríbenos.</Aviso>
         )}
 
         {resultado && <Exito resultado={resultado} correo={rep.correo.trim()} cuenta={conSesion} />}
 
-        {formulario.data?.disponible && !resultado && modo === 'inicio' && (
+        {formulario.data && !resultado && modo === 'inicio' && (
           <EntradaInscripcion
+            abiertas={formulario.data.disponible}
             onNuevo={(cedula) => {
               setRep((r) => ({ ...r, cedula }));
               setModo('nuevo');
             }}
             onCuenta={() => setModo('cuenta')}
+            onPagar={() => setModo('pagar')}
           />
+        )}
+
+        {modo === 'pagar' && user && (
+          <div className="space-y-4">
+            <Button variant="ghost" className="h-11" onClick={() => setModo('inicio')}>
+              ← Volver
+            </Button>
+            <PagarMensualidad />
+          </div>
         )}
 
         {formulario.data?.disponible && !resultado && modo === 'cuenta' && misDatos.isLoading && (

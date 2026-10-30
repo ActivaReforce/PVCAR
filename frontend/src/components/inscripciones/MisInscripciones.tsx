@@ -9,7 +9,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFichaInscripcion, useInscripciones } from '@/hooks/useInscripciones';
+import PagarMensualidad from '@/components/mensualidades/PagarMensualidad';
 import { fechaCorta, fechaHora } from './formato';
 
 const VERDE =
@@ -36,45 +38,57 @@ const MisInscripciones = () => {
   return (
     <div className="container mx-auto min-w-0 max-w-3xl space-y-6 p-4 lg:p-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Mis inscripciones</h1>
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Inscripciones</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Tus inscripciones y los documentos firmados de tus hijos.
+          Las mensualidades, tus inscripciones y los documentos firmados de tus hijos.
         </p>
       </div>
 
-      {lista.isLoading && <p className="py-8 text-center text-muted-foreground">Cargando…</p>}
-      {lista.isError && (
-        <p className="text-destructive">No se pudieron cargar: {(lista.error as Error).message}</p>
-      )}
+      {/* Mensualidades primero: es a lo que se vuelve cada mes (cliente, 2026-10-30). */}
+      <Tabs defaultValue="mensualidades">
+        <TabsList>
+          <TabsTrigger value="mensualidades">Mensualidades</TabsTrigger>
+          <TabsTrigger value="inscripciones">Mis inscripciones</TabsTrigger>
+        </TabsList>
+        <TabsContent value="mensualidades" className="pt-2">
+          <PagarMensualidad />
+        </TabsContent>
+        <TabsContent value="inscripciones" className="space-y-6 pt-2">
+          {lista.isLoading && <p className="py-8 text-center text-muted-foreground">Cargando…</p>}
+          {lista.isError && (
+            <p className="text-destructive">No se pudieron cargar: {(lista.error as Error).message}</p>
+          )}
 
-      {lista.data && items.length === 0 && (
-        <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
-          <ClipboardList className="mx-auto mb-3 h-10 w-10 opacity-50" />
-          <p className="text-lg">No tienes inscripciones</p>
-        </div>
-      )}
+          {lista.data && items.length === 0 && (
+            <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
+              <ClipboardList className="mx-auto mb-3 h-10 w-10 opacity-50" />
+              <p className="text-lg">No tienes inscripciones</p>
+            </div>
+          )}
 
-      {items.length > 0 && (
-        <ul className="divide-y overflow-hidden rounded-lg border">
-          {items.map((i) => (
-            <li key={i.ins_id}>
-              <button
-                type="button"
-                onClick={() => setAbierta(i.ins_id)}
-                className="flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none sm:flex-row sm:items-center"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{i.ninos.join(', ')}</div>
-                  <div className="truncate text-sm text-muted-foreground">
-                    {i.colegios.join(', ')} · enviada el {fechaCorta(i.ins_fecha)}
-                  </div>
-                </div>
-                <Estado estado={i.ins_estado} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+          {items.length > 0 && (
+            <ul className="divide-y overflow-hidden rounded-lg border">
+              {items.map((i) => (
+                <li key={i.ins_id}>
+                  <button
+                    type="button"
+                    onClick={() => setAbierta(i.ins_id)}
+                    className="flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none sm:flex-row sm:items-center"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{i.ninos.join(', ')}</div>
+                      <div className="truncate text-sm text-muted-foreground">
+                        {i.colegios.join(', ')} · enviada el {fechaCorta(i.ins_fecha)}
+                      </div>
+                    </div>
+                    <Estado estado={i.ins_estado} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <FichaPropia id={abierta} onClose={() => setAbierta(null)} />
     </div>
