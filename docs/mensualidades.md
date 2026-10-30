@@ -1,6 +1,6 @@
 # Mensualidades
 
-Pedido del cliente el 2026-10-30. Migración `0041_mensualidades.sql`. Código en `backend/src/modules/mensualidades` y `frontend/src/components/mensualidades`.
+Pedido del cliente el 2026-10-30. Migraciones `0041_mensualidades.sql`, `0042_mensualidades_dias_por_colegio.sql` y `0043_mensualidades_quitar_dias_generales.sql`. Código en `backend/src/modules/mensualidades` y `frontend/src/components/mensualidades`.
 
 ## Qué es
 
@@ -28,7 +28,7 @@ La inscripción paga el primer mes. Desde ahí, cada mes de cada alumno es una *
 
 - **Lo que se debe no se guarda:** se calcula cada vez (`mensualidades.calculo.ts`, puro y con tests) con las disciplinas activas, la configuración de cada colegio y lo ya pagado. Cambiar la configuración cambia lo que se debe desde ese momento.
 - **Lo pagado sí, congelado:** `mensualidad_pago` (un comprobante: estado, totales, copia del detalle, motivo) y `mensualidad_cuota` (un mes de un alumno, con disciplinas e importes). Un mes de un alumno se paga una sola vez (índice único). Borrar un alumno no borra su contabilidad (`SET NULL`, con el nombre copiado).
-- Configuración (Inscripciones → Configuración → Mensualidades, colegio por colegio): `colegio_precio.colpre_mens_dia_limite`, `colpre_mens_dia_corte` (0042), `colpre_meses_cobro`, `colpre_cobro_desde` (0041). General: `inscripcion_config.inscfg_mens_recordatorio`. Las `inscfg_mens_dia_*` de la 0041 quedaron sin uso.
+- Configuración (Inscripciones → Configuración → Mensualidades, colegio por colegio): `colegio_precio.colpre_mens_dia_limite`, `colpre_mens_dia_corte` (0042), `colpre_meses_cobro`, `colpre_cobro_desde` (0041). General: `inscripcion_config.inscfg_mens_recordatorio`. Las `inscfg_mens_dia_*` de la 0041 se quitan en la 0043.
 
 ## Permisos
 
