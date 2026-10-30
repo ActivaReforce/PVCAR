@@ -64,12 +64,12 @@ const query = vi.fn(async (sql: string, params: unknown[] = []) => {
     return { rows: auxiliarYaAtado && auxiliarYaAtado.ent_id === params[2] ? [auxiliarYaAtado] : [] };
   }
   if (sql.includes('entasig_fecha_fin IS NULL') && sql.includes('ea.ent_id = $1')) {
-    return { rows: [{ colacthor_id: 135 }, { colacthor_id: 136 }] };
+    return { rows: [{ colacthor_id: 60 }, { colacthor_id: 136 }] };
   }
   if (sql.includes('OVERLAPS')) {
     return {
       rows: cruzada
-        ? [{ a: 135, b: 136, a_nombre: 'Karate — X (Lun 15:00–16:00)', b_nombre: 'Danza — Y (Lun 15:30–16:30)', dia_nombre: 'Lunes' }]
+        ? [{ a: 60, b: 136, a_nombre: 'Futbol Sub 8 — X (Lun 15:00–16:00)', b_nombre: 'Futbol Sub 10 — X (Lun 15:00–16:00)', dia_nombre: 'Lunes' }]
         : [],
     };
   }
@@ -192,12 +192,18 @@ describe('asignar', () => {
     expect(sqls.some((s) => s.includes('RETURNING entasig_id'))).toBe(true);
   });
 
-  it('no deja darle una disciplina que se le cruza con otra suya, y dice cual', async () => {
+  it('le deja dar dos disciplinas a la misma hora y devuelve el aviso', async () => {
     cruzada = true;
-    await expect(service.asignar(coordinadora, 76, { colacthor_id: 135 })).rejects.toMatchObject({
-      statusCode: 409,
-      message: expect.stringContaining('se cruzan el lunes'),
-    });
+    const r = await service.asignar(coordinadora, 76, { colacthor_id: 60 });
+
+    const sqls = query.mock.calls.map((c) => String(c[0]));
+    expect(sqls.some((s) => s.includes('RETURNING entasig_id'))).toBe(true);
+    expect(r.cruces_de_horario).toEqual([expect.stringContaining('se cruzan el lunes')]);
+  });
+
+  it('sin cruce, el aviso va vacio', async () => {
+    const r = await service.asignar(coordinadora, 76, { colacthor_id: 60 });
+    expect(r.cruces_de_horario).toEqual([]);
   });
 });
 

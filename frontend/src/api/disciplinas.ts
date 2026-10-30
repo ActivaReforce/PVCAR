@@ -152,8 +152,12 @@ export const disciplinasApi = {
   /** Una disciplina con todos sus días. */
   crear: (datos: DatosNuevaDisciplina) => api.post<Disciplina>('/disciplinas', datos),
 
+  /**
+   * `entrenadores_cruzados`: a quién deja el horario nuevo con dos clases a
+   * la vez. Solo aviso. Opcional: Vercel publica antes que Railway.
+   */
   actualizar: (id: number, datos: DatosDisciplina) =>
-    api.patch<Disciplina>(`/disciplinas/${id}`, datos),
+    api.patch<Disciplina & { entrenadores_cruzados?: string[] }>(`/disciplinas/${id}`, datos),
 
   previoBaja: (id: number) => api.get<PrevioBaja>(`/disciplinas/${id}/previo-baja`),
 

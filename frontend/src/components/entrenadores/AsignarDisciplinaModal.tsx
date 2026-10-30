@@ -34,6 +34,7 @@ import {
   useFichaEntrenador,
 } from '@/hooks/useEntrenadores';
 import type { Asignacion, DisciplinaDisponible, Entrenador } from '@/api/entrenadores';
+import { diaDeCruce } from '@/lib/horarios';
 
 interface Props {
   entrenador: Entrenador | null;
@@ -52,6 +53,9 @@ interface Props {
  * Las que ya da otro aparecen marcadas con su nombre: asignarlas cierra la
  * del otro y abre la nueva en la misma transacción. El sistema viejo dejaba
  * dos entrenadores activos sobre la misma disciplina sin avisar.
+ *
+ * Las que se cruzan con una que ya da llevan un aviso, pero se pueden asignar:
+ * un entrenador puede dar varias a la vez (cliente, 2026-10-30).
  */
 const TODOS = 'todos';
 
@@ -96,6 +100,17 @@ const AsignarDisciplinaModal = ({ entrenador, onClose }: Props) => {
       sinTildes(busqueda.trim()),
     );
   });
+
+  /** "Se cruza con Fútbol Sub 8 (Colegio X) el lunes", o null. */
+  const cruceCon = (d: DisciplinaDisponible): string | null => {
+    for (const a of asignaciones) {
+      const diaCruce = diaDeCruce(d.horarios, a.horarios);
+      if (diaCruce) {
+        return `Se cruza con ${a.act_nombre}${a.col_id !== d.col_id ? ` (${a.col_nombre})` : ''} el ${diaCruce.toLowerCase()}`;
+      }
+    }
+    return null;
+  };
 
   const porColegio = new Map<string, DisciplinaDisponible[]>();
   for (const d of lista) porColegio.set(d.col_nombre, [...(porColegio.get(d.col_nombre) ?? []), d]);
@@ -287,41 +302,50 @@ const AsignarDisciplinaModal = ({ entrenador, onClose }: Props) => {
                   {nombreColegio} · {delColegio.length}
                 </p>
                 <ul className="space-y-2">
-                  {delColegio.map((d) => (
-                    <li
-                      key={d.colacthor_id}
-                      className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <p className="break-words font-medium">{d.act_nombre}</p>
-                        <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {d.horario_texto}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <GraduationCap className="h-3 w-3" />
-                            {d.alumnos} alumnos
-                          </span>
-                        </p>
-                        {d.entrenador_actual && (
-                          <Badge variant="outline" className="mt-1.5 max-w-full text-xs">
-                            <span className="truncate">La da {d.entrenador_actual}</span>
-                          </Badge>
-                        )}
-                      </div>
-
-                      <Button
-                        variant={d.entrenador_actual ? 'outline' : 'brand'}
-                        size="sm"
-                        className="min-h-11 w-full flex-shrink-0 sm:w-auto"
-                        disabled={asignar.isPending}
-                        onClick={() => pedirAsignacion(d, false)}
+                  {delColegio.map((d) => {
+                    const cruce = cruceCon(d);
+                    return (
+                      <li
+                        key={d.colacthor_id}
+                        className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
                       >
-                        {d.entrenador_actual ? 'Reemplazar' : 'Asignar'}
-                      </Button>
-                    </li>
-                  ))}
+                        <div className="min-w-0">
+                          <p className="break-words font-medium">{d.act_nombre}</p>
+                          <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {d.horario_texto}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <GraduationCap className="h-3 w-3" />
+                              {d.alumnos} alumnos
+                            </span>
+                          </p>
+                          {d.entrenador_actual && (
+                            <Badge variant="outline" className="mt-1.5 max-w-full text-xs">
+                              <span className="truncate">La da {d.entrenador_actual}</span>
+                            </Badge>
+                          )}
+                          {cruce && (
+                            <p className="mt-1.5 flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
+                              <AlertTriangle className="mt-px h-3 w-3 flex-shrink-0" />
+                              <span>{cruce}. Se puede asignar igual.</span>
+                            </p>
+                          )}
+                        </div>
+  
+                        <Button
+                          variant={d.entrenador_actual ? 'outline' : 'brand'}
+                          size="sm"
+                          className="min-h-11 w-full flex-shrink-0 sm:w-auto"
+                          disabled={asignar.isPending}
+                          onClick={() => pedirAsignacion(d, false)}
+                        >
+                          {d.entrenador_actual ? 'Reemplazar' : 'Asignar'}
+                        </Button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             ))}
