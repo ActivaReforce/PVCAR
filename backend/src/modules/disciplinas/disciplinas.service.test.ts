@@ -28,7 +28,7 @@ const DISCIPLINA = {
 
 /** La disciplina que devuelve obtenerDisciplina. */
 let disciplinaActual: typeof DISCIPLINA | null = DISCIPLINA;
-/** Respuesta de haySolape y de afectadosPorCruce. */
+/** Respuesta de haySolape y de alumnosCruzados. */
 let solapada = false;
 let alumnoCruzado = false;
 /** Respuesta de calcularImpacto. */

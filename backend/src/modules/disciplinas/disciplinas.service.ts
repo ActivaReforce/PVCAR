@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { alcanceDe, alcanzaColegio, alcanzaDisciplina, type Alcance } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
-import { afectadosPorCruce } from '../../lib/horarios.js';
+import { alumnosCruzados } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { enTransaccion } from '../../lib/tx.js';
@@ -144,19 +144,17 @@ async function exigirSinSolape(client: PoolClient, colacthorId: number): Promise
 }
 
 /**
- * Nadie inscrito ni asignado puede quedar con dos disciplinas a la vez por
- * culpa del cambio de horario. Se dice a quien afecta, con nombres.
+ * Ningun alumno inscrito puede quedar con dos disciplinas a la vez por culpa
+ * del cambio de horario. Se dice a quien afecta, con nombres. Los
+ * entrenadores si pueden (cliente, 2026-10-30).
  */
-async function exigirSinCrucesDeGente(client: PoolClient, colacthorId: number): Promise<void> {
-  const { alumnos, entrenadores } = await afectadosPorCruce(client, colacthorId);
-  if (alumnos.length === 0 && entrenadores.length === 0) return;
-  const partes: string[] = [];
-  if (alumnos.length > 0) partes.push(`alumnos: ${alumnos.join(', ')}`);
-  if (entrenadores.length > 0) partes.push(`entrenadores: ${entrenadores.join(', ')}`);
+async function exigirSinCrucesDeAlumnos(client: PoolClient, colacthorId: number): Promise<void> {
+  const alumnos = await alumnosCruzados(client, colacthorId);
+  if (alumnos.length === 0) return;
   throw new ApiError(
     409,
-    `Con ese horario se cruzaría con otra disciplina de ${partes.join('; ')}. Cambia el horario o mueve primero a esas personas.`,
-    { alumnos, entrenadores },
+    `Con ese horario se cruzaría con otra disciplina de alumnos: ${alumnos.join(', ')}. Cambia el horario o mueve primero a esos alumnos.`,
+    { alumnos },
   );
 }
 
@@ -165,8 +163,7 @@ async function exigirSinCrucesDeGente(client: PoolClient, colacthorId: number): 
  *
  * Los horarios se pueden cambiar aunque la disciplina tenga historia (a veces
  * el horario cambia de verdad): las asistencias guardan su fecha. Lo que no se
- * deja es que el cambio cruce a un alumno o a un entrenador con su otra
- * disciplina.
+ * deja es que el cambio cruce a un alumno con su otra disciplina.
  */
 export async function actualizar(
   actor: AuthUser,
@@ -221,7 +218,7 @@ export async function actualizar(
     });
     if (input.horarios) {
       await repo.reemplazarHorarios(client, colacthorId, input.horarios);
-      await exigirSinCrucesDeGente(client, colacthorId);
+      await exigirSinCrucesDeAlumnos(client, colacthorId);
     }
     // Cambiar los cursos no toca a los ya inscritos: solo decide qué ofrece
     // desde ahora el formulario público.

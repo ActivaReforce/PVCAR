@@ -75,6 +75,10 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
 
+### 2026-10-30 — Entrenador en varias disciplinas a la misma hora (PR aparte, sin SQL)
+
+Pedido del cliente: un mismo entrenador puede dar Fútbol Sub 8 y Fútbol Sub 10 a la vez; la empresa lo resuelve en la cancha y el sistema lo permite. Se quitó el bloqueo al asignar y al editar horarios; en su lugar sale un **aviso** ("se cruzan el lunes") y se guarda igual. Los alumnos siguen sin poder cruzarse. Al cambiar de entrenador, la historia queda como siempre (se cierra una asignación y se abre otra). Va en su propio PR para no subir Mensualidades, que sigue en `dev`.
+
 ### Corte de sesión — 2026-10-20
 
 **Hecho hoy (en producción desde el PR #22, con `0040` en dev y prod):** notas de los hijos para el representante (card en el tablero + pestaña "Mis hijos" con Evaluaciones → Ver; detalle en modal), observaciones extra por alumno (formulario → ficha y borde ámbar en /inscripciones → `nino_observacion_extra`, editable solo por el Propietario en /estudiantes, con filo ámbar en la lista), número rojo de Inscripciones solo para el Propietario, y la inscripción reintenta sola si se corta la conexión (`Idempotency-Key`).
