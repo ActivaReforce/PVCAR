@@ -11,11 +11,11 @@ La inscripción paga el primer mes. Desde ahí, cada mes de cada alumno es una *
 | Tema | Regla |
 |---|---|
 | Primer mes | Lo paga la inscripción. Sale como **"Pagado (Inscripción)"**, también en los reportes. |
-| Día de corte | Una inscripción enviada **desde** ese día (hora de Ecuador) paga el mes siguiente: inscrito el 25 de enero, empieza en febrero. Configurable (por defecto 20). |
+| Día de corte | Una inscripción enviada **desde** ese día (hora de Ecuador) paga el mes siguiente: inscrito el 25 de enero, empieza en febrero. Por colegio (por defecto 20). |
 | Mes de la cuota | Es el mes que se paga, no la fecha del pago: quien paga abril el 25 de abril está pagando abril, tarde. |
 | Meses de cobro | Por colegio. Los meses no marcados quedan **en pausa**. |
-| Cobrar desde | Por colegio. Sin él, el colegio no cobra mensualidades. Lo inscrito antes de ese mes queda pagado ese mes por la inscripción (lo de prod: noviembre 2026). |
-| Día límite | Configurable (por defecto 10). Pasado ese día, el mes sin pagar sale **atrasado**. Los meses anteriores sin pagar, también. No se bloquea nada. |
+| Cobrar desde | Por colegio; el select ofrece de enero del año en curso a diciembre del siguiente. Sin él, el colegio no cobra mensualidades. Lo inscrito antes de ese mes queda pagado ese mes por la inscripción (lo de prod: noviembre 2026). |
+| Día límite | Por colegio (por defecto 10). Pasado ese día, el mes sin pagar sale **atrasado**. Los meses anteriores sin pagar, también. No se bloquea nada. |
 | Adelantado | No: se paga el mes en curso y los que se deben. |
 | Varios hijos | Casilla por mes y por hijo, agrupados por colegio; el total cambia al marcar. Un solo comprobante por todo lo marcado. |
 | Descuento de hermano | El importe de cada hijo se calcula con **toda la familia** (la misma regla de la inscripción), no con lo marcado: desmarcar a un hijo resta exactamente lo suyo. Familia = alumnos unidos por algún representante en común. |
@@ -28,7 +28,7 @@ La inscripción paga el primer mes. Desde ahí, cada mes de cada alumno es una *
 
 - **Lo que se debe no se guarda:** se calcula cada vez (`mensualidades.calculo.ts`, puro y con tests) con las disciplinas activas, la configuración de cada colegio y lo ya pagado. Cambiar la configuración cambia lo que se debe desde ese momento.
 - **Lo pagado sí, congelado:** `mensualidad_pago` (un comprobante: estado, totales, copia del detalle, motivo) y `mensualidad_cuota` (un mes de un alumno, con disciplinas e importes). Un mes de un alumno se paga una sola vez (índice único). Borrar un alumno no borra su contabilidad (`SET NULL`, con el nombre copiado).
-- Configuración: `inscripcion_config.inscfg_mens_dia_limite`, `inscfg_mens_dia_corte`, `inscfg_mens_recordatorio`; `colegio_precio.colpre_meses_cobro`, `colpre_cobro_desde`.
+- Configuración (Inscripciones → Configuración → Mensualidades, colegio por colegio): `colegio_precio.colpre_mens_dia_limite`, `colpre_mens_dia_corte` (0042), `colpre_meses_cobro`, `colpre_cobro_desde` (0041). General: `inscripcion_config.inscfg_mens_recordatorio`. Las `inscfg_mens_dia_*` de la 0041 quedaron sin uso.
 
 ## Permisos
 

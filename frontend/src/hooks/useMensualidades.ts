@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
-import { mensualidadesApi } from '@/api/mensualidades';
+import { mensualidadesApi, type CobroDelColegio } from '@/api/mensualidades';
 
 function mensajeDe(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -79,17 +79,9 @@ export function useDescartarPago() {
   return useMutacion((id: number) => mensualidadesApi.descartar(id), null);
 }
 
-export function useGuardarConfigMensualidades() {
-  return useMutacion(
-    (c: { dia_limite: number; dia_corte: number }) => mensualidadesApi.guardarConfig(c),
-    'Configuración guardada',
-  );
-}
-
 export function useGuardarCobroColegio() {
   return useMutacion(
-    ({ colId, meses, desde }: { colId: number; meses: number[]; desde: string | null }) =>
-      mensualidadesApi.guardarCobroColegio(colId, { meses, desde }),
-    'Meses de cobro guardados',
+    ({ colId, ...c }: CobroDelColegio & { colId: number }) => mensualidadesApi.guardarCobroColegio(colId, c),
+    'Guardado',
   );
 }

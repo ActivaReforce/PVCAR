@@ -13,34 +13,20 @@ import type { ListarPagosQuery } from './mensualidades.schemas.js';
 // ---------------------------------------------------------------------------
 // Configuración
 
+/** Lo general: el recordatorio y la cuenta a la que se transfiere. Los días son de cada colegio (0042). */
 export interface ConfigMensualidades {
-  dia_limite: number;
-  dia_corte: number;
   recordatorio: boolean;
   cuenta_bancaria: string | null;
 }
 
 export async function obtenerConfig(client?: PoolClient): Promise<ConfigMensualidades> {
   const { rows } = await (client ?? getPool()).query<ConfigMensualidades>(
-    `SELECT inscfg_mens_dia_limite AS dia_limite, inscfg_mens_dia_corte AS dia_corte,
-            inscfg_mens_recordatorio AS recordatorio, inscfg_cuenta_bancaria AS cuenta_bancaria
+    `SELECT inscfg_mens_recordatorio AS recordatorio, inscfg_cuenta_bancaria AS cuenta_bancaria
        FROM public.inscripcion_config WHERE inscfg_id = 1`,
   );
   const r = rows[0];
   if (!r) throw new Error('Falta la fila de inscripcion_config (migración 0016)');
   return r;
-}
-
-export async function guardarConfig(
-  client: PoolClient,
-  c: { dia_limite: number; dia_corte: number },
-): Promise<void> {
-  await client.query(
-    `UPDATE public.inscripcion_config
-        SET inscfg_mens_dia_limite = $1, inscfg_mens_dia_corte = $2, inscfg_fecha_modificacion = now()
-      WHERE inscfg_id = 1`,
-    [c.dia_limite, c.dia_corte],
-  );
 }
 
 export interface ColegioConCobro extends ColegioCobro {
@@ -57,8 +43,11 @@ export async function colegios(client?: PoolClient): Promise<ColegioConCobro[]> 
     descuento: string;
     meses: number[];
     desde: string | null;
+    dia_limite: number;
+    dia_corte: number;
   }>(
     `SELECT cp.col_id, c.col_nombre,
+            cp.colpre_mens_dia_limite AS dia_limite, cp.colpre_mens_dia_corte AS dia_corte,
             cp.colpre_precio_disciplina AS precio, cp.colpre_descuento_hermano AS descuento,
             cp.colpre_meses_cobro AS meses,
             to_char(cp.colpre_cobro_desde, 'YYYY-MM-DD') AS desde
@@ -73,22 +62,27 @@ export async function colegios(client?: PoolClient): Promise<ColegioConCobro[]> 
     descuentoHermano: Number(r.descuento),
     meses: [...r.meses].map(Number).sort((a, b) => a - b),
     desde: r.desde,
+    diaLimite: r.dia_limite,
+    diaCorte: r.dia_corte,
   }));
 }
 
+export interface CobroDelColegio {
+  meses: number[];
+  desde: Mes | null;
+  dia_limite: number;
+  dia_corte: number;
+}
+
 /** false si el colegio no tiene precio (no hay fila que actualizar). */
-export async function guardarCobroColegio(
-  client: PoolClient,
-  colId: number,
-  meses: number[],
-  desde: Mes | null,
-): Promise<boolean> {
+export async function guardarCobroColegio(client: PoolClient, colId: number, c: CobroDelColegio): Promise<boolean> {
   const { rowCount } = await client.query(
     `UPDATE public.colegio_precio
         SET colpre_meses_cobro = $2::smallint[], colpre_cobro_desde = $3::date,
+            colpre_mens_dia_limite = $4, colpre_mens_dia_corte = $5,
             colpre_fecha_modificacion = now()
       WHERE col_id = $1`,
-    [colId, meses, desde],
+    [colId, c.meses, c.desde, c.dia_limite, c.dia_corte],
   );
   return (rowCount ?? 0) > 0;
 }

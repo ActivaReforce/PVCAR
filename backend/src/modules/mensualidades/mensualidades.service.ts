@@ -80,7 +80,6 @@ async function calcular(soloDe: number[] | null): Promise<Calculo> {
       grupo.map(aHijo),
       porColegio,
       cuotas.filter((c) => deGrupo.has(c.nino_id)),
-      { diaLimite: config.dia_limite, diaCorte: config.dia_corte },
       hoy,
     );
     for (const [id, lista] of r) meses.set(id, lista);
@@ -104,11 +103,12 @@ export interface PagoVista {
 
 export interface MisMensualidades {
   cuenta_bancaria: string | null;
-  dia_limite: number;
   /** Sus hijos por colegio, con todos sus meses (pagados y por pagar). */
   colegios: Array<{
     col_id: number;
     col_nombre: string;
+    /** Hasta qué día del mes se paga en ese colegio. */
+    dia_limite: number;
     hijos: Array<{ nino_id: number; nombre: string; meses: MesDelHijo[] }>;
   }>;
   pagos: PagoVista[];
@@ -133,13 +133,17 @@ export async function misMensualidades(actor: AuthUser): Promise<MisMensualidade
     const a = calculo.alumnos.get(id);
     const meses = calculo.meses.get(id) ?? [];
     if (!a || meses.length === 0) continue;
-    const col = colegios.get(a.col_id) ?? { col_id: a.col_id, col_nombre: a.col_nombre, hijos: [] };
+    const col = colegios.get(a.col_id) ?? {
+      col_id: a.col_id,
+      col_nombre: a.col_nombre,
+      dia_limite: calculo.colegios.find((c) => c.col_id === a.col_id)?.diaLimite ?? 10,
+      hijos: [],
+    };
     col.hijos.push({ nino_id: id, nombre: a.nombre, meses });
     colegios.set(a.col_id, col);
   }
   return {
     cuenta_bancaria: calculo.config.cuenta_bancaria,
-    dia_limite: calculo.config.dia_limite,
     colegios: [...colegios.values()].sort((x, y) => x.col_nombre.localeCompare(y.col_nombre)),
     pagos: pagos.map(vistaDePago),
   };
@@ -382,34 +386,29 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
 // ---------------------------------------------------------------------------
 // Configuración
 
+/** Lo de cada colegio con valores: sus días y sus meses de cobro (0041, 0042). */
 export async function config() {
   const [c, colegios] = await Promise.all([repo.obtenerConfig(), repo.colegios()]);
   return {
-    dia_limite: c.dia_limite,
-    dia_corte: c.dia_corte,
     recordatorio: c.recordatorio,
-    colegios: colegios.map((x) => ({ col_id: x.col_id, col_nombre: x.col_nombre, meses: x.meses, desde: x.desde })),
+    colegios: colegios.map((x) => ({
+      col_id: x.col_id,
+      col_nombre: x.col_nombre,
+      meses: x.meses,
+      desde: x.desde,
+      dia_limite: x.diaLimite,
+      dia_corte: x.diaCorte,
+    })),
   };
 }
 
-export async function guardarConfig(actor: AuthUser, c: { dia_limite: number; dia_corte: number }): Promise<void> {
+export async function guardarCobroColegio(actor: AuthUser, colId: number, c: repo.CobroDelColegio): Promise<void> {
+  if (c.desde !== null && c.meses.length === 0) throw new ApiError(400, 'Marca al menos un mes de cobro.');
   await enTransaccion(async (client) => {
-    await repo.guardarConfig(client, c);
-    await auditar({ actor, accion: 'editar', entidad: 'mensualidad_config', entidadId: 1, detalle: c }, client);
-  });
-}
-
-export async function guardarCobroColegio(
-  actor: AuthUser,
-  colId: number,
-  meses: number[],
-  desde: Mes | null,
-): Promise<void> {
-  await enTransaccion(async (client) => {
-    const hecho = await repo.guardarCobroColegio(client, colId, meses, desde);
+    const hecho = await repo.guardarCobroColegio(client, colId, c);
     if (!hecho) throw new ApiError(404, 'Ese colegio no tiene valores configurados.');
     await auditar(
-      { actor, accion: 'editar', entidad: 'mensualidad_colegio', entidadId: colId, detalle: { meses, desde } },
+      { actor, accion: 'editar', entidad: 'mensualidad_colegio', entidadId: colId, detalle: { ...c } },
       client,
     );
   });

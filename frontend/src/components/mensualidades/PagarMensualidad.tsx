@@ -202,7 +202,8 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
           <div>
             <h2 className="text-lg font-semibold">Pagar mensualidad</h2>
             <p className="text-sm text-muted-foreground">
-              Marca lo que vas a pagar. Se paga hasta el día {datos.dia_limite} de cada mes.
+              Marca lo que vas a pagar.
+              {datos.colegios.length === 1 && ` Se paga hasta el día ${datos.colegios[0]!.dia_limite} de cada mes.`}
             </p>
           </div>
 
@@ -211,7 +212,11 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
             if (hijos.length === 0) return null;
             return (
               <div key={c.col_id} className="space-y-3">
-                {datos.colegios.length > 1 && <p className="text-sm font-semibold text-muted-foreground">{c.col_nombre}</p>}
+                {datos.colegios.length > 1 && (
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    {c.col_nombre} <span className="font-normal">· se paga hasta el día {c.dia_limite}</span>
+                  </p>
+                )}
                 {hijos.map((h) => (
                   <div key={h.nino_id} className="rounded-md bg-muted/40 p-3">
                     <p className="mb-2 font-medium">{h.nombre}</p>

@@ -730,7 +730,9 @@ const Inscripcion = () => {
           <Aviso titulo="No se pudieron cargar tus datos">Revisa tu conexión y recarga la página.</Aviso>
         )}
 
-        {formulario.data?.disponible && !resultado && modo !== 'inicio' && !(modo === 'cuenta' && !misDatos.data) && (
+        {formulario.data?.disponible &&
+          !resultado &&
+          (modo === 'nuevo' || (modo === 'cuenta' && misDatos.data)) && (
           <div className="space-y-5">
             <ol className="grid grid-cols-5 gap-2" aria-label="Pasos">
               {PASOS.map((nombre, i) => (

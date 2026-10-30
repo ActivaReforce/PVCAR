@@ -7,7 +7,6 @@ import * as service from './mensualidades.service.js';
 import {
   cobroColegioSchema,
   colIdParamSchema,
-  configSchema,
   idParamSchema,
   listarPagosSchema,
   mesQuerySchema,
@@ -166,30 +165,15 @@ mensualidadesRouter.get(
 );
 
 mensualidadesRouter.put(
-  '/config',
-  personal,
-  requirePermission('inscripciones', 'editar'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const input = configSchema.parse(req.body);
-      await service.guardarConfig(actor(req), input);
-      res.json({ data: input, error: null });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-mensualidadesRouter.put(
   '/config/colegios/:colId',
   personal,
   requirePermission('inscripciones', 'editar'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { colId } = colIdParamSchema.parse(req.params);
-      const { meses, desde } = cobroColegioSchema.parse(req.body);
-      await service.guardarCobroColegio(actor(req), colId, meses, desde);
-      res.json({ data: { col_id: colId, meses, desde }, error: null });
+      const input = cobroColegioSchema.parse(req.body);
+      await service.guardarCobroColegio(actor(req), colId, input);
+      res.json({ data: { col_id: colId, ...input }, error: null });
     } catch (err) {
       next(err);
     }

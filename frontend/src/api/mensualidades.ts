@@ -29,10 +29,10 @@ export interface PagoVista {
 
 export interface MisMensualidades {
   cuenta_bancaria: string | null;
-  dia_limite: number;
   colegios: Array<{
     col_id: number;
     col_nombre: string;
+    dia_limite: number;
     hijos: Array<{ nino_id: number; nombre: string; meses: MesDelHijo[] }>;
   }>;
   pagos: PagoVista[];
@@ -115,11 +115,16 @@ export interface EstadoDelMes {
   }>;
 }
 
-export interface ConfigMensualidades {
+export interface CobroDelColegio {
+  meses: number[];
+  desde: string | null;
   dia_limite: number;
   dia_corte: number;
+}
+
+export interface ConfigMensualidades {
   recordatorio: boolean;
-  colegios: Array<{ col_id: number; col_nombre: string; meses: number[]; desde: string | null }>;
+  colegios: Array<CobroDelColegio & { col_id: number; col_nombre: string }>;
 }
 
 export const mensualidadesApi = {
@@ -156,8 +161,7 @@ export const mensualidadesApi = {
   },
 
   config: () => api.get<ConfigMensualidades>('/mensualidades/config'),
-  guardarConfig: (c: { dia_limite: number; dia_corte: number }) => api.put<typeof c>('/mensualidades/config', c),
-  guardarCobroColegio: (colId: number, c: { meses: number[]; desde: string | null }) =>
+  guardarCobroColegio: (colId: number, c: CobroDelColegio) =>
     api.put<{ col_id: number }>(`/mensualidades/config/colegios/${colId}`, c),
 };
 

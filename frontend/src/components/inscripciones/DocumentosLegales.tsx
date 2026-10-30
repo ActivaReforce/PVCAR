@@ -175,6 +175,7 @@ const DocumentosLegales = () => {
         <TabsList>
           <TabsTrigger value="generales">Generales</TabsTrigger>
           <TabsTrigger value="colegio">Por colegio</TabsTrigger>
+          <TabsTrigger value="mensualidades">Mensualidades</TabsTrigger>
           <TabsTrigger value="configuracion">Más</TabsTrigger>
         </TabsList>
         <TabsContent value="generales" className="space-y-3 pt-3">
@@ -187,6 +188,9 @@ const DocumentosLegales = () => {
         </TabsContent>
         <TabsContent value="colegio" className="pt-3">
           <PorColegio datos={documentos.data} />
+        </TabsContent>
+        <TabsContent value="mensualidades" className="pt-3">
+          <ConfigMensualidades />
         </TabsContent>
         <TabsContent value="configuracion" className="space-y-3 pt-3">
           <CuentaBancaria />
@@ -202,7 +206,6 @@ const DocumentosLegales = () => {
             descripcion="Sale al aprobar. Llega al representante con sus documentos aprobados."
           />
           <MaxDisciplinas />
-          <ConfigMensualidades />
           <Membrete />
         </TabsContent>
       </Tabs>

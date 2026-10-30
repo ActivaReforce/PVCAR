@@ -144,23 +144,31 @@ export const EntradaInscripcion = ({
         <p className="flex items-center gap-2 text-lg font-semibold">
           <UserRound className="h-5 w-5" /> Hola, {user.usu_nombre}
         </p>
-        <p className="text-sm text-muted-foreground">
-          Ya iniciaste sesión en este navegador. ¿Qué quieres hacer?
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <p className="text-sm text-muted-foreground">Ya iniciaste sesión en este navegador. ¿Qué quieres hacer?</p>
+        <div className="grid gap-3 sm:grid-cols-2">
           {abiertas && (
-            <Button className="h-12 sm:h-10" onClick={onCuenta}>
-              Continuar con mi cuenta
+            <Button variant="outline" className="h-auto min-h-16 justify-start gap-3 py-3 text-left" onClick={onCuenta}>
+              <LogIn className="h-5 w-5 flex-shrink-0" />
+              <span className="min-w-0 whitespace-normal">
+                <span className="block font-medium">Continuar con mi cuenta</span>
+                <span className="block text-xs font-normal text-muted-foreground">
+                  Para inscribir a otro hijo o agregar disciplinas
+                </span>
+              </span>
             </Button>
           )}
-          <Button variant={abiertas ? 'outline' : 'default'} className="h-12 sm:h-10" onClick={onPagar}>
-            <Receipt className="mr-2 h-4 w-4" /> Pagar mensualidad
-          </Button>
-          {/* Sin cerrar su sesión: el formulario va como anónimo (sinSesion). */}
-          <Button variant="ghost" className="h-12 sm:h-10" onClick={() => setNoSoy(true)}>
-            No soy {primerNombre}
+          <Button variant="outline" className="h-auto min-h-16 justify-start gap-3 py-3 text-left" onClick={onPagar}>
+            <Receipt className="h-5 w-5 flex-shrink-0" />
+            <span className="min-w-0 whitespace-normal">
+              <span className="block font-medium">Pagar mensualidad</span>
+              <span className="block text-xs font-normal text-muted-foreground">De mis hijos ya inscritos</span>
+            </span>
           </Button>
         </div>
+        {/* Sin cerrar su sesión: el formulario va como anónimo (sinSesion). */}
+        <Button variant="link" className="h-11 px-0" onClick={() => setNoSoy(true)}>
+          No soy {primerNombre}
+        </Button>
       </div>
     );
   }
@@ -209,14 +217,14 @@ export const EntradaInscripcion = ({
             <>
               <Button variant="outline" className="h-auto min-h-16 justify-start gap-3 py-3 text-left" onClick={() => onNuevo('')}>
                 <UserPlus className="h-5 w-5 flex-shrink-0" />
-                <span>
+                <span className="min-w-0 whitespace-normal">
                   <span className="block font-medium">Es mi primera vez</span>
                   <span className="block text-xs font-normal text-muted-foreground">Nunca inscribí a nadie en Activa Reforce</span>
                 </span>
               </Button>
               <Button variant="outline" className="h-auto min-h-16 justify-start gap-3 py-3 text-left" onClick={() => setBuscando(true)}>
                 <LogIn className="h-5 w-5 flex-shrink-0" />
-                <span>
+                <span className="min-w-0 whitespace-normal">
                   <span className="block font-medium">Ya inscribí antes</span>
                   <span className="block text-xs font-normal text-muted-foreground">Quiero añadir disciplinas o inscribir a otro hijo</span>
                 </span>
@@ -229,7 +237,7 @@ export const EntradaInscripcion = ({
             onClick={() => setPagando(true)}
           >
             <Receipt className="h-5 w-5 flex-shrink-0" />
-            <span>
+            <span className="min-w-0 whitespace-normal">
               <span className="block font-medium">Pagar mensualidad</span>
               <span className="block text-xs font-normal text-muted-foreground">Mis hijos ya están inscritos</span>
             </span>

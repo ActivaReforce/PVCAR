@@ -31,14 +31,11 @@ export const rechazarPagoSchema = z.object({
   motivo: z.string().trim().min(1, 'Escribe el motivo').max(500),
 });
 
-export const configSchema = z.object({
-  dia_limite: z.number().int().min(1).max(28),
-  dia_corte: z.number().int().min(1).max(28),
-});
-
 export const cobroColegioSchema = z.object({
   meses: z.array(z.number().int().min(1).max(12)).max(12).transform((m) => [...new Set(m)].sort((a, b) => a - b)),
   desde: mes.nullable(),
+  dia_limite: z.number().int().min(1).max(28),
+  dia_corte: z.number().int().min(1).max(28),
 });
 
 export const mesQuerySchema = z.object({

@@ -6,7 +6,7 @@ import { IVA_PCT, calcularCobro, type PrecioColegio } from '../inscripciones/ins
  *
  * Reglas del cliente (2026-10-30):
  *   - La inscripción paga el primer mes de lo que trae. Enviada desde el
- *     día de corte (hora de Ecuador), paga el mes siguiente: quien se
+ *     día de corte de su colegio (hora de Ecuador), paga el mes siguiente: quien se
  *     inscribe el 25 de enero empieza en febrero.
  *   - Cada colegio cobra solo sus meses marcados; los demás quedan en pausa.
  *     Y solo desde su "cobrar desde": lo inscrito antes cubre ese mes.
@@ -24,16 +24,15 @@ import { IVA_PCT, calcularCobro, type PrecioColegio } from '../inscripciones/ins
 
 export type Mes = string; // 'YYYY-MM-01'
 
-export interface ConfigCobro {
-  diaLimite: number;
-  diaCorte: number;
-}
-
 export interface ColegioCobro extends PrecioColegio {
   /** 1-12. Vacío = no cobra. */
   meses: number[];
   /** Primer mes que cobra. null = no cobra. */
   desde: Mes | null;
+  /** Hasta qué día del mes se paga sin atraso. */
+  diaLimite: number;
+  /** Desde qué día una inscripción paga el mes siguiente. */
+  diaCorte: number;
 }
 
 export interface DisciplinaDelHijo {
@@ -95,10 +94,10 @@ export const cobraEn = (col: ColegioCobro, mes: Mes): boolean =>
   col.desde !== null && mes >= col.desde && col.meses.includes(numeroDeMes(mes));
 
 /** El primer mes que paga una disciplina que empezó en `fecha`. null si el colegio no cobra. */
-export function primerMes(fecha: string, col: ColegioCobro, diaCorte: number): Mes | null {
+export function primerMes(fecha: string, col: ColegioCobro): Mes | null {
   if (col.desde === null || col.meses.length === 0) return null;
   let mes = mesDe(fecha);
-  if (Number(fecha.slice(8, 10)) >= diaCorte) mes = sumarMeses(mes, 1);
+  if (Number(fecha.slice(8, 10)) >= col.diaCorte) mes = sumarMeses(mes, 1);
   if (mes < col.desde) mes = col.desde;
   for (let i = 0; i < 12; i++) {
     if (col.meses.includes(numeroDeMes(mes))) return mes;
@@ -126,7 +125,6 @@ export function mesesDeLaFamilia(
   hijos: HijoCobro[],
   colegios: Map<number, ColegioCobro>,
   registradas: CuotaRegistrada[],
-  config: ConfigCobro,
   hoy: string,
 ): Map<number, MesDelHijo[]> {
   const actual = mesDe(hoy);
@@ -140,7 +138,7 @@ export function mesesDeLaFamilia(
     const lista: Array<{ d: DisciplinaDelHijo; desde: Mes }> = [];
     if (col) {
       for (const d of h.disciplinas) {
-        const desde = primerMes(d.inicio, col, config.diaCorte);
+        const desde = primerMes(d.inicio, col);
         if (desde !== null && desde <= actual) lista.push({ d, desde });
       }
     }
@@ -200,7 +198,7 @@ export function mesesDeLaFamilia(
       } else if (a.cobradas.length === 0) {
         fila = { ...base, estado: 'inscripcion', disciplinas: [], subtotal: 0, descuento: 0, iva: 0, total: 0, menpag_id: null };
       } else {
-        const atrasado = mes < actual || dia > config.diaLimite;
+        const atrasado = mes < actual || dia > a.col.diaLimite;
         fila = {
           ...base,
           estado: atrasado ? 'atrasado' : 'pendiente',
