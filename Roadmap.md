@@ -75,6 +75,23 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
 
+### Corte de sesión — 2026-10-30, cierre (Mensualidades, se retoma el 2026-10-31)
+
+**Si pregunta "¿en qué nos quedamos?", es esto.** Mensualidades sigue en `dev`, **sin PR a `main`**. Mañana se continúa con Mensualidades; el cliente aún tiene otros cambios que pedir.
+
+- **Diseño y reglas:** `docs/mensualidades.md` (manda). Cada mes de cada alumno es una cuota; la inscripción paga el primer mes ("Pagado (Inscripción)"); día de corte, día límite, meses de cobro (pausa) y "cobrar desde", **todo por colegio**; atrasado sin bloquear; sin pago adelantado; descuento de hermano con toda la familia; rechazo con motivo y "Volver a intentar" que lo borra.
+- **SQL:** `0041`, `0042` y `0043_mensualidades_quitar_dias_generales.sql` (quita las `inscfg_mens_dia_*` sin uso) **aplicadas y verificadas en dev** (la 0043 verificada por MCP el 2026-10-30). **En prod no está ninguna:** van las tres, en orden (0041 → 0042 → 0043), antes del merge a `main`.
+- **En `dev`** (commits `cd094ba` y `1bb3ebd`): backend `modules/mensualidades` (cálculo puro con 15 tests); padre en Inscripciones → pestaña Mensualidades (casillas por hijo y mes, total en vivo, comprobante, historial); `/inscripcion` con "Pagar mensualidad" en la entrada (con y sin sesión, tarjetas iguales, "No soy [nombre]" como enlace); personal en Inscripciones → Mensualidades (pagos por revisar con aprobar/rechazar, estado del mes por colegio); Configuración → pestaña Mensualidades (colegio, Valores, Meses de cobro). También en `dev`: disciplinas activas fuera de curso se ven como "Ya inscrito" (`440ce51`).
+- **Falta construir:** pestaña Mensualidades en Reportes → Inscripciones (pantalla y Excel) y el recordatorio por correo (columna y remitente ya en la 0041).
+- **Preguntas hechas al cliente, sin respuesta todavía** (retomar por aquí):
+  1. Cambiar de disciplina desde Mensualidades: ¿el representante puede, o solo el personal desde Estudiantes?
+  2. Recordatorio: ¿cuándo sale (días antes del límite, el día límite, al quedar atrasado)?, ¿uno solo o se repite?, ¿solo al representante o copia al personal?
+  3. Reporte: propuesta por alumno y mes (colegio, estado, importe, total recaudado y por cobrar). ¿Así o por familia?
+  4. Prod: "cobrar desde" = noviembre 2026, ¿para todos los colegios?
+- **Sin probar en pantalla por el cliente:** todo lo de Mensualidades.
+- **Hecho hoy aparte, en producción desde el PR #25** (sin SQL, sin Mensualidades): un entrenador puede dar varias disciplinas a la misma hora; al asignar (aviso ámbar en la lista + toast) o al editar horarios sale un aviso del cruce y se guarda igual. Los alumnos siguen sin poder cruzarse. Revisado: auxiliares y asistencia de personal (upsert por día y colegio) no fallan. Le falta al cliente verlo en pantalla (aviso en móvil y oscuro).
+- **Ojo al hacer el PR de Mensualidades:** `dev` y `main` llevan cada uno su copia del cambio del entrenador (cherry-pick); el merge de `dev` a `main` puede dar conflicto en `Roadmap.md` (sección del 2026-10-30 de `main`): quedarse con la de `dev`.
+
 ### Corte de sesión — 2026-10-20
 
 **Hecho hoy (en producción desde el PR #22, con `0040` en dev y prod):** notas de los hijos para el representante (card en el tablero + pestaña "Mis hijos" con Evaluaciones → Ver; detalle en modal), observaciones extra por alumno (formulario → ficha y borde ámbar en /inscripciones → `nino_observacion_extra`, editable solo por el Propietario en /estudiantes, con filo ámbar en la lista), número rojo de Inscripciones solo para el Propietario, y la inscripción reintenta sola si se corta la conexión (`Idempotency-Key`).
