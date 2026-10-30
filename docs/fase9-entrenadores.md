@@ -45,7 +45,7 @@ Este módulo no da de alta personas — un entrenador **es** un usuario con el r
 **Decidido por el cliente el 2026-10-02 (al probar la Fase 8):** el asistente con varios titulares, al entrar, **elige de quién quiere ver** —un selector arriba, con la opción **"Todos"**— y lo puede cambiar cuando quiera. Hereda todas las disciplinas de cada titular. Se construye antes de abrir la Fase 9, junto con:
 
 - quitar el 409 de "ya respalda a otro" y poner unicidad parcial `(usu_id, ent_id) WHERE est_id = 1` (migración nueva);
-- **aviso de choque de horario** al asignar: el mismo entrenador con dos disciplinas a la misma hora el mismo día, aunque sean de colegios distintos (hoy nada lo impide).
+- ~~aviso de choque de horario al asignar~~: descartado (cliente, 2026-10-30). Un entrenador puede dar varias disciplinas a la misma hora el mismo día.
 
 ---
 

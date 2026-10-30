@@ -2,7 +2,6 @@ import type { PoolClient } from 'pg';
 import { alcanceDe, alcanzaColegio } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
-import { crucesEntre, describirCruce, disciplinasAbiertasDeEntrenador } from '../../lib/horarios.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { firmarFoto, firmarFotos } from '../../lib/storage.js';
 import { enTransaccion } from '../../lib/tx.js';
@@ -199,13 +198,9 @@ export async function asignar(
       input.desde ?? null,
     );
 
-    const cruces = await crucesEntre(await disciplinasAbiertasDeEntrenador(entId, client), client);
-    const cruce = cruces.find((c) => c.a === input.colacthor_id || c.b === input.colacthor_id);
-    if (cruce) {
-      throw new ApiError(409, `Se le cruza con otra disciplina que ya da: ${describirCruce(cruce)}.`, {
-        cruce,
-      });
-    }
+    // Sin control de cruce de horario: un entrenador puede dar varias
+    // disciplinas a la misma hora (Futbol Sub 8 y Sub 10 juntas en la cancha;
+    // cliente, 2026-10-30). Cada una guarda su asignacion y su historia.
 
     await auditar(
       {

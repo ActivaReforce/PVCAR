@@ -38,8 +38,6 @@ let ocupadaPor: { entasig_id: number; ent_id: number; usu_nombre: string } | nul
 let rolAuxiliar: number | null = ROL.ASISTENTE;
 let auxiliarYaAtado: { entaux_id: number; ent_id: number; usu_nombre: string } | null = null;
 
-let cruzada = false;
-
 const query = vi.fn(async (sql: string, params: unknown[] = []) => {
   if (sql.includes('WITH col_coordinador')) {
     return { rows: [{ colegios: [14], disciplinas: [60] }] };
@@ -62,16 +60,6 @@ const query = vi.fn(async (sql: string, params: unknown[] = []) => {
   if (sql.includes('FROM public.entrenador_auxiliar aux') && sql.includes('LIMIT 1')) {
     // Solo cuenta si ya esta atado a ESTE titular ($3).
     return { rows: auxiliarYaAtado && auxiliarYaAtado.ent_id === params[2] ? [auxiliarYaAtado] : [] };
-  }
-  if (sql.includes('entasig_fecha_fin IS NULL') && sql.includes('ea.ent_id = $1')) {
-    return { rows: [{ colacthor_id: 135 }, { colacthor_id: 136 }] };
-  }
-  if (sql.includes('OVERLAPS')) {
-    return {
-      rows: cruzada
-        ? [{ a: 135, b: 136, a_nombre: 'Karate — X (Lun 15:00–16:00)', b_nombre: 'Danza — Y (Lun 15:30–16:30)', dia_nombre: 'Lunes' }]
-        : [],
-    };
   }
   if (sql.includes('RETURNING entasig_id')) return { rows: [{ entasig_id: 500 }] };
   if (sql.includes('RETURNING entaux_id')) return { rows: [{ entaux_id: 600 }] };
@@ -104,7 +92,6 @@ const coordinadora = {
 } as never;
 
 beforeEach(() => {
-  cruzada = false;
   entrenadorActual = ENTRENADOR;
   disciplina = { colacthor_id: 60, col_id: 14, est_id: 1 };
   yaLaTiene = false;
@@ -192,12 +179,12 @@ describe('asignar', () => {
     expect(sqls.some((s) => s.includes('RETURNING entasig_id'))).toBe(true);
   });
 
-  it('no deja darle una disciplina que se le cruza con otra suya, y dice cual', async () => {
-    cruzada = true;
-    await expect(service.asignar(coordinadora, 76, { colacthor_id: 135 })).rejects.toMatchObject({
-      statusCode: 409,
-      message: expect.stringContaining('se cruzan el lunes'),
-    });
+  it('le deja dar dos disciplinas a la misma hora: no mira cruces de horario', async () => {
+    await service.asignar(coordinadora, 76, { colacthor_id: 60 });
+
+    const sqls = query.mock.calls.map((c) => String(c[0]));
+    expect(sqls.some((s) => s.includes('RETURNING entasig_id'))).toBe(true);
+    expect(sqls.some((s) => s.includes('OVERLAPS'))).toBe(false);
   });
 });
 
