@@ -106,6 +106,19 @@ export async function disciplinasActivasDeNino(
   return rows.map((r) => r.colacthor_id);
 }
 
+/** Disciplinas que el entrenador tiene abiertas. */
+export async function disciplinasAbiertasDeEntrenador(
+  entId: number,
+  client?: PoolClient,
+): Promise<number[]> {
+  const { rows } = await (client ?? getPool()).query<{ colacthor_id: number }>(
+    `SELECT ea.colacthor_id FROM public.entrenador_asignacion ea
+      WHERE ea.ent_id = $1 AND ea.est_id = $2 AND ea.entasig_fecha_fin IS NULL`,
+    [entId, ESTADO.ACTIVO],
+  );
+  return rows.map((r) => r.colacthor_id);
+}
+
 /** "Fútbol — Colegio X (Lun 15:00–16:00) y Danza — … se cruzan el Lunes". */
 export function describirCruce(c: Cruce): string {
   return `${c.a_nombre} y ${c.b_nombre} se cruzan el ${c.dia_nombre.toLowerCase()}`;
@@ -114,8 +127,9 @@ export function describirCruce(c: Cruce): string {
 /**
  * Alumnos activos que quedarian cruzados si la disciplina `colacthorId`
  * tuviera los horarios que ya tiene escritos (se llama dentro de la
- * transaccion, despues de reemplazarlos). Los entrenadores no cuentan: pueden
- * dar varias disciplinas a la vez (cliente, 2026-10-30).
+ * transaccion, despues de reemplazarlos). Los entrenadores no cuentan aqui:
+ * pueden dar varias disciplinas a la vez (cliente, 2026-10-30); a ellos se les
+ * avisa con `entrenadoresCruzados`.
  */
 export async function alumnosCruzados(client: PoolClient, colacthorId: number): Promise<string[]> {
   const { rows } = await client.query<{ nombre: string }>(
@@ -132,6 +146,34 @@ export async function alumnosCruzados(client: PoolClient, colacthorId: number): 
     [colacthorId, ESTADO.ACTIVO],
   );
   return rows.map((r) => r.nombre);
+}
+
+/**
+ * Entrenadores que, con los horarios ya escritos de `colacthorId`, la dan a
+ * la vez que otra suya: "Ricardo Moya (con Futbol Sub 8 — Colegio X, el
+ * lunes)". Solo es un aviso, no bloquea (cliente, 2026-10-30).
+ */
+export async function entrenadoresCruzados(client: PoolClient, colacthorId: number): Promise<string[]> {
+  const { rows } = await client.query<{ texto: string }>(
+    `SELECT DISTINCT u.usu_nombre || ' (con ' || act.act_nombre || ' — ' || col.col_nombre
+              || ', el ' || lower(dd.dia_nombre) || ')' AS texto
+       FROM public.entrenador_asignacion yo
+       JOIN public.usuario u ON u.usu_id = yo.ent_id
+       JOIN public.entrenador_asignacion otra
+         ON otra.ent_id = yo.ent_id AND otra.colacthor_id <> yo.colacthor_id
+        AND otra.est_id = $2 AND otra.entasig_fecha_fin IS NULL
+       JOIN public.colegio_actividad_horario x ON x.colacthor_id = otra.colacthor_id
+       JOIN public.actividad act ON act.act_id = x.act_id
+       JOIN public.colegio col ON col.col_id = x.col_id
+       JOIN public.disciplina_horario a ON a.colacthor_id = yo.colacthor_id
+       JOIN public.disciplina_horario b ON b.colacthor_id = otra.colacthor_id AND b.dia_id = a.dia_id
+        AND (a.dishor_hora_inicio, a.dishor_hora_fin) OVERLAPS (b.dishor_hora_inicio, b.dishor_hora_fin)
+       JOIN public.dia dd ON dd.dia_id = a.dia_id
+      WHERE yo.colacthor_id = $1 AND yo.est_id = $2 AND yo.entasig_fecha_fin IS NULL
+      ORDER BY 1`,
+    [colacthorId, ESTADO.ACTIVO],
+  );
+  return rows.map((r) => r.texto);
 }
 
 /**

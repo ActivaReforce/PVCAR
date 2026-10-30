@@ -44,6 +44,11 @@ export interface AuxiliarDesvinculado {
 export interface CambioDeAsignacion {
   asignaciones: Asignacion[];
   auxiliares_desvinculados: AuxiliarDesvinculado[];
+  /**
+   * Al asignar, con qué otras suyas se cruza: solo un aviso, ya quedó
+   * guardada. Opcional: Vercel publica antes que Railway.
+   */
+  cruces_de_horario?: string[];
 }
 
 export interface Asignacion {

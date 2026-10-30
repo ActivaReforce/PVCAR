@@ -151,7 +151,9 @@ it('cada consulta manda tantos valores como marcadores, y sin huecos', async () 
   for (const [nombre, llamada] of [
     ['crucesEntre', () => horarios.crucesEntre([1, 2], cliente as never)],
     ['disciplinasActivasDeNino', () => horarios.disciplinasActivasDeNino(1, cliente as never)],
+    ['disciplinasAbiertasDeEntrenador', () => horarios.disciplinasAbiertasDeEntrenador(1, cliente as never)],
     ['alumnosCruzados', () => horarios.alumnosCruzados(cliente as never, 1)],
+    ['entrenadoresCruzados', () => horarios.entrenadoresCruzados(cliente as never, 1)],
   ] as const) {
     actual = { modulo: 'lib', fn: nombre, variante: 0 };
     try {

@@ -57,17 +57,26 @@ function mensajeDe(error: unknown): string {
  * auxiliares: lo que ven en Disciplinas, Estudiantes y Asistencias deja de ser
  * válido. Por eso se invalida todo, no solo la lista de entrenadores.
  */
-function useMutacion<TVars, TData>(fn: (vars: TVars) => Promise<TData>, exito: string) {
+interface Exito {
+  title: string;
+  description?: string;
+}
+
+function useMutacion<TVars, TData>(
+  fn: (vars: TVars) => Promise<TData>,
+  exito: string | ((data: TData) => Exito),
+) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: fn,
-    onSuccess: async () => {
+    onSuccess: async (data: TData) => {
       await queryClient.invalidateQueries({ queryKey: ['entrenadores'] });
       await queryClient.invalidateQueries({ queryKey: ['disciplinas'] });
       await queryClient.invalidateQueries({ queryKey: ['colegios'] });
-      toast({ title: exito });
+      // Un solo toast a la vez (TOAST_LIMIT = 1): el aviso va en el de éxito.
+      toast(typeof exito === 'string' ? { title: exito } : exito(data));
     },
     onError: (error: unknown) => {
       toast({
@@ -87,7 +96,13 @@ export function useAsignarDisciplina() {
       avisar(r.auxiliares_desvinculados);
       return r;
     },
-    'Disciplina asignada',
+    (r) =>
+      r.cruces_de_horario?.length
+        ? {
+            title: 'Disciplina asignada, con cruce de horario',
+            description: `${r.cruces_de_horario.join('. ')}. Se guardó igual: las dará a la vez.`,
+          }
+        : { title: 'Disciplina asignada' },
   );
 }
 

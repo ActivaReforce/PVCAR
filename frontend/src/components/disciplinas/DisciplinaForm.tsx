@@ -159,7 +159,7 @@ const DisciplinaForm = ({ disciplina, onSuccess, onCancel }: Props) => {
             {disciplina.evaluaciones > 0 && ` y ${disciplina.evaluaciones} evaluaciones`}. Cambiar
             los días o las horas no mueve las asistencias ya registradas: quedan con su fecha. Si
             el cambio cruza a algún alumno con su otra disciplina, no se guardará y te dirá a
-            quién.
+            quién. Si deja al entrenador con dos clases a la vez, se guarda y te avisa.
           </p>
         </div>
       )}
