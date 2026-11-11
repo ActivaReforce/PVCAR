@@ -20,6 +20,10 @@ const envSchema = z.object({
   // Correo propio de la aplicacion (Resend). Opcionales: sin ellas, lo que
   // manda correo sigue funcionando y avisa de que no salio.
   RESEND_API_KEY: z.string().optional(),
+  // Comunicados (Resend Broadcasts): contactos, segmentos y broadcasts piden
+  // una key de acceso completo; la de arriba solo envia. Sin ella, Comunicados
+  // deja escribir y guardar, pero no enviar.
+  RESEND_API_KEY_BROADCASTS: z.string().optional(),
   // Dominio verificado en Resend. El remitente de cada tipo (nombre y parte
   // local) lo configura el Propietario en la tabla correo_config.
   CORREO_DOMINIO: z.string().trim().toLowerCase().optional(),

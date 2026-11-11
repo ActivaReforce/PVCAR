@@ -26,8 +26,8 @@ describe('contar los correos enviados', () => {
     expect(query).toHaveBeenCalledTimes(1);
     const [sql, params] = query.mock.calls[0]!;
     expect(sql).toContain("AT TIME ZONE 'America/Guayaquil'");
-    expect(sql).toContain('cordia_enviados + 1');
-    expect(params).toEqual(['ausencias']);
+    expect(sql).toContain('cordia_enviados + $2');
+    expect(params).toEqual(['ausencias', 1]);
   });
 
   it('si Resend lo rechaza no cuenta', async () => {

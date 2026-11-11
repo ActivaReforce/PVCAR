@@ -37,6 +37,8 @@ const NOMBRE_CORREO: Record<string, string> = {
   novedades: 'novedades',
   ausencias: 'ausencias',
   recuperar_contrasena: 'recuperar contraseña',
+  comunicados: 'comunicados',
+  comunicados_prueba: 'pruebas de comunicados',
 };
 
 /** "3 ausencias · 1 novedades": de dónde salieron los de hoy. */

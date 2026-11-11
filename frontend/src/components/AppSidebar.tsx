@@ -33,7 +33,8 @@ import {
   UserRound,
   ShieldCheck,
   FileSignature,
-  Megaphone
+  Megaphone,
+  Mail
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -105,12 +106,17 @@ export function AppSidebar() {
     { title: "Inscripciones", path: "/inscripciones", icon: FileSignature, module: "inscripciones" },
     { title: "Encuestas", path: "/encuestas", icon: MessageSquare, module: "encuestas" },
     { title: "Novedades", path: "/novedades", icon: Megaphone, module: "novedades" },
+    // Sin casilla en Permisos: solo el rol Propietario (2026-11-11).
+    { title: "Comunicados", path: "/comunicados", icon: Mail, module: "comunicados", soloPropietario: true },
     { title: "Reportes", path: "/reportes", icon: BarChart3, module: "reportes" },
     { title: "Perfil", path: "/perfil", icon: User, module: "perfil" },
     { title: "Permisos", path: "/permisos", icon: ShieldCheck, module: "permisos" },
   ];
 
-  const mainMenuItems = allMenuItems.filter(item => hasPermission(item.module));
+  const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
+  const mainMenuItems = allMenuItems.filter((item) =>
+    "soloPropietario" in item && item.soloPropietario ? esPropietario : hasPermission(item.module),
+  );
 
   return (
     <Sidebar>

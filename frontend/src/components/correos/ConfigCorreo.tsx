@@ -19,6 +19,8 @@ interface Props {
   conPara?: boolean;
   /** Casillas de "Notificar también" que enseña; ninguna si no se pasa. */
   avisos?: Aviso[];
+  /** Sin "Con copia a": Comunicados sale por Broadcasts, que no admite copias. */
+  sinCopias?: boolean;
 }
 
 type CampoAviso = 'notificar_mencionado' | 'notificar_representante';
@@ -53,6 +55,7 @@ const ConfigCorreo = ({
   descripcion,
   conPara = false,
   avisos: AVISOS = [],
+  sinCopias = false,
 }: Props) => {
   const conAvisos = AVISOS.length > 0;
   const { user, hasPermission } = useAuth();
@@ -92,7 +95,7 @@ const ConfigCorreo = ({
 
   const para = conPara ? lineas(destinatarios) : [];
   const paraMalos = para.filter((c) => !CORREO.test(c));
-  const cc = lineas(copias);
+  const cc = sinCopias ? [] : lineas(copias);
   const ccMalos = cc.filter((c) => !CORREO.test(c));
   const usuarioLimpio = usuario.trim().toLowerCase();
   const responder = responderA.trim().toLowerCase();
@@ -168,6 +171,7 @@ const ConfigCorreo = ({
           </div>
         )}
 
+        {!sinCopias && (
         <div className="space-y-1.5">
           <Label htmlFor={`correo-cc-${tipo}`}>Con copia a</Label>
           <Textarea
@@ -183,6 +187,7 @@ const ConfigCorreo = ({
             Un correo por línea, hasta 10. Quien recibe el correo ve estas direcciones.
           </p>
         </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor={`correo-responder-${tipo}`}>Las respuestas van a</Label>

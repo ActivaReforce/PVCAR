@@ -34,14 +34,14 @@ export interface Correo {
  * "Correos enviados hoy" del tablero. Una fila por día y tipo, no por correo.
  * Nunca lanza: un contador que falla no es motivo para dar un envío por malo.
  */
-export async function contarEnvio(tipo: string): Promise<void> {
+export async function contarEnvio(tipo: string, cuantos = 1): Promise<void> {
   try {
     await getPool().query(
       `INSERT INTO public.correo_diario (cordia_dia, cordia_tipo, cordia_enviados)
-       VALUES (${HOY_EC}, $1, 1)
+       VALUES (${HOY_EC}, $1, $2)
        ON CONFLICT (cordia_dia, cordia_tipo)
-       DO UPDATE SET cordia_enviados = public.correo_diario.cordia_enviados + 1`,
-      [tipo],
+       DO UPDATE SET cordia_enviados = public.correo_diario.cordia_enviados + $2`,
+      [tipo, cuantos],
     );
   } catch (err) {
     console.error('No se pudo contar el correo enviado:', err);

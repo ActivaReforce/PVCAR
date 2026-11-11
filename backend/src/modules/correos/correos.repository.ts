@@ -13,8 +13,10 @@ import { getPool } from '../../config/db.js';
  * ausencias            — aviso automático de ausencia y su corrección (punto
  *                        9): a la lista fija `para` + CC; con
  *                        `notificar_representante`, también al representante.
+ * comunicados          — remitente único de Comunicados (2026-11-11). Sin
+ *                        copias: un broadcast no las admite.
  */
-export const TIPOS_CORREO = ['inscripciones', 'inscripciones_aviso', 'novedades', 'ausencias'] as const;
+export const TIPOS_CORREO = ['inscripciones', 'inscripciones_aviso', 'novedades', 'ausencias', 'comunicados'] as const;
 export type TipoCorreo = (typeof TIPOS_CORREO)[number];
 
 export interface ConfigCorreo {

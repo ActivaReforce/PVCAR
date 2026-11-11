@@ -28,6 +28,7 @@ import {
   inscripcionesRouter,
 } from './modules/inscripciones/inscripciones.routes.js';
 import { mensualidadesRouter } from './modules/mensualidades/mensualidades.routes.js';
+import { comunicadosRouter } from './modules/comunicados/comunicados.routes.js';
 
 export function createApp(): Application {
   const app = express();
@@ -57,6 +58,9 @@ export function createApp(): Application {
   app.use('/api/v1/inscripcion', express.json({ limit: '4mb' }));
   // El pago de la mensualidad trae el mismo comprobante.
   app.use('/api/v1/mensualidades/pagos', express.json({ limit: '4mb' }));
+  // Comunicados: importar contactos trae el Excel o CSV en base64 (hasta
+  // ~4 MB de archivo), y un correo con tablas puede pasar de 1 MB.
+  app.use('/api/v1/comunicados', express.json({ limit: '7mb' }));
   app.use(express.json({ limit: '1mb' }));
 
   // Rutas versionadas.
@@ -101,6 +105,7 @@ export function createApp(): Application {
   api.use('/mensualidades', mensualidadesRouter);
   api.use('/correos', correosRouter);
   api.use('/novedades', novedadesRouter);
+  api.use('/comunicados', comunicadosRouter);
 
   app.use('/api/v1', api);
 

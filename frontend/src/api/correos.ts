@@ -6,7 +6,8 @@ import { api } from '@/lib/api';
  */
 
 /** inscripciones: aprobada, al representante. inscripciones_aviso: nueva, al equipo. novedades: punto 8. */
-export type TipoCorreo = 'inscripciones' | 'inscripciones_aviso' | 'novedades' | 'ausencias';
+/** comunicados: remitente único de Comunicados (2026-11-11), sin copias. */
+export type TipoCorreo = 'inscripciones' | 'inscripciones_aviso' | 'novedades' | 'ausencias' | 'comunicados';
 
 export interface ConfigCorreo {
   tipo: TipoCorreo;
