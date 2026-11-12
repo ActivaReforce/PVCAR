@@ -75,9 +75,29 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
 
+### Corte de sesión — 2026-11-11 (Mensualidades a producción; Comunicados aparcado)
+
+**Si pregunta "¿en qué nos quedamos?", es esto, y debajo el corte del 2026-11-05.**
+
+- **Mensualidades a producción** por decisión del cliente (2026-11-11), sin esperar las 3 preguntas del corte del 2026-11-05. Sin configurar, ningún colegio cobra mensualidades. Antes del merge: `0041` → `0042` → `0043` en prod (el 2026-11-11, por MCP, no estaba ninguna).
+- **Comunicados — PENDIENTE.** Construido en la rama `comunicados` (sin mezclar a `dev`; diseño en `docs/comunicados.md`; migración `0044_comunicados.sql` **sin correr en ningún lado**). **Recordatorio:** cuando Mensualidades esté en producción, retomar Comunicados: el cliente corre la `0044` en dev, se mezcla la rama a `dev` y se prueba el módulo en pantalla.
+- Los contactos y los 2 segmentos que hoy hay en Resend son **reales**: no se borran ni se hacen pruebas ni envíos contra Resend. Se limpian cuando estén importados en la plataforma y Comunicados esté en producción.
+
+### Corte de sesión — 2026-11-05 (Mensualidades: preguntas reenviadas al cliente)
+
+**Histórico: lo reemplaza el corte del 2026-11-11.** Mensualidades sigue en `dev`, sin PR. Se le mandaron al cliente final estas preguntas (redactadas en sesión), **sin respuesta todavía**:
+
+0. ¿Para qué fecha necesitan el módulo? (se le explicó el flujo: el representante entra, ve a sus hijos y sus meses, marca, sube un comprobante y el personal aprueba). ¿La mensualidad cuesta lo mismo que la inscripción y lleva el mismo descuento de hermano (20 %)?
+1. ¿El padre debería poder cambiar la disciplina de su hijo al pagar la mensualidad, o eso ni siquiera es una opción?
+2. ¿Desde qué día del mes se cobra (p. ej. el 1 o el último del mes anterior)? ¿Hasta qué día se puede pagar? ¿Qué pasa si no paga a tiempo (recargo, aviso, sigue asistiendo)?
+
+**Lo decidimos nosotros con esas respuestas, no se pregunta:** el recordatorio por correo (cuándo, cuántos, a quién), la forma del reporte de Mensualidades y el "cobrar desde" de prod (noviembre ya empezó sin el módulo en prod; probablemente diciembre). Esto reemplaza las 4 preguntas del corte del 2026-10-30.
+
+Aparte, el 2026-11-05: revisada la novedad #8 de prod (ausencia de EMILIA ENRIQUEZ QUIROZ, 29/10 09:57) que salía "Sin representante activo": es normal, Pablo anuló su inscripción a las 09:59 y eso dio de baja a la alumna y a su representante (usu 27). El cliente no quiere cambio.
+
 ### Corte de sesión — 2026-10-30, cierre (Mensualidades, se retoma el 2026-10-31)
 
-**Si pregunta "¿en qué nos quedamos?", es esto.** Mensualidades sigue en `dev`, **sin PR a `main`**. Mañana se continúa con Mensualidades; el cliente aún tiene otros cambios que pedir.
+**Histórico: las preguntas de abajo las reemplaza el corte del 2026-11-05.** Mensualidades sigue en `dev`, **sin PR a `main`**. Mañana se continúa con Mensualidades; el cliente aún tiene otros cambios que pedir.
 
 - **Diseño y reglas:** `docs/mensualidades.md` (manda). Cada mes de cada alumno es una cuota; la inscripción paga el primer mes ("Pagado (Inscripción)"); día de corte, día límite, meses de cobro (pausa) y "cobrar desde", **todo por colegio**; atrasado sin bloquear; sin pago adelantado; descuento de hermano con toda la familia; rechazo con motivo y "Volver a intentar" que lo borra.
 - **SQL:** `0041`, `0042` y `0043_mensualidades_quitar_dias_generales.sql` (quita las `inscfg_mens_dia_*` sin uso) **aplicadas y verificadas en dev** (la 0043 verificada por MCP el 2026-10-30). **En prod no está ninguna:** van las tres, en orden (0041 → 0042 → 0043), antes del merge a `main`.
