@@ -72,14 +72,7 @@ export function useAprobarPago() {
 }
 
 export function useRechazarPago() {
-  return useMutacion(
-    ({ id, motivo }: { id: number; motivo: string }) => mensualidadesApi.rechazar(id, motivo),
-    'Pago rechazado',
-  );
-}
-
-export function useDescartarPago() {
-  return useMutacion((id: number) => mensualidadesApi.descartar(id), null);
+  return useMutacion((id: number) => mensualidadesApi.rechazar(id), 'Pago rechazado');
 }
 
 export function useGuardarCobroColegio() {

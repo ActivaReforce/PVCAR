@@ -27,10 +27,6 @@ export const listarPagosSchema = paginacionSchema.extend({
 });
 export type ListarPagosQuery = z.infer<typeof listarPagosSchema>;
 
-export const rechazarPagoSchema = z.object({
-  motivo: z.string().trim().min(1, 'Escribe el motivo').max(500),
-});
-
 /** Meses con año ('YYYY-MM-01'). Los de años pasados viajan también: no se pierden. */
 export const cobroColegioSchema = z.object({
   meses: z.array(mes).max(240).transform((m) => [...new Set(m)].sort()),

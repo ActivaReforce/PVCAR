@@ -33,9 +33,10 @@ import type { ListarPagosQuery, PagarInput } from './mensualidades.schemas.js';
  *
  *   representante ──pagar──▶ pendiente ──aprobar──▶ aprobado
  *                                │
- *                                └──rechazar──▶ rechazado (con motivo; sus meses
- *                                               vuelven a deberse) ──volver a
- *                                               intentar──▶ ∅
+ *                                └──rechazar──▶ ∅ (se borra con su comprobante:
+ *                                               como si nunca se hubiera
+ *                                               subido; sus meses vuelven a
+ *                                               deberse. Cliente, 2026-11-16)
  *
  * Qué se debe no se guarda: se calcula cada vez con las disciplinas activas,
  * la configuración de cada colegio y las cuotas ya pagadas
@@ -102,15 +103,6 @@ async function calcular(soloDe: number[] | null, hoy: string = hoyEc()): Promise
 // ---------------------------------------------------------------------------
 // El representante
 
-export interface PagoVista {
-  menpag_id: number;
-  estado: 'pendiente' | 'aprobado' | 'rechazado';
-  fecha: string;
-  total: number;
-  motivo: string | null;
-  cuotas: Array<{ nombre: string; col_nombre: string; mes: Mes; total: number }>;
-}
-
 export interface MisMensualidades {
   cuenta_bancaria: string | null;
   /** Sus hijos por colegio, con todos sus meses (pagados y por pagar). */
@@ -121,22 +113,12 @@ export interface MisMensualidades {
     dia_limite: number;
     hijos: Array<{ nino_id: number; nombre: string; meses: MesDelHijo[] }>;
   }>;
-  pagos: PagoVista[];
 }
-
-const vistaDePago = (p: repo.PagoFila): PagoVista => ({
-  menpag_id: p.menpag_id,
-  estado: p.estado,
-  fecha: p.fecha,
-  total: p.total,
-  motivo: p.motivo,
-  cuotas: p.detalle.map((c) => ({ nombre: c.nombre, col_nombre: c.col_nombre, mes: c.mes, total: c.total })),
-});
 
 export async function misMensualidades(actor: AuthUser): Promise<MisMensualidades> {
   const usuId = actor.usuario.usu_id;
   const hijos = await repo.hijosDe(usuId);
-  const [calculo, pagos] = await Promise.all([calcular(hijos), repo.pagosDe(usuId)]);
+  const calculo = await calcular(hijos);
 
   const colegios = new Map<number, MisMensualidades['colegios'][number]>();
   for (const id of hijos) {
@@ -155,7 +137,6 @@ export async function misMensualidades(actor: AuthUser): Promise<MisMensualidade
   return {
     cuenta_bancaria: calculo.config.cuenta_bancaria,
     colegios: [...colegios.values()].sort((x, y) => x.col_nombre.localeCompare(y.col_nombre)),
-    pagos: pagos.map(vistaDePago),
   };
 }
 
@@ -252,18 +233,6 @@ export async function pagar(
   }
 }
 
-/** "Volver a intentar": borra el rechazado, con su motivo y su comprobante. */
-export async function descartarRechazado(actor: AuthUser, id: number): Promise<void> {
-  const ruta = await enTransaccion(async (client) => {
-    const p = await repo.obtenerPago(id, client);
-    if (!p || p.usu_id !== actor.usuario.usu_id) throw new ApiError(404, 'Pago no encontrado');
-    if (p.estado !== 'rechazado') throw new ApiError(409, 'Solo se descarta un pago rechazado.');
-    await repo.borrarPago(client, id);
-    return p.comprobante;
-  });
-  await borrarArchivos([ruta]);
-}
-
 // ---------------------------------------------------------------------------
 // El personal
 
@@ -306,17 +275,36 @@ export async function aprobarPago(actor: AuthUser, id: number): Promise<void> {
   });
 }
 
-export async function rechazarPago(actor: AuthUser, id: number, motivo: string): Promise<void> {
-  await enTransaccion(async (client) => {
+/**
+ * Rechazar (cliente, 2026-11-16): el pago se borra entero, con sus meses y
+ * su comprobante, como si nunca se hubiera subido; el representante puede
+ * volver a pagar esos meses. El personal lo contacta por fuera (la pantalla
+ * le da teléfono, correo y WhatsApp). Solo queda la línea de auditoría.
+ */
+export async function rechazarPago(actor: AuthUser, id: number): Promise<void> {
+  const ruta = await enTransaccion(async (client) => {
     const p = await repo.obtenerPago(id, client);
     if (!p || p.estado === 'rechazado') throw new ApiError(404, 'Pago no encontrado');
     if (p.estado !== 'pendiente') throw new ApiError(409, 'Un pago aprobado no se rechaza.');
-    await repo.rechazarPago(client, id, actor.usuario.usu_id, motivo);
+    await repo.borrarPago(client, id);
     await auditar(
-      { actor, accion: 'eliminar', entidad: 'mensualidad_pago', entidadId: id, detalle: { rechazado: true, motivo } },
+      {
+        actor,
+        accion: 'eliminar',
+        entidad: 'mensualidad_pago',
+        entidadId: id,
+        detalle: {
+          rechazado: true,
+          representante: p.representante_nombre,
+          total: p.total,
+          cuotas: p.detalle.map((c) => `${c.nombre} ${c.mes}`),
+        },
+      },
       client,
     );
+    return p.comprobante;
   });
+  await borrarArchivos([ruta]);
 }
 
 export interface AlumnoDelMes {

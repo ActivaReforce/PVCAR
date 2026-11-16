@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ImageUp, RotateCcw } from 'lucide-react';
+import { CheckCircle2, ImageUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDescartarPago, useMisMensualidades } from '@/hooks/useMensualidades';
+import { useMisMensualidades } from '@/hooks/useMensualidades';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
 import { aBase64, conReintentos, nuevaClave, prepararComprobante } from '@/lib/comprobante';
@@ -18,7 +18,6 @@ import {
   type MesDelHijo,
   type MisMensualidades,
 } from '@/api/mensualidades';
-import { fechaCorta } from '@/components/inscripciones/formato';
 import { hoyEc } from '@/lib/fecha';
 import { cn } from '@/lib/utils';
 
@@ -91,7 +90,6 @@ const PagarMensualidad = () => {
 
 const Contenido = ({ datos }: { datos: MisMensualidades }) => {
   const queryClient = useQueryClient();
-  const descartar = useDescartarPago();
   const actual = `${hoyEc().slice(0, 7)}-01`;
 
   const hijos: Hijo[] = useMemo(
@@ -194,7 +192,6 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
       return { mes, hijos: delMes.length, total: delMes.reduce((s, c) => s + centavos(c.total), 0) / 100 };
     })
     .filter((x) => x.hijos > 0);
-  const rechazados = datos.pagos.filter((p) => p.estado === 'rechazado');
 
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [vista, setVista] = useState<string | null>(null);
@@ -265,26 +262,6 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
 
   return (
     <div className="space-y-6">
-      {rechazados.map((p) => (
-        <div key={p.menpag_id} role="alert" className="space-y-2 rounded-md border border-destructive/50 bg-destructive/5 p-4 text-sm">
-          <p className="flex items-center gap-2 font-medium text-destructive">
-            <AlertTriangle className="h-4 w-4" /> Pago rechazado · {dinero(p.total)} · enviado el {fechaCorta(p.fecha)}
-          </p>
-          <p>{[...new Set(p.cuotas.map((c) => `${c.nombre}: ${nombreDeMes(c.mes)}`))].join(' · ')}</p>
-          <p>
-            <span className="font-medium">Motivo:</span> {p.motivo}
-          </p>
-          <Button
-            variant="outline"
-            className="h-11 sm:h-10"
-            disabled={descartar.isPending}
-            onClick={() => descartar.mutate(p.menpag_id)}
-          >
-            <RotateCcw className="mr-2 h-4 w-4" /> Volver a intentar
-          </Button>
-        </div>
-      ))}
-
       {enviado !== null && (
         <div role="status" className="flex items-start gap-3 rounded-md border border-primary/40 bg-primary/5 p-4 text-sm">
           <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />

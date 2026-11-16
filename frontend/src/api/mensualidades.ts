@@ -20,15 +20,6 @@ export interface MesDelHijo {
   pagado_el?: string | null;
 }
 
-export interface PagoVista {
-  menpag_id: number;
-  estado: 'pendiente' | 'aprobado' | 'rechazado';
-  fecha: string;
-  total: number;
-  motivo: string | null;
-  cuotas: Array<{ nombre: string; col_nombre: string; mes: string; total: number }>;
-}
-
 export interface MisMensualidades {
   cuenta_bancaria: string | null;
   colegios: Array<{
@@ -37,7 +28,6 @@ export interface MisMensualidades {
     dia_limite: number;
     hijos: Array<{ nino_id: number; nombre: string; meses: MesDelHijo[] }>;
   }>;
-  pagos: PagoVista[];
 }
 
 export interface Pagar {
@@ -149,7 +139,6 @@ export const mensualidadesApi = {
       body: JSON.stringify(datos),
       headers: { 'Idempotency-Key': clave },
     }),
-  descartar: (id: number) => api.delete<{ menpag_id: number }>(`/mensualidades/pagos/${id}`),
 
   listar: (f: { estado?: 'pendiente' | 'aprobado'; colegio?: number; buscar?: string; page?: number }) => {
     const qs = new URLSearchParams();
@@ -162,8 +151,8 @@ export const mensualidadesApi = {
   },
   ver: (id: number) => api.get<PagoListado & { comprobante_url: string | null }>(`/mensualidades/pagos/${id}`),
   aprobar: (id: number) => api.post<{ menpag_id: number }>(`/mensualidades/pagos/${id}/aprobar`),
-  rechazar: (id: number, motivo: string) =>
-    api.post<{ menpag_id: number }>(`/mensualidades/pagos/${id}/rechazar`, { motivo }),
+  /** Borra el pago y su comprobante: el representante vuelve a pagar esos meses. */
+  rechazar: (id: number) => api.post<{ menpag_id: number }>(`/mensualidades/pagos/${id}/rechazar`),
   /** `mes`: 'YYYY-MM'. */
   mes: (mes?: string, colegio?: number) => {
     const qs = new URLSearchParams();

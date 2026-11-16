@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Receipt, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Mail, MessageCircle, Receipt, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,8 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
@@ -25,9 +23,9 @@ import {
   useRechazarPago,
 } from '@/hooks/useMensualidades';
 import { dinero } from '@/api/inscripciones';
-import { diaLegible, mesesCortos, nombreDeMes, type AlumnoDelMes, type EstadoMes } from '@/api/mensualidades';
+import { diaLegible, mesesCortos, nombreDeMes, type AlumnoDelMes, type EstadoMes, type PagoListado } from '@/api/mensualidades';
 import { cn } from '@/lib/utils';
-import { fechaHora } from '@/components/inscripciones/formato';
+import { enlaceWhatsApp, fechaHora } from '@/components/inscripciones/formato';
 import { EstadoMesBadge } from './PagarMensualidad';
 
 const TODOS = 'todos';
@@ -185,17 +183,75 @@ const Pagos = () => {
   );
 };
 
+/**
+ * Rechazar (cliente, 2026-11-16): no se escribe motivo ni queda registro. Se
+ * enseña con quién hablar —representante, sus hijos y lo que pagaba, teléfono,
+ * correo y WhatsApp— y, al confirmar, el pago se borra como si nunca se
+ * hubiera subido: el representante vuelve a pagar esos meses.
+ */
+const ConfirmarRechazo = ({ pago }: { pago: PagoListado }) => {
+  const whatsapp = pago.representante_telefono ? enlaceWhatsApp(pago.representante_telefono) : null;
+  return (
+    <div className="space-y-4">
+      <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
+        Al confirmar, este pago y su comprobante se borran, como si nunca se hubiera subido. El representante podrá
+        volver a pagar esos meses. Avísale para que lo haga de nuevo.
+      </div>
+
+      <div className="space-y-2 rounded-md border p-3 text-sm">
+        <p className="text-base font-semibold">{pago.representante_nombre ?? 'Cuenta borrada'}</p>
+        {pago.representante_telefono && <p>Teléfono: {pago.representante_telefono}</p>}
+        {pago.representante_correo && <p className="break-words">Correo: {pago.representante_correo}</p>}
+        <div className="flex flex-wrap gap-2 pt-1">
+          {whatsapp && (
+            <Button variant="outline" size="sm" asChild className="h-10 sm:h-9">
+              <a href={whatsapp} target="_blank" rel="noreferrer">
+                <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+              </a>
+            </Button>
+          )}
+          {pago.representante_correo && (
+            <Button variant="outline" size="sm" asChild className="h-10 sm:h-9">
+              <a href={`mailto:${pago.representante_correo}`}>
+                <Mail className="mr-2 h-4 w-4" /> Correo
+              </a>
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-md border">
+        <ul className="divide-y">
+          {pago.detalle.map((c) => (
+            <li key={`${c.nino_id}-${c.mes}`} className="flex items-start justify-between gap-3 p-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium">{c.nombre}</p>
+                <p className="text-muted-foreground">
+                  Mensualidad {nombreDeMes(c.mes).toLowerCase()} · {c.col_nombre}
+                </p>
+              </div>
+              <span className="whitespace-nowrap font-medium">{dinero(c.total)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex items-center justify-between border-t bg-muted/40 p-3">
+          <span className="font-semibold">Total · enviado el {fechaHora(pago.fecha)}</span>
+          <span className="text-lg font-bold">{dinero(pago.total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) => {
   const pago = usePagoMensualidad(id);
   const aprobar = useAprobarPago();
   const rechazar = useRechazarPago();
   const [rechazando, setRechazando] = useState(false);
-  const [motivo, setMotivo] = useState('');
   const p = pago.data;
 
   const cerrar = () => {
     setRechazando(false);
-    setMotivo('');
     onClose();
   };
 
@@ -211,7 +267,9 @@ const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) 
 
         {pago.isError && <p className="text-destructive">No se pudo abrir: {(pago.error as Error).message}</p>}
 
-        {p && (
+        {p && rechazando && <ConfirmarRechazo pago={p} />}
+
+        {p && !rechazando && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {[p.representante_correo, p.representante_telefono].filter(Boolean).join(' · ')}
@@ -259,18 +317,7 @@ const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) 
               </p>
             )}
 
-            {p.estado === 'pendiente' && rechazando && (
-              <div className="space-y-1.5">
-                <Label htmlFor="motivo-rechazo">Motivo (lo verá el representante)</Label>
-                <Textarea
-                  id="motivo-rechazo"
-                  value={motivo}
-                  maxLength={500}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  placeholder="Ej.: el valor transferido no coincide con el total"
-                />
-              </div>
-            )}
+
           </div>
         )}
 
@@ -284,17 +331,17 @@ const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) 
                 <Button
                   variant="destructive"
                   className="h-11 sm:h-10"
-                  disabled={!motivo.trim() || rechazar.isPending}
+                  disabled={rechazar.isPending}
                   onClick={async () => {
                     try {
-                      await rechazar.mutateAsync({ id: p.menpag_id, motivo: motivo.trim() });
+                      await rechazar.mutateAsync(p.menpag_id);
                       cerrar();
                     } catch {
                       // El hook ya muestra el motivo.
                     }
                   }}
                 >
-                  {rechazar.isPending ? 'Rechazando…' : 'Rechazar pago'}
+                  {rechazar.isPending ? 'Rechazando…' : 'Confirmar rechazo'}
                 </Button>
               </>
             ) : (

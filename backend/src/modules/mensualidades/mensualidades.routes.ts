@@ -11,13 +11,12 @@ import {
   listarPagosSchema,
   mesQuerySchema,
   pagarSchema,
-  rechazarPagoSchema,
 } from './mensualidades.schemas.js';
 
 /**
  * Mensualidades (migración 0041).
  *
- * - `/mias`, `POST /pagos` y `DELETE /pagos/:id`: el representante, con su
+ * - `/mias` y `POST /pagos`: el representante, con su
  *   sesión, sobre sus hijos. No piden casilla: pagar es cosa de la familia y
  *   el alcance ya lo da su cuenta (solo sus hijos, solo sus pagos).
  * - El resto, solo el personal (Propietario y Admin) con la casilla de
@@ -59,17 +58,6 @@ mensualidadesRouter.post('/pagos', async (req: Request, res: Response, next: Nex
       service.pagar(actor(req), input, { ip: req.ip ?? null, navegador }),
     );
     res.status(201).json({ data: hecho, error: null });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/** Volver a intentar un pago rechazado: se borra, con su motivo. */
-mensualidadesRouter.delete('/pagos/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = idParamSchema.parse(req.params);
-    await service.descartarRechazado(actor(req), id);
-    res.json({ data: { menpag_id: id }, error: null });
   } catch (err) {
     next(err);
   }
@@ -127,8 +115,7 @@ mensualidadesRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = idParamSchema.parse(req.params);
-      const { motivo } = rechazarPagoSchema.parse(req.body);
-      await service.rechazarPago(actor(req), id, motivo);
+      await service.rechazarPago(actor(req), id);
       res.json({ data: { menpag_id: id }, error: null });
     } catch (err) {
       next(err);

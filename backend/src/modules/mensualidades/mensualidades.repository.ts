@@ -271,14 +271,6 @@ export async function obtenerPago(id: number, client?: PoolClient): Promise<Pago
   return rows[0] ?? null;
 }
 
-export async function pagosDe(usuId: number): Promise<PagoFila[]> {
-  const { rows } = await getPool().query<PagoFila>(
-    `${SELECT_PAGO} WHERE p.usu_id = $1 ORDER BY p.menpag_fecha DESC`,
-    [usuId],
-  );
-  return rows;
-}
-
 /** Personal: en revisión o aprobados. Los rechazados no salen (cliente, 2026-10-30). */
 export async function listarPagos(q: ListarPagosQuery): Promise<{ items: PagoFila[]; total: number }> {
   const filtros: string[] = [`p.menpag_estado = ANY($1::text[])`];
@@ -326,17 +318,7 @@ export async function aprobarPago(client: PoolClient, id: number, revisor: numbe
   );
 }
 
-/** El pago queda con su motivo para el representante; sus meses vuelven a deberse. */
-export async function rechazarPago(client: PoolClient, id: number, revisor: number, motivo: string): Promise<void> {
-  await client.query(`DELETE FROM public.mensualidad_cuota WHERE menpag_id = $1`, [id]);
-  await client.query(
-    `UPDATE public.mensualidad_pago
-        SET menpag_estado = 'rechazado', menpag_motivo = $3, menpag_revisado_por = $2, menpag_fecha_revision = now()
-      WHERE menpag_id = $1`,
-    [id, revisor, motivo],
-  );
-}
-
+/** Rechazar: el pago se borra con sus meses (ON DELETE CASCADE). */
 export async function borrarPago(client: PoolClient, id: number): Promise<void> {
   await client.query(`DELETE FROM public.mensualidad_pago WHERE menpag_id = $1`, [id]);
 }
