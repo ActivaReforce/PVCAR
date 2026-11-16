@@ -546,6 +546,60 @@ const inscripciones: Constructor = (filas) => {
   ];
 };
 
+const mensualidades: Constructor = (filas) => {
+  const centavos = (g: Fila[], estado: string) =>
+    Math.round(g.filter((f) => texto(f.estado) === estado).reduce((s, f) => s + numero(f.valor), 0) * 100) / 100;
+  const pagos = (g: Fila[]) => new Set(g.map((f) => texto(f.menpag_id))).size;
+  return [
+    {
+      titulo: 'Totales',
+      cabeceras: ['Concepto', 'Cantidad'],
+      filas: [
+        ['Pagos', pagos(filas)],
+        ['Meses pagados', filas.length],
+        ['Total recaudado ($)', centavos(filas, 'Aprobado')],
+        ['En revisión ($)', centavos(filas, 'En revisión')],
+      ],
+      destacadas: [],
+    },
+    agrupar(
+      'Por mes en que se pagó',
+      filas,
+      [{ cabecera: 'Mes de pago', de: campo('_mes_pago') }],
+      [
+        { cabecera: 'Pagos', calc: pagos },
+        cuenta('Meses pagados'),
+        { cabecera: 'Recaudado ($)', calc: (g) => centavos(g, 'Aprobado') },
+        { cabecera: 'En revisión ($)', calc: (g) => centavos(g, 'En revisión') },
+      ],
+      { nota: 'El dinero cuenta en el mes en que se pagó, aunque cubra meses siguientes.', total: false },
+    ),
+    agrupar(
+      'Por mes pagado',
+      filas,
+      [{ cabecera: 'Mes pagado', de: campo('_mes_pagado') }],
+      [
+        cuenta('Alumnos'),
+        { cabecera: 'Recaudado ($)', calc: (g) => centavos(g, 'Aprobado') },
+        { cabecera: 'En revisión ($)', calc: (g) => centavos(g, 'En revisión') },
+      ],
+      { nota: 'Qué meses cubre lo pagado. Un mes pagado por adelantado sale aquí con su valor.', total: false },
+    ),
+    agrupar(
+      'Por colegio',
+      filas,
+      [{ cabecera: 'Colegio', de: campo('colegio') }],
+      [
+        { cabecera: 'Pagos', calc: pagos },
+        cuenta('Meses pagados'),
+        { cabecera: 'Recaudado ($)', calc: (g) => centavos(g, 'Aprobado') },
+        { cabecera: 'En revisión ($)', calc: (g) => centavos(g, 'En revisión') },
+      ],
+      { total: false },
+    ),
+  ];
+};
+
 const encuestas: Constructor = (filas) => {
   const sinRespuestas = filas.filter((f) => numero(f.respondidas) === 0).map((f) => texto(f.encu_titulo));
   const bloques: Bloque[] = [
@@ -591,6 +645,7 @@ const RESUMENES: Record<string, Constructor> = {
   evaluaciones,
   representantes,
   inscripciones,
+  mensualidades,
   encuestas,
   novedades,
 };

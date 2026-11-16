@@ -41,7 +41,8 @@ import {
 } from './inscripciones.documentos.js';
 import { PLANTILLAS_INICIALES } from './inscripciones.plantillas.js';
 import { IVA_PCT, calcularCobro, dinero, type Cobro, type CobroAlumno } from './inscripciones.precios.js';
-import { ahoraEc } from '../../lib/fecha.js';
+import { ahoraEc, hoyEc } from '../../lib/fecha.js';
+import { sumarMeses } from '../mensualidades/mensualidades.calculo.js';
 import {
   BYTES_MAX_MEMBRETE,
   PARENTESCOS,
@@ -608,6 +609,13 @@ export async function enviar(
 
   const situacion = await estado();
   if (!situacion.abiertas) throw new ApiError(503, 'Las inscripciones están cerradas.');
+
+  // El mes que paga: el en curso o el siguiente (hora de Ecuador).
+  const esteMes = `${hoyEc().slice(0, 7)}-01`;
+  const mesInicio = input.mes_inicio ?? esteMes;
+  if (mesInicio !== esteMes && mesInicio !== sumarMeses(esteMes, 1)) {
+    throw new ApiError(409, 'El mes de inicio ya no es válido. Recarga la página y elígelo otra vez.');
+  }
   const abiertos = new Set(situacion.colegios.filter((c) => c.abierto).map((c) => c.col_id));
   if (input.ninos.some((n) => !abiertos.has(n.col_id))) {
     throw new ApiError(409, 'Las inscripciones de uno de los colegios elegidos se cerraron. Recarga la página.');
@@ -713,6 +721,7 @@ export async function enviar(
         navegador: meta.navegador,
         fecha,
         usuId,
+        mesInicio,
       });
       for (const [i, nino] of guardados.entries()) {
         const insninoId = await repo.insertarNinoDeInscripcion(client, {
@@ -785,8 +794,8 @@ export interface ListaInscripciones extends Pagina<repo.InscripcionListada> {
  * permiso de verlas (un representante) solo ve las suyas: las que le dieron
  * de alta, con sus hijos (decisión del cliente, 2026-10-05).
  */
-export async function avisoDelMenu(actor: AuthUser): Promise<{ pendientes: number; abiertas: boolean }> {
-  if (!veAvisoDelMenu(actor)) return { pendientes: 0, abiertas: false };
+export async function avisoDelMenu(actor: AuthUser): Promise<repo.AvisoDelMenu> {
+  if (!veAvisoDelMenu(actor)) return { pendientes: 0, mensualidades: 0, abiertas: false };
   return repo.avisoDelMenu();
 }
 

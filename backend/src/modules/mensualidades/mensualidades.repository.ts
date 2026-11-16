@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
 import { ESTADO } from '../../lib/constants.js';
-import { textoEc } from '../../lib/fecha.js';
+import { diaEc, textoEc } from '../../lib/fecha.js';
 import { horariosJson, type HorarioDisciplina } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import { offsetDe } from '../../lib/paginacion.js';
@@ -41,16 +41,12 @@ export async function colegios(client?: PoolClient): Promise<ColegioConCobro[]> 
     col_nombre: string;
     precio: string;
     descuento: string;
-    meses: number[];
-    desde: string | null;
+    meses: string[];
     dia_limite: number;
-    dia_corte: number;
   }>(
-    `SELECT cp.col_id, c.col_nombre,
-            cp.colpre_mens_dia_limite AS dia_limite, cp.colpre_mens_dia_corte AS dia_corte,
+    `SELECT cp.col_id, c.col_nombre, cp.colpre_mens_dia_limite AS dia_limite,
             cp.colpre_precio_disciplina AS precio, cp.colpre_descuento_hermano AS descuento,
-            cp.colpre_meses_cobro AS meses,
-            to_char(cp.colpre_cobro_desde, 'YYYY-MM-DD') AS desde
+            ARRAY(SELECT to_char(m, 'YYYY-MM-DD') FROM unnest(cp.colpre_meses) AS m ORDER BY m) AS meses
        FROM public.colegio_precio cp
        JOIN public.colegio c ON c.col_id = cp.col_id
       ORDER BY c.col_nombre`,
@@ -60,29 +56,25 @@ export async function colegios(client?: PoolClient): Promise<ColegioConCobro[]> 
     col_nombre: r.col_nombre,
     precio: Number(r.precio),
     descuentoHermano: Number(r.descuento),
-    meses: [...r.meses].map(Number).sort((a, b) => a - b),
-    desde: r.desde,
+    meses: r.meses,
     diaLimite: r.dia_limite,
-    diaCorte: r.dia_corte,
   }));
 }
 
 export interface CobroDelColegio {
-  meses: number[];
-  desde: Mes | null;
+  /** Meses con año ('YYYY-MM-01'), ordenados. */
+  meses: Mes[];
   dia_limite: number;
-  dia_corte: number;
 }
 
 /** false si el colegio no tiene precio (no hay fila que actualizar). */
 export async function guardarCobroColegio(client: PoolClient, colId: number, c: CobroDelColegio): Promise<boolean> {
   const { rowCount } = await client.query(
     `UPDATE public.colegio_precio
-        SET colpre_meses_cobro = $2::smallint[], colpre_cobro_desde = $3::date,
-            colpre_mens_dia_limite = $4, colpre_mens_dia_corte = $5,
+        SET colpre_meses = $2::date[], colpre_mens_dia_limite = $3,
             colpre_fecha_modificacion = now()
       WHERE col_id = $1`,
-    [colId, c.meses, c.desde, c.dia_limite, c.dia_corte],
+    [colId, c.meses, c.dia_limite],
   );
   return (rowCount ?? 0) > 0;
 }
@@ -108,9 +100,9 @@ export interface AlumnoConDisciplinas {
 }
 
 /**
- * Los alumnos activos con sus disciplinas activas. Para cada disciplina, la
- * fecha (Ecuador) de la inscripción aprobada que la trajo o, si se dio de
- * alta a mano, la del alta.
+ * Los alumnos activos con sus disciplinas activas. Para cada disciplina, el
+ * mes que pagó la inscripción aprobada que la trajo o, si se dio de alta a
+ * mano, el mes (Ecuador) del alta.
  */
 export async function alumnosActivos(client?: PoolClient): Promise<AlumnoConDisciplinas[]> {
   const { rows } = await (client ?? getPool()).query<AlumnoConDisciplinas>(
@@ -129,7 +121,9 @@ export async function alumnosActivos(client?: PoolClient): Promise<AlumnoConDisc
                        'colacthor_id', d.colacthor_id,
                        'actividad', act.act_nombre,
                        'horarios', ${horariosJson('d')},
-                       'inicio', ${textoEc('COALESCE(ins.ins_fecha, na.ninoasig_fecha_inscripcion)', 'YYYY-MM-DD')},
+                       'inicio', CASE WHEN ins.ins_id IS NOT NULL
+                                      THEN to_char(ins.ins_mes_inicio, 'YYYY-MM-DD')
+                                      ELSE ${textoEc('na.ninoasig_fecha_inscripcion', 'YYYY-MM')} || '-01' END,
                        'por_inscripcion', ins.ins_id IS NOT NULL) ORDER BY act.act_nombre)
                 FROM public.nino_asignacion na
                 JOIN public.colegio_actividad_horario d ON d.colacthor_id = na.colacthor_id
@@ -166,6 +160,7 @@ export async function cuotasDe(ninoIds: number[], client?: PoolClient): Promise<
     mes: string;
     estado: 'pendiente' | 'aprobado';
     menpag_id: number;
+    fecha_pago: string;
     disciplinas: string[];
     subtotal: string;
     descuento: string;
@@ -173,7 +168,7 @@ export async function cuotasDe(ninoIds: number[], client?: PoolClient): Promise<
     total: string;
   }>(
     `SELECT c.nino_id, to_char(c.mencuo_mes, 'YYYY-MM-DD') AS mes, p.menpag_estado AS estado,
-            c.menpag_id, c.mencuo_disciplinas AS disciplinas, c.mencuo_subtotal AS subtotal,
+            c.menpag_id, ${textoEc('p.menpag_fecha', 'YYYY-MM-DD')} AS fecha_pago, c.mencuo_disciplinas AS disciplinas, c.mencuo_subtotal AS subtotal,
             c.mencuo_descuento AS descuento, c.mencuo_iva AS iva, c.mencuo_total AS total
        FROM public.mensualidad_cuota c
        JOIN public.mensualidad_pago p ON p.menpag_id = c.menpag_id
@@ -347,31 +342,34 @@ export async function borrarPago(client: PoolClient, id: number): Promise<void> 
 }
 
 // ---------------------------------------------------------------------------
-// Reportes
+// Lo que entró en un mes (por fecha de pago)
 
-export interface CuotaDelReporte extends CuotaDetalle {
+export interface CuotaCobrada {
+  nino_id: number | null;
+  nombre: string;
+  col_id: number | null;
+  /** El mes que paga. */
+  mes: Mes;
+  total: number;
   estado: 'pendiente' | 'aprobado';
+  /** Día (Ecuador) en que se envió el pago. */
   fecha_pago: string;
-  representante: string | null;
 }
 
-/** Cuotas de un rango de meses, en revisión o aprobadas. */
-export async function cuotasEntre(desde: Mes, hasta: Mes, colIds: number[] | null): Promise<CuotaDelReporte[]> {
-  const { rows } = await getPool().query<CuotaDelReporte>(
-    `SELECT c.nino_id, c.mencuo_nino_nombre AS nombre, c.col_id, COALESCE(col.col_nombre, '—') AS col_nombre,
-            to_char(c.mencuo_mes, 'YYYY-MM-DD') AS mes, c.mencuo_disciplinas AS disciplinas,
-            c.mencuo_subtotal::float8 AS subtotal, c.mencuo_descuento::float8 AS descuento,
-            c.mencuo_iva::float8 AS iva, c.mencuo_total::float8 AS total,
-            p.menpag_estado AS estado, p.menpag_fecha AS fecha_pago, u.usu_nombre AS representante
+/**
+ * Las cuotas cuyo pago se envió en `mes` (hora de Ecuador), en revisión o
+ * aprobadas, sea cual sea el mes que pagan: es lo que entró ese mes.
+ */
+export async function cobradoEn(mes: Mes): Promise<CuotaCobrada[]> {
+  const { rows } = await getPool().query<CuotaCobrada>(
+    `SELECT c.nino_id, c.mencuo_nino_nombre AS nombre, c.col_id,
+            to_char(c.mencuo_mes, 'YYYY-MM-DD') AS mes, c.mencuo_total::float8 AS total,
+            p.menpag_estado AS estado, ${textoEc('p.menpag_fecha', 'YYYY-MM-DD')} AS fecha_pago
        FROM public.mensualidad_cuota c
        JOIN public.mensualidad_pago p ON p.menpag_id = c.menpag_id
-       LEFT JOIN public.colegio col ON col.col_id = c.col_id
-       LEFT JOIN public.usuario u ON u.usu_id = p.usu_id
-      WHERE c.mencuo_mes BETWEEN $1::date AND $2::date
-        AND p.menpag_estado IN ('pendiente', 'aprobado')
-        AND ($3::int[] IS NULL OR c.col_id = ANY($3::int[]))
-      ORDER BY c.mencuo_mes, col.col_nombre, c.mencuo_nino_nombre`,
-    [desde, hasta, colIds],
+      WHERE p.menpag_estado IN ('pendiente', 'aprobado')
+        AND date_trunc('month', ${diaEc('p.menpag_fecha')})::date = $1::date`,
+    [mes],
   );
   return rows;
 }

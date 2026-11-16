@@ -44,6 +44,11 @@ export interface DatosClase {
   estado: string;
   hora_tarde: string | null;
   razon: string | null;
+  /**
+   * Ausente por mensualidad atrasada (2026-11-16): los meses que debe
+   * ('YYYY-MM-01'). Sin el campo, una ausencia normal.
+   */
+  mensualidad?: string[];
 }
 
 export interface MencionPersona {

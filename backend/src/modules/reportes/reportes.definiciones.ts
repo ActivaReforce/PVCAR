@@ -1105,6 +1105,114 @@ const inscripciones: Definicion = {
   }),
 };
 
+/** 'Diciembre 2026' de un `date` día 1, sin depender del idioma de la base. */
+const MES_LEGIBLE = (expr: string) =>
+  `(ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])[extract(month FROM ${expr})::int] || ' ' || extract(year FROM ${expr})::int`;
+
+const SQL_MENSUALIDADES = `
+      SELECT p.menpag_id,
+             ${textoEc('p.menpag_fecha', 'DD/MM/YYYY HH24:MI')}       AS fecha,
+             CASE p.menpag_estado WHEN 'pendiente' THEN 'En revisión' ELSE 'Aprobado' END AS estado,
+             COALESCE(u.usu_nombre, 'Cuenta borrada')                AS representante,
+             COALESCE(u.usu_correo, '')                              AS correo,
+             c.mencuo_nino_nombre                                    AS alumno,
+             COALESCE(col.col_nombre, '—')                           AS colegio,
+             ${MES_LEGIBLE('c.mencuo_mes')}                          AS mes_pagado,
+             array_to_string(c.mencuo_disciplinas, ', ')             AS disciplinas,
+             c.mencuo_descuento::float8                              AS descuento,
+             c.mencuo_total::float8                                  AS valor,
+             COALESCE(r.usu_nombre, '')                              AS aprobado_por,
+             COALESCE(${textoEc('p.menpag_fecha_revision', 'DD/MM/YYYY')}, '') AS fecha_aprobacion,
+             -- 'AAAA-MM Mes': ordena bien en la hoja Resumen.
+             to_char(${diaEc('p.menpag_fecha')}, 'YYYY-MM') || ' ' ||
+               (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])[extract(month FROM ${diaEc('p.menpag_fecha')})::int] AS _mes_pago,
+             to_char(c.mencuo_mes, 'YYYY-MM') || ' ' ||
+               (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])[extract(month FROM c.mencuo_mes)::int] AS _mes_pagado,
+             c.mencuo_mes                                            AS _mes_orden,
+             p.menpag_fecha                                          AS _orden
+        FROM public.mensualidad_cuota c
+        JOIN public.mensualidad_pago p ON p.menpag_id = c.menpag_id
+        LEFT JOIN public.usuario u ON u.usu_id = p.usu_id
+        LEFT JOIN public.usuario r ON r.usu_id = p.menpag_revisado_por
+        LEFT JOIN public.colegio col ON col.col_id = c.col_id
+       WHERE p.menpag_estado IN ('pendiente', 'aprobado')
+         AND ($1::date IS NULL OR ${diaEc('p.menpag_fecha')} >= $1::date)
+         AND ($2::date IS NULL OR ${diaEc('p.menpag_fecha')} <= $2::date)
+         AND ($3::text IS NULL
+              OR ${contieneSinTildes("COALESCE(u.usu_nombre, '')", '$3')}
+              OR ${contieneSinTildes("COALESCE(u.usu_correo, '')", '$3')}
+              OR ${contieneSinTildes('c.mencuo_nino_nombre', '$3')})
+         AND ($4::int IS NULL
+              OR ($4 = 1 AND p.menpag_estado = 'pendiente')
+              OR ($4 = 2 AND p.menpag_estado = 'aprobado'))
+         AND ($5::int[] IS NULL OR c.col_id = ANY($5::int[]))
+       ORDER BY _orden DESC, alumno, _mes_orden`;
+
+const mensualidades: Definicion = {
+  id: 'mensualidades',
+  titulo: 'Mensualidades',
+  descripcion:
+    'Lo que entró por mensualidades, por fecha de pago. Un pago de varios meses sale una fila por mes, todas con la fecha en que se pagó.',
+  modulo: 'inscripciones',
+  // Lleva montos: solo Propietario, como Inscripciones.
+  soloRoles: [ROL.PROPIETARIO],
+  exigeRango: false,
+  filtros: {
+    colegio: true,
+    disciplina: false,
+    estado: {
+      etiqueta: 'Estado',
+      opciones: [
+        { id: 1, nombre: 'En revisión' },
+        { id: 2, nombre: 'Aprobado' },
+      ],
+    },
+    fechas: true,
+  },
+  columnas: [
+    { clave: 'menpag_id', cabecera: 'Nº pago', ancho: 9 },
+    { clave: 'fecha', cabecera: 'Fecha de pago', ancho: 17 },
+    { clave: 'estado', cabecera: 'Estado', ancho: 12 },
+    { clave: 'representante', cabecera: 'Representante', ancho: 30 },
+    { clave: 'correo', cabecera: 'Correo', ancho: 30 },
+    { clave: 'alumno', cabecera: 'Alumno', ancho: 30 },
+    { clave: 'colegio', cabecera: 'Colegio', ancho: 28 },
+    { clave: 'mes_pagado', cabecera: 'Mes pagado', ancho: 16 },
+    { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 36 },
+    { clave: 'descuento', cabecera: 'Descuento ($)', ancho: 13 },
+    { clave: 'valor', cabecera: 'Valor ($)', ancho: 11 },
+    { clave: 'aprobado_por', cabecera: 'Aprobado por', ancho: 26 },
+    { clave: 'fecha_aprobacion', cabecera: 'Aprobado el', ancho: 13 },
+  ],
+  /** Sin alcance por colegio: solo Propietario. Los rechazados no salen (no entró dinero). */
+  construir: (f) => ({ sql: SQL_MENSUALIDADES, params: paramsMensualidades(f) }),
+  totales: (f) => ({
+    consulta: {
+      sql: `
+        SELECT count(DISTINCT r.menpag_id)::int                                   AS pagos,
+               count(*)::int                                                     AS meses,
+               COALESCE(SUM(r.valor) FILTER (WHERE r.estado = 'Aprobado'), 0)::float8    AS recaudado,
+               COALESCE(SUM(r.valor) FILTER (WHERE r.estado = 'En revisión'), 0)::float8 AS en_revision
+          FROM (${SQL_MENSUALIDADES}) r`,
+      params: paramsMensualidades(f),
+    },
+    formato: [
+      { clave: 'pagos', etiqueta: 'Pagos' },
+      { clave: 'meses', etiqueta: 'Meses pagados' },
+      { clave: 'recaudado', etiqueta: 'Total recaudado', moneda: true },
+      { clave: 'en_revision', etiqueta: 'En revisión', moneda: true },
+    ],
+  }),
+};
+
+const paramsMensualidades = (f: FiltrosReporte) => [
+  oNulo(f.desde),
+  oNulo(f.hasta),
+  textoONulo(f.buscar),
+  oNulo(f.estado),
+  oNulo(f.colegio),
+];
+
 const encuestas: Definicion = {
   id: 'encuestas',
   titulo: 'Encuestas',
@@ -1301,6 +1409,7 @@ export const DEFINICIONES: Definicion[] = [
   asistenciasEntrenadores,
   representantes,
   inscripciones,
+  mensualidades,
   encuestas,
   novedades,
 ];

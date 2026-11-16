@@ -1,9 +1,11 @@
 import type { PoolClient } from 'pg';
+import { frontendBaseUrl } from '../../config/env.js';
 import { escaparHtml } from '../../lib/correo.js';
 import { hoyEc } from '../../lib/fecha.js';
 import type { HorarioDisciplina } from '../../lib/horarios.js';
 import { ASISTENCIA } from '../asistencias/asistencias.schemas.js';
 import { configuracion, enviarComo } from '../correos/correos.service.js';
+import { listaDeMeses } from '../mensualidades/mensualidades.calculo.js';
 import * as repo from './novedades.repository.js';
 
 /**
@@ -24,6 +26,11 @@ import * as repo from './novedades.repository.js';
  *
  * Los correos salen **después** del COMMIT, uno por alumno y en fila: si la
  * transacción se deshace no ha salido nada, y Resend admite dos por segundo.
+ *
+ * Mensualidad atrasada (2026-11-16): el alumno que debe un mes vencido queda
+ * Ausente sin poder cambiarlo. Su aviso es una ausencia con los meses que
+ * debe en `datos.mensualidad`: otro texto y otro correo, que va siempre al
+ * representante (el contrato pide avisarle por escrito).
  */
 
 /** Solo se avisa de clases de hoy o de los últimos días: pasar lista atrasada de hace un mes no debe escribir a los padres. */
@@ -73,9 +80,15 @@ function diaIso(fecha: string): number {
 /** 2026-10-12 → 12/10/2026 */
 export const fechaLegible = (fecha: string) => fecha.split('-').reverse().join('/');
 
-export function datosDe(clase: ClaseParaAviso, fecha: string, marca: MarcaParaAviso): repo.DatosClase {
+export function datosDe(
+  clase: ClaseParaAviso,
+  fecha: string,
+  marca: MarcaParaAviso,
+  mensualidad?: string[],
+): repo.DatosClase {
   const h = clase.horarios.find((x) => x.dia_id === diaIso(fecha));
   return {
+    ...(mensualidad?.length && marca.asisest_id === ASISTENCIA.AUSENTE ? { mensualidad } : {}),
     colacthor_id: clase.colacthor_id,
     fecha,
     colegio: clase.col_nombre,
@@ -93,6 +106,9 @@ export function textoDe(tipo: 'ausencia' | 'correccion', alumno: string, d: repo
   const clase = `${d.actividad} en ${d.colegio} el ${d.dia ? `${d.dia} ` : ''}${fechaLegible(d.fecha)}${
     d.horario ? ` (${d.horario})` : ''
   }`;
+  if (tipo === 'ausencia' && d.mensualidad?.length) {
+    return `${alumno} no pudo asistir a ${clase}: tiene pendiente la mensualidad de ${listaDeMeses(d.mensualidad)}.`;
+  }
   if (tipo === 'ausencia') return `${alumno} faltó a ${clase}.`;
   if (d.estado === 'Tarde') {
     return `Corrección: ${alumno} no faltó a ${clase}: llegó tarde${d.hora_tarde ? `, a las ${d.hora_tarde}` : ''}.`;
@@ -109,7 +125,14 @@ export function textoDe(tipo: 'ausencia' | 'correccion', alumno: string, d: repo
  */
 export async function registrarAvisos(
   client: PoolClient,
-  opts: { clase: ClaseParaAviso; fecha: string; marcas: MarcaParaAviso[]; autorId: number },
+  opts: {
+    clase: ClaseParaAviso;
+    fecha: string;
+    marcas: MarcaParaAviso[];
+    autorId: number;
+    /** Alumnos con mensualidad atrasada ese día y los meses que deben. */
+    mora?: Map<number, string[]>;
+  },
 ): Promise<number[]> {
   if (opts.marcas.length === 0 || !fechaAvisable(opts.fecha)) return [];
 
@@ -127,7 +150,7 @@ export async function registrarAvisos(
   const nombres = await repo.nombresDeAlumnos(client, tocan.map((x) => x.marca.nino_id));
   const ids: number[] = [];
   for (const { marca, tipo } of tocan) {
-    const datos = datosDe(opts.clase, opts.fecha, marca);
+    const datos = datosDe(opts.clase, opts.fecha, marca, opts.mora?.get(marca.nino_id));
     ids.push(
       await repo.insertarAviso(client, {
         tipo,
@@ -163,9 +186,11 @@ export async function enviarAvisos(ids: number[]): Promise<void> {
     }
     for (const [i, n] of novedades.entries()) {
       if (i > 0) await esperar(PAUSA_ENTRE_CORREOS);
-      const paraExtra = config.notificar_representante
-        ? await repo.correosDeRepresentantesDe(n.alumnos.map((a) => a.id))
-        : [];
+      // La de mensualidad va siempre al representante.
+      const paraExtra =
+        config.notificar_representante || n.datos?.mensualidad?.length
+          ? await repo.correosDeRepresentantesDe(n.alumnos.map((a) => a.id))
+          : [];
       await enviarComo('ausencias', { ...correoDe(n), paraExtra });
     }
   } catch (err) {
@@ -178,8 +203,11 @@ export function correoDe(n: repo.Novedad): { asunto: string; html: string; texto
   const alumno = n.alumnos[0];
   const nombre = alumno?.nombre ?? 'Alumno';
   const esAusencia = n.nov_tipo === 'ausencia';
-  const titulo = esAusencia ? 'Ausencia' : 'Corrección de ausencia';
-  const asunto = `${titulo}: ${nombre} — ${d.actividad}, ${fechaLegible(d.fecha)}`;
+  const mora = esAusencia && (d.mensualidad?.length ?? 0) > 0;
+  const titulo = mora ? 'Mensualidad pendiente' : esAusencia ? 'Ausencia' : 'Corrección de ausencia';
+  const asunto = mora
+    ? `${titulo}: ${nombre} no pudo asistir a ${d.actividad}, ${fechaLegible(d.fecha)}`
+    : `${titulo}: ${nombre} — ${d.actividad}, ${fechaLegible(d.fecha)}`;
 
   const representantes = (alumno?.representantes ?? []).map((r) =>
     [r.nombre, r.telefono, r.correo].filter(Boolean).join(' · '),
@@ -191,6 +219,7 @@ export function correoDe(n: repo.Novedad): { asunto: string; html: string; texto
     ['Fecha', `${d.dia ? `${d.dia} ` : ''}${fechaLegible(d.fecha)}`],
     ...(d.horario ? ([['Horario', d.horario]] as Array<[string, string]>) : []),
     ['Asistencia', d.estado],
+    ...(mora ? ([['Mensualidad pendiente', listaDeMeses(d.mensualidad!)]] as Array<[string, string]>) : []),
     ...(d.hora_tarde ? ([['Hora de llegada', d.hora_tarde]] as Array<[string, string]>) : []),
     ...(d.razon ? ([['Motivo', d.razon]] as Array<[string, string]>) : []),
     ...(representantes.length > 0
@@ -199,7 +228,14 @@ export function correoDe(n: repo.Novedad): { asunto: string; html: string; texto
     ['Registró', n.autor.usu_nombre],
   ];
 
-  const texto = [titulo, '', n.nov_texto, '', ...filas.map(([k, v]) => `${k}: ${v}`)].join('\n');
+  const enlace = `${frontendBaseUrl}/inscripcion`;
+  const explicacion = mora
+    ? 'Pasado el día límite de pago, el alumno no puede asistir a clases hasta que la mensualidad esté pagada. ' +
+      `Puedes pagarla en ${enlace}, en "Pagar mensualidad". Cuando revisemos el pago, vuelve a clases con normalidad.`
+    : null;
+  const texto = [titulo, '', n.nov_texto, ...(explicacion ? ['', explicacion] : []), '', ...filas.map(([k, v]) => `${k}: ${v}`)].join(
+    '\n',
+  );
 
   const color = esAusencia ? '#b91c1c' : '#047857';
   const html = `
@@ -208,6 +244,11 @@ export function correoDe(n: repo.Novedad): { asunto: string; html: string; texto
     <body style="font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;padding:16px;">
       <h2 style="margin:0 0 8px 0;font-size:18px;color:${color};">${escaparHtml(titulo)}</h2>
       <p style="margin:0 0 12px 0;font-size:15px;line-height:1.5;">${escaparHtml(n.nov_texto)}</p>
+      ${
+        mora
+          ? `<p style="margin:0 0 12px 0;font-size:14px;line-height:1.5;">Pasado el día límite de pago, el alumno no puede asistir a clases hasta que la mensualidad esté pagada. Puedes pagarla en <a href="${escaparHtml(enlace)}">${escaparHtml(enlace)}</a>, en «Pagar mensualidad». Cuando revisemos el pago, vuelve a clases con normalidad.</p>`
+          : ''
+      }
       <table style="border-collapse:collapse;font-size:14px;">
         ${filas
           .map(

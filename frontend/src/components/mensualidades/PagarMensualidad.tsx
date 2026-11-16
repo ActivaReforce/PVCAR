@@ -11,12 +11,14 @@ import { aBase64, conReintentos, nuevaClave, prepararComprobante } from '@/lib/c
 import { dinero } from '@/api/inscripciones';
 import {
   ETIQUETA_ESTADO,
+  diaLegible,
   mensualidadesApi,
   nombreDeMes,
   type EstadoMes,
   type MisMensualidades,
 } from '@/api/mensualidades';
 import { fechaCorta } from '@/components/inscripciones/formato';
+import { hoyEc } from '@/lib/fecha';
 
 const VERDE =
   'border-transparent bg-emerald-700 text-white hover:bg-emerald-700 dark:bg-emerald-400 dark:text-emerald-950 dark:hover:bg-emerald-400';
@@ -40,10 +42,14 @@ const debe = (e: EstadoMes) => e === 'pendiente' || e === 'atrasado';
 const clave = (ninoId: number, mes: string) => `${ninoId}|${mes}`;
 
 /**
- * Pagar la mensualidad (cliente, 2026-10-30): los hijos por colegio, cada
- * mes que se debe con su casilla y su valor, el total al momento, la cuenta
- * y el comprobante. Debajo, el historial de cada hijo. Es la misma pantalla
- * en el módulo Inscripciones y en /inscripcion → "Pagar mensualidad".
+ * Pagar la mensualidad (cliente, 2026-11-16): los hijos por colegio, cada
+ * mes por pagar —también los futuros que su colegio tiene abiertos— con su
+ * casilla y su valor, el total al momento, la cuenta y el comprobante (uno
+ * por todo). Debajo, el historial de cada hijo. Es la misma pantalla en el
+ * módulo Inscripciones y en /inscripcion → "Pagar mensualidad".
+ *
+ * Los meses se pagan en orden: no se marca uno si el anterior del mismo hijo
+ * sigue sin marcar (sale un aviso), y desmarcar uno desmarca los siguientes.
  *
  * El valor de cada mes lo da el servidor con toda la familia (descuento de
  * hermano incluido), así que el total es la suma de lo marcado: no hace falta
@@ -73,9 +79,11 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
     [datos],
   );
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
-  // Al cargar (o recargar) se marca todo lo que se debe.
+  const [avisoOrden, setAvisoOrden] = useState<{ k: string; texto: string } | null>(null);
+  // Al cargar (o recargar) no se marca nada: el representante elige qué meses paga.
   useEffect(() => {
-    setMarcados(new Set(porPagar.map((m) => clave(m.nino_id, m.mes))));
+    setMarcados(new Set());
+    setAvisoOrden(null);
   }, [porPagar]);
 
   const [comprobante, setComprobante] = useState<File | null>(null);
@@ -90,13 +98,28 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
   const total = elegidos.reduce((s, m) => s + Math.round(m.total * 100), 0) / 100;
   const rechazados = datos.pagos.filter((p) => p.estado === 'rechazado');
 
-  const alternar = (k: string, si: boolean) =>
+  /** Los meses por pagar de un hijo, en orden. */
+  const deHijo = (ninoId: number) => porPagar.filter((m) => m.nino_id === ninoId).sort((a, b) => a.mes.localeCompare(b.mes));
+
+  const alternar = (ninoId: number, mes: string, si: boolean) => {
+    const suyos = deHijo(ninoId);
+    const i = suyos.findIndex((m) => m.mes === mes);
+    if (si) {
+      const falta = suyos.slice(0, i).find((m) => !marcados.has(clave(ninoId, m.mes)));
+      if (falta) {
+        setAvisoOrden({ k: clave(ninoId, mes), texto: `Primero marca ${nombreDeMes(falta.mes)}, que está pendiente.` });
+        return;
+      }
+    }
+    setAvisoOrden(null);
     setMarcados((antes) => {
       const nuevo = new Set(antes);
-      if (si) nuevo.add(k);
-      else nuevo.delete(k);
+      if (si) nuevo.add(clave(ninoId, mes));
+      // Desmarcar uno desmarca los siguientes: no puede quedar un hueco.
+      else for (const m of suyos.slice(i)) nuevo.delete(clave(ninoId, m.mes));
       return nuevo;
     });
+  };
 
   const elegirArchivo = async (archivo: File | undefined) => {
     if (!archivo) return;
@@ -151,6 +174,9 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
   };
 
   const sinHijos = datos.colegios.length === 0;
+  // Al día: nada por pagar hasta este mes (lo que queda es adelantable).
+  const actual = `${hoyEc().slice(0, 7)}-01`;
+  const alDia = !porPagar.some((m) => m.mes <= actual);
 
   return (
     <div className="space-y-6">
@@ -190,10 +216,12 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
         </p>
       )}
 
-      {!sinHijos && porPagar.length === 0 && (
+      {!sinHijos && alDia && (
         <div className="flex items-center gap-3 rounded-lg border p-4">
           <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
-          <p className="font-medium">Estás al día. No tienes mensualidades por pagar.</p>
+          <p className="font-medium">
+            Estás al día.{porPagar.length > 0 ? ' Si quieres, puedes pagar meses por adelantado.' : ' No tienes mensualidades por pagar.'}
+          </p>
         </div>
       )}
 
@@ -202,7 +230,7 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
           <div>
             <h2 className="text-lg font-semibold">Pagar mensualidad</h2>
             <p className="text-sm text-muted-foreground">
-              Marca lo que vas a pagar.
+              Marca los meses que vas a pagar, en orden. Puedes pagar varios meses por adelantado con una sola transferencia.
               {datos.colegios.length === 1 && ` Se paga hasta el día ${datos.colegios[0]!.dia_limite} de cada mes.`}
             </p>
           </div>
@@ -227,8 +255,13 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
                           const k = clave(h.nino_id, m.mes);
                           const id = `pagar-${k}`;
                           return (
-                            <label key={k} htmlFor={id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-1">
-                              <Checkbox id={id} checked={marcados.has(k)} onCheckedChange={(v) => alternar(k, v === true)} />
+                            <div key={k}>
+                            <label htmlFor={id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-1">
+                              <Checkbox
+                                id={id}
+                                checked={marcados.has(k)}
+                                onCheckedChange={(v) => alternar(h.nino_id, m.mes, v === true)}
+                              />
                               <span className="min-w-0 flex-1 text-sm">
                                 <span className="flex flex-wrap items-center gap-2">
                                   <span className="font-medium">{nombreDeMes(m.mes)}</span>
@@ -242,6 +275,12 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
                               </span>
                               <span className="whitespace-nowrap text-sm font-medium">{dinero(m.total)}</span>
                             </label>
+                            {avisoOrden?.k === k && (
+                              <p role="alert" className="ml-9 text-sm text-amber-700 dark:text-amber-400">
+                                {avisoOrden.texto}
+                              </p>
+                            )}
+                            </div>
                           );
                         })}
                     </div>
@@ -310,8 +349,13 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
   );
 };
 
-/** Cada hijo con todos sus meses, del más nuevo al más antiguo, agrupados por colegio. */
-const Historial = ({ datos }: { datos: MisMensualidades }) => (
+/**
+ * Cada hijo con sus meses hasta el actual y los ya pagados por adelantado,
+ * del más nuevo al más antiguo, agrupados por colegio.
+ */
+const Historial = ({ datos }: { datos: MisMensualidades }) => {
+  const actual = `${hoyEc().slice(0, 7)}-01`;
+  return (
   <section className="space-y-3">
     <h2 className="text-lg font-semibold">Historial de pagos</h2>
     {datos.colegios.map((c) => (
@@ -321,19 +365,24 @@ const Historial = ({ datos }: { datos: MisMensualidades }) => (
           <div key={h.nino_id} className="overflow-hidden rounded-lg border">
             <p className="border-b bg-muted/40 px-4 py-2 font-medium">{h.nombre}</p>
             <ul className="divide-y">
-              {[...h.meses].reverse().map((m) => (
-                <li key={m.mes} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
-                  <span className="min-w-[8.5rem] font-medium">{nombreDeMes(m.mes)}</span>
-                  <EstadoMesBadge estado={m.estado} />
-                  <span className="ml-auto whitespace-nowrap">{m.estado === 'inscripcion' ? '—' : dinero(m.total)}</span>
-                </li>
-              ))}
+              {[...h.meses]
+                .filter((m) => m.mes <= actual || !debe(m.estado))
+                .reverse()
+                .map((m) => (
+                  <li key={m.mes} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
+                    <span className="min-w-[8.5rem] font-medium">{nombreDeMes(m.mes)}</span>
+                    <EstadoMesBadge estado={m.estado} />
+                    {m.pagado_el && <span className="text-xs text-muted-foreground">pagado el {diaLegible(m.pagado_el)}</span>}
+                    <span className="ml-auto whitespace-nowrap">{m.estado === 'inscripcion' ? '—' : dinero(m.total)}</span>
+                  </li>
+                ))}
             </ul>
           </div>
         ))}
       </div>
     ))}
   </section>
-);
+  );
+};
 
 export default PagarMensualidad;

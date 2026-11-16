@@ -32,6 +32,11 @@ export interface FilaOriginal {
   asisest_id: number | null;
   hora_tarde: string | null;
   razon: string | null;
+  /**
+   * Mensualidad atrasada (2026-11-16): el borrador nace en Ausente y no se
+   * puede cambiar. Al guardar se manda como cualquier otro cambio.
+   */
+  bloqueada?: boolean;
 }
 
 export interface Borrador {
@@ -68,8 +73,13 @@ const vacio = (fila: FilaOriginal): Borrador => ({
   razon: fila.razon ?? '',
 });
 
+const ausente: Borrador = { asisest_id: ESTADO_ASISTENCIA.AUSENTE, hora: '', razon: '' };
+
+/** Lo que se pinta al abrir: lo guardado, salvo la fila bloqueada, que va en Ausente. */
+const inicial = (fila: FilaOriginal): Borrador => (fila.bloqueada ? ausente : vacio(fila));
+
 function desdeFilas(filas: FilaOriginal[]): Record<string, Borrador> {
-  return Object.fromEntries(filas.map((fila) => [fila.clave, vacio(fila)]));
+  return Object.fromEntries(filas.map((fila) => [fila.clave, inicial(fila)]));
 }
 
 const comoPresente: Borrador = {
@@ -80,6 +90,26 @@ const comoPresente: Borrador = {
 
 export function useBorradorAsistencia(filas: FilaOriginal[], firma: string): UsoBorrador {
   const [marcas, setMarcas] = useState<Record<string, Borrador>>(() => desdeFilas(filas));
+  const bloqueadas = useMemo(() => new Set(filas.filter((f) => f.bloqueada).map((f) => f.clave)), [filas]);
+
+  /**
+   * Una fila que se bloquea o se desbloquea después (pagaron, o se recargó
+   * la lista) vuelve a su estado inicial: Ausente si está bloqueada.
+   */
+  useEffect(() => {
+    setMarcas((previas) => {
+      let tocado = false;
+      const siguientes = { ...previas };
+      for (const fila of filas) {
+        const actual = previas[fila.clave];
+        if (fila.bloqueada && actual && actual.asisest_id !== ESTADO_ASISTENCIA.AUSENTE) {
+          siguientes[fila.clave] = ausente;
+          tocado = true;
+        }
+      }
+      return tocado ? siguientes : previas;
+    });
+  }, [filas]);
 
   /**
    * `firma` es la sesión: disciplina + fecha, o colegio + fecha. Al cambiar,
@@ -101,6 +131,7 @@ export function useBorradorAsistencia(filas: FilaOriginal[], firma: string): Uso
   }, [filas]);
 
   const elegirEstado = useCallback((clave: string, asisest_id: number) => {
+    if (bloqueadas.has(clave)) return;
     setMarcas((previas) => {
       const actual = previas[clave];
       if (!actual) return previas;
@@ -120,7 +151,7 @@ export function useBorradorAsistencia(filas: FilaOriginal[], firma: string): Uso
         },
       };
     });
-  }, []);
+  }, [bloqueadas]);
 
   const escribirHora = useCallback((clave: string, hora: string) => {
     setMarcas((previas) =>

@@ -8,7 +8,7 @@ const contarNuevas = vi.fn(async (_usu: number) => 3);
 
 vi.mock('./novedades.repository.js', () => ({ marcarVisto, contarNuevas }));
 vi.mock('../../config/db.js', () => ({ getPool: () => ({ query: vi.fn() }) }));
-vi.mock('../../config/env.js', () => ({ env: {} }));
+vi.mock('../../config/env.js', () => ({ env: {}, frontendBaseUrl: 'https://activareforce.com' }));
 
 const service = await import('./novedades.service.js');
 

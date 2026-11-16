@@ -8,7 +8,9 @@ import type { AuthUser } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
 import * as repo from './asistencias.repository.js';
 import { enviarAvisos, registrarAvisos } from '../novedades/novedades.ausencias.js';
+import { atrasadosEn } from '../mensualidades/mensualidades.service.js';
 import {
+  ASISTENCIA,
   type GuardarAlumnosInput,
   type GuardarEntrenadoresInput,
   type ListaAlumnosQuery,
@@ -125,7 +127,15 @@ async function exigirColegio(actor: AuthUser, colId: number): Promise<repo.Coleg
 // ---------------------------------------------------------------------------
 // Alumnos
 
-export type AlumnoConFoto = repo.AlumnoDeSesion & { nino_foto_url: string | null };
+export type AlumnoConFoto = repo.AlumnoDeSesion & {
+  nino_foto_url: string | null;
+  /**
+   * Meses de mensualidad vencidos sin pagar ese día ('YYYY-MM-01'). Con
+   * ellos el alumno queda Ausente y no se puede cambiar (cliente,
+   * 2026-11-16). Nulo si está al día.
+   */
+  mensualidad_pendiente: string[] | null;
+};
 
 export interface ListaAlumnos {
   sesion: repo.Sesion;
@@ -135,11 +145,15 @@ export interface ListaAlumnos {
   hora_servidor: string;
 }
 
-async function conFotos(alumnos: repo.AlumnoDeSesion[]): Promise<AlumnoConFoto[]> {
-  const firmadas = await firmarFotos(alumnos.map((a) => a.nino_foto));
+async function conFotos(alumnos: repo.AlumnoDeSesion[], fecha: string): Promise<AlumnoConFoto[]> {
+  const [firmadas, atrasados] = await Promise.all([
+    firmarFotos(alumnos.map((a) => a.nino_foto)),
+    atrasadosEn(alumnos.map((a) => a.nino_id), fecha),
+  ]);
   return alumnos.map((a) => ({
     ...a,
     nino_foto_url: a.nino_foto ? (firmadas.get(a.nino_foto) ?? a.nino_foto) : null,
+    mensualidad_pendiente: atrasados.get(a.nino_id) ?? null,
   }));
 }
 
@@ -157,7 +171,7 @@ export async function listaAlumnos(
   return {
     sesion,
     fecha: query.fecha,
-    alumnos: await conFotos(alumnos),
+    alumnos: await conFotos(alumnos, query.fecha),
     hora_servidor: hora,
   };
 }
@@ -189,6 +203,19 @@ export async function guardarAlumnos(
 
   if (sesion.est_id !== ESTADO.ACTIVO) {
     throw new ApiError(409, 'Esa disciplina esta dada de baja: su asistencia ya no se modifica');
+  }
+
+  // Quien debe un mes vencido ese día solo puede quedar Ausente.
+  const mora = await atrasadosEn(
+    input.marcas.map((m) => m.nino_id),
+    input.fecha,
+  );
+  const forzados = input.marcas.filter((m) => mora.has(m.nino_id) && m.asisest_id !== ASISTENCIA.AUSENTE);
+  if (forzados.length > 0) {
+    throw new ApiError(
+      409,
+      `${forzados.length === 1 ? 'Un alumno tiene' : `${forzados.length} alumnos tienen`} la mensualidad pendiente: queda ausente hasta que se pague. Recarga la lista.`,
+    );
   }
 
   const resultado = await enTransaccion(async (client) => {
@@ -254,6 +281,7 @@ export async function guardarAlumnos(
       fecha: input.fecha,
       marcas: input.marcas,
       autorId: actor.usuario.usu_id,
+      mora,
     });
 
     return { altas, cambios, avisos };

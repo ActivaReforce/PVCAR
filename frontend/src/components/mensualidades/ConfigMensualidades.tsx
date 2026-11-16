@@ -1,23 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Save } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CalendarPlus, Save } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useConfigMensualidades, useGuardarCobroColegio } from '@/hooks/useMensualidades';
-import { NOMBRES_DE_MES, nombreDeMes, type ConfigMensualidades as Config } from '@/api/mensualidades';
+import { NOMBRES_DE_MES, type ConfigMensualidades as Config } from '@/api/mensualidades';
 import { hoyEc } from '@/lib/fecha';
 import { cn } from '@/lib/utils';
 import TarjetaConfig from '@/components/inscripciones/TarjetaConfig';
 
 type ColegioConfig = Config['colegios'][number];
-const SIN_COBRO = 'ninguno';
+
+const mesDe = (ano: number, n: number) => `${ano}-${String(n).padStart(2, '0')}-01`;
 
 /**
  * Pestaña Mensualidades de la Configuración de Inscripciones (cliente,
- * 2026-10-30): como "Por colegio", primero el colegio y debajo sus dos
- * tarjetas, Valores (día límite y día de corte) y Meses de cobro.
+ * 2026-11-16): primero el colegio y debajo sus dos tarjetas, Valores (día
+ * límite de pago) y Meses de cobro, con año: el año en curso y, si se abre,
+ * el siguiente. Al empezar el año nuevo, ese pasa a ser el principal.
  */
 const ConfigMensualidades = () => {
   const config = useConfigMensualidades();
@@ -40,6 +43,8 @@ const ConfigMensualidades = () => {
     );
   }
   const fila = colegios.find((c) => String(c.col_id) === colId) ?? colegios[0]!;
+  const ano = Number(hoyEc().slice(0, 4));
+  const deEsteAno = (c: ColegioConfig) => c.meses.filter((m) => m.startsWith(`${ano}-`)).length;
 
   return (
     <div className="space-y-5">
@@ -53,88 +58,59 @@ const ConfigMensualidades = () => {
             {colegios.map((c) => (
               <SelectItem key={c.col_id} value={String(c.col_id)}>
                 {c.col_nombre}
-                {c.desde === null ? ' · no cobra' : ''}
+                {c.meses.length === 0 ? ' · no cobra' : ''}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <p className="text-sm text-muted-foreground">
-          {fila.desde === null
+          {fila.meses.length === 0
             ? 'Este colegio todavía no cobra mensualidades.'
-            : `Cobra desde ${nombreDeMes(fila.desde)}, ${fila.meses.length} ${fila.meses.length === 1 ? 'mes' : 'meses'} al año.`}
+            : `Cobra ${deEsteAno(fila)} ${deEsteAno(fila) === 1 ? 'mes' : 'meses'} en ${ano}.`}
         </p>
       </div>
       <Valores key={`v-${fila.col_id}`} colegio={fila} />
-      <MesesDeCobro key={`m-${fila.col_id}`} colegio={fila} />
+      <MesesDeCobro key={`m-${fila.col_id}`} colegio={fila} ano={ano} />
     </div>
   );
 };
-
-/** Lo que se guarda: siempre todo el colegio, cada tarjeta con lo suyo cambiado. */
-const datosDe = (c: ColegioConfig) => ({ meses: c.meses, desde: c.desde, dia_limite: c.dia_limite, dia_corte: c.dia_corte });
 
 const Valores = ({ colegio }: { colegio: ColegioConfig }) => {
   const guardar = useGuardarCobroColegio();
   const { hasPermission } = usePermissions();
   const puede = hasPermission('inscripciones', 'editar');
   const [limite, setLimite] = useState(String(colegio.dia_limite));
-  const [corte, setCorte] = useState(String(colegio.dia_corte));
-  useEffect(() => {
-    setLimite(String(colegio.dia_limite));
-    setCorte(String(colegio.dia_corte));
-  }, [colegio.dia_limite, colegio.dia_corte]);
+  useEffect(() => setLimite(String(colegio.dia_limite)), [colegio.dia_limite]);
 
-  const valido = (v: string) => Number.isInteger(Number(v)) && Number(v) >= 1 && Number(v) <= 28;
-  const cambio = Number(limite) !== colegio.dia_limite || Number(corte) !== colegio.dia_corte;
+  const valido = Number.isInteger(Number(limite)) && Number(limite) >= 1 && Number(limite) <= 28;
+  const cambio = Number(limite) !== colegio.dia_limite;
 
   return (
-    <TarjetaConfig
-      titulo="Valores"
-      descripcion={`Se paga hasta el día ${colegio.dia_limite}. Quien se inscribe desde el día ${colegio.dia_corte} empieza el mes siguiente.`}
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="mens-limite">Día límite de pago</Label>
-          <Input
-            id="mens-limite"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={28}
-            value={limite}
-            disabled={!puede}
-            onChange={(e) => setLimite(e.target.value)}
-            aria-invalid={!valido(limite)}
-            className="h-11 max-w-[8rem] sm:h-10"
-          />
-          <p className="text-xs text-muted-foreground">Pasado este día, el mes sin pagar sale como atrasado. No se bloquea nada.</p>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="mens-corte">Día de corte de la inscripción</Label>
-          <Input
-            id="mens-corte"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={28}
-            value={corte}
-            disabled={!puede}
-            onChange={(e) => setCorte(e.target.value)}
-            aria-invalid={!valido(corte)}
-            className="h-11 max-w-[8rem] sm:h-10"
-          />
-          <p className="text-xs text-muted-foreground">
-            Quien se inscribe desde este día paga con la inscripción el mes siguiente (inscrito el 25 de enero, paga febrero).
-          </p>
-        </div>
+    <TarjetaConfig titulo="Valores" descripcion={`Se paga hasta el día ${colegio.dia_limite} de cada mes.`}>
+      <div className="space-y-1.5">
+        <Label htmlFor="mens-limite">Día límite de pago</Label>
+        <Input
+          id="mens-limite"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={28}
+          value={limite}
+          disabled={!puede}
+          onChange={(e) => setLimite(e.target.value)}
+          aria-invalid={!valido}
+          className="h-11 max-w-[8rem] sm:h-10"
+        />
+        <p className="text-xs text-muted-foreground">
+          Pasado este día, el mes sin pagar sale atrasado y el alumno queda ausente en Asistencias hasta que pague. Se
+          puede pagar después, sin recargo.
+        </p>
       </div>
       {puede && (
         <Button
           className="h-11 sm:h-10"
-          disabled={!valido(limite) || !valido(corte) || !cambio || guardar.isPending}
-          onClick={() =>
-            guardar.mutate({ colId: colegio.col_id, ...datosDe(colegio), dia_limite: Number(limite), dia_corte: Number(corte) })
-          }
+          disabled={!valido || !cambio || guardar.isPending}
+          onClick={() => guardar.mutate({ colId: colegio.col_id, meses: colegio.meses, dia_limite: Number(limite) })}
         >
           <Save className="mr-2 h-4 w-4" />
           {guardar.isPending ? 'Guardando…' : 'Guardar'}
@@ -144,103 +120,82 @@ const Valores = ({ colegio }: { colegio: ColegioConfig }) => {
   );
 };
 
-/** Enero del año en curso a diciembre del siguiente; cambia solo al empezar cada año. */
-function mesesElegibles(guardado: string | null): string[] {
-  const ano = Number(hoyEc().slice(0, 4));
-  const lista = [ano, ano + 1].flatMap((a) => NOMBRES_DE_MES.map((_, i) => `${a}-${String(i + 1).padStart(2, '0')}-01`));
-  // Uno guardado en un año que ya pasó sigue saliendo, para no cambiarlo sin querer.
-  if (guardado && !lista.includes(guardado)) lista.unshift(guardado);
-  return lista;
-}
-
-const MesesDeCobro = ({ colegio }: { colegio: ColegioConfig }) => {
+const MesesDeCobro = ({ colegio, ano }: { colegio: ColegioConfig; ano: number }) => {
   const guardar = useGuardarCobroColegio();
   const { hasPermission } = usePermissions();
   const puede = hasPermission('inscripciones', 'editar');
-  const [meses, setMeses] = useState<number[]>(colegio.meses);
-  const [desde, setDesde] = useState<string>(colegio.desde ?? SIN_COBRO);
+  const [meses, setMeses] = useState<Set<string>>(new Set(colegio.meses));
+  const tieneSiguiente = colegio.meses.some((m) => m.startsWith(`${ano + 1}-`));
+  const [siguienteAbierto, setSiguienteAbierto] = useState(tieneSiguiente);
   useEffect(() => {
-    setMeses(colegio.meses);
-    setDesde(colegio.desde ?? SIN_COBRO);
-  }, [colegio.meses, colegio.desde]);
+    setMeses(new Set(colegio.meses));
+    setSiguienteAbierto(colegio.meses.some((m) => m.startsWith(`${ano + 1}-`)));
+  }, [colegio.meses, ano]);
 
-  const opciones = useMemo(() => mesesElegibles(colegio.desde), [colegio.desde]);
-  const ordenados = [...meses].sort((x, y) => x - y);
-  const elegido = desde === SIN_COBRO ? null : desde;
-  const cambio = ordenados.join() !== colegio.meses.join() || elegido !== colegio.desde;
-  const faltaMes = elegido !== null && meses.length === 0;
-  // El primer mes elegido tiene que ser de cobro: si no, en realidad empezaría después.
-  const desdeEnPausa = elegido !== null && meses.length > 0 && !meses.includes(Number(elegido.slice(5, 7)));
+  const ordenados = [...meses].sort();
+  const cambio = ordenados.join() !== [...colegio.meses].sort().join();
+  const alternar = (m: string) =>
+    setMeses((antes) => {
+      const nuevo = new Set(antes);
+      if (nuevo.has(m)) nuevo.delete(m);
+      else nuevo.add(m);
+      return nuevo;
+    });
+
+  const anos = siguienteAbierto ? [ano, ano + 1] : [ano];
 
   return (
     <TarjetaConfig
       titulo="Meses de cobro"
-      descripcion={
-        colegio.desde === null
-          ? 'Todavía no cobra mensualidades.'
-          : `Desde ${nombreDeMes(colegio.desde)}: ${colegio.meses.map((m) => NOMBRES_DE_MES[m - 1]!.slice(0, 3)).join(', ')}.`
-      }
+      descripcion="Los meses en que este colegio cobra mensualidad. Los que no marques quedan en pausa (vacaciones): ese mes no se cobra a nadie."
     >
-      <div className="space-y-1.5">
-        <p className="text-sm font-medium">Meses que se cobran</p>
-        <p className="text-xs text-muted-foreground">Los que no marques quedan en pausa (vacaciones): ese mes no se cobra a nadie.</p>
-        <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6" role="group" aria-label={`Meses que cobra ${colegio.col_nombre}`}>
-          {NOMBRES_DE_MES.map((nombre, i) => {
-            const n = i + 1;
-            const activo = meses.includes(n);
-            return (
-              <button
-                key={n}
-                type="button"
-                aria-pressed={activo}
-                disabled={!puede}
-                onClick={() => setMeses((antes) => (activo ? antes.filter((x) => x !== n) : [...antes, n]))}
-                className={cn(
-                  'min-h-11 rounded-md border px-2 text-sm transition-colors disabled:cursor-not-allowed sm:min-h-9',
-                  activo ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted',
-                )}
-              >
-                {nombre.slice(0, 3)}
-              </button>
-            );
-          })}
+      {anos.map((a) => (
+        <div key={a} className="space-y-2">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">Meses que se cobran</p>
+            <Badge variant={a === ano ? 'default' : 'secondary'}>{a}</Badge>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6" role="group" aria-label={`Meses que cobra ${colegio.col_nombre} en ${a}`}>
+            {NOMBRES_DE_MES.map((nombre, i) => {
+              const m = mesDe(a, i + 1);
+              const activo = meses.has(m);
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={activo}
+                  aria-label={`${nombre} ${a}`}
+                  disabled={!puede}
+                  onClick={() => alternar(m)}
+                  className={cn(
+                    'min-h-11 rounded-md border px-2 text-sm transition-colors disabled:cursor-not-allowed sm:min-h-9',
+                    activo ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted',
+                  )}
+                >
+                  {nombre.slice(0, 3)}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ))}
 
-      <div className="space-y-1.5">
-        <Label htmlFor={`mens-desde-${colegio.col_id}`}>Cobrar desde</Label>
-        <Select value={desde} onValueChange={setDesde} disabled={!puede}>
-          <SelectTrigger id={`mens-desde-${colegio.col_id}`} className="h-11 sm:h-10 sm:max-w-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={SIN_COBRO}>Todavía no cobra</SelectItem>
-            {opciones.map((m) => (
-              <SelectItem key={m} value={m}>
-                {nombreDeMes(m)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {!siguienteAbierto && puede && (
+        <Button variant="outline" className="h-11 sm:h-10" onClick={() => setSiguienteAbierto(true)}>
+          <CalendarPlus className="mr-2 h-4 w-4" /> Abrir {ano + 1}
+        </Button>
+      )}
+      {siguienteAbierto && (
         <p className="text-xs text-muted-foreground">
-          El primer mes en que este colegio cobra mensualidad. Antes de ese mes no se cobra nada, y quien ya estaba
-          inscrito tiene ese primer mes pagado con su inscripción. Ejemplo: con Noviembre 2026, los inscritos en octubre
-          tienen noviembre pagado y su primera mensualidad es diciembre.
-        </p>
-      </div>
-
-      {faltaMes && <p className="text-sm text-destructive">Marca al menos un mes de cobro.</p>}
-      {desdeEnPausa && (
-        <p className="text-sm text-amber-700 dark:text-amber-400">
-          {nombreDeMes(elegido!)} está en pausa: el cobro empezará en el siguiente mes marcado.
+          Los representantes pueden pagar por adelantado los meses marcados de {ano} y {ano + 1}.
         </p>
       )}
 
       {puede && (
         <Button
           className="h-11 sm:h-10"
-          disabled={!cambio || faltaMes || guardar.isPending}
-          onClick={() => guardar.mutate({ colId: colegio.col_id, ...datosDe(colegio), meses: ordenados, desde: elegido })}
+          disabled={!cambio || guardar.isPending}
+          onClick={() => guardar.mutate({ colId: colegio.col_id, meses: ordenados, dia_limite: colegio.dia_limite })}
         >
           <Save className="mr-2 h-4 w-4" />
           {guardar.isPending ? 'Guardando…' : 'Guardar'}

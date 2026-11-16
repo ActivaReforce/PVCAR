@@ -24,7 +24,8 @@ import {
   useRechazarPago,
 } from '@/hooks/useMensualidades';
 import { dinero } from '@/api/inscripciones';
-import { nombreDeMes, type EstadoMes } from '@/api/mensualidades';
+import { diaLegible, mesesCortos, nombreDeMes, type AlumnoDelMes, type EstadoMes } from '@/api/mensualidades';
+import { cn } from '@/lib/utils';
 import { fechaHora } from '@/components/inscripciones/formato';
 import { EstadoMesBadge } from './PagarMensualidad';
 
@@ -328,36 +329,63 @@ const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) 
   );
 };
 
-const ORDEN: EstadoMes[] = ['atrasado', 'pendiente', 'revision', 'pagado', 'inscripcion'];
+const ORDEN: Array<EstadoMes | null> = ['atrasado', 'pendiente', 'revision', 'pagado', 'inscripcion', null];
 
-/** El estado de un mes por colegio: quién pagó, quién está en revisión y quién debe. */
+/** El dinero de una fila: lo que entró este mes, o lo que vale/debe el mes. */
+const DineroDeFila = ({ a, mes }: { a: AlumnoDelMes; mes: string }) => {
+  const debe = a.estado === 'pendiente' || a.estado === 'atrasado';
+  let nota: string | null = null;
+  if (a.recibido > 0 && a.cubre.length > 0) nota = `incluye ${mesesCortos(a.cubre)}`;
+  else if (a.pagado_el && !a.pagado_el.startsWith(mes.slice(0, 7))) nota = `pagado el ${diaLegible(a.pagado_el)}`;
+  return (
+    <div className="text-right">
+      <p className={cn('w-24 font-medium', debe && 'text-muted-foreground')}>
+        {a.estado === 'inscripcion' && a.recibido === 0 ? '—' : debe && a.recibido === 0 ? dinero(a.valor) : dinero(a.recibido)}
+      </p>
+      {nota && <p className="text-xs text-muted-foreground">{nota}</p>}
+    </div>
+  );
+};
+
+/**
+ * El estado de un mes por colegio: quién pagó, quién está en revisión y quién
+ * debe. Solo lectura. El dinero va por fecha de pago (cliente, 2026-11-16):
+ * lo pagado por adelantado suma en el mes en que se pagó, y en los meses que
+ * cubre sale pagado con $0 y la fecha del pago.
+ */
 const EstadoDelMes = () => {
   const [mes, setMes] = useState<string | undefined>(undefined);
   const [colegio, setColegio] = useState(TODOS);
   const consulta = useEstadoDelMes(mes, colegio === TODOS ? undefined : Number(colegio));
   const datos = consulta.data;
 
-  // Del mes en curso hacia atrás, dos años.
+  // Del último mes abierto al de hace dos años; por defecto, el actual.
   const meses = useMemo(() => {
     if (!datos) return [];
-    const [a, m] = datos.actual.split('-').map(Number) as [number, number];
-    return Array.from({ length: 24 }, (_, i) => {
-      const total = a * 12 + (m - 1) - i;
+    const indice = (m: string) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7)) - 1;
+    const desde = indice(datos.actual) - 23;
+    const hasta = Math.max(indice(datos.hasta ?? datos.actual), indice(datos.actual));
+    return Array.from({ length: hasta - desde + 1 }, (_, i) => {
+      const total = hasta - i;
       return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
     });
   }, [datos]);
 
   const visibles = (datos?.colegios ?? []).filter((c) => c.cobra || c.alumnos.length > 0);
+  const elegido = mes ?? datos?.actual.slice(0, 7) ?? '';
+  const nombreElegido = elegido ? nombreDeMes(`${elegido}-01`).split(' ')[0]!.toLowerCase() : '';
 
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Estado del mes</h2>
-        <p className="text-sm text-muted-foreground">Cada alumno del mes elegido: pagado, en revisión o por pagar.</p>
+        <p className="text-sm text-muted-foreground">
+          Cada alumno del mes elegido: pagado, en revisión o por pagar. El dinero cuenta en el mes en que se pagó.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Select value={mes ?? datos?.actual.slice(0, 7) ?? ''} onValueChange={setMes}>
+        <Select value={elegido} onValueChange={setMes}>
           <SelectTrigger className="h-11 sm:h-10" aria-label="Mes">
             <SelectValue placeholder="Mes" />
           </SelectTrigger>
@@ -365,6 +393,7 @@ const EstadoDelMes = () => {
             {meses.map((m) => (
               <SelectItem key={m} value={m}>
                 {nombreDeMes(`${m}-01`)}
+                {datos && m === datos.actual.slice(0, 7) ? ' · este mes' : ''}
               </SelectItem>
             ))}
           </SelectContent>
@@ -389,7 +418,7 @@ const EstadoDelMes = () => {
 
       {datos && visibles.length === 0 && (
         <p className="rounded-lg border border-dashed py-10 text-center text-muted-foreground">
-          Ningún colegio cobra este mes. Los meses de cobro se eligen en Configuración → Más → Mensualidades.
+          Ningún colegio cobra este mes. Los meses de cobro se eligen en Configuración → Mensualidades.
         </p>
       )}
 
@@ -405,7 +434,7 @@ const EstadoDelMes = () => {
               {!c.cobra && <p className="text-sm text-muted-foreground">Este mes está en pausa para este colegio.</p>}
               <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
                 <div>
-                  <dt className="text-muted-foreground">Recaudado</dt>
+                  <dt className="text-muted-foreground">Recaudado en {nombreElegido}</dt>
                   <dd className="font-semibold">{dinero(t.recaudado)}</dd>
                 </div>
                 <div>
@@ -413,7 +442,7 @@ const EstadoDelMes = () => {
                   <dd className="font-semibold">{dinero(t.en_revision)}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Por cobrar</dt>
+                  <dt className="text-muted-foreground">Por cobrar de {nombreElegido}</dt>
                   <dd className="font-semibold">{dinero(t.por_cobrar)}</dd>
                 </div>
                 <div>
@@ -429,17 +458,26 @@ const EstadoDelMes = () => {
             ) : (
               <ul className="divide-y">
                 {alumnos.map((a) => (
-                  <li key={a.nino_id} className="flex flex-col gap-1 px-4 py-2 text-sm sm:flex-row sm:items-center sm:gap-3">
+                  <li
+                    key={a.nino_id ?? `n-${a.nombre}`}
+                    className="flex flex-col gap-1 px-4 py-2 text-sm sm:flex-row sm:items-center sm:gap-3"
+                  >
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{a.nombre}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {a.representantes.join(', ') || 'Sin representante'}
+                        {a.representantes.join(', ') || (a.estado === null ? 'Ya no está activo' : 'Sin representante')}
                         {a.inscripcion.length > 0 && a.estado !== 'inscripcion' && ` · inscripción: ${a.inscripcion.join(', ')}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <EstadoMesBadge estado={a.estado} />
-                      <span className="w-20 text-right font-medium">{a.estado === 'inscripcion' ? '—' : dinero(a.total)}</span>
+                      {a.estado ? (
+                        <EstadoMesBadge estado={a.estado} />
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          Pagó otros meses
+                        </Badge>
+                      )}
+                      <DineroDeFila a={a} mes={`${elegido}-01`} />
                     </div>
                   </li>
                 ))}

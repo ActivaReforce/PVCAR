@@ -16,6 +16,8 @@ export interface MesDelHijo {
   iva: number;
   total: number;
   menpag_id: number | null;
+  /** Pagado o en revisión: el día en que se envió el pago ('YYYY-MM-DD'). */
+  pagado_el?: string | null;
 }
 
 export interface PagoVista {
@@ -85,18 +87,28 @@ export interface ListaPagos {
 }
 
 export interface AlumnoDelMes {
-  nino_id: number;
+  nino_id: number | null;
   nombre: string;
   representantes: string[];
-  estado: EstadoMes;
+  /** null: ese mes no tiene cobro; sale porque pagó en él otros meses. */
+  estado: EstadoMes | null;
   disciplinas: string[];
   inscripcion: string[];
-  total: number;
+  /** Lo que vale el mes: lo pagado o lo que debe. */
+  valor: number;
+  /** Pagado o en revisión: el día del pago ('YYYY-MM-DD'). */
+  pagado_el: string | null;
+  /** Lo que entró este mes por este alumno, sea del mes que sea. */
+  recibido: number;
+  /** Los otros meses que pagó con lo recibido este mes. */
+  cubre: string[];
 }
 
 export interface EstadoDelMes {
   mes: string;
   actual: string;
+  /** El último mes que algún colegio tiene abierto ('YYYY-MM-01'). */
+  hasta: string;
   colegios: Array<{
     col_id: number;
     col_nombre: string;
@@ -116,10 +128,9 @@ export interface EstadoDelMes {
 }
 
 export interface CobroDelColegio {
-  meses: number[];
-  desde: string | null;
+  /** Meses con año ('YYYY-MM-01'), también los de años pasados. */
+  meses: string[];
   dia_limite: number;
-  dia_corte: number;
 }
 
 export interface ConfigMensualidades {
@@ -173,6 +184,20 @@ export const NOMBRES_DE_MES = MESES;
 
 /** '2026-11-01' → 'Noviembre 2026'. */
 export const nombreDeMes = (mes: string) => `${MESES[Number(mes.slice(5, 7)) - 1]} ${mes.slice(0, 4)}`;
+
+/** '2026-11-01' → 'Nov'. */
+export const mesCorto = (mes: string) => MESES[Number(mes.slice(5, 7)) - 1]!.slice(0, 3);
+
+/** '2026-11-16' → '16/11/2026'. */
+export const diaLegible = (dia: string) => dia.split('-').reverse().join('/');
+
+/** "dic, ene y feb" (con año si cruzan de año). */
+export function mesesCortos(meses: string[]): string {
+  const ordenados = [...new Set(meses)].sort();
+  const anos = new Set(ordenados.map((m) => m.slice(0, 4)));
+  const nombres = ordenados.map((m) => (anos.size > 1 ? `${mesCorto(m).toLowerCase()} ${m.slice(2, 4)}` : mesCorto(m).toLowerCase()));
+  return nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}` : (nombres[0] ?? '');
+}
 
 export const ETIQUETA_ESTADO: Record<EstadoMes, string> = {
   inscripcion: 'Pagado (Inscripción)',

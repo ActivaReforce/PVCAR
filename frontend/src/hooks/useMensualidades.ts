@@ -55,7 +55,10 @@ function useMutacion<TVars, TData>(fn: (vars: TVars) => Promise<TData>, exito: s
   return useMutation({
     mutationFn: fn,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['mensualidades'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['mensualidades'] }),
+        queryClient.invalidateQueries({ queryKey: ['inscripciones', 'aviso-menu'] }),
+      ]);
       if (exito) toast({ title: exito });
     },
     onError: (error: unknown) => {

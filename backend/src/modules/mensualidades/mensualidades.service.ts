@@ -12,8 +12,11 @@ import {
 } from '../../lib/storageInscripciones.js';
 import { describirDisciplina, esPersonal, firmaDeImagenValida } from '../inscripciones/inscripciones.service.js';
 import {
+  debe,
   familias,
   mesDe,
+  mesQueFalta,
+  mesesAtrasados,
   mesesDeLaFamilia,
   nombreDeMes,
   type ColegioCobro,
@@ -56,18 +59,18 @@ const aHijo = (a: repo.AlumnoConDisciplinas): HijoCobro => ({
   disciplinas: a.disciplinas.map((d) => ({
     colacthor_id: d.colacthor_id,
     nombre: describirDisciplina(d),
-    inicio: d.inicio,
+    inicio: mesDe(d.inicio),
     porInscripcion: d.por_inscripcion,
   })),
 });
 
 /**
  * Los meses de los alumnos activos. Con `soloDe`, solo las familias de esos
- * niños (el descuento de hermano se calcula con la familia entera).
+ * niños (el descuento de hermano se calcula con la familia entera). `hoy`
+ * decide qué está atrasado: Asistencias lo pide con la fecha de la clase.
  */
-async function calcular(soloDe: number[] | null): Promise<Calculo> {
+async function calcular(soloDe: number[] | null, hoy: string = hoyEc()): Promise<Calculo> {
   const [config, colegios, todos] = await Promise.all([repo.obtenerConfig(), repo.colegios(), repo.alumnosActivos()]);
-  const hoy = hoyEc();
   const porColegio = new Map<number, ColegioCobro>(colegios.map((c) => [c.col_id, c]));
   const grupos = familias(todos).filter((f) => soloDe === null || f.some((a) => soloDe.includes(a.nino_id)));
   const ids = grupos.flat().map((a) => a.nino_id);
@@ -86,8 +89,6 @@ async function calcular(soloDe: number[] | null): Promise<Calculo> {
   }
   return { alumnos: new Map(grupos.flat().map((a) => [a.nino_id, a])), meses, colegios, config, hoy };
 }
-
-const DEBE = new Set(['pendiente', 'atrasado']);
 
 // ---------------------------------------------------------------------------
 // El representante
@@ -136,7 +137,7 @@ export async function misMensualidades(actor: AuthUser): Promise<MisMensualidade
     const col = colegios.get(a.col_id) ?? {
       col_id: a.col_id,
       col_nombre: a.col_nombre,
-      dia_limite: calculo.colegios.find((c) => c.col_id === a.col_id)?.diaLimite ?? 10,
+      dia_limite: calculo.colegios.find((c) => c.col_id === a.col_id)?.diaLimite ?? 5,
       hijos: [],
     };
     col.hijos.push({ nino_id: id, nombre: a.nombre, meses });
@@ -170,7 +171,7 @@ export async function pagar(
     const mes = hijos.includes(pedida.nino_id)
       ? calculo.meses.get(pedida.nino_id)?.find((m) => m.mes === pedida.mes)
       : undefined;
-    if (!a || !mes || !DEBE.has(mes.estado)) {
+    if (!a || !mes || !debe(mes.estado)) {
       throw new ApiError(409, 'Uno de los meses elegidos ya está pagado o en revisión. Recarga la página.');
     }
     detalle.push({
@@ -186,6 +187,16 @@ export async function pagar(
       total: mes.total,
     });
   }
+  // En orden: no se paga un mes si el anterior del mismo alumno sigue por pagar.
+  for (const id of new Set(input.cuotas.map((c) => c.nino_id))) {
+    const elegidos = new Set(input.cuotas.filter((c) => c.nino_id === id).map((c) => c.mes));
+    const falta = mesQueFalta(calculo.meses.get(id) ?? [], elegidos);
+    if (falta) {
+      const nombre = calculo.alumnos.get(id)?.nombre ?? 'tu hijo';
+      throw new ApiError(400, `Primero marca ${nombreDeMes(falta)} de ${nombre}, que está pendiente.`);
+    }
+  }
+
   const suma = (f: (c: repo.CuotaDetalle) => number) => detalle.reduce((s, c) => s + aCentavos(f(c)), 0);
   const total = suma((c) => c.total);
   if (total !== aCentavos(input.total)) {
@@ -300,13 +311,21 @@ export async function rechazarPago(actor: AuthUser, id: number, motivo: string):
 }
 
 export interface AlumnoDelMes {
-  nino_id: number;
+  nino_id: number | null;
   nombre: string;
   representantes: string[];
-  estado: MesDelHijo['estado'];
+  /** null: ese mes no tiene cobro; sale porque pagó en él otros meses. */
+  estado: MesDelHijo['estado'] | null;
   disciplinas: string[];
   inscripcion: string[];
-  total: number;
+  /** Lo que vale el mes: lo pagado o lo que debe. */
+  valor: number;
+  /** Pagado o en revisión: el día del pago. */
+  pagado_el: string | null;
+  /** Lo que entró este mes por este alumno (aprobado o en revisión), sea del mes que sea. */
+  recibido: number;
+  /** Los otros meses que pagó con lo recibido este mes. */
+  cubre: Mes[];
 }
 
 export interface ColegioDelMes {
@@ -321,58 +340,105 @@ export interface ColegioDelMes {
     revision: number;
     pendientes: number;
     atrasados: number;
+    /** Aprobado y enviado en este mes, sea del mes que sea (caja). */
     recaudado: number;
+    /** En revisión, enviado en este mes. */
     en_revision: number;
+    /** Lo que se debe de este mes. */
     por_cobrar: number;
   };
 }
 
-/** El estado de un mes (por defecto, el actual), alumno por alumno y por colegio. */
+/**
+ * El estado de un mes (por defecto, el actual), alumno por alumno y por
+ * colegio. El dinero va por fecha de pago (cliente, 2026-11-16): quien pagó
+ * $300 el 16 de noviembre por diciembre, enero y febrero suma $300 en
+ * noviembre, y en diciembre, enero y febrero sale pagado con $0 recibido.
+ */
 export async function estadoDelMes(mesPedido: string | undefined, colegio: number | undefined) {
-  const calculo = await calcular(null);
-  const actual = mesDe(calculo.hoy);
+  const hoy = hoyEc();
+  const actual = mesDe(hoy);
   const mes = mesPedido ? `${mesPedido}-01` : actual;
-  if (mes > actual) throw new ApiError(400, 'Solo se consultan el mes en curso y los anteriores.');
+  const [calculo, cobrado] = await Promise.all([calcular(null, hoy), repo.cobradoEn(mes)]);
+  // Hasta el último mes que algún colegio tiene abierto.
+  const hasta = calculo.colegios.flatMap((c) => c.meses).reduce((m, x) => (x > m ? x : m), actual);
 
   const resultado: ColegioDelMes[] = calculo.colegios
     .filter((c) => !colegio || c.col_id === colegio)
     .map((c) => ({
       col_id: c.col_id,
       col_nombre: c.col_nombre,
-      cobra: c.desde !== null && mes >= c.desde && c.meses.includes(Number(mes.slice(5, 7))),
+      cobra: c.meses.includes(mes),
       alumnos: [],
       totales: { pagados: 0, inscripcion: 0, revision: 0, pendientes: 0, atrasados: 0, recaudado: 0, en_revision: 0, por_cobrar: 0 },
     }));
   const porId = new Map(resultado.map((c) => [c.col_id, c]));
 
+  // Lo que entró este mes, por alumno.
+  const claveDe = (colId: number, ninoId: number | null, nombre: string) => `${colId}|${ninoId ?? `n:${nombre}`}`;
+  const entradas = new Map<string, repo.CuotaCobrada[]>();
+  for (const c of cobrado) {
+    if (c.col_id === null || !porId.has(c.col_id)) continue;
+    const k = claveDe(c.col_id, c.nino_id, c.nombre);
+    entradas.set(k, [...(entradas.get(k) ?? []), c]);
+  }
+  const sacarEntradas = (col: ColegioDelMes, k: string) => {
+    const lista = entradas.get(k) ?? [];
+    entradas.delete(k);
+    for (const c of lista) {
+      if (c.estado === 'aprobado') col.totales.recaudado += aCentavos(c.total);
+      else col.totales.en_revision += aCentavos(c.total);
+    }
+    return {
+      recibido: lista.reduce((s, c) => s + aCentavos(c.total), 0) / 100,
+      cubre: [...new Set(lista.map((c) => c.mes).filter((m) => m !== mes))].sort(),
+    };
+  };
+
   for (const [ninoId, meses] of calculo.meses) {
     const m = meses.find((x) => x.mes === mes);
     const a = calculo.alumnos.get(ninoId);
     const col = a ? porId.get(a.col_id) : undefined;
-    if (!m || !a || !col) continue;
+    if (!a || !col) continue;
+    const k = claveDe(col.col_id, ninoId, a.nombre);
+    if (!m && !entradas.has(k)) continue;
     col.alumnos.push({
       nino_id: ninoId,
       nombre: a.nombre,
       representantes: a.representantes_nombres,
-      estado: m.estado,
-      disciplinas: m.disciplinas,
-      inscripcion: m.inscripcion,
-      total: m.total,
+      estado: m?.estado ?? null,
+      disciplinas: m?.disciplinas ?? [],
+      inscripcion: m?.inscripcion ?? [],
+      valor: m?.total ?? 0,
+      pagado_el: m?.pagado_el ?? null,
+      ...sacarEntradas(col, k),
     });
+    if (!m) continue;
     const t = col.totales;
-    const c = aCentavos(m.total);
-    if (m.estado === 'pagado') {
-      t.pagados++;
-      t.recaudado += c;
-    } else if (m.estado === 'inscripcion') t.inscripcion++;
-    else if (m.estado === 'revision') {
-      t.revision++;
-      t.en_revision += c;
-    } else {
+    if (m.estado === 'pagado') t.pagados++;
+    else if (m.estado === 'inscripcion') t.inscripcion++;
+    else if (m.estado === 'revision') t.revision++;
+    else {
       if (m.estado === 'pendiente') t.pendientes++;
       else t.atrasados++;
-      t.por_cobrar += c;
+      t.por_cobrar += aCentavos(m.total);
     }
+  }
+  // Pagos de alumnos que ya no están activos: el dinero entró y tiene que cuadrar.
+  for (const [k, lista] of [...entradas]) {
+    const primera = lista[0]!;
+    const col = porId.get(primera.col_id!)!;
+    col.alumnos.push({
+      nino_id: primera.nino_id,
+      nombre: primera.nombre,
+      representantes: [],
+      estado: null,
+      disciplinas: [],
+      inscripcion: [],
+      valor: 0,
+      pagado_el: null,
+      ...sacarEntradas(col, k),
+    });
   }
   for (const c of resultado) {
     c.alumnos.sort((x, y) => x.nombre.localeCompare(y.nombre));
@@ -380,13 +446,40 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
     c.totales.en_revision /= 100;
     c.totales.por_cobrar /= 100;
   }
-  return { mes, actual, colegios: resultado };
+  return { mes, actual, hasta, colegios: resultado };
+}
+
+// ---------------------------------------------------------------------------
+// Asistencias
+
+/**
+ * Los alumnos que en `fecha` deben algún mes ya vencido, con esos meses:
+ * Asistencias los deja ausentes y sin poder cambiarlo (cliente,
+ * 2026-11-16). Se mira con lo pagado hoy: si pagan, los días bloqueados se
+ * vuelven a poder editar. Un mes en revisión no cuenta.
+ */
+export async function atrasadosEn(ninoIds: number[], fecha: string): Promise<Map<number, Mes[]>> {
+  if (ninoIds.length === 0) return new Map();
+  let calculo: Calculo;
+  try {
+    calculo = await calcular(ninoIds, fecha);
+  } catch (err) {
+    // Asistencias es lo más usado: si esto falla, se pasa lista sin bloqueo.
+    console.error('No se pudo calcular la mensualidad atrasada:', err);
+    return new Map();
+  }
+  const resultado = new Map<number, Mes[]>();
+  for (const id of ninoIds) {
+    const atrasados = mesesAtrasados(calculo.meses.get(id) ?? []);
+    if (atrasados.length > 0) resultado.set(id, atrasados);
+  }
+  return resultado;
 }
 
 // ---------------------------------------------------------------------------
 // Configuración
 
-/** Lo de cada colegio con valores: sus días y sus meses de cobro (0041, 0042). */
+/** Lo de cada colegio con valores: su día límite y sus meses de cobro (con año). */
 export async function config() {
   const [c, colegios] = await Promise.all([repo.obtenerConfig(), repo.colegios()]);
   return {
@@ -395,15 +488,12 @@ export async function config() {
       col_id: x.col_id,
       col_nombre: x.col_nombre,
       meses: x.meses,
-      desde: x.desde,
       dia_limite: x.diaLimite,
-      dia_corte: x.diaCorte,
     })),
   };
 }
 
 export async function guardarCobroColegio(actor: AuthUser, colId: number, c: repo.CobroDelColegio): Promise<void> {
-  if (c.desde !== null && c.meses.length === 0) throw new ApiError(400, 'Marca al menos un mes de cobro.');
   await enTransaccion(async (client) => {
     const hecho = await repo.guardarCobroColegio(client, colId, c);
     if (!hecho) throw new ApiError(404, 'Ese colegio no tiene valores configurados.');

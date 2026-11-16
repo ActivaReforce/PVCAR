@@ -118,7 +118,13 @@ vi.mock('../../config/db.js', () => ({
 
 // El aviso de ausencia (punto 9) llega hasta los correos y su configuración;
 // sin esto, en CI (sin .env) la validación de variables corta el proceso.
-vi.mock('../../config/env.js', () => ({ env: {} }));
+vi.mock('../../config/env.js', () => ({ env: {}, frontendBaseUrl: 'https://activareforce.com' }));
+
+/** Mensualidad atrasada (2026-11-16): quién debe un mes vencido el día de la clase. */
+let atrasados = new Map<number, string[]>();
+vi.mock('../mensualidades/mensualidades.service.js', () => ({
+  atrasadosEn: async () => atrasados,
+}));
 
 vi.mock('../../lib/storage.js', () => ({
   firmarFotos: async () => new Map(),
@@ -166,6 +172,7 @@ beforeEach(() => {
     { tipo: 'auxiliar', id: 91 },
   ];
   esAlta = true;
+  atrasados = new Map();
   auditorias.length = 0;
   query.mockClear();
 });
@@ -271,6 +278,28 @@ describe('guardado por lote de alumnos', () => {
     await expect(
       service.guardarAlumnos(propietario, { colacthor_id: 135, fecha: JUEVES, marcas }),
     ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('quien debe un mes vencido solo puede quedar ausente', async () => {
+    atrasados = new Map([[11, ['2026-07-01']]]);
+    await expect(
+      service.guardarAlumnos(propietario, { colacthor_id: 135, fecha: JUEVES, marcas }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    const res = await service.guardarAlumnos(propietario, {
+      colacthor_id: 135,
+      fecha: JUEVES,
+      marcas: [{ nino_id: 11, asisest_id: ASISTENCIA.AUSENTE }, marcas[1]!],
+    });
+    expect(res.resultado.altas).toBe(2);
+  });
+
+  it('la lista dice qué alumno tiene la mensualidad pendiente', async () => {
+    atrasados = new Map([[11, ['2026-07-01']]]);
+    const res = await service.listaAlumnos(propietario, { disciplina: 135, fecha: JUEVES });
+    expect(res.alumnos.length).toBeGreaterThan(0);
+    for (const a of res.alumnos) {
+      expect(a.mensualidad_pendiente).toEqual(a.nino_id === 11 ? ['2026-07-01'] : null);
+    }
   });
 
   it('pasar lista por primera vez no escribe en auditoria', async () => {

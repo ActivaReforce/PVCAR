@@ -4,15 +4,18 @@ import { IVA_PCT, calcularCobro, type PrecioColegio } from '../inscripciones/ins
  * Qué meses debe cada alumno y cuánto (docs/mensualidades.md). Puro: sin
  * base ni reloj, para poder probarlo.
  *
- * Reglas del cliente (2026-10-30):
- *   - La inscripción paga el primer mes de lo que trae. Enviada desde el
- *     día de corte de su colegio (hora de Ecuador), paga el mes siguiente: quien se
- *     inscribe el 25 de enero empieza en febrero.
- *   - Cada colegio cobra solo sus meses marcados; los demás quedan en pausa.
- *     Y solo desde su "cobrar desde": lo inscrito antes cubre ese mes.
- *   - Un mes sin pagar sale hasta que se pague: el del mes en curso es
- *     "pendiente" hasta el día límite y "atrasado" después; los anteriores,
- *     atrasados. Nada se bloquea. No se paga por adelantado.
+ * Reglas del cliente (2026-11-16):
+ *   - La inscripción paga un mes: el que eligió el representante en el
+ *     formulario (el alumno empieza ese mes). Las mensualidades corren desde
+ *     el siguiente. Una disciplina dada de alta a mano, sin inscripción, se
+ *     cobra desde el mes del alta.
+ *   - Cada colegio cobra solo sus meses marcados, con año (el año en curso
+ *     y, si lo abrió, el siguiente). Los demás quedan en pausa.
+ *   - Se puede pagar por adelantado cualquier mes marcado, pero en orden:
+ *     no se elige un mes si el anterior del mismo alumno sigue por pagar.
+ *   - Un mes sin pagar es "pendiente" hasta su día límite y "atrasado"
+ *     después; los meses anteriores sin pagar, atrasados. Los futuros,
+ *     pendientes. Un mes en revisión no está atrasado.
  *   - El importe de cada alumno se calcula con toda la familia (la misma
  *     regla de hermanos de la inscripción), no con lo que se marca para
  *     pagar: así desmarcar a un hijo resta exactamente lo suyo.
@@ -25,21 +28,20 @@ import { IVA_PCT, calcularCobro, type PrecioColegio } from '../inscripciones/ins
 export type Mes = string; // 'YYYY-MM-01'
 
 export interface ColegioCobro extends PrecioColegio {
-  /** 1-12. Vacío = no cobra. */
-  meses: number[];
-  /** Primer mes que cobra. null = no cobra. */
-  desde: Mes | null;
+  /** Meses que cobra, con año, ordenados. Vacío = no cobra. */
+  meses: Mes[];
   /** Hasta qué día del mes se paga sin atraso. */
   diaLimite: number;
-  /** Desde qué día una inscripción paga el mes siguiente. */
-  diaCorte: number;
 }
 
 export interface DisciplinaDelHijo {
   colacthor_id: number;
   nombre: string;
-  /** Fecha (Ecuador) de la inscripción que la trajo, o del alta a mano. */
-  inicio: string;
+  /**
+   * Por inscripción: el mes que pagó la inscripción. A mano: el mes del
+   * alta, que ya se cobra.
+   */
+  inicio: Mes;
   /** Vino por una inscripción aprobada: su primer mes ya está pagado. */
   porInscripcion: boolean;
 }
@@ -56,6 +58,8 @@ export interface CuotaRegistrada {
   mes: Mes;
   estado: 'pendiente' | 'aprobado';
   menpag_id: number;
+  /** Día (Ecuador) en que se envió el pago, 'YYYY-MM-DD'. */
+  fecha_pago: string;
   disciplinas: string[];
   subtotal: number;
   descuento: number;
@@ -78,6 +82,8 @@ export interface MesDelHijo {
   /** Con IVA. 0 si lo cubre la inscripción. */
   total: number;
   menpag_id: number | null;
+  /** Pagado o en revisión: el día en que se envió el pago. */
+  pagado_el: string | null;
 }
 
 export const mesDe = (fecha: string): Mes => `${fecha.slice(0, 7)}-01`;
@@ -88,22 +94,16 @@ export function sumarMeses(mes: Mes, n: number): Mes {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}-01`;
 }
 
-const numeroDeMes = (mes: Mes) => Number(mes.slice(5, 7));
+export const cobraEn = (col: ColegioCobro, mes: Mes): boolean => col.meses.includes(mes);
 
-export const cobraEn = (col: ColegioCobro, mes: Mes): boolean =>
-  col.desde !== null && mes >= col.desde && col.meses.includes(numeroDeMes(mes));
+export const debe = (e: EstadoMes) => e === 'pendiente' || e === 'atrasado';
 
-/** El primer mes que paga una disciplina que empezó en `fecha`. null si el colegio no cobra. */
-export function primerMes(fecha: string, col: ColegioCobro): Mes | null {
-  if (col.desde === null || col.meses.length === 0) return null;
-  let mes = mesDe(fecha);
-  if (Number(fecha.slice(8, 10)) >= col.diaCorte) mes = sumarMeses(mes, 1);
-  if (mes < col.desde) mes = col.desde;
-  for (let i = 0; i < 12; i++) {
-    if (col.meses.includes(numeroDeMes(mes))) return mes;
-    mes = sumarMeses(mes, 1);
-  }
-  return null;
+/** El estado de un mes sin pagar, visto el día `hoy`. */
+export function estadoSinPagar(mes: Mes, hoy: string, diaLimite: number): 'pendiente' | 'atrasado' {
+  const actual = mesDe(hoy);
+  if (mes < actual) return 'atrasado';
+  if (mes === actual && Number(hoy.slice(8, 10)) > diaLimite) return 'atrasado';
+  return 'pendiente';
 }
 
 const centavos = (d: number) => Math.round(d * 100);
@@ -116,10 +116,14 @@ interface Activo {
   inscripcion: string[];
 }
 
+/** Desde qué mes cuenta una disciplina para la familia (incluido el que pagó la inscripción). */
+const vigenteEn = (d: DisciplinaDelHijo, mes: Mes) => d.inicio <= mes;
+
 /**
- * Los meses de cada hijo de una familia, desde su primer mes hasta el de
- * `hoy`, más los que ya tienen cuota aunque hoy no tocaran (cambió la
- * configuración). Ordenados del más antiguo al más nuevo.
+ * Los meses de cada hijo de una familia: todos los meses marcados de su
+ * colegio desde que empezó (también los futuros, que se pueden pagar por
+ * adelantado), más los que ya tienen cuota aunque hoy no tocaran (cambió
+ * la configuración). Ordenados del más antiguo al más nuevo.
  */
 export function mesesDeLaFamilia(
   hijos: HijoCobro[],
@@ -127,24 +131,12 @@ export function mesesDeLaFamilia(
   registradas: CuotaRegistrada[],
   hoy: string,
 ): Map<number, MesDelHijo[]> {
-  const actual = mesDe(hoy);
-  const dia = Number(hoy.slice(8, 10));
-
-  // Cada disciplina con su primer mes.
-  const inicios = new Map<number, Array<{ d: DisciplinaDelHijo; desde: Mes }>>();
   const todosLosMeses = new Set<Mes>();
   for (const h of hijos) {
     const col = colegios.get(h.col_id);
-    const lista: Array<{ d: DisciplinaDelHijo; desde: Mes }> = [];
-    if (col) {
-      for (const d of h.disciplinas) {
-        const desde = primerMes(d.inicio, col);
-        if (desde !== null && desde <= actual) lista.push({ d, desde });
-      }
-    }
-    inicios.set(h.nino_id, lista);
-    const primero = lista.reduce<Mes | null>((m, x) => (m === null || x.desde < m ? x.desde : m), null);
-    if (primero) for (let m = primero; m <= actual; m = sumarMeses(m, 1)) todosLosMeses.add(m);
+    if (!col || h.disciplinas.length === 0) continue;
+    const primero = h.disciplinas.reduce((m, d) => (d.inicio < m ? d.inicio : m), h.disciplinas[0]!.inicio);
+    for (const m of col.meses) if (m >= primero) todosLosMeses.add(m);
   }
 
   const resultado = new Map<number, MesDelHijo[]>(hijos.map((h) => [h.nino_id, []]));
@@ -155,13 +147,13 @@ export function mesesDeLaFamilia(
     for (const h of hijos) {
       const col = colegios.get(h.col_id);
       if (!col || !cobraEn(col, mes)) continue;
-      const vigentes = inicios.get(h.nino_id)!.filter((x) => x.desde <= mes);
+      const vigentes = h.disciplinas.filter((d) => vigenteEn(d, mes));
       if (vigentes.length === 0) continue;
       activos.push({
         hijo: h,
         col,
-        cobradas: vigentes.filter((x) => !(x.d.porInscripcion && x.desde === mes)).map((x) => x.d.nombre),
-        inscripcion: vigentes.filter((x) => x.d.porInscripcion && x.desde === mes).map((x) => x.d.nombre),
+        cobradas: vigentes.filter((d) => !(d.porInscripcion && d.inicio === mes)).map((d) => d.nombre),
+        inscripcion: vigentes.filter((d) => d.porInscripcion && d.inicio === mes).map((d) => d.nombre),
       });
     }
     if (activos.length === 0) continue;
@@ -193,21 +185,32 @@ export function mesesDeLaFamilia(
           iva: ya.iva,
           total: ya.total,
           menpag_id: ya.menpag_id,
+          pagado_el: ya.fecha_pago,
         };
         registro.delete(`${a.hijo.nino_id}|${mes}`);
       } else if (a.cobradas.length === 0) {
-        fila = { ...base, estado: 'inscripcion', disciplinas: [], subtotal: 0, descuento: 0, iva: 0, total: 0, menpag_id: null };
-      } else {
-        const atrasado = mes < actual || dia > a.col.diaLimite;
         fila = {
           ...base,
-          estado: atrasado ? 'atrasado' : 'pendiente',
+          estado: 'inscripcion',
+          disciplinas: [],
+          subtotal: 0,
+          descuento: 0,
+          iva: 0,
+          total: 0,
+          menpag_id: null,
+          pagado_el: null,
+        };
+      } else {
+        fila = {
+          ...base,
+          estado: estadoSinPagar(mes, hoy, a.col.diaLimite),
           disciplinas: a.cobradas,
           subtotal: dolares(subtotal),
           descuento: dolares(descuento),
           iva: dolares(iva),
           total: dolares(neto + iva),
           menpag_id: null,
+          pagado_el: null,
         };
       }
       resultado.get(a.hijo.nino_id)!.push(fila);
@@ -226,11 +229,34 @@ export function mesesDeLaFamilia(
       iva: r.iva,
       total: r.total,
       menpag_id: r.menpag_id,
+      pagado_el: r.fecha_pago,
     });
   }
   for (const lista of resultado.values()) lista.sort((a, b) => a.mes.localeCompare(b.mes));
   return resultado;
 }
+
+/**
+ * Los meses que no se pueden pagar todavía porque falta uno anterior del
+ * mismo alumno. Devuelve el primer mes que falta, o null si el orden está
+ * bien: lo elegido tiene que ser, por alumno, los primeros meses por pagar.
+ */
+export function mesQueFalta(meses: MesDelHijo[], elegidos: Set<Mes>): Mes | null {
+  let saltado: Mes | null = null;
+  for (const m of meses) {
+    if (!debe(m.estado)) continue;
+    if (elegidos.has(m.mes)) {
+      if (saltado) return saltado;
+    } else if (!saltado) {
+      saltado = m.mes;
+    }
+  }
+  return null;
+}
+
+/** Los meses atrasados de un alumno: lo que lo deja ausente en Asistencias. */
+export const mesesAtrasados = (meses: MesDelHijo[]): Mes[] =>
+  meses.filter((m) => m.estado === 'atrasado').map((m) => m.mes);
 
 /**
  * Familias: los alumnos unidos por algún representante en común. El
@@ -260,11 +286,24 @@ export function familias<T extends { nino_id: number; representantes: number[] }
   return [...grupos.values()];
 }
 
+const NOMBRES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
 /** "Noviembre 2026". */
 export function nombreDeMes(mes: Mes): string {
-  const nombres = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-  ];
-  return `${nombres[numeroDeMes(mes) - 1]} ${mes.slice(0, 4)}`;
+  return `${NOMBRES[Number(mes.slice(5, 7)) - 1]} ${mes.slice(0, 4)}`;
+}
+
+/** "diciembre", "enero y febrero 2027"… para frases. */
+export function listaDeMeses(meses: Mes[]): string {
+  const ordenados = [...new Set(meses)].sort();
+  const anos = new Set(ordenados.map((m) => m.slice(0, 4)));
+  const nombres = ordenados.map((m) => {
+    const n = NOMBRES[Number(m.slice(5, 7)) - 1]!.toLowerCase();
+    return anos.size > 1 ? `${n} ${m.slice(0, 4)}` : n;
+  });
+  const texto = nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}` : (nombres[0] ?? '');
+  return anos.size === 1 ? `${texto} ${[...anos][0]}` : texto;
 }

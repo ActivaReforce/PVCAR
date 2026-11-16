@@ -31,11 +31,10 @@ export const rechazarPagoSchema = z.object({
   motivo: z.string().trim().min(1, 'Escribe el motivo').max(500),
 });
 
+/** Meses con año ('YYYY-MM-01'). Los de años pasados viajan también: no se pierden. */
 export const cobroColegioSchema = z.object({
-  meses: z.array(z.number().int().min(1).max(12)).max(12).transform((m) => [...new Set(m)].sort((a, b) => a - b)),
-  desde: mes.nullable(),
+  meses: z.array(mes).max(240).transform((m) => [...new Set(m)].sort()),
   dia_limite: z.number().int().min(1).max(28),
-  dia_corte: z.number().int().min(1).max(28),
 });
 
 export const mesQuerySchema = z.object({

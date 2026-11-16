@@ -38,6 +38,7 @@ import { diaDeCruce, horarioLargo } from '@/lib/horarios';
 import { esParaCurso } from '@/lib/cursos';
 import { compressImage } from '@/lib/imageCompression';
 import PagarMensualidad from '@/components/mensualidades/PagarMensualidad';
+import { nombreDeMes } from '@/api/mensualidades';
 import {
   dinero,
   documentoPara,
@@ -452,6 +453,13 @@ const Inscripcion = () => {
     () => Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, false])) as Record<TipoDocumento, boolean>,
   );
   const [comprobante, setComprobante] = useState<File | null>(null);
+  // El mes que paga la inscripción (cliente, 2026-11-16): el en curso o el siguiente.
+  const mesesDeInicio = useMemo(() => {
+    const [a, m] = hoyEc().split('-').map(Number) as [number, number];
+    const siguiente = m === 12 ? `${a + 1}-01-01` : `${a}-${String(m + 1).padStart(2, '0')}-01`;
+    return [`${a}-${String(m).padStart(2, '0')}-01`, siguiente];
+  }, []);
+  const [mesInicio, setMesInicio] = useState(() => mesesDeInicio[0]!);
   const [vista, setVista] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -635,6 +643,7 @@ const Inscripcion = () => {
         ...documentosLeidos(datos, alumnos),
         acepta: Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, true])) as Record<TipoDocumento, true>,
         comprobante: { mime, base64: await aBase64(comprobante) },
+        mes_inicio: mesInicio,
       };
       const recibido = await conReintentos(() =>
         inscripcionesApi.enviar(envio, conSesion, claveEnvio.current),
@@ -814,6 +823,9 @@ const Inscripcion = () => {
                   cobro={cotizacion.data}
                   cargandoCobro={cotizacion.isFetching}
                   cuenta={conSesion}
+                  meses={mesesDeInicio}
+                  mesInicio={mesInicio}
+                  onMesInicio={setMesInicio}
                 />
               )}
             </section>
@@ -1684,6 +1696,9 @@ const PasoPago = ({
   cobro,
   cargandoCobro,
   cuenta,
+  meses,
+  mesInicio,
+  onMesInicio,
 }: {
   cuentaBancaria: string | null;
   vista: string | null;
@@ -1694,11 +1709,36 @@ const PasoPago = ({
   cargandoCobro: boolean;
   /** Entró con su cuenta: ya está activa, solo lo nuevo espera la aprobación. */
   cuenta: boolean;
+  /** El mes en curso y el siguiente. */
+  meses: string[];
+  mesInicio: string;
+  onMesInicio: (mes: string) => void;
 }) => (
   <>
     <div>
       <h1 className="text-xl font-semibold">Pago</h1>
     </div>
+
+    <fieldset className="space-y-2 rounded-md border p-3">
+      <legend className="px-1 text-sm font-semibold">¿En qué mes empieza?</legend>
+      <RadioGroup value={mesInicio} onValueChange={onMesInicio} className="grid gap-2 sm:grid-cols-2">
+        {meses.map((m) => (
+          <Label
+            key={m}
+            htmlFor={`mes-inicio-${m}`}
+            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3 font-normal has-[[data-state=checked]]:border-primary"
+          >
+            <RadioGroupItem id={`mes-inicio-${m}`} value={m} />
+            {nombreDeMes(m)}
+          </Label>
+        ))}
+      </RadioGroup>
+      <p className="text-xs text-muted-foreground">
+        Este pago es el del primer mes. Si eliges {nombreDeMes(meses[1]!)}, {alumnos.length > 1 ? 'tus hijos empiezan' : 'tu hijo empieza'} a
+        entrenar en {nombreDeMes(meses[1]!).split(' ')[0]!.toLowerCase()} y {nombreDeMes(meses[0]!).split(' ')[0]!.toLowerCase()} no se
+        cobra. Las mensualidades se pagan desde el mes siguiente al que elijas.
+      </p>
+    </fieldset>
 
     <div className="rounded-md border">
       {cobro ? (

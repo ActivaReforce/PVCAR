@@ -77,8 +77,8 @@ beforeEach(() => {
 });
 
 describe('el catalogo', () => {
-  it('trae los trece reportes a quien tiene todos los permisos', () => {
-    expect(service.catalogo(TODO)).toHaveLength(13);
+  it('trae los catorce reportes a quien tiene todos los permisos', () => {
+    expect(service.catalogo(TODO)).toHaveLength(14);
   });
 
   /**
@@ -100,6 +100,7 @@ describe('el catalogo', () => {
       'asistencias-entrenadores',
       'representantes',
       'inscripciones',
+      'mensualidades',
       'encuestas',
       'novedades',
     ]);
