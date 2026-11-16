@@ -5,6 +5,7 @@ import { ApiError } from '../../middleware/error.js';
 import { claveValida, unaVez } from '../../lib/unaVez.js';
 import * as service from './mensualidades.service.js';
 import {
+  anularPagoSchema,
   cobroColegioSchema,
   colIdParamSchema,
   idParamSchema,
@@ -116,6 +117,23 @@ mensualidadesRouter.post(
     try {
       const { id } = idParamSchema.parse(req.params);
       await service.rechazarPago(actor(req), id);
+      res.json({ data: { menpag_id: id }, error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Anular un pago aprobado (solo Propietario): el cuerpo lleva el nombre del representante escrito a mano. */
+mensualidadesRouter.post(
+  '/pagos/:id/anular',
+  personal,
+  requirePermission('inscripciones', 'eliminar'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      const { confirmacion } = anularPagoSchema.parse(req.body);
+      await service.anularPago(actor(req), id, confirmacion);
       res.json({ data: { menpag_id: id }, error: null });
     } catch (err) {
       next(err);

@@ -168,7 +168,7 @@ export function firmaDeImagenValida(contenido: Buffer, mime: string): boolean {
   return false;
 }
 
-function normalizarNombre(texto: string): string {
+export function normalizarNombre(texto: string): string {
   return texto
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')

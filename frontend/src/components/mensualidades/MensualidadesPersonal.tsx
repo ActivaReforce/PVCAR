@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Mail, MessageCircle, Receipt, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Receipt, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +25,11 @@ import {
 import { dinero } from '@/api/inscripciones';
 import { diaLegible, mesesCortos, nombreDeMes, type AlumnoDelMes, type EstadoMes, type PagoListado } from '@/api/mensualidades';
 import { cn } from '@/lib/utils';
-import { enlaceWhatsApp, fechaHora } from '@/components/inscripciones/formato';
+import { fechaHora } from '@/components/inscripciones/formato';
+import { useAuth } from '@/contexts/AuthContext';
+import { ROL } from '@/hooks/useUserForm';
+import AnularPagoDialog from './AnularPagoDialog';
+import ContactoPago from './ContactoPago';
 import { EstadoMesBadge } from './PagarMensualidad';
 
 const TODOS = 'todos';
@@ -189,65 +193,25 @@ const Pagos = () => {
  * correo y WhatsApp— y, al confirmar, el pago se borra como si nunca se
  * hubiera subido: el representante vuelve a pagar esos meses.
  */
-const ConfirmarRechazo = ({ pago }: { pago: PagoListado }) => {
-  const whatsapp = pago.representante_telefono ? enlaceWhatsApp(pago.representante_telefono) : null;
-  return (
-    <div className="space-y-4">
-      <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
-        Al confirmar, este pago y su comprobante se borran, como si nunca se hubiera subido. El representante podrá
-        volver a pagar esos meses. Avísale para que lo haga de nuevo.
-      </div>
-
-      <div className="space-y-2 rounded-md border p-3 text-sm">
-        <p className="text-base font-semibold">{pago.representante_nombre ?? 'Cuenta borrada'}</p>
-        {pago.representante_telefono && <p>Teléfono: {pago.representante_telefono}</p>}
-        {pago.representante_correo && <p className="break-words">Correo: {pago.representante_correo}</p>}
-        <div className="flex flex-wrap gap-2 pt-1">
-          {whatsapp && (
-            <Button variant="outline" size="sm" asChild className="h-10 sm:h-9">
-              <a href={whatsapp} target="_blank" rel="noreferrer">
-                <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
-              </a>
-            </Button>
-          )}
-          {pago.representante_correo && (
-            <Button variant="outline" size="sm" asChild className="h-10 sm:h-9">
-              <a href={`mailto:${pago.representante_correo}`}>
-                <Mail className="mr-2 h-4 w-4" /> Correo
-              </a>
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-md border">
-        <ul className="divide-y">
-          {pago.detalle.map((c) => (
-            <li key={`${c.nino_id}-${c.mes}`} className="flex items-start justify-between gap-3 p-3 text-sm">
-              <div className="min-w-0">
-                <p className="font-medium">{c.nombre}</p>
-                <p className="text-muted-foreground">
-                  Mensualidad {nombreDeMes(c.mes).toLowerCase()} · {c.col_nombre}
-                </p>
-              </div>
-              <span className="whitespace-nowrap font-medium">{dinero(c.total)}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="flex items-center justify-between border-t bg-muted/40 p-3">
-          <span className="font-semibold">Total · enviado el {fechaHora(pago.fecha)}</span>
-          <span className="text-lg font-bold">{dinero(pago.total)}</span>
-        </div>
-      </div>
+const ConfirmarRechazo = ({ pago }: { pago: PagoListado }) => (
+  <div className="space-y-4">
+    <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
+      Al confirmar, este pago y su comprobante se borran, como si nunca se hubiera subido. El representante podrá
+      volver a pagar esos meses. Avísale para que lo haga de nuevo.
     </div>
-  );
-};
+    <ContactoPago pago={pago} />
+  </div>
+);
 
 const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) => {
   const pago = usePagoMensualidad(id);
   const aprobar = useAprobarPago();
   const rechazar = useRechazarPago();
   const [rechazando, setRechazando] = useState(false);
+  const [anulando, setAnulando] = useState(false);
+  const { user } = useAuth();
+  // Anular un aprobado es solo del Propietario (el backend lo exige igual).
+  const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
   const p = pago.data;
 
   const cerrar = () => {
@@ -256,7 +220,8 @@ const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) 
   };
 
   return (
-    <Dialog open={id !== null} onOpenChange={(v) => !v && cerrar()}>
+    <>
+      <Dialog open={id !== null} onOpenChange={(v) => !v && cerrar()}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Pago de mensualidad</DialogTitle>
@@ -371,8 +336,32 @@ const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) 
             )}
           </DialogFooter>
         )}
+
+        {p?.estado === 'aprobado' && esPropietario && (
+          <DialogFooter>
+            <ConditionalAction module="inscripciones" action="eliminar">
+              <Button
+                variant="outline"
+                className="h-11 border-destructive/50 text-destructive hover:bg-destructive/10 sm:h-10"
+                onClick={() => setAnulando(true)}
+              >
+                Anular pago
+              </Button>
+            </ConditionalAction>
+          </DialogFooter>
+        )}
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      <AnularPagoDialog
+        pago={anulando ? (p ?? null) : null}
+        onClose={() => setAnulando(false)}
+        onAnulado={() => {
+          setAnulando(false);
+          cerrar();
+        }}
+      />
+    </>
   );
 };
 

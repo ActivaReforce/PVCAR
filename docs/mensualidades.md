@@ -25,6 +25,7 @@ No hay costo de inscripción: la inscripción es el pago del primer mes. Desde a
 | Precio | Lo pagado queda con su precio; los meses sin pagar toman el precio vigente. |
 | Baja con meses adelantados | Esos meses siguen como pagados; la devolución va fuera de la plataforma. |
 | Rechazo | Sin motivo (2026-11-16): al pulsar Rechazar sale un modal con el representante, sus hijos y lo que pagaba, teléfono, correo y **WhatsApp**, y debajo **Confirmar rechazo**. Al confirmar, el pago se **borra entero** con su comprobante, como si nunca se hubiera subido: el representante vuelve a pagar esos meses. El personal lo contacta por fuera. No se guarda nada del rechazo, ni en auditoría. El estado `rechazado` de la tabla ya no se usa. |
+| Anular un pago aprobado | Solo Propietario, desde el detalle del pago ("Anular pago"). Mismo modal que Anular inscripción: datos de contacto y WhatsApp, qué se borra, qué más pasa y el nombre del representante escrito a mano. Mismo efecto que rechazar: se borra entero con su comprobante, sin registro; sus meses vuelven a deberse y, si ya vencieron, el alumno queda ausente en Asistencias hasta que vuelva a pagar. No se avisa al representante. |
 | Factura | No: solo se lleva el registro. |
 
 ## Pantallas

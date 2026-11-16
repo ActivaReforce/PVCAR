@@ -20,6 +20,9 @@ export type PagarInput = z.infer<typeof pagarSchema>;
 export const idParamSchema = z.object({ id: z.coerce.number().int().positive() });
 export const colIdParamSchema = z.object({ colId: z.coerce.number().int().positive() });
 
+/** Anular un pago aprobado: el nombre del representante, escrito a mano (es un borrado permanente). */
+export const anularPagoSchema = z.object({ confirmacion: z.string().trim().min(1) });
+
 export const listarPagosSchema = paginacionSchema.extend({
   estado: z.enum(['pendiente', 'aprobado']).optional(),
   colegio: z.coerce.number().int().positive().optional(),

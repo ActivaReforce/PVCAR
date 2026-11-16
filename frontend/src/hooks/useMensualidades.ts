@@ -71,6 +71,13 @@ export function useAprobarPago() {
   return useMutacion((id: number) => mensualidadesApi.aprobar(id), 'Pago aprobado');
 }
 
+export function useAnularPago() {
+  return useMutacion(
+    ({ id, confirmacion }: { id: number; confirmacion: string }) => mensualidadesApi.anular(id, confirmacion),
+    'Pago anulado',
+  );
+}
+
 export function useRechazarPago() {
   return useMutacion((id: number) => mensualidadesApi.rechazar(id), 'Pago rechazado');
 }

@@ -155,6 +155,9 @@ export const mensualidadesApi = {
   aprobar: (id: number) => api.post<{ menpag_id: number }>(`/mensualidades/pagos/${id}/aprobar`),
   /** Borra el pago y su comprobante: el representante vuelve a pagar esos meses. */
   rechazar: (id: number) => api.post<{ menpag_id: number }>(`/mensualidades/pagos/${id}/rechazar`),
+  /** Lo mismo para un aprobado (solo Propietario), con el nombre del representante escrito a mano. */
+  anular: (id: number, confirmacion: string) =>
+    api.post<{ menpag_id: number }>(`/mensualidades/pagos/${id}/anular`, { confirmacion }),
   /** `mes`: 'YYYY-MM'. */
   mes: (mes?: string, colegio?: number) => {
     const qs = new URLSearchParams();

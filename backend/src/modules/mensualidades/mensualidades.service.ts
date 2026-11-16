@@ -10,7 +10,13 @@ import {
   firmarArchivos,
   subirArchivo,
 } from '../../lib/storageInscripciones.js';
-import { describirDisciplina, esPersonal, firmaDeImagenValida } from '../inscripciones/inscripciones.service.js';
+import { ROL } from '../../lib/constants.js';
+import {
+  describirDisciplina,
+  esPersonal,
+  firmaDeImagenValida,
+  normalizarNombre,
+} from '../inscripciones/inscripciones.service.js';
 import {
   PRIMER_MES,
   debe,
@@ -282,11 +288,36 @@ export async function aprobarPago(actor: AuthUser, id: number): Promise<void> {
  * le da teléfono, correo y WhatsApp). No se guarda nada del rechazo, ni en
  * auditoría (cliente, 2026-11-16).
  */
-export async function rechazarPago(actor: AuthUser, id: number): Promise<void> {
+export async function rechazarPago(_actor: AuthUser, id: number): Promise<void> {
+  await borrarPagoEntero(id, (p) => {
+    if (p.estado !== 'pendiente') throw new ApiError(409, 'Un pago aprobado no se rechaza: se anula.');
+  });
+}
+
+/**
+ * Anular un pago ya aprobado (cliente, 2026-11-16): el mismo efecto que
+ * rechazar —se borra entero, sin registro, y sus meses vuelven a deberse—.
+ * Solo el Propietario y con el nombre del representante escrito a mano,
+ * como Anular inscripción.
+ */
+export async function anularPago(actor: AuthUser, id: number, confirmacion: string): Promise<void> {
+  if (!actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO)) {
+    throw new ApiError(403, 'Solo el Propietario puede anular un pago aprobado');
+  }
+  await borrarPagoEntero(id, (p) => {
+    if (p.estado !== 'aprobado') throw new ApiError(409, 'Solo se anula un pago aprobado: uno por revisar se rechaza.');
+    if (!p.representante_nombre || normalizarNombre(confirmacion) !== normalizarNombre(p.representante_nombre)) {
+      throw new ApiError(400, 'El nombre escrito no coincide con el del representante');
+    }
+  });
+}
+
+/** Borra el pago con sus meses y, tras el COMMIT, su comprobante. `exigir` lanza si no toca. */
+async function borrarPagoEntero(id: number, exigir: (p: repo.PagoFila) => void): Promise<void> {
   const ruta = await enTransaccion(async (client) => {
     const p = await repo.obtenerPago(id, client);
     if (!p || p.estado === 'rechazado') throw new ApiError(404, 'Pago no encontrado');
-    if (p.estado !== 'pendiente') throw new ApiError(409, 'Un pago aprobado no se rechaza.');
+    exigir(p);
     await repo.borrarPago(client, id);
     return p.comprobante;
   });
