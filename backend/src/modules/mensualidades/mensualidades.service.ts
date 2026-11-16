@@ -337,6 +337,8 @@ export interface AlumnoDelMes {
   cubre: Mes[];
   /** Tiene una inscripción enviada este mes que aún no se aprueba. */
   inscripcion_en_revision: boolean;
+  /** Ya no está activo: sale solo porque su dinero entró este mes. */
+  baja: boolean;
 }
 
 export interface ColegioDelMes {
@@ -418,6 +420,7 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
     const k = claveDe(col.col_id, ninoId, a.nombre);
     if (!m && !entradas.has(k)) continue;
     col.alumnos.push({
+      baja: false,
       nino_id: ninoId,
       nombre: a.nombre,
       representantes: a.representantes_nombres,
@@ -439,15 +442,29 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
       t.por_cobrar += aCentavos(m.total);
     }
   }
-  // Pagos de alumnos que ya no están activos: el dinero entró y tiene que cuadrar.
+  /**
+   * Lo que entró de alumnos que no salen arriba: dados de baja (el dinero
+   * entró y tiene que cuadrar) o inscripciones aún sin aprobar. Con su estado
+   * real de este mes si pagaron este mes; si no, "pagó otros meses".
+   */
   for (const [k, lista] of [...entradas]) {
     const primera = lista[0]!;
     const col = porId.get(primera.col_id!)!;
+    const deEsteMes = lista.filter((c) => c.mes === mes);
+    const aprobada = (tipo: repo.CuotaCobrada['tipo']) => deEsteMes.some((c) => c.tipo === tipo && c.estado === 'aprobado');
+    const estado: AlumnoDelMes['estado'] = aprobada('inscripcion')
+      ? 'inscripcion'
+      : aprobada('mensualidad')
+        ? 'pagado'
+        : deEsteMes.some((c) => c.tipo === 'mensualidad')
+          ? 'revision'
+          : null;
     col.alumnos.push({
+      baja: lista.some((c) => c.tipo === 'mensualidad' || c.estado === 'aprobado'),
       nino_id: primera.nino_id,
       nombre: primera.nombre,
       representantes: [],
-      estado: null,
+      estado,
       disciplinas: [],
       inscripcion: [],
       valor: 0,

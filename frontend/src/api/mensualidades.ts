@@ -104,6 +104,8 @@ export interface AlumnoDelMes {
   cubre: string[];
   /** Tiene una inscripción enviada este mes sin aprobar. Opcional: Vercel publica antes que Railway. */
   inscripcion_en_revision?: boolean;
+  /** Ya no está activo: sale porque su dinero entró este mes. Opcional, como el anterior. */
+  baja?: boolean;
 }
 
 export interface EstadoDelMes {

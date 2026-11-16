@@ -468,8 +468,9 @@ const EstadoDelMes = () => {
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{a.nombre}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {a.representantes.join(', ') ||
-                          (a.estado === null ? (a.inscripcion_en_revision ? 'Aún no aprobado' : 'Ya no está activo') : 'Sin representante')}
+                        {a.baja
+                          ? 'Dado de baja'
+                          : a.representantes.join(', ') || (a.inscripcion_en_revision ? 'Aún no aprobado' : 'Sin representante')}
                         {a.inscripcion.length > 0 && a.estado !== 'inscripcion' && ` · inscripción: ${a.inscripcion.join(', ')}`}
                       </p>
                     </div>
