@@ -24,7 +24,7 @@ No hay costo de inscripción: la inscripción es el pago del primer mes. Desde a
 | Alta a mano | Una disciplina dada de alta desde Estudiantes (sin inscripción) cobra desde el mes del alta. **Arranque:** lo dado de alta a mano hasta noviembre de 2026 cuenta como noviembre pagado (`PRIMER_MES`), como lo inscrito; en prod eran 2 alumnos con una disciplina extra. |
 | Precio | Lo pagado queda con su precio; los meses sin pagar toman el precio vigente. |
 | Baja con meses adelantados | Esos meses siguen como pagados; la devolución va fuera de la plataforma. |
-| Rechazo | Sin motivo (2026-11-16): al pulsar Rechazar sale un modal con el representante, sus hijos y lo que pagaba, teléfono, correo y **WhatsApp**, y debajo **Confirmar rechazo**. Al confirmar, el pago se **borra entero** con su comprobante, como si nunca se hubiera subido: el representante vuelve a pagar esos meses. El personal lo contacta por fuera. Solo queda la línea de auditoría. El estado `rechazado` de la tabla ya no se usa. |
+| Rechazo | Sin motivo (2026-11-16): al pulsar Rechazar sale un modal con el representante, sus hijos y lo que pagaba, teléfono, correo y **WhatsApp**, y debajo **Confirmar rechazo**. Al confirmar, el pago se **borra entero** con su comprobante, como si nunca se hubiera subido: el representante vuelve a pagar esos meses. El personal lo contacta por fuera. No se guarda nada del rechazo, ni en auditoría. El estado `rechazado` de la tabla ya no se usa. |
 | Factura | No: solo se lleva el registro. |
 
 ## Pantallas

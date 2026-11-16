@@ -279,7 +279,8 @@ export async function aprobarPago(actor: AuthUser, id: number): Promise<void> {
  * Rechazar (cliente, 2026-11-16): el pago se borra entero, con sus meses y
  * su comprobante, como si nunca se hubiera subido; el representante puede
  * volver a pagar esos meses. El personal lo contacta por fuera (la pantalla
- * le da teléfono, correo y WhatsApp). Solo queda la línea de auditoría.
+ * le da teléfono, correo y WhatsApp). No se guarda nada del rechazo, ni en
+ * auditoría (cliente, 2026-11-16).
  */
 export async function rechazarPago(actor: AuthUser, id: number): Promise<void> {
   const ruta = await enTransaccion(async (client) => {
@@ -287,21 +288,6 @@ export async function rechazarPago(actor: AuthUser, id: number): Promise<void> {
     if (!p || p.estado === 'rechazado') throw new ApiError(404, 'Pago no encontrado');
     if (p.estado !== 'pendiente') throw new ApiError(409, 'Un pago aprobado no se rechaza.');
     await repo.borrarPago(client, id);
-    await auditar(
-      {
-        actor,
-        accion: 'eliminar',
-        entidad: 'mensualidad_pago',
-        entidadId: id,
-        detalle: {
-          rechazado: true,
-          representante: p.representante_nombre,
-          total: p.total,
-          cuotas: p.detalle.map((c) => `${c.nombre} ${c.mes}`),
-        },
-      },
-      client,
-    );
     return p.comprobante;
   });
   await borrarArchivos([ruta]);

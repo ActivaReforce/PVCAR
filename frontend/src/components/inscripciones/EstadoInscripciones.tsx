@@ -84,7 +84,7 @@ export const EstadoGeneral = () => {
             onCheckedChange={(v) => abrir.mutate(v)}
           />
           <Label htmlFor="abrir-inscripciones" className="cursor-pointer">
-            Abrir inscripciones
+            {e.interruptor ? 'Cerrar inscripciones' : 'Abrir inscripciones'}
           </Label>
         </div>
       )}
@@ -123,7 +123,7 @@ export const EstadoDelColegio = ({ colId }: { colId: number }) => {
             onCheckedChange={(v) => abrir.mutate({ colId, abiertas: v })}
           />
           <Label htmlFor={`abrir-colegio-${colId}`} className="cursor-pointer">
-            Abrir inscripciones en este colegio
+            {c.interruptor ? 'Cerrar inscripciones en este colegio' : 'Abrir inscripciones en este colegio'}
           </Label>
           {sinValores && <span className="text-xs text-muted-foreground">Primero guarda sus valores.</span>}
         </div>
