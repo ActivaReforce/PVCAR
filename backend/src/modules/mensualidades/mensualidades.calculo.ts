@@ -88,6 +88,14 @@ export interface MesDelHijo {
 
 export const mesDe = (fecha: string): Mes => `${fecha.slice(0, 7)}-01`;
 
+/**
+ * El primer mes de la plataforma (cliente, 2026-11-16): todo lo que existía
+ * hasta noviembre de 2026 —inscrito en octubre o noviembre, o dado de alta
+ * a mano— es el pago de noviembre. El dinero de las inscripciones de octubre
+ * también cuenta en noviembre.
+ */
+export const PRIMER_MES: Mes = '2026-11-01';
+
 export function sumarMeses(mes: Mes, n: number): Mes {
   const [a, m] = mes.split('-').map(Number) as [number, number];
   const total = a * 12 + (m - 1) + n;

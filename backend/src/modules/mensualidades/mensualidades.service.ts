@@ -12,6 +12,7 @@ import {
 } from '../../lib/storageInscripciones.js';
 import { describirDisciplina, esPersonal, firmaDeImagenValida } from '../inscripciones/inscripciones.service.js';
 import {
+  PRIMER_MES,
   debe,
   familias,
   mesDe,
@@ -52,16 +53,24 @@ interface Calculo {
   hoy: string;
 }
 
+/**
+ * Lo dado de alta a mano hasta noviembre de 2026 entra como lo inscrito:
+ * noviembre pagado (PRIMER_MES). Después, una alta a mano cobra su primer mes.
+ */
 const aHijo = (a: repo.AlumnoConDisciplinas): HijoCobro => ({
   nino_id: a.nino_id,
   nombre: a.nombre,
   col_id: a.col_id,
-  disciplinas: a.disciplinas.map((d) => ({
-    colacthor_id: d.colacthor_id,
-    nombre: describirDisciplina(d),
-    inicio: mesDe(d.inicio),
-    porInscripcion: d.por_inscripcion,
-  })),
+  disciplinas: a.disciplinas.map((d) => {
+    const inicio = mesDe(d.inicio);
+    const deArranque = inicio <= PRIMER_MES;
+    return {
+      colacthor_id: d.colacthor_id,
+      nombre: describirDisciplina(d),
+      inicio: deArranque && inicio < PRIMER_MES ? PRIMER_MES : inicio,
+      porInscripcion: d.por_inscripcion || deArranque,
+    };
+  }),
 });
 
 /**
@@ -326,6 +335,8 @@ export interface AlumnoDelMes {
   recibido: number;
   /** Los otros meses que pagó con lo recibido este mes. */
   cubre: Mes[];
+  /** Tiene una inscripción enviada este mes que aún no se aprueba. */
+  inscripcion_en_revision: boolean;
 }
 
 export interface ColegioDelMes {
@@ -340,9 +351,9 @@ export interface ColegioDelMes {
     revision: number;
     pendientes: number;
     atrasados: number;
-    /** Aprobado y enviado en este mes, sea del mes que sea (caja). */
+    /** Aprobado y enviado en este mes, sea del mes que sea (caja): mensualidades e inscripciones. */
     recaudado: number;
-    /** En revisión, enviado en este mes. */
+    /** En revisión, enviado en este mes: mensualidades e inscripciones. */
     en_revision: number;
     /** Lo que se debe de este mes. */
     por_cobrar: number;
@@ -359,7 +370,12 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
   const hoy = hoyEc();
   const actual = mesDe(hoy);
   const mes = mesPedido ? `${mesPedido}-01` : actual;
-  const [calculo, cobrado] = await Promise.all([calcular(null, hoy), repo.cobradoEn(mes)]);
+  const [calculo, mensualidades, inscripciones] = await Promise.all([
+    calcular(null, hoy),
+    repo.cobradoEn(mes),
+    repo.inscripcionesCobradasEn(mes),
+  ]);
+  const cobrado = [...mensualidades, ...inscripciones];
 
   const resultado: ColegioDelMes[] = calculo.colegios
     .filter((c) => !colegio || c.col_id === colegio)
@@ -390,6 +406,7 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
     return {
       recibido: lista.reduce((s, c) => s + aCentavos(c.total), 0) / 100,
       cubre: [...new Set(lista.map((c) => c.mes).filter((m) => m !== mes))].sort(),
+      inscripcion_en_revision: lista.some((c) => c.tipo === 'inscripcion' && c.estado === 'pendiente'),
     };
   };
 

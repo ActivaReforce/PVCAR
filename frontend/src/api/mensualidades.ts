@@ -102,6 +102,8 @@ export interface AlumnoDelMes {
   recibido: number;
   /** Los otros meses que pagó con lo recibido este mes. */
   cubre: string[];
+  /** Tiene una inscripción enviada este mes sin aprobar. Opcional: Vercel publica antes que Railway. */
+  inscripcion_en_revision?: boolean;
 }
 
 export interface EstadoDelMes {

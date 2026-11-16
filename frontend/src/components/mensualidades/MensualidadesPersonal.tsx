@@ -331,6 +331,17 @@ const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) 
 
 const ORDEN: Array<EstadoMes | null> = ['atrasado', 'pendiente', 'revision', 'pagado', 'inscripcion', null];
 
+/** Una cifra de la cabecera de cada colegio: etiqueta arriba, número grande debajo. */
+const Cifra = ({ etiqueta, valor, nota }: { etiqueta: string; valor: string | number; nota?: string }) => (
+  <div className="min-w-0">
+    <dt className="truncate text-xs text-muted-foreground sm:text-sm" title={etiqueta}>
+      {etiqueta}
+    </dt>
+    <dd className="text-base font-semibold tabular-nums sm:text-lg">{valor}</dd>
+    {nota && <dd className="text-xs text-destructive">{nota}</dd>}
+  </div>
+);
+
 /** El dinero de una fila: lo que entró este mes, o lo que vale/debe el mes. */
 const DineroDeFila = ({ a, mes }: { a: AlumnoDelMes; mes: string }) => {
   const debe = a.estado === 'pendiente' || a.estado === 'atrasado';
@@ -430,25 +441,19 @@ const EstadoDelMes = () => {
             <div className="space-y-2 border-b bg-muted/40 px-4 py-3">
               <p className="font-semibold">{c.col_nombre}</p>
               {!c.cobra && <p className="text-sm text-muted-foreground">Este mes está en pausa para este colegio.</p>}
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
-                <div>
-                  <dt className="text-muted-foreground">Recaudado en {nombreElegido}</dt>
-                  <dd className="font-semibold">{dinero(t.recaudado)}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">En revisión</dt>
-                  <dd className="font-semibold">{dinero(t.en_revision)}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Por cobrar de {nombreElegido}</dt>
-                  <dd className="font-semibold">{dinero(t.por_cobrar)}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Alumnos</dt>
-                  <dd className="font-semibold">
-                    {t.pagados + t.inscripcion} al día · {t.revision} en revisión · {t.pendientes + t.atrasados} por pagar
-                  </dd>
-                </div>
+              <dl className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm">
+                <Cifra etiqueta={`Recaudado en ${nombreElegido}`} valor={dinero(t.recaudado)} />
+                <Cifra etiqueta="En revisión" valor={dinero(t.en_revision)} />
+                <Cifra etiqueta={`Por cobrar de ${nombreElegido}`} valor={dinero(t.por_cobrar)} />
+              </dl>
+              <dl className="grid grid-cols-3 gap-x-4 gap-y-1 border-t pt-2 text-sm">
+                <Cifra etiqueta="Alumnos al día" valor={t.pagados + t.inscripcion} />
+                <Cifra etiqueta="Alumnos en revisión" valor={t.revision} />
+                <Cifra
+                  etiqueta="Alumnos por pagar"
+                  valor={t.pendientes + t.atrasados}
+                  nota={t.atrasados > 0 ? `${t.atrasados} atrasado${t.atrasados === 1 ? '' : 's'}` : undefined}
+                />
               </dl>
             </div>
             {alumnos.length === 0 ? (
@@ -463,13 +468,16 @@ const EstadoDelMes = () => {
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{a.nombre}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {a.representantes.join(', ') || (a.estado === null ? 'Ya no está activo' : 'Sin representante')}
+                        {a.representantes.join(', ') ||
+                          (a.estado === null ? (a.inscripcion_en_revision ? 'Aún no aprobado' : 'Ya no está activo') : 'Sin representante')}
                         {a.inscripcion.length > 0 && a.estado !== 'inscripcion' && ` · inscripción: ${a.inscripcion.join(', ')}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       {a.estado ? (
                         <EstadoMesBadge estado={a.estado} />
+                      ) : a.inscripcion_en_revision ? (
+                        <Badge variant="secondary">Inscripción en revisión</Badge>
                       ) : (
                         <Badge variant="outline" className="text-muted-foreground">
                           Pagó otros meses

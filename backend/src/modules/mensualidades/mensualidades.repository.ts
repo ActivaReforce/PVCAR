@@ -5,7 +5,7 @@ import { diaEc, textoEc } from '../../lib/fecha.js';
 import { horariosJson, type HorarioDisciplina } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import { offsetDe } from '../../lib/paginacion.js';
-import type { ColegioCobro, CuotaRegistrada, Mes } from './mensualidades.calculo.js';
+import { PRIMER_MES, type ColegioCobro, type CuotaRegistrada, type Mes } from './mensualidades.calculo.js';
 import type { ListarPagosQuery } from './mensualidades.schemas.js';
 
 /** Acceso a datos de Mensualidades (migración 0041). */
@@ -345,6 +345,8 @@ export async function borrarPago(client: PoolClient, id: number): Promise<void> 
 // Lo que entró en un mes (por fecha de pago)
 
 export interface CuotaCobrada {
+  /** Una mensualidad o el pago de una inscripción (su primer mes). */
+  tipo: 'mensualidad' | 'inscripcion';
   nino_id: number | null;
   nombre: string;
   col_id: number | null;
@@ -362,7 +364,7 @@ export interface CuotaCobrada {
  */
 export async function cobradoEn(mes: Mes): Promise<CuotaCobrada[]> {
   const { rows } = await getPool().query<CuotaCobrada>(
-    `SELECT c.nino_id, c.mencuo_nino_nombre AS nombre, c.col_id,
+    `SELECT 'mensualidad' AS tipo, c.nino_id, c.mencuo_nino_nombre AS nombre, c.col_id,
             to_char(c.mencuo_mes, 'YYYY-MM-DD') AS mes, c.mencuo_total::float8 AS total,
             p.menpag_estado AS estado, ${textoEc('p.menpag_fecha', 'YYYY-MM-DD')} AS fecha_pago
        FROM public.mensualidad_cuota c
@@ -370,6 +372,42 @@ export async function cobradoEn(mes: Mes): Promise<CuotaCobrada[]> {
       WHERE p.menpag_estado IN ('pendiente', 'aprobado')
         AND date_trunc('month', ${diaEc('p.menpag_fecha')})::date = $1::date`,
     [mes],
+  );
+  return rows;
+}
+
+/**
+ * Lo que entró por inscripciones en `mes`, hijo por hijo: aprobadas
+ * (recaudado) y pendientes (en revisión). Cuenta en el mes en que se envió;
+ * lo de antes de noviembre de 2026, en noviembre (PRIMER_MES).
+ *
+ * El valor de cada hijo es el suyo con IVA (`insnino_precio.total_con_iva`) y
+ * el redondeo de la inscripción va al primero: la suma da exactamente
+ * `ins_total`, lo mismo que el Total recaudado del reporte de Inscripciones.
+ * Su colegio sale de sus disciplinas, como en ese reporte.
+ */
+export async function inscripcionesCobradasEn(mes: Mes): Promise<CuotaCobrada[]> {
+  const { rows } = await getPool().query<CuotaCobrada>(
+    `WITH hijos AS (
+       SELECT inn.ins_id, inn.insnino_orden, inn.nino_id,
+              COALESCE(inn.insnino_datos->>'nombre', 'Alumno') AS nombre,
+              (SELECT cah.col_id FROM unnest(inn.insnino_disciplinas) AS cid
+                 JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+                LIMIT 1) AS col_id,
+              COALESCE((inn.insnino_precio->>'total_con_iva')::numeric, 0) AS valor,
+              i.ins_total, i.ins_estado, i.ins_fecha, i.ins_mes_inicio
+         FROM public.inscripcion_nino inn
+         JOIN public.inscripcion i ON i.ins_id = inn.ins_id
+        WHERE GREATEST(date_trunc('month', ${diaEc('i.ins_fecha')})::date, $2::date) = $1::date
+     )
+     SELECT 'inscripcion' AS tipo, nino_id, nombre, col_id,
+            to_char(ins_mes_inicio, 'YYYY-MM-DD') AS mes,
+            (valor + CASE WHEN insnino_orden = min(insnino_orden) OVER (PARTITION BY ins_id)
+                          THEN COALESCE(ins_total, 0) - sum(valor) OVER (PARTITION BY ins_id) ELSE 0 END)::float8 AS total,
+            CASE ins_estado WHEN 'aprobada' THEN 'aprobado' ELSE 'pendiente' END AS estado,
+            ${textoEc('ins_fecha', 'YYYY-MM-DD')} AS fecha_pago
+       FROM hijos`,
+    [mes, PRIMER_MES],
   );
   return rows;
 }
