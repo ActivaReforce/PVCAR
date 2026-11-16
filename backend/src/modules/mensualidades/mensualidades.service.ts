@@ -360,8 +360,6 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
   const actual = mesDe(hoy);
   const mes = mesPedido ? `${mesPedido}-01` : actual;
   const [calculo, cobrado] = await Promise.all([calcular(null, hoy), repo.cobradoEn(mes)]);
-  // Hasta el último mes que algún colegio tiene abierto.
-  const hasta = calculo.colegios.flatMap((c) => c.meses).reduce((m, x) => (x > m ? x : m), actual);
 
   const resultado: ColegioDelMes[] = calculo.colegios
     .filter((c) => !colegio || c.col_id === colegio)
@@ -446,7 +444,7 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
     c.totales.en_revision /= 100;
     c.totales.por_cobrar /= 100;
   }
-  return { mes, actual, hasta, colegios: resultado };
+  return { mes, actual, colegios: resultado };
 }
 
 // ---------------------------------------------------------------------------

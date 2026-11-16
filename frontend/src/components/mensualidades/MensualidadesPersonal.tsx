@@ -359,16 +359,14 @@ const EstadoDelMes = () => {
   const consulta = useEstadoDelMes(mes, colegio === TODOS ? undefined : Number(colegio));
   const datos = consulta.data;
 
-  // Del último mes abierto al de hace dos años; por defecto, el actual.
+  // Tres años enteros: el pasado, el actual y el siguiente (cliente, 2026-11-16).
+  // Cambia solo con el año: en enero de 2027 sale de 2026 a 2028. Por defecto, el mes actual.
   const meses = useMemo(() => {
     if (!datos) return [];
-    const indice = (m: string) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7)) - 1;
-    const desde = indice(datos.actual) - 23;
-    const hasta = Math.max(indice(datos.hasta ?? datos.actual), indice(datos.actual));
-    return Array.from({ length: hasta - desde + 1 }, (_, i) => {
-      const total = hasta - i;
-      return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
-    });
+    const ano = Number(datos.actual.slice(0, 4));
+    return [ano + 1, ano, ano - 1].flatMap((a) =>
+      Array.from({ length: 12 }, (_, i) => `${a}-${String(12 - i).padStart(2, '0')}`),
+    );
   }, [datos]);
 
   const visibles = (datos?.colegios ?? []).filter((c) => c.cobra || c.alumnos.length > 0);

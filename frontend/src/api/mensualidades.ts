@@ -107,8 +107,6 @@ export interface AlumnoDelMes {
 export interface EstadoDelMes {
   mes: string;
   actual: string;
-  /** El último mes que algún colegio tiene abierto ('YYYY-MM-01'). */
-  hasta: string;
   colegios: Array<{
     col_id: number;
     col_nombre: string;
