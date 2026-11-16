@@ -44,6 +44,8 @@ export interface DisciplinaDelHijo {
   inicio: Mes;
   /** Vino por una inscripción aprobada: su primer mes ya está pagado. */
   porInscripcion: boolean;
+  /** El día en que se envió esa inscripción, si vino por una. */
+  pagadoEl?: string | null;
 }
 
 export interface HijoCobro {
@@ -122,6 +124,8 @@ interface Activo {
   col: ColegioCobro;
   cobradas: string[];
   inscripcion: string[];
+  /** El día de la inscripción que pagó este mes, si la hay. */
+  pagadoEl: string | null;
 }
 
 /** Desde qué mes cuenta una disciplina para la familia (incluido el que pagó la inscripción). */
@@ -162,6 +166,8 @@ export function mesesDeLaFamilia(
         col,
         cobradas: vigentes.filter((d) => !(d.porInscripcion && d.inicio === mes)).map((d) => d.nombre),
         inscripcion: vigentes.filter((d) => d.porInscripcion && d.inicio === mes).map((d) => d.nombre),
+        pagadoEl:
+          vigentes.find((d) => d.porInscripcion && d.inicio === mes && d.pagadoEl)?.pagadoEl ?? null,
       });
     }
     if (activos.length === 0) continue;
@@ -206,7 +212,7 @@ export function mesesDeLaFamilia(
           iva: 0,
           total: 0,
           menpag_id: null,
-          pagado_el: null,
+          pagado_el: a.pagadoEl,
         };
       } else {
         fila = {

@@ -124,8 +124,8 @@ describe('el catalogo', () => {
     const def = DEFINICIONES.find((d) => d.id === 'novedades')!;
     expect(service.catalogo(TODO).find((r) => r.id === 'novedades')!.filtros.ausencias).toBe(true);
     const ctx = { global: true, colegios: [], disciplinas: [], actorId: 1 };
-    expect(def.construir({ ausencias: false }, ctx).params.at(-1)).toBe(false);
-    expect(def.construir({}, ctx).params.at(-1)).toBeNull();
+    expect(def.construir!({ ausencias: false }, ctx).params.at(-1)).toBe(false);
+    expect(def.construir!({}, ctx).params.at(-1)).toBeNull();
     expect(def.hojaExtra!.sale({})).toBe(true);
     expect(def.hojaExtra!.sale({ ausencias: false })).toBe(false);
     expect(def.hojaExtra!.incluye({ tipo: 'Ausencia' })).toBe(true);
@@ -301,6 +301,7 @@ describe('las definiciones', () => {
   it('cada consulta usa tantos parametros como declara', () => {
     const ctx = { global: false, colegios: [1], disciplinas: [2], actorId: 3 };
     for (const d of DEFINICIONES) {
+      if (!d.construir) continue;
       const { sql, params } = d.construir(
         { desde: '2026-01-01', hasta: '2026-01-31' },
         ctx,

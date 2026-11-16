@@ -547,57 +547,53 @@ const inscripciones: Constructor = (filas) => {
 };
 
 const mensualidades: Constructor = (filas) => {
-  const centavos = (g: Fila[], estado: string) =>
-    Math.round(g.filter((f) => texto(f.estado) === estado).reduce((s, f) => s + numero(f.valor), 0) * 100) / 100;
-  const pagos = (g: Fila[]) => new Set(g.map((f) => texto(f.menpag_id))).size;
-  return [
+  const plata = (g: Fila[], clave: string) => Math.round(g.reduce((s, f) => s + numero(f[clave]), 0) * 100) / 100;
+  const con = (...e: string[]) => (f: Fila) => e.includes(texto(f._estado));
+  const medidas = (): Medida[] => [
+    cuantos('Al día', con('pagado', 'inscripcion')),
+    cuantos('En revisión', con('revision')),
+    cuantos('Pendientes', con('pendiente')),
+    cuantos('Atrasados', con('atrasado')),
+    { cabecera: 'Recaudado ($)', calc: (g) => plata(g, '_recaudado') },
+    { cabecera: 'En revisión ($)', calc: (g) => plata(g, '_en_revision') },
+    { cabecera: 'Por cobrar ($)', calc: (g) => plata(g, '_debe') },
+  ];
+  const porPagar = filas.filter(con('pendiente', 'atrasado'));
+  const bloques: Bloque[] = [
     {
       titulo: 'Totales',
       cabeceras: ['Concepto', 'Cantidad'],
       filas: [
-        ['Pagos', pagos(filas)],
-        ['Meses pagados', filas.length],
-        ['Total recaudado ($)', centavos(filas, 'Aprobado')],
-        ['En revisión ($)', centavos(filas, 'En revisión')],
+        ['Recaudado ($)', plata(filas, '_recaudado')],
+        ['En revisión ($)', plata(filas, '_en_revision')],
+        ['Por cobrar ($)', plata(filas, '_debe')],
+        ['Alumnos al día', filas.filter(con('pagado', 'inscripcion')).length],
+        ['Alumnos por pagar', porPagar.length],
       ],
       destacadas: [],
     },
-    agrupar(
-      'Por mes en que se pagó',
-      filas,
-      [{ cabecera: 'Mes de pago', de: campo('_mes_pago') }],
-      [
-        { cabecera: 'Pagos', calc: pagos },
-        cuenta('Meses pagados'),
-        { cabecera: 'Recaudado ($)', calc: (g) => centavos(g, 'Aprobado') },
-        { cabecera: 'En revisión ($)', calc: (g) => centavos(g, 'En revisión') },
-      ],
-      { nota: 'El dinero cuenta en el mes en que se pagó, aunque cubra meses siguientes.', total: false },
-    ),
-    agrupar(
-      'Por mes pagado',
-      filas,
-      [{ cabecera: 'Mes pagado', de: campo('_mes_pagado') }],
-      [
-        cuenta('Alumnos'),
-        { cabecera: 'Recaudado ($)', calc: (g) => centavos(g, 'Aprobado') },
-        { cabecera: 'En revisión ($)', calc: (g) => centavos(g, 'En revisión') },
-      ],
-      { nota: 'Qué meses cubre lo pagado. Un mes pagado por adelantado sale aquí con su valor.', total: false },
-    ),
-    agrupar(
-      'Por colegio',
-      filas,
-      [{ cabecera: 'Colegio', de: campo('colegio') }],
-      [
-        { cabecera: 'Pagos', calc: pagos },
-        cuenta('Meses pagados'),
-        { cabecera: 'Recaudado ($)', calc: (g) => centavos(g, 'Aprobado') },
-        { cabecera: 'En revisión ($)', calc: (g) => centavos(g, 'En revisión') },
-      ],
-      { total: false },
-    ),
+    agrupar('Por mes', filas, [{ cabecera: 'Mes', de: (f) => `${texto(f._mes).slice(0, 7)} ${texto(f.mes).split(' ')[0]}` }], medidas(), {
+      nota: 'Recaudado y en revisión van por fecha de pago: lo adelantado suma en el mes en que se pagó.',
+    }),
+    agrupar('Por colegio', filas, [{ cabecera: 'Colegio', de: campo('colegio') }], medidas()),
   ];
+  if (porPagar.length > 0) {
+    bloques.push(
+      agrupar(
+        'Por pagar',
+        porPagar,
+        [
+          { cabecera: 'Mes', de: (f) => `${texto(f._mes).slice(0, 7)} ${texto(f.mes).split(' ')[0]}` },
+          { cabecera: 'Alumno', de: campo('alumno') },
+          { cabecera: 'Representante', de: campo('representante') },
+          { cabecera: 'Teléfono', de: campo('telefono') },
+        ],
+        [{ cabecera: 'Debe ($)', calc: (g) => plata(g, '_debe') }],
+        { total: false },
+      ),
+    );
+  }
+  return bloques;
 };
 
 const encuestas: Constructor = (filas) => {

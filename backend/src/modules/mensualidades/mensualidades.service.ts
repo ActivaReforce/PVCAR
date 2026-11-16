@@ -76,6 +76,7 @@ const aHijo = (a: repo.AlumnoConDisciplinas): HijoCobro => ({
       nombre: describirDisciplina(d),
       inicio: deArranque && inicio < PRIMER_MES ? PRIMER_MES : inicio,
       porInscripcion: d.por_inscripcion || deArranque,
+      pagadoEl: d.pagado_el,
     };
   }),
 });
@@ -345,6 +346,8 @@ export interface AlumnoDelMes {
   menpag_id: number | null;
   /** Lo que entró este mes por este alumno (aprobado o en revisión), sea del mes que sea. */
   recibido: number;
+  /** La parte de `recibido` que sigue en revisión. */
+  recibido_revision: number;
   /** Los otros meses que pagó con lo recibido este mes. */
   cubre: Mes[];
   /** Tiene una inscripción enviada este mes que aún no se aprueba. */
@@ -381,18 +384,34 @@ export interface ColegioDelMes {
  * noviembre, y en diciembre, enero y febrero sale pagado con $0 recibido.
  */
 export async function estadoDelMes(mesPedido: string | undefined, colegio: number | undefined) {
-  const hoy = hoyEc();
-  const actual = mesDe(hoy);
+  const actual = mesDe(hoyEc());
   const mes = mesPedido ? `${mesPedido}-01` : actual;
-  const [calculo, mensualidades, inscripciones] = await Promise.all([
-    calcular(null, hoy),
-    repo.cobradoEn(mes),
-    repo.inscripcionesCobradasEn(mes),
-  ]);
-  const cobrado = [...mensualidades, ...inscripciones];
+  const porMes = await estadoDeMeses([mes], colegio ? [colegio] : null);
+  return { mes, actual, colegios: porMes.get(mes)! };
+}
 
+/**
+ * El estado de varios meses de una vez, con un solo cálculo: lo usa también
+ * el reporte de Mensualidades (Reportes → Pagos), para que cuadre con esta
+ * pantalla. `colegios` null = todos.
+ */
+export async function estadoDeMeses(meses: Mes[], colegios: number[] | null): Promise<Map<Mes, ColegioDelMes[]>> {
+  const calculo = await calcular(null, hoyEc());
+  const cobros = await Promise.all(
+    meses.map(async (mes) => {
+      const [mensualidades, inscripciones] = await Promise.all([
+        repo.cobradoEn(mes),
+        repo.inscripcionesCobradasEn(mes),
+      ]);
+      return [...mensualidades, ...inscripciones];
+    }),
+  );
+  return new Map(meses.map((mes, i) => [mes, armarMes(calculo, mes, cobros[i]!, colegios)]));
+}
+
+function armarMes(calculo: Calculo, mes: Mes, cobrado: repo.CuotaCobrada[], colegios: number[] | null): ColegioDelMes[] {
   const resultado: ColegioDelMes[] = calculo.colegios
-    .filter((c) => !colegio || c.col_id === colegio)
+    .filter((c) => !colegios || colegios.includes(c.col_id))
     .map((c) => ({
       col_id: c.col_id,
       col_nombre: c.col_nombre,
@@ -420,6 +439,7 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
     }
     return {
       recibido: lista.reduce((s, c) => s + aCentavos(c.total), 0) / 100,
+      recibido_revision: lista.filter((c) => c.estado !== 'aprobado').reduce((s, c) => s + aCentavos(c.total), 0) / 100,
       cubre: [...new Set(lista.map((c) => c.mes).filter((m) => m !== mes))].sort(),
       inscripcion_en_revision: lista.some((c) => c.tipo === 'inscripcion' && c.estado === 'pendiente'),
       menpag_id: pago,
@@ -497,7 +517,7 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
     c.totales.en_revision /= 100;
     c.totales.por_cobrar /= 100;
   }
-  return { mes, actual, colegios: resultado };
+  return resultado;
 }
 
 // ---------------------------------------------------------------------------

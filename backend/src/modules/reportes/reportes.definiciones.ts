@@ -1,8 +1,10 @@
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
-import { HOY_EC, diaEc, textoEc } from '../../lib/fecha.js';
+import { HOY_EC, diaEc, hoyEc, textoEc } from '../../lib/fecha.js';
 import { CTE_VISIBLES } from '../usuarios/usuarios.repository.js';
+import { mesDe, nombreDeMes, sumarMeses } from '../mensualidades/mensualidades.calculo.js';
+import { estadoDeMeses } from '../mensualidades/mensualidades.service.js';
 
 /**
  * El catálogo de reportes.
@@ -153,7 +155,19 @@ export interface Definicion {
    * Siguen estando; hay que marcar la casilla, y la exportación queda auditada.
    */
   columnasSensibles?: string[];
-  construir: (f: FiltrosReporte, ctx: ContextoReporte) => ConsultaReporte;
+  /** La consulta del reporte. Sin ella, las filas salen de `fuente`. */
+  construir?: (f: FiltrosReporte, ctx: ContextoReporte) => ConsultaReporte;
+  /**
+   * Filas calculadas en código, para lo que no se guarda en una tabla (lo
+   * que se debe de mensualidades se calcula, no se guarda). Ya filtradas y
+   * ordenadas; la paginación la hace el servicio.
+   */
+  fuente?: (f: FiltrosReporte, ctx: ContextoReporte) => Promise<Array<Record<string, unknown>>>;
+  /** Con `fuente`: las cifras de encima de la tabla, sacadas de sus filas. */
+  totalesDeFilas?: {
+    calcular: (filas: Array<Record<string, unknown>>) => Record<string, number>;
+    formato: TotalPantalla[];
+  };
   /**
    * Un conjunto de cifras agregadas que se pinta encima de la tabla en
    * pantalla, con los mismos filtros que el detalle. Pensado para los
@@ -1105,54 +1119,54 @@ const inscripciones: Definicion = {
   }),
 };
 
-/** 'Diciembre 2026' de un `date` día 1, sin depender del idioma de la base. */
-const MES_LEGIBLE = (expr: string) =>
-  `(ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])[extract(month FROM ${expr})::int] || ' ' || extract(year FROM ${expr})::int`;
+/**
+ * Mensualidades (Reportes → Pagos, cliente 2026-11-16): el **Estado del mes**
+ * de /inscripciones para cada mes del rango, con el mismo cálculo. Por cada
+ * mes, cada alumno con su estado: pagado (o pagado por la inscripción), en
+ * revisión, pendiente o atrasado; cuánto vale ese mes; cuándo se pagó; y lo
+ * que entró ese mes por él (el dinero va por fecha de pago: lo adelantado
+ * suma en el mes en que se pagó y en los que cubre sale con $0 y su fecha).
+ *
+ * Así, sacando febrero se ve quién ya pagó febrero —aunque fuera en
+ * noviembre— y quién no. Lo que se debe no se guarda: por eso las filas salen
+ * de código y no de una consulta.
+ */
+const ETIQUETA_MES: Record<string, string> = {
+  pagado: 'Pagado',
+  inscripcion: 'Pagado (Inscripción)',
+  revision: 'En revisión',
+  pendiente: 'Pendiente',
+  atrasado: 'Atrasado',
+};
+const ORDEN_ESTADO = ['atrasado', 'pendiente', 'revision', 'pagado', 'inscripcion', ''];
+/** Filtro de estado del desplegable: 1 pagado (también por inscripción), 2 en revisión, 3 pendiente, 4 atrasado. */
+const ESTADOS_DEL_FILTRO: Record<number, string[]> = {
+  1: ['pagado', 'inscripcion'],
+  2: ['revision'],
+  3: ['pendiente'],
+  4: ['atrasado'],
+};
+/** Tope de meses por consulta: dos años. */
+const MESES_MAXIMOS = 24;
 
-const SQL_MENSUALIDADES = `
-      SELECT p.menpag_id,
-             ${textoEc('p.menpag_fecha', 'DD/MM/YYYY HH24:MI')}       AS fecha,
-             CASE p.menpag_estado WHEN 'pendiente' THEN 'En revisión' ELSE 'Aprobado' END AS estado,
-             COALESCE(u.usu_nombre, 'Cuenta borrada')                AS representante,
-             COALESCE(u.usu_correo, '')                              AS correo,
-             c.mencuo_nino_nombre                                    AS alumno,
-             COALESCE(col.col_nombre, '—')                           AS colegio,
-             ${MES_LEGIBLE('c.mencuo_mes')}                          AS mes_pagado,
-             array_to_string(c.mencuo_disciplinas, ', ')             AS disciplinas,
-             c.mencuo_descuento::float8                              AS descuento,
-             c.mencuo_total::float8                                  AS valor,
-             COALESCE(r.usu_nombre, '')                              AS aprobado_por,
-             COALESCE(${textoEc('p.menpag_fecha_revision', 'DD/MM/YYYY')}, '') AS fecha_aprobacion,
-             -- 'AAAA-MM Mes': ordena bien en la hoja Resumen.
-             to_char(${diaEc('p.menpag_fecha')}, 'YYYY-MM') || ' ' ||
-               (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])[extract(month FROM ${diaEc('p.menpag_fecha')})::int] AS _mes_pago,
-             to_char(c.mencuo_mes, 'YYYY-MM') || ' ' ||
-               (ARRAY['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'])[extract(month FROM c.mencuo_mes)::int] AS _mes_pagado,
-             c.mencuo_mes                                            AS _mes_orden,
-             p.menpag_fecha                                          AS _orden
-        FROM public.mensualidad_cuota c
-        JOIN public.mensualidad_pago p ON p.menpag_id = c.menpag_id
-        LEFT JOIN public.usuario u ON u.usu_id = p.usu_id
-        LEFT JOIN public.usuario r ON r.usu_id = p.menpag_revisado_por
-        LEFT JOIN public.colegio col ON col.col_id = c.col_id
-       WHERE p.menpag_estado IN ('pendiente', 'aprobado')
-         AND ($1::date IS NULL OR ${diaEc('p.menpag_fecha')} >= $1::date)
-         AND ($2::date IS NULL OR ${diaEc('p.menpag_fecha')} <= $2::date)
-         AND ($3::text IS NULL
-              OR ${contieneSinTildes("COALESCE(u.usu_nombre, '')", '$3')}
-              OR ${contieneSinTildes("COALESCE(u.usu_correo, '')", '$3')}
-              OR ${contieneSinTildes('c.mencuo_nino_nombre', '$3')})
-         AND ($4::int IS NULL
-              OR ($4 = 1 AND p.menpag_estado = 'pendiente')
-              OR ($4 = 2 AND p.menpag_estado = 'aprobado'))
-         AND ($5::int[] IS NULL OR c.col_id = ANY($5::int[]))
-       ORDER BY _orden DESC, alumno, _mes_orden`;
+/** Para buscar sin tildes ni mayúsculas en filas calculadas en código. */
+const plano = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+const diaLegible = (dia: string | null) => (dia ? dia.split('-').reverse().join('/') : '');
+
+function mesesDelRango(desde: string | undefined, hasta: string | undefined): string[] {
+  const inicio = mesDe(desde ?? hasta ?? hoyEc());
+  const fin = mesDe(hasta ?? desde ?? hoyEc());
+  const meses: string[] = [];
+  for (let m = inicio; m <= fin && meses.length < MESES_MAXIMOS; m = sumarMeses(m, 1)) meses.push(m);
+  return meses;
+}
 
 const mensualidades: Definicion = {
   id: 'mensualidades',
   titulo: 'Mensualidades',
   descripcion:
-    'Lo que entró por mensualidades, por fecha de pago. Un pago de varios meses sale una fila por mes, todas con la fecha en que se pagó.',
+    'El estado de cada mes del rango, alumno por alumno: quién pagó (y cuándo), quién está en revisión y quién debe. Sin fechas, el mes en curso.',
   modulo: 'inscripciones',
   // Lleva montos: solo Propietario, como Inscripciones.
   soloRoles: [ROL.PROPIETARIO],
@@ -1163,55 +1177,99 @@ const mensualidades: Definicion = {
     estado: {
       etiqueta: 'Estado',
       opciones: [
-        { id: 1, nombre: 'En revisión' },
-        { id: 2, nombre: 'Aprobado' },
+        { id: 1, nombre: 'Pagado' },
+        { id: 2, nombre: 'En revisión' },
+        { id: 3, nombre: 'Pendiente' },
+        { id: 4, nombre: 'Atrasado' },
       ],
     },
     fechas: true,
   },
   columnas: [
-    { clave: 'menpag_id', cabecera: 'Nº pago', ancho: 9 },
-    { clave: 'fecha', cabecera: 'Fecha de pago', ancho: 17 },
-    { clave: 'estado', cabecera: 'Estado', ancho: 12 },
-    { clave: 'representante', cabecera: 'Representante', ancho: 30 },
-    { clave: 'correo', cabecera: 'Correo', ancho: 30 },
-    { clave: 'alumno', cabecera: 'Alumno', ancho: 30 },
+    { clave: 'mes', cabecera: 'Mes', ancho: 16 },
     { clave: 'colegio', cabecera: 'Colegio', ancho: 28 },
-    { clave: 'mes_pagado', cabecera: 'Mes pagado', ancho: 16 },
+    { clave: 'alumno', cabecera: 'Alumno', ancho: 30 },
+    { clave: 'estado', cabecera: 'Estado', ancho: 20 },
+    { clave: 'valor', cabecera: 'Valor del mes ($)', ancho: 15 },
+    { clave: 'pagado_el', cabecera: 'Pagado el', ancho: 12 },
+    { clave: 'recibido', cabecera: 'Recibido en el mes ($)', ancho: 18 },
+    { clave: 'incluye', cabecera: 'Incluye', ancho: 24 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 36 },
-    { clave: 'descuento', cabecera: 'Descuento ($)', ancho: 13 },
-    { clave: 'valor', cabecera: 'Valor ($)', ancho: 11 },
-    { clave: 'aprobado_por', cabecera: 'Aprobado por', ancho: 26 },
-    { clave: 'fecha_aprobacion', cabecera: 'Aprobado el', ancho: 13 },
+    { clave: 'representante', cabecera: 'Representante', ancho: 30 },
+    { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
+    { clave: 'correo', cabecera: 'Correo', ancho: 30 },
   ],
-  /** Sin alcance por colegio: solo Propietario. Los rechazados no salen (no entró dinero). */
-  construir: (f) => ({ sql: SQL_MENSUALIDADES, params: paramsMensualidades(f) }),
-  totales: (f) => ({
-    consulta: {
-      sql: `
-        SELECT count(DISTINCT r.menpag_id)::int                                   AS pagos,
-               count(*)::int                                                     AS meses,
-               COALESCE(SUM(r.valor) FILTER (WHERE r.estado = 'Aprobado'), 0)::float8    AS recaudado,
-               COALESCE(SUM(r.valor) FILTER (WHERE r.estado = 'En revisión'), 0)::float8 AS en_revision
-          FROM (${SQL_MENSUALIDADES}) r`,
-      params: paramsMensualidades(f),
+  fuente: async (f) => {
+    const meses = mesesDelRango(f.desde, f.hasta);
+    const porMes = await estadoDeMeses(meses, f.colegio && f.colegio.length > 0 ? f.colegio : null);
+    const estados = f.estado ? ESTADOS_DEL_FILTRO[f.estado] : null;
+    const buscar = f.buscar?.trim() ? plano(f.buscar.trim()) : null;
+
+    const filas: Array<Record<string, unknown>> = [];
+    for (const mes of meses) {
+      for (const col of porMes.get(mes) ?? []) {
+        for (const a of col.alumnos) {
+          const estado = a.estado ?? '';
+          if (estados && !estados.includes(estado)) continue;
+          const contacto = a.contactos[0];
+          const representante = contacto?.nombre ?? a.representantes[0] ?? '';
+          if (buscar && !plano(`${a.nombre} ${representante} ${contacto?.correo ?? ''}`).includes(buscar)) continue;
+          const debe = estado === 'pendiente' || estado === 'atrasado';
+          filas.push({
+            mes: nombreDeMes(mes),
+            colegio: col.col_nombre,
+            alumno: a.nombre,
+            estado: a.estado
+              ? ETIQUETA_MES[a.estado]
+              : a.inscripcion_en_revision
+                ? 'Inscripción en revisión'
+                : 'Pagó otros meses',
+            valor: a.valor,
+            pagado_el: diaLegible(a.pagado_el),
+            recibido: a.recibido,
+            incluye: a.cubre.map((m) => nombreDeMes(m)).join(', '),
+            disciplinas: a.disciplinas.join(', '),
+            representante: a.baja ? `${representante || a.nombre} (dado de baja)` : representante,
+            telefono: contacto?.telefono ?? '',
+            correo: contacto?.correo ?? '',
+            _mes: mes,
+            _estado: estado,
+            _debe: debe ? a.valor : 0,
+            _recaudado: Math.round((a.recibido - a.recibido_revision) * 100) / 100,
+            _en_revision: a.recibido_revision,
+          });
+        }
+      }
+    }
+    return filas.sort(
+      (x, y) =>
+        String(x._mes).localeCompare(String(y._mes)) ||
+        String(x.colegio).localeCompare(String(y.colegio)) ||
+        ORDEN_ESTADO.indexOf(String(x._estado)) - ORDEN_ESTADO.indexOf(String(y._estado)) ||
+        String(x.alumno).localeCompare(String(y.alumno)),
+    );
+  },
+  totalesDeFilas: {
+    calcular: (filas) => {
+      const suma = (clave: string) => Math.round(filas.reduce((s, f) => s + Number(f[clave] ?? 0), 0) * 100) / 100;
+      const con = (...e: string[]) => filas.filter((f) => e.includes(String(f._estado))).length;
+      return {
+        recaudado: suma('_recaudado'),
+        en_revision: suma('_en_revision'),
+        por_cobrar: suma('_debe'),
+        al_dia: con('pagado', 'inscripcion'),
+        por_pagar: con('pendiente', 'atrasado'),
+      };
     },
     formato: [
-      { clave: 'pagos', etiqueta: 'Pagos' },
-      { clave: 'meses', etiqueta: 'Meses pagados' },
-      { clave: 'recaudado', etiqueta: 'Total recaudado', moneda: true },
+      { clave: 'recaudado', etiqueta: 'Recaudado', moneda: true },
       { clave: 'en_revision', etiqueta: 'En revisión', moneda: true },
+      { clave: 'por_cobrar', etiqueta: 'Por cobrar', moneda: true },
+      { clave: 'al_dia', etiqueta: 'Al día' },
+      { clave: 'por_pagar', etiqueta: 'Por pagar' },
     ],
-  }),
+  },
 };
-
-const paramsMensualidades = (f: FiltrosReporte) => [
-  oNulo(f.desde),
-  oNulo(f.hasta),
-  textoONulo(f.buscar),
-  oNulo(f.estado),
-  oNulo(f.colegio),
-];
 
 const encuestas: Definicion = {
   id: 'encuestas',

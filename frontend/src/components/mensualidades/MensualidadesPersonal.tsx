@@ -387,7 +387,7 @@ const DineroDeFila = ({ a, mes }: { a: AlumnoDelMes; mes: string }) => {
   return (
     <div className="text-right">
       <p className={cn('w-24 font-medium', debe && 'text-muted-foreground')}>
-        {a.estado === 'inscripcion' && a.recibido === 0 ? '—' : debe && a.recibido === 0 ? dinero(a.valor) : dinero(a.recibido)}
+        {debe && a.recibido === 0 ? dinero(a.valor) : dinero(a.recibido)}
       </p>
       {nota && <p className="text-xs text-muted-foreground">{nota}</p>}
     </div>

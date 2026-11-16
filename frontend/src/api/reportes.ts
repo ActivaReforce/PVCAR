@@ -135,3 +135,16 @@ export const reportesApi = {
   exportar: (modulo: string, filtros: FiltrosReporte) =>
     api.descargar(`/reportes/${modulo}/export`, filtros, `${modulo}.xlsx`),
 };
+
+/**
+ * Pagos (cliente, 2026-11-16): Inscripciones y Mensualidades son el mismo
+ * dinero —la inscripción es la mensualidad del primer mes—, así que salen en
+ * una sola tarjeta con dos pestañas (/reportes/pagos). Ocupa el lugar de
+ * Inscripciones en el orden.
+ */
+export const PAGOS = {
+  id: 'pagos',
+  titulo: 'Pagos',
+  descripcion: 'Inscripciones y mensualidades: lo que entró, quién pagó cada mes y quién debe.',
+  reportes: ['inscripciones', 'mensualidades'],
+};

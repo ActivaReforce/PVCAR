@@ -104,6 +104,8 @@ export interface AlumnoConDisciplinas {
     horarios: HorarioDisciplina[];
     inicio: string;
     por_inscripcion: boolean;
+    /** Día (Ecuador) en que se envió la inscripción que la trajo. */
+    pagado_el: string | null;
   }>;
 }
 
@@ -138,7 +140,8 @@ export async function alumnosActivos(client?: PoolClient): Promise<AlumnoConDisc
                        'inicio', CASE WHEN ins.ins_id IS NOT NULL
                                       THEN to_char(ins.ins_mes_inicio, 'YYYY-MM-DD')
                                       ELSE ${textoEc('na.ninoasig_fecha_inscripcion', 'YYYY-MM')} || '-01' END,
-                       'por_inscripcion', ins.ins_id IS NOT NULL) ORDER BY act.act_nombre)
+                       'por_inscripcion', ins.ins_id IS NOT NULL,
+                       'pagado_el', ${textoEc('ins.ins_fecha', 'YYYY-MM-DD')}) ORDER BY act.act_nombre)
                 FROM public.nino_asignacion na
                 JOIN public.colegio_actividad_horario d ON d.colacthor_id = na.colacthor_id
                 JOIN public.actividad act ON act.act_id = d.act_id

@@ -120,6 +120,11 @@ function columnasVisibles(definicion: Definicion, incluirSensibles: boolean): Co
   return definicion.columnas.filter((c) => !sensibles.includes(c.clave));
 }
 
+function consultaDe(definicion: Definicion, filtros: FiltrosReporte, ctx: ContextoReporte) {
+  if (!definicion.construir) throw new Error(`El reporte ${definicion.id} no tiene consulta`);
+  return definicion.construir(filtros, ctx);
+}
+
 async function contextoDe(actor: AuthUser): Promise<ContextoReporte> {
   const alcance = await alcanceDe(actor.usuario);
   return {
@@ -167,9 +172,28 @@ export async function ejecutar(
 ): Promise<PaginaReporte> {
   const definicion = exigirDefinicion(actor, id);
   const filtros = exigirRango(definicion, query);
-  const { sql, params } = definicion.construir(filtros, await contextoDe(actor));
-
   const offset = (query.page - 1) * query.limit;
+
+  // Filas calculadas en código (Mensualidades): se paginan aquí.
+  if (definicion.fuente) {
+    const todas = await definicion.fuente(filtros, await contextoDe(actor));
+    const columnas = columnasVisibles(definicion, query.incluirSensibles === true);
+    const t = definicion.totalesDeFilas;
+    const cifras = t?.calcular(todas);
+    return {
+      id: definicion.id,
+      titulo: definicion.titulo,
+      columnas,
+      filas: todas.slice(offset, offset + query.limit).map((f) => proyectar(f, columnas)),
+      total: todas.length,
+      page: query.page,
+      limit: query.limit,
+      totalPages: todas.length === 0 ? 0 : Math.ceil(todas.length / query.limit),
+      ...(t && cifras ? { totales: t.formato.map((x) => ({ ...x, valor: cifras[x.clave] ?? 0 })) } : {}),
+    };
+  }
+  const { sql, params } = consultaDe(definicion, filtros, await contextoDe(actor));
+
   const n = params.length;
 
   const totalesDef = definicion.totales?.(filtros, await contextoDe(actor));
@@ -237,7 +261,7 @@ export async function exportar(
 ): Promise<Exportacion> {
   const definicion = exigirDefinicion(actor, id);
   const filtros = exigirRango(definicion, filtrosQuery);
-  const { sql, params } = definicion.construir(filtros, await contextoDe(actor));
+  const contexto = await contextoDe(actor);
 
   const libro = new ExcelJS.stream.xlsx.WorkbookWriter({
     stream: destino,
@@ -253,10 +277,16 @@ export async function exportar(
    * Las filas se traen antes de abrir ninguna hoja: el Resumen va primero y
    * se calcula sobre ellas. Ya se tenían enteras en memoria igualmente.
    */
-  const { rows } = await getPool().query<Record<string, unknown>>(
-    `SELECT * FROM (${sql}) r LIMIT $${params.length + 1}`,
-    [...params, TOPE_EXPORTACION],
-  );
+  const rows = definicion.fuente
+    ? (await definicion.fuente(filtros, contexto)).slice(0, TOPE_EXPORTACION)
+    : await (async () => {
+        const { sql, params } = consultaDe(definicion, filtros, contexto);
+        const r = await getPool().query<Record<string, unknown>>(
+          `SELECT * FROM (${sql}) r LIMIT $${params.length + 1}`,
+          [...params, TOPE_EXPORTACION],
+        );
+        return r.rows;
+      })();
 
   const cortado = rows.length === TOPE_EXPORTACION;
   const avisos = [`Generado el ${ahoraEc()} (hora de Ecuador) por ${actor.usuario.usu_nombre}.`];
