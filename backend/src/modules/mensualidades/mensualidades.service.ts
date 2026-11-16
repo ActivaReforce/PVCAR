@@ -305,6 +305,11 @@ export interface AlumnoDelMes {
   valor: number;
   /** Pagado o en revisión: el día del pago. */
   pagado_el: string | null;
+  /**
+   * El pago de mensualidad que se abre al pulsar la fila: el de este mes o,
+   * si no, el que entró este mes. Null si no hay ninguno (2026-11-16).
+   */
+  menpag_id: number | null;
   /** Lo que entró este mes por este alumno (aprobado o en revisión), sea del mes que sea. */
   recibido: number;
   /** Los otros meses que pagó con lo recibido este mes. */
@@ -375,6 +380,7 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
   const sacarEntradas = (col: ColegioDelMes, k: string) => {
     const lista = entradas.get(k) ?? [];
     entradas.delete(k);
+    const pago = lista.find((c) => c.menpag_id !== null)?.menpag_id ?? null;
     for (const c of lista) {
       if (c.estado === 'aprobado') col.totales.recaudado += aCentavos(c.total);
       else col.totales.en_revision += aCentavos(c.total);
@@ -383,6 +389,7 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
       recibido: lista.reduce((s, c) => s + aCentavos(c.total), 0) / 100,
       cubre: [...new Set(lista.map((c) => c.mes).filter((m) => m !== mes))].sort(),
       inscripcion_en_revision: lista.some((c) => c.tipo === 'inscripcion' && c.estado === 'pendiente'),
+      menpag_id: pago,
     };
   };
 
@@ -403,7 +410,10 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
       inscripcion: m?.inscripcion ?? [],
       valor: m?.total ?? 0,
       pagado_el: m?.pagado_el ?? null,
-      ...sacarEntradas(col, k),
+      ...(() => {
+        const dinero = sacarEntradas(col, k);
+        return { ...dinero, menpag_id: m?.menpag_id ?? dinero.menpag_id };
+      })(),
     });
     if (!m) continue;
     const t = col.totales;

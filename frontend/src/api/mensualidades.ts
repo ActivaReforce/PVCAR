@@ -96,6 +96,8 @@ export interface AlumnoDelMes {
   inscripcion_en_revision?: boolean;
   /** Ya no está activo: sale porque su dinero entró este mes. Opcional, como el anterior. */
   baja?: boolean;
+  /** El pago que se abre al pulsar la fila. Opcional, como el anterior. */
+  menpag_id?: number | null;
 }
 
 export interface EstadoDelMes {

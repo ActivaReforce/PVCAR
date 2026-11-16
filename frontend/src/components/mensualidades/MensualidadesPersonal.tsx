@@ -412,6 +412,7 @@ const DineroDeFila = ({ a, mes }: { a: AlumnoDelMes; mes: string }) => {
  * cubre sale pagado con $0 y la fecha del pago.
  */
 const EstadoDelMes = () => {
+  const [abierto, setAbierto] = useState<number | null>(null);
   const [mes, setMes] = useState<string | undefined>(undefined);
   const [colegio, setColegio] = useState(TODOS);
   const consulta = useEstadoDelMes(mes, colegio === TODOS ? undefined : Number(colegio));
@@ -505,10 +506,8 @@ const EstadoDelMes = () => {
             ) : (
               <ul className="divide-y">
                 {alumnos.map((a) => (
-                  <li
-                    key={a.nino_id ?? `n-${a.nombre}`}
-                    className="flex flex-col gap-1 px-4 py-2 text-sm sm:flex-row sm:items-center sm:gap-3"
-                  >
+                  <li key={a.nino_id ?? `n-${a.nombre}`}>
+                    <FilaAlumno pago={a.menpag_id ?? null} onAbrir={setAbierto}>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{a.nombre}</p>
                       <p className="truncate text-xs text-muted-foreground">
@@ -530,6 +529,7 @@ const EstadoDelMes = () => {
                       )}
                       <DineroDeFila a={a} mes={`${elegido}-01`} />
                     </div>
+                    </FilaAlumno>
                   </li>
                 ))}
               </ul>
@@ -537,7 +537,32 @@ const EstadoDelMes = () => {
           </div>
         );
       })}
+
+      <FichaPago id={abierto} onClose={() => setAbierto(null)} />
     </section>
+  );
+};
+
+/** Una fila del estado del mes: si tiene pago, se pulsa y abre su detalle, como en Por revisar. */
+const FilaAlumno = ({
+  pago,
+  onAbrir,
+  children,
+}: {
+  pago: number | null;
+  onAbrir: (id: number) => void;
+  children: React.ReactNode;
+}) => {
+  const clase = 'flex w-full flex-col gap-1 px-4 py-2 text-left text-sm sm:flex-row sm:items-center sm:gap-3';
+  if (pago === null) return <div className={clase}>{children}</div>;
+  return (
+    <button
+      type="button"
+      onClick={() => onAbrir(pago)}
+      className={cn(clase, 'transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none')}
+    >
+      {children}
+    </button>
   );
 };
 

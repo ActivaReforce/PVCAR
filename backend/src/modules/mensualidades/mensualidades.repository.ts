@@ -329,6 +329,8 @@ export async function borrarPago(client: PoolClient, id: number): Promise<void> 
 export interface CuotaCobrada {
   /** Una mensualidad o el pago de una inscripción (su primer mes). */
   tipo: 'mensualidad' | 'inscripcion';
+  /** El pago de mensualidad; null en una inscripción. */
+  menpag_id: number | null;
   nino_id: number | null;
   nombre: string;
   col_id: number | null;
@@ -346,7 +348,7 @@ export interface CuotaCobrada {
  */
 export async function cobradoEn(mes: Mes): Promise<CuotaCobrada[]> {
   const { rows } = await getPool().query<CuotaCobrada>(
-    `SELECT 'mensualidad' AS tipo, c.nino_id, c.mencuo_nino_nombre AS nombre, c.col_id,
+    `SELECT 'mensualidad' AS tipo, c.menpag_id, c.nino_id, c.mencuo_nino_nombre AS nombre, c.col_id,
             to_char(c.mencuo_mes, 'YYYY-MM-DD') AS mes, c.mencuo_total::float8 AS total,
             p.menpag_estado AS estado, ${textoEc('p.menpag_fecha', 'YYYY-MM-DD')} AS fecha_pago
        FROM public.mensualidad_cuota c
@@ -382,7 +384,7 @@ export async function inscripcionesCobradasEn(mes: Mes): Promise<CuotaCobrada[]>
          JOIN public.inscripcion i ON i.ins_id = inn.ins_id
         WHERE GREATEST(date_trunc('month', ${diaEc('i.ins_fecha')})::date, $2::date) = $1::date
      )
-     SELECT 'inscripcion' AS tipo, nino_id, nombre, col_id,
+     SELECT 'inscripcion' AS tipo, NULL::int AS menpag_id, nino_id, nombre, col_id,
             to_char(ins_mes_inicio, 'YYYY-MM-DD') AS mes,
             (valor + CASE WHEN insnino_orden = min(insnino_orden) OVER (PARTITION BY ins_id)
                           THEN COALESCE(ins_total, 0) - sum(valor) OVER (PARTITION BY ins_id) ELSE 0 END)::float8 AS total,
