@@ -550,6 +550,7 @@ const mensualidades: Constructor = (filas) => {
   const plata = (g: Fila[], clave: string) => Math.round(g.reduce((s, f) => s + numero(f[clave]), 0) * 100) / 100;
   const es = (...e: string[]) => (f: Fila) => e.includes(texto(f._estado));
   const del = filas.filter((f) => f._del_periodo === true);
+  const cuentan = filas.filter((f) => f._cuenta === true);
   const porPagar = del.filter(es('pendiente', 'atrasado'));
   const mesDeLaFila = (clave: string) => (f: Fila) => {
     const m = texto(f[clave]);
@@ -564,7 +565,7 @@ const mensualidades: Constructor = (filas) => {
         ['Recaudado en el periodo ($)', plata(filas, '_recaudado')],
         ['En revisión ($)', plata(filas, '_en_revision')],
         ['Por cobrar ($)', plata(filas, '_debe')],
-        ['Alumnos al día', del.filter(es('pagado', 'inscripcion')).length],
+        ['Alumnos al día', cuentan.filter(es('pagado', 'inscripcion')).length],
         ['Alumnos por pagar', porPagar.length],
       ],
       destacadas: [],

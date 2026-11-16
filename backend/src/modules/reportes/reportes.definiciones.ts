@@ -1251,6 +1251,8 @@ const mensualidades: Definicion = {
         _mes_pago: r.mes_pago ?? '',
         _estado: r.estado,
         _del_periodo: delPeriodo,
+        // Como el Estado del mes: los de baja suman su dinero pero no cuentan como alumnos.
+        _cuenta: delPeriodo && !r.baja,
         _recaudado: r.aprobado ? recaudado : 0,
         _en_revision: r.aprobado ? 0 : recaudado,
         _debe: delPeriodo && (r.estado === 'pendiente' || r.estado === 'atrasado') ? r.valor : 0,
@@ -1267,7 +1269,7 @@ const mensualidades: Definicion = {
   totalesDeFilas: {
     calcular: (filas) => {
       const suma = (clave: string) => Math.round(filas.reduce((s, f) => s + Number(f[clave] ?? 0), 0) * 100) / 100;
-      const del = filas.filter((f) => f._del_periodo === true);
+      const del = filas.filter((f) => f._cuenta === true);
       const con = (...e: string[]) => del.filter((f) => e.includes(String(f._estado))).length;
       return {
         recaudado: suma('_recaudado'),
