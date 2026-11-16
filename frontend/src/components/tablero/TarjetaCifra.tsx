@@ -37,7 +37,8 @@ const TarjetaCifra = ({ titulo, valor, detalle, icono: Icono, a, avisa }: Props)
             {valor}
           </div>
           <div className="truncate text-sm text-muted-foreground">{titulo}</div>
-          {detalle && <div className="truncate text-xs text-muted-foreground">{detalle}</div>}
+          {/* Entero, en varias líneas si hace falta (cada salto de línea, una). */}
+          {detalle && <div className="whitespace-pre-line break-words text-xs text-muted-foreground">{detalle}</div>}
         </div>
       </CardContent>
     </Card>

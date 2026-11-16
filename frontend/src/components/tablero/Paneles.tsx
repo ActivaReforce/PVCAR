@@ -43,7 +43,10 @@ const NOMBRE_CORREO: Record<string, string> = {
 const detalleCorreos = (porTipo: TableroGeneral['correosHoyPorTipo']) =>
   porTipo.length === 0
     ? 'Vuelve a 0 a las 00:00 (Ecuador)'
-    : porTipo.map((t) => `${t.enviados} ${NOMBRE_CORREO[t.tipo] ?? t.tipo}`).join(' · ');
+    : porTipo.map((t) => `${t.enviados} ${NOMBRE_CORREO[t.tipo] ?? t.tipo}`).join('\n');
+
+/** El tope diario de correos del plan de Resend. */
+const TOPE_CORREOS_DIA = 100;
 
 export const PanelGeneral = ({ datos }: { datos: TableroGeneral }) => (
   <div className="space-y-6">
@@ -93,7 +96,8 @@ export const PanelGeneral = ({ datos }: { datos: TableroGeneral }) => (
       />
       <TarjetaCifra
         titulo="Correos enviados hoy"
-        valor={datos.correosHoy}
+        valor={`${datos.correosHoy}/${TOPE_CORREOS_DIA}`}
+        avisa={datos.correosHoy >= TOPE_CORREOS_DIA * 0.8}
         detalle={detalleCorreos(datos.correosHoyPorTipo)}
         icono={Mail}
       />
