@@ -6,7 +6,7 @@ import { contieneSinTildes } from '../../lib/sql.js';
 import type { FiltroRepresentantes } from './comunicados.schemas.js';
 
 /**
- * Consultas de Comunicados (0044). Todo es del Propietario: no hay alcance
+ * Consultas de Comunicados (0045). Todo es del Propietario: no hay alcance
  * que filtrar. Los representantes se leen, nunca se tocan.
  */
 

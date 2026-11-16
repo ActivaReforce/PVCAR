@@ -326,7 +326,7 @@ export async function borrar(actor: AuthUser, id: number) {
 
 async function remitente(): Promise<{ de: string; responderA: string | null }> {
   const config = await obtenerConfig('comunicados');
-  if (!config) throw new ApiError(500, 'Falta la fila de comunicados en correo_config (migración 0044)');
+  if (!config) throw new ApiError(500, 'Falta la fila de comunicados en correo_config (migración 0045)');
   if (!env.CORREO_DOMINIO) throw new ApiError(500, 'Falta CORREO_DOMINIO en Railway');
   return { de: `${config.nombre} <${config.usuario}@${env.CORREO_DOMINIO}>`, responderA: config.responder_a };
 }

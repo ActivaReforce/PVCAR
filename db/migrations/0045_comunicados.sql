@@ -1,5 +1,5 @@
 -- =====================================================================
--- PVCAR — 0044_comunicados.sql
+-- PVCAR — 0045_comunicados.sql
 -- Comunicados (pedido del cliente, 2026-11-11). Diseño en docs/comunicados.md.
 --
 -- Correos masivos por Resend Broadcasts sin entrar a Resend. Resend es solo
@@ -26,7 +26,7 @@
 -- 6. Fila 'comunicados' en correo_config (remitente único).
 --
 -- Solo añade: el código desplegado sigue funcionando con ella aplicada.
--- Requiere 0001-0043. Idempotente. Todo en una transacción.
+-- Requiere 0001-0044 (antes se llamaba 0044; renumerada el 2026-11-16). Idempotente. Todo en una transacción.
 -- =====================================================================
 
 BEGIN;

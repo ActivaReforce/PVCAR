@@ -1,6 +1,6 @@
 # Comunicados
 
-Pedido y diseñado con el cliente el 2026-11-11. Rama `comunicados`, migración `0044_comunicados.sql`.
+Pedido y diseñado con el cliente el 2026-11-11. Rama `comunicados`, migración `0045_comunicados.sql`.
 
 Sirve para mandar correos masivos a representantes y contactos por **Resend Broadcasts** sin entrar a Resend. Lo usa **solo el rol Propietario**, sin casilla en Permisos.
 
@@ -11,7 +11,7 @@ Sirve para mandar correos masivos a representantes y contactos por **Resend Broa
 
 ## Resend como tubería
 
-Resend queda vacío en reposo. Los contactos, segmentos y plantillas viven en la plataforma (`0044`). En cada envío (`backend/src/modules/comunicados/comunicados.envio.ts`):
+Resend queda vacío en reposo. Los contactos, segmentos y plantillas viven en la plataforma (`0045`). En cada envío (`backend/src/modules/comunicados/comunicados.envio.ts`):
 
 1. **en_cola → preparando:** se crea un segmento temporal en Resend y se mete en él a cada destinatario, sin repetidos.
    - Si el correo **ya existía en Resend** (los contactos reales que el cliente tenía antes, 2026-11-11), solo se añade al segmento y se marca `existia`. **Nunca se borra ni se le cambia nada.**
