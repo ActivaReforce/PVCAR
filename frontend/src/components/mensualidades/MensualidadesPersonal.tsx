@@ -13,6 +13,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { usePrecios } from '@/hooks/useInscripciones';
@@ -36,14 +37,22 @@ const VERDE =
 /**
  * Mensualidades, lado del personal (cliente, 2026-10-30): los pagos que
  * llegan (revisar el comprobante, aprobar o rechazar con motivo) y el estado
- * de cada mes por colegio. Un rechazado desaparece de aquí, como las
+ * de cada mes por colegio, en dos pestañas (2026-11-16). Un rechazado desaparece de aquí, como las
  * inscripciones; el representante ve el motivo hasta que vuelve a intentar.
  */
 const MensualidadesPersonal = () => (
-  <div className="space-y-8">
-    <Pagos />
-    <EstadoDelMes />
-  </div>
+  <Tabs defaultValue="por-revisar">
+    <TabsList>
+      <TabsTrigger value="por-revisar">Por revisar</TabsTrigger>
+      <TabsTrigger value="estado">Estado del mes</TabsTrigger>
+    </TabsList>
+    <TabsContent value="por-revisar" className="pt-2">
+      <Pagos />
+    </TabsContent>
+    <TabsContent value="estado" className="pt-2">
+      <EstadoDelMes />
+    </TabsContent>
+  </Tabs>
 );
 
 const Pagos = () => {
@@ -65,15 +74,6 @@ const Pagos = () => {
 
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Pagos de mensualidades</h2>
-        {datos && (
-          <p className="text-sm text-muted-foreground">
-            {datos.conteos.pendientes} por revisar
-          </p>
-        )}
-      </div>
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <DebouncedSearchInput
           placeholder="Buscar por representante, correo o alumno..."
@@ -386,12 +386,9 @@ const EstadoDelMes = () => {
 
   return (
     <section className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Estado del mes</h2>
-        <p className="text-sm text-muted-foreground">
-          Cada alumno del mes elegido: pagado, en revisión o por pagar. El dinero cuenta en el mes en que se pagó.
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Cada alumno del mes elegido: pagado, en revisión o por pagar. El dinero cuenta en el mes en que se pagó.
+      </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Select value={elegido} onValueChange={setMes}>
