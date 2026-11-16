@@ -496,7 +496,7 @@ export async function atrasadosEn(ninoIds: number[], fecha: string): Promise<Map
   try {
     calculo = await calcular(ninoIds, fecha);
   } catch (err) {
-    // Asistencias es lo más usado: si esto falla, se pasa lista sin bloqueo.
+    // Asistencias es lo más usado: si esto falla, se pasa lista sin bloqueo (queda en el log).
     console.error('No se pudo calcular la mensualidad atrasada:', err);
     return new Map();
   }
