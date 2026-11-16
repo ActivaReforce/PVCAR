@@ -412,3 +412,70 @@ export async function inscripcionesCobradasEn(mes: Mes): Promise<CuotaCobrada[]>
   );
   return rows;
 }
+
+// ---------------------------------------------------------------------------
+// Reportes → Pagos → Mensualidades
+
+export interface RegistroDePago {
+  tipo: 'mensualidad' | 'inscripcion';
+  nino_id: number | null;
+  nombre: string;
+  col_id: number | null;
+  col_nombre: string;
+  /** El mes que paga ('YYYY-MM-01'). */
+  mes: Mes;
+  /** Lo que vale ese mes para ese alumno (con IVA). */
+  total: number;
+  estado: 'pendiente' | 'aprobado';
+  /** Día (Ecuador) del envío, 'YYYY-MM-DD'. */
+  fecha_pago: string;
+  /** Mes (día 1) en que cuenta el dinero: el del envío; lo de antes de noviembre de 2026, noviembre. */
+  mes_pago: Mes;
+  disciplinas: string[];
+}
+
+/**
+ * Todo lo pagado o en revisión, mes por mes y alumno por alumno: las cuotas
+ * de mensualidad y, de cada inscripción, la parte de cada hijo (su valor con
+ * IVA, con el redondeo al primero para que sume `ins_total`) en el mes que
+ * paga.
+ */
+export async function registrosDePago(): Promise<RegistroDePago[]> {
+  const { rows } = await getPool().query<RegistroDePago>(
+    `SELECT 'mensualidad' AS tipo, c.nino_id, c.mencuo_nino_nombre AS nombre, c.col_id,
+            COALESCE(col.col_nombre, '—') AS col_nombre,
+            to_char(c.mencuo_mes, 'YYYY-MM-DD') AS mes, c.mencuo_total::float8 AS total,
+            p.menpag_estado AS estado, ${textoEc('p.menpag_fecha', 'YYYY-MM-DD')} AS fecha_pago,
+            to_char(date_trunc('month', ${diaEc('p.menpag_fecha')}), 'YYYY-MM-DD') AS mes_pago,
+            c.mencuo_disciplinas AS disciplinas
+       FROM public.mensualidad_cuota c
+       JOIN public.mensualidad_pago p ON p.menpag_id = c.menpag_id
+       LEFT JOIN public.colegio col ON col.col_id = c.col_id
+      WHERE p.menpag_estado IN ('pendiente', 'aprobado')
+     UNION ALL
+     SELECT 'inscripcion', h.nino_id, h.nombre, h.col_id, COALESCE(col.col_nombre, '—'),
+            to_char(h.ins_mes_inicio, 'YYYY-MM-DD'),
+            (h.valor + CASE WHEN h.insnino_orden = min(h.insnino_orden) OVER (PARTITION BY h.ins_id)
+                            THEN COALESCE(h.ins_total, 0) - sum(h.valor) OVER (PARTITION BY h.ins_id) ELSE 0 END)::float8,
+            CASE h.ins_estado WHEN 'aprobada' THEN 'aprobado' ELSE 'pendiente' END,
+            ${textoEc('h.ins_fecha', 'YYYY-MM-DD')},
+            to_char(GREATEST(date_trunc('month', ${diaEc('h.ins_fecha')})::date, $1::date), 'YYYY-MM-DD'),
+            h.disciplinas
+       FROM (
+         SELECT inn.ins_id, inn.insnino_orden, inn.nino_id,
+                COALESCE(inn.insnino_datos->>'nombre', 'Alumno') AS nombre,
+                (SELECT cah.col_id FROM unnest(inn.insnino_disciplinas) AS cid
+                   JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid LIMIT 1) AS col_id,
+                ARRAY(SELECT a.act_nombre FROM unnest(inn.insnino_disciplinas) AS cid
+                        JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+                        JOIN public.actividad a ON a.act_id = cah.act_id ORDER BY a.act_nombre) AS disciplinas,
+                COALESCE((inn.insnino_precio->>'total_con_iva')::numeric, 0) AS valor,
+                i.ins_total, i.ins_estado, i.ins_fecha, i.ins_mes_inicio
+           FROM public.inscripcion_nino inn
+           JOIN public.inscripcion i ON i.ins_id = inn.ins_id
+       ) h
+       LEFT JOIN public.colegio col ON col.col_id = h.col_id`,
+    [PRIMER_MES],
+  );
+  return rows;
+}

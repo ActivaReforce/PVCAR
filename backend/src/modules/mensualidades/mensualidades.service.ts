@@ -27,6 +27,7 @@ import {
   mesesDeLaFamilia,
   nombreDeMes,
   type ColegioCobro,
+  type EstadoMes,
   type HijoCobro,
   type Mes,
   type MesDelHijo,
@@ -518,6 +519,160 @@ function armarMes(calculo: Calculo, mes: Mes, cobrado: repo.CuotaCobrada[], cole
     c.totales.por_cobrar /= 100;
   }
   return resultado;
+}
+
+// ---------------------------------------------------------------------------
+// Reportes → Pagos → Mensualidades
+
+export type EstadoRegistro = EstadoMes | 'inscripcion_revision';
+
+/** Un mes de un alumno: lo que vale, cómo está y, si se pagó, con qué y cuándo. */
+export interface RegistroMensual {
+  mes: Mes;
+  col_id: number | null;
+  col_nombre: string;
+  nino_id: number | null;
+  alumno: string;
+  estado: EstadoRegistro;
+  /** Lo que vale ese mes para ese alumno (con IVA): lo pagado o lo que debe. */
+  valor: number;
+  pagado_con: 'inscripcion' | 'mensualidad' | null;
+  /** Día (Ecuador) del pago. */
+  fecha_pago: string | null;
+  /** Mes en que entró el dinero. */
+  mes_pago: Mes | null;
+  /** El dinero ya está aprobado (si no, en revisión). */
+  aprobado: boolean;
+  disciplinas: string[];
+  representante: string;
+  telefono: string;
+  correo: string;
+  baja: boolean;
+  /** Un mes que aún no llega y está sin pagar. */
+  futuro: boolean;
+}
+
+/** "Danza — Martes y Jueves 15:00–16:00" → "Danza". */
+const soloActividad = (d: string) => d.split(' — ')[0]!;
+
+/**
+ * Una fila por alumno y por mes que le corresponde (cliente, 2026-11-16),
+ * para Reportes → Pagos → Mensualidades: todos los meses de cobro de cada
+ * alumno (los que aún no llegan y siguen sin pagar, con `futuro`); lo pagado
+ * por alumnos que ya no están activos; y las inscripciones aún sin aprobar. El valor nunca es 0: un mes
+ * pagado por la inscripción vale la parte del alumno en ella.
+ */
+export async function registrosMensuales(colegios: number[] | null): Promise<RegistroMensual[]> {
+  const hoy = hoyEc();
+  const actual = mesDe(hoy);
+  const [calculo, registros] = await Promise.all([calcular(null, hoy), repo.registrosDePago()]);
+
+  const pendientes = new Map<string, repo.RegistroDePago[]>();
+  const clave = (tipo: string, nino: number | null, nombre: string, mes: Mes) => `${tipo}|${nino ?? `n:${nombre}`}|${mes}`;
+  for (const r of registros) {
+    const k = clave(r.tipo, r.nino_id, r.nombre, r.mes);
+    pendientes.set(k, [...(pendientes.get(k) ?? []), r]);
+  }
+  const sacar = (tipo: string, nino: number, nombre: string, mes: Mes) => {
+    const k = clave(tipo, nino, nombre, mes);
+    const lista = pendientes.get(k) ?? [];
+    pendientes.delete(k);
+    return lista;
+  };
+  const ultimo = <T>(lista: T[], f: (x: T) => string | null) =>
+    lista.map(f).filter((x): x is string => Boolean(x)).sort().at(-1) ?? null;
+  const sumar = (lista: repo.RegistroDePago[]) => lista.reduce((s, r) => s + aCentavos(r.total), 0) / 100;
+
+  const filas: RegistroMensual[] = [];
+  for (const [ninoId, meses] of calculo.meses) {
+    const a = calculo.alumnos.get(ninoId);
+    if (!a) continue;
+    const contacto = a.contactos[0];
+    const base = {
+      col_id: a.col_id,
+      col_nombre: a.col_nombre,
+      nino_id: ninoId,
+      alumno: a.nombre,
+      representante: contacto?.nombre ?? a.representantes_nombres[0] ?? '',
+      telefono: contacto?.telefono ?? '',
+      correo: contacto?.correo ?? '',
+      baja: false,
+      futuro: false,
+    };
+    for (const m of meses) {
+      if (m.estado === 'pagado' || m.estado === 'revision') {
+        const regs = sacar('mensualidad', ninoId, a.nombre, m.mes);
+        filas.push({
+          ...base,
+          mes: m.mes,
+          estado: m.estado,
+          valor: regs.length > 0 ? sumar(regs) : m.total,
+          pagado_con: 'mensualidad',
+          fecha_pago: ultimo(regs, (r) => r.fecha_pago) ?? m.pagado_el,
+          mes_pago: ultimo(regs, (r) => r.mes_pago) ?? (m.pagado_el ? mesDe(m.pagado_el) : null),
+          aprobado: m.estado === 'pagado',
+          disciplinas: m.disciplinas.map(soloActividad),
+        });
+      } else if (m.estado === 'inscripcion') {
+        const regs = sacar('inscripcion', ninoId, a.nombre, m.mes);
+        filas.push({
+          ...base,
+          mes: m.mes,
+          estado: 'inscripcion',
+          valor: sumar(regs),
+          pagado_con: 'inscripcion',
+          fecha_pago: ultimo(regs, (r) => r.fecha_pago) ?? m.pagado_el,
+          mes_pago: ultimo(regs, (r) => r.mes_pago),
+          aprobado: true,
+          disciplinas: m.inscripcion.map(soloActividad),
+        });
+      } else {
+        filas.push({
+          ...base,
+          mes: m.mes,
+          estado: m.estado,
+          valor: m.total,
+          pagado_con: null,
+          fecha_pago: null,
+          mes_pago: null,
+          aprobado: false,
+          disciplinas: m.disciplinas.map(soloActividad),
+          futuro: m.mes > actual,
+        });
+      }
+    }
+  }
+
+  // Lo pagado que no salió arriba: alumnos de baja, inscripciones sin aprobar, meses fuera de la configuración.
+  for (const regs of pendientes.values()) {
+    const r = regs[0]!;
+    const activo = r.nino_id !== null ? calculo.alumnos.get(r.nino_id) : undefined;
+    const contacto = activo?.contactos[0];
+    const aprobado = r.estado === 'aprobado';
+    filas.push({
+      mes: r.mes,
+      col_id: r.col_id,
+      col_nombre: r.col_nombre,
+      nino_id: r.nino_id,
+      alumno: r.nombre,
+      estado:
+        r.tipo === 'inscripcion' ? (aprobado ? 'inscripcion' : 'inscripcion_revision') : aprobado ? 'pagado' : 'revision',
+      valor: sumar(regs),
+      pagado_con: r.tipo,
+      fecha_pago: ultimo(regs, (x) => x.fecha_pago),
+      mes_pago: ultimo(regs, (x) => x.mes_pago),
+      aprobado,
+      disciplinas: [...new Set(regs.flatMap((x) => x.disciplinas.map(soloActividad)))],
+      representante: contacto?.nombre ?? '',
+      telefono: contacto?.telefono ?? '',
+      correo: contacto?.correo ?? '',
+      // De baja: tenía alumno y ya no está activo (una inscripción sin aprobar aún no tiene alumno).
+      baja: r.nino_id !== null && !activo,
+      futuro: false,
+    });
+  }
+
+  return colegios ? filas.filter((f) => f.col_id !== null && colegios.includes(f.col_id)) : filas;
 }
 
 // ---------------------------------------------------------------------------

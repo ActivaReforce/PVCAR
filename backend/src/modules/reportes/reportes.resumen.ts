@@ -548,34 +548,61 @@ const inscripciones: Constructor = (filas) => {
 
 const mensualidades: Constructor = (filas) => {
   const plata = (g: Fila[], clave: string) => Math.round(g.reduce((s, f) => s + numero(f[clave]), 0) * 100) / 100;
-  const con = (...e: string[]) => (f: Fila) => e.includes(texto(f._estado));
-  const medidas = (): Medida[] => [
-    cuantos('Al día', con('pagado', 'inscripcion')),
-    cuantos('En revisión', con('revision')),
-    cuantos('Pendientes', con('pendiente')),
-    cuantos('Atrasados', con('atrasado')),
-    { cabecera: 'Recaudado ($)', calc: (g) => plata(g, '_recaudado') },
-    { cabecera: 'En revisión ($)', calc: (g) => plata(g, '_en_revision') },
-    { cabecera: 'Por cobrar ($)', calc: (g) => plata(g, '_debe') },
-  ];
-  const porPagar = filas.filter(con('pendiente', 'atrasado'));
+  const es = (...e: string[]) => (f: Fila) => e.includes(texto(f._estado));
+  const del = filas.filter((f) => f._del_periodo === true);
+  const porPagar = del.filter(es('pendiente', 'atrasado'));
+  const mesDeLaFila = (clave: string) => (f: Fila) => {
+    const m = texto(f[clave]);
+    return m ? `${m.slice(0, 7)} ${['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][Number(m.slice(5, 7)) - 1]}` : '—';
+  };
+
   const bloques: Bloque[] = [
     {
       titulo: 'Totales',
       cabeceras: ['Concepto', 'Cantidad'],
       filas: [
-        ['Recaudado ($)', plata(filas, '_recaudado')],
+        ['Recaudado en el periodo ($)', plata(filas, '_recaudado')],
         ['En revisión ($)', plata(filas, '_en_revision')],
         ['Por cobrar ($)', plata(filas, '_debe')],
-        ['Alumnos al día', filas.filter(con('pagado', 'inscripcion')).length],
+        ['Alumnos al día', del.filter(es('pagado', 'inscripcion')).length],
         ['Alumnos por pagar', porPagar.length],
       ],
       destacadas: [],
     },
-    agrupar('Por mes', filas, [{ cabecera: 'Mes', de: (f) => `${texto(f._mes).slice(0, 7)} ${texto(f.mes).split(' ')[0]}` }], medidas(), {
-      nota: 'Recaudado y en revisión van por fecha de pago: lo adelantado suma en el mes en que se pagó.',
-    }),
-    agrupar('Por colegio', filas, [{ cabecera: 'Colegio', de: campo('colegio') }], medidas()),
+    agrupar(
+      'Por mes',
+      del,
+      [{ cabecera: 'Mes', de: mesDeLaFila('_mes') }],
+      [
+        cuantos('Al día', es('pagado', 'inscripcion')),
+        cuantos('En revisión', es('revision', 'inscripcion_revision')),
+        cuantos('Por pagar', es('pendiente', 'atrasado')),
+        { cabecera: 'Valor pagado ($)', calc: (g) => plata(g.filter(es('pagado', 'inscripcion')), 'valor') },
+        { cabecera: 'Por cobrar ($)', calc: (g) => plata(g, '_debe') },
+      ],
+      { nota: 'Lo que vale cada mes, lo haya pagado cuando lo haya pagado.' },
+    ),
+    agrupar(
+      'Dinero por mes de pago',
+      filas.filter((f) => numero(f._recaudado) + numero(f._en_revision) > 0),
+      [{ cabecera: 'Mes de pago', de: mesDeLaFila('_mes_pago') }],
+      [
+        cuenta('Meses pagados'),
+        { cabecera: 'Recaudado ($)', calc: (g) => plata(g, '_recaudado') },
+        { cabecera: 'En revisión ($)', calc: (g) => plata(g, '_en_revision') },
+      ],
+      { nota: 'Lo que entró cada mes, incluidos los adelantos de meses siguientes.' },
+    ),
+    agrupar(
+      'Por colegio',
+      del,
+      [{ cabecera: 'Colegio', de: campo('colegio') }],
+      [
+        cuantos('Al día', es('pagado', 'inscripcion')),
+        cuantos('Por pagar', es('pendiente', 'atrasado')),
+        { cabecera: 'Por cobrar ($)', calc: (g) => plata(g, '_debe') },
+      ],
+    ),
   ];
   if (porPagar.length > 0) {
     bloques.push(
@@ -583,7 +610,7 @@ const mensualidades: Constructor = (filas) => {
         'Por pagar',
         porPagar,
         [
-          { cabecera: 'Mes', de: (f) => `${texto(f._mes).slice(0, 7)} ${texto(f.mes).split(' ')[0]}` },
+          { cabecera: 'Mes', de: mesDeLaFila('_mes') },
           { cabecera: 'Alumno', de: campo('alumno') },
           { cabecera: 'Representante', de: campo('representante') },
           { cabecera: 'Teléfono', de: campo('telefono') },

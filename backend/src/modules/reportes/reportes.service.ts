@@ -15,6 +15,7 @@ import {
   type FiltrosReporte,
   type TotalPantalla,
 } from './reportes.definiciones.js';
+import { nombreDeMes } from '../mensualidades/mensualidades.calculo.js';
 import { GRAFICAS, type DefinicionGrafica, type FormaGrafica, type SerieGrafica } from './reportes.analisis.js';
 import type { ConsultaQuery, FiltrosQuery } from './reportes.schemas.js';
 import { ahoraEc, hoyEc } from '../../lib/fecha.js';
@@ -291,6 +292,13 @@ export async function exportar(
   const cortado = rows.length === TOPE_EXPORTACION;
   const avisos = [`Generado el ${ahoraEc()} (hora de Ecuador) por ${actor.usuario.usu_nombre}.`];
   if (filtros.desde && filtros.hasta) avisos.unshift(`Del ${diaTexto(filtros.desde)} al ${diaTexto(filtros.hasta)}.`);
+  if (definicion.filtros.meses) {
+    avisos.unshift(
+      filtros.meses && filtros.meses.length > 0
+        ? `Meses: ${filtros.meses.map((m) => nombreDeMes(m)).join(', ')}.`
+        : 'Meses: todos (del año pasado al siguiente).',
+    );
+  }
   if (conSensibles && (definicion.columnasSensibles ?? []).length > 0) {
     avisos.push('Incluye información de salud: dato médico de menores, no reenviar.');
   }

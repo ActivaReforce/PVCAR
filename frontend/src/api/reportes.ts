@@ -28,6 +28,8 @@ export interface FiltrosDisponibles {
   fechas: boolean;
   /** Casilla "Ver ausencias" (solo Novedades). */
   ausencias?: boolean;
+  /** Selector de meses (varios) en vez de fechas (Mensualidades). */
+  meses?: boolean;
 }
 
 export interface ReporteDisponible {
@@ -110,6 +112,8 @@ export interface FiltrosReporte {
   incluirSensibles?: boolean;
   /** Novedades: false quita ausencias y correcciones. */
   ausencias?: boolean;
+  /** Meses elegidos, 'YYYY-MM'. Vacío = todo. */
+  meses?: string[];
 }
 
 function queryString(filtros: object): string {

@@ -3,8 +3,8 @@ import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
 import { HOY_EC, diaEc, hoyEc, textoEc } from '../../lib/fecha.js';
 import { CTE_VISIBLES } from '../usuarios/usuarios.repository.js';
-import { mesDe, nombreDeMes, sumarMeses } from '../mensualidades/mensualidades.calculo.js';
-import { estadoDeMeses } from '../mensualidades/mensualidades.service.js';
+import { nombreDeMes } from '../mensualidades/mensualidades.calculo.js';
+import { registrosMensuales } from '../mensualidades/mensualidades.service.js';
 
 /**
  * El catálogo de reportes.
@@ -63,6 +63,8 @@ export interface FiltrosReporte {
   hasta?: string;
   /** Novedades: `false` quita ausencias y correcciones. Sin valor, salen. */
   ausencias?: boolean;
+  /** Meses elegidos ('YYYY-MM-01'), en vez de fechas (Mensualidades). Vacío = todo. */
+  meses?: string[];
 }
 
 /** Una opción de un desplegable de filtro. */
@@ -88,6 +90,8 @@ export interface FiltrosDisponibles {
   fechas: boolean;
   /** Casilla "Ver ausencias" (solo Novedades). */
   ausencias?: boolean;
+  /** Selector de meses (varios), del año pasado al siguiente (Mensualidades). */
+  meses?: boolean;
 }
 
 const ACTIVO_INACTIVO = (etiqueta = 'Estado') => ({
@@ -1120,53 +1124,59 @@ const inscripciones: Definicion = {
 };
 
 /**
- * Mensualidades (Reportes → Pagos, cliente 2026-11-16): el **Estado del mes**
- * de /inscripciones para cada mes del rango, con el mismo cálculo. Por cada
- * mes, cada alumno con su estado: pagado (o pagado por la inscripción), en
- * revisión, pendiente o atrasado; cuánto vale ese mes; cuándo se pagó; y lo
- * que entró ese mes por él (el dinero va por fecha de pago: lo adelantado
- * suma en el mes en que se pagó y en los que cubre sale con $0 y su fecha).
+ * Mensualidades (Reportes → Pagos, cliente 2026-11-16): **una fila por
+ * alumno y por mes** —un registro—, con el mismo cálculo que el Estado del
+ * mes de /inscripciones.
  *
- * Así, sacando febrero se ve quién ya pagó febrero —aunque fuera en
- * noviembre— y quién no. Lo que se debe no se guarda: por eso las filas salen
- * de código y no de una consulta.
+ * Dos montos por fila, para que lo adelantado tenga sentido:
+ *   - **Valor**: lo que vale ese mes para ese alumno (lo pagado o lo que
+ *     debe). Nunca 0: un mes pagado con la inscripción vale su parte en ella.
+ *   - **Recaudado en el periodo**: lo que de ese valor **entró en los meses
+ *     elegidos**. Diciembre pagado en noviembre: al elegir diciembre, su valor
+ *     es 36,92 y su recaudado 0 (entró en noviembre); al elegir noviembre, esa
+ *     misma fila sale como «adelantada» con su recaudado, para que la columna
+ *     sume lo que entró ese mes.
+ *
+ * Lo que se debe no se guarda: por eso las filas salen de código.
  */
-const ETIQUETA_MES: Record<string, string> = {
+const ETIQUETA_REGISTRO: Record<string, string> = {
   pagado: 'Pagado',
   inscripcion: 'Pagado (Inscripción)',
   revision: 'En revisión',
+  inscripcion_revision: 'Inscripción en revisión',
   pendiente: 'Pendiente',
   atrasado: 'Atrasado',
 };
-const ORDEN_ESTADO = ['atrasado', 'pendiente', 'revision', 'pagado', 'inscripcion', ''];
-/** Filtro de estado del desplegable: 1 pagado (también por inscripción), 2 en revisión, 3 pendiente, 4 atrasado. */
+const ORDEN_REGISTRO = ['atrasado', 'pendiente', 'revision', 'inscripcion_revision', 'pagado', 'inscripcion'];
+/** Filtro de estado: 1 pagado (también por inscripción), 2 en revisión, 3 pendiente, 4 atrasado. */
 const ESTADOS_DEL_FILTRO: Record<number, string[]> = {
   1: ['pagado', 'inscripcion'],
-  2: ['revision'],
+  2: ['revision', 'inscripcion_revision'],
   3: ['pendiente'],
   4: ['atrasado'],
 };
-/** Tope de meses por consulta: dos años. */
-const MESES_MAXIMOS = 24;
+const NOMBRES_MES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
 
 /** Para buscar sin tildes ni mayúsculas en filas calculadas en código. */
 const plano = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-
 const diaLegible = (dia: string | null) => (dia ? dia.split('-').reverse().join('/') : '');
 
-function mesesDelRango(desde: string | undefined, hasta: string | undefined): string[] {
-  const inicio = mesDe(desde ?? hasta ?? hoyEc());
-  const fin = mesDe(hasta ?? desde ?? hoyEc());
-  const meses: string[] = [];
-  for (let m = inicio; m <= fin && meses.length < MESES_MAXIMOS; m = sumarMeses(m, 1)) meses.push(m);
-  return meses;
+/** "Todo": del año pasado al siguiente, como el filtro de la pantalla. */
+function mesesDeTodo(): string[] {
+  const ano = Number(hoyEc().slice(0, 4));
+  return [ano - 1, ano, ano + 1].flatMap((a) =>
+    NOMBRES_MES.map((_, i) => `${a}-${String(i + 1).padStart(2, '0')}-01`),
+  );
 }
 
 const mensualidades: Definicion = {
   id: 'mensualidades',
   titulo: 'Mensualidades',
   descripcion:
-    'El estado de cada mes del rango, alumno por alumno: quién pagó (y cuándo), quién está en revisión y quién debe. Sin fechas, el mes en curso.',
+    'Una fila por alumno y mes: cuánto vale, cómo está, con qué y cuándo se pagó. «Recaudado en el periodo» es lo que entró en los meses elegidos.',
   modulo: 'inscripciones',
   // Lleva montos: solo Propietario, como Inscripciones.
   soloRoles: [ROL.PROPIETARIO],
@@ -1183,76 +1193,82 @@ const mensualidades: Definicion = {
         { id: 4, nombre: 'Atrasado' },
       ],
     },
-    fechas: true,
+    fechas: false,
+    meses: true,
   },
   columnas: [
-    { clave: 'mes', cabecera: 'Mes', ancho: 16 },
+    { clave: 'ano', cabecera: 'Año', ancho: 7 },
+    { clave: 'mes', cabecera: 'Mes', ancho: 12 },
     { clave: 'colegio', cabecera: 'Colegio', ancho: 28 },
     { clave: 'alumno', cabecera: 'Alumno', ancho: 30 },
-    { clave: 'estado', cabecera: 'Estado', ancho: 20 },
-    { clave: 'valor', cabecera: 'Valor del mes ($)', ancho: 15 },
-    { clave: 'pagado_el', cabecera: 'Pagado el', ancho: 12 },
-    { clave: 'recibido', cabecera: 'Recibido en el mes ($)', ancho: 18 },
-    { clave: 'incluye', cabecera: 'Incluye', ancho: 24 },
-    { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 36 },
+    { clave: 'estado', cabecera: 'Estado', ancho: 22 },
+    { clave: 'valor', cabecera: 'Valor ($)', ancho: 11 },
+    { clave: 'recaudado', cabecera: 'Recaudado en el periodo ($)', ancho: 16 },
+    { clave: 'pagado_con', cabecera: 'Pagado con', ancho: 24 },
+    { clave: 'fecha_pago', cabecera: 'Fecha de pago', ancho: 13 },
+    { clave: 'mes_pago', cabecera: 'Mes de pago', ancho: 15 },
+    { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 30 },
     { clave: 'representante', cabecera: 'Representante', ancho: 30 },
     { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
     { clave: 'correo', cabecera: 'Correo', ancho: 30 },
   ],
   fuente: async (f) => {
-    const meses = mesesDelRango(f.desde, f.hasta);
-    const porMes = await estadoDeMeses(meses, f.colegio && f.colegio.length > 0 ? f.colegio : null);
+    const explicitos = Boolean(f.meses && f.meses.length > 0);
+    const elegidos = new Set(explicitos ? f.meses : mesesDeTodo());
+    const registros = await registrosMensuales(f.colegio && f.colegio.length > 0 ? f.colegio : null);
     const estados = f.estado ? ESTADOS_DEL_FILTRO[f.estado] : null;
     const buscar = f.buscar?.trim() ? plano(f.buscar.trim()) : null;
 
     const filas: Array<Record<string, unknown>> = [];
-    for (const mes of meses) {
-      for (const col of porMes.get(mes) ?? []) {
-        for (const a of col.alumnos) {
-          const estado = a.estado ?? '';
-          if (estados && !estados.includes(estado)) continue;
-          const contacto = a.contactos[0];
-          const representante = contacto?.nombre ?? a.representantes[0] ?? '';
-          if (buscar && !plano(`${a.nombre} ${representante} ${contacto?.correo ?? ''}`).includes(buscar)) continue;
-          const debe = estado === 'pendiente' || estado === 'atrasado';
-          filas.push({
-            mes: nombreDeMes(mes),
-            colegio: col.col_nombre,
-            alumno: a.nombre,
-            estado: a.estado
-              ? ETIQUETA_MES[a.estado]
-              : a.inscripcion_en_revision
-                ? 'Inscripción en revisión'
-                : 'Pagó otros meses',
-            valor: a.valor,
-            pagado_el: diaLegible(a.pagado_el),
-            recibido: a.recibido,
-            incluye: a.cubre.map((m) => nombreDeMes(m)).join(', '),
-            disciplinas: a.disciplinas.join(', '),
-            representante: a.baja ? `${representante || a.nombre} (dado de baja)` : representante,
-            telefono: contacto?.telefono ?? '',
-            correo: contacto?.correo ?? '',
-            _mes: mes,
-            _estado: estado,
-            _debe: debe ? a.valor : 0,
-            _recaudado: Math.round((a.recibido - a.recibido_revision) * 100) / 100,
-            _en_revision: a.recibido_revision,
-          });
-        }
-      }
+    for (const r of registros) {
+      const delPeriodo = elegidos.has(r.mes);
+      const entroEnElPeriodo = r.mes_pago !== null && elegidos.has(r.mes_pago);
+      // Sale si es de un mes elegido o si su dinero entró en uno (un adelanto).
+      if (!delPeriodo && !entroEnElPeriodo) continue;
+      // Con «Todo», lo que aún no llega y está sin pagar no sale; eligiendo el mes, sí.
+      if (r.futuro && !explicitos) continue;
+      if (estados && !estados.includes(r.estado)) continue;
+      if (buscar && !plano(`${r.alumno} ${r.representante} ${r.correo}`).includes(buscar)) continue;
+      const recaudado = entroEnElPeriodo ? r.valor : 0;
+      const adelantado = r.mes_pago !== null && r.mes_pago < r.mes;
+      const con = r.pagado_con === 'inscripcion' ? 'Inscripción' : r.pagado_con === 'mensualidad' ? 'Mensualidad' : 'Sin pagar';
+      filas.push({
+        ano: Number(r.mes.slice(0, 4)),
+        mes: NOMBRES_MES[Number(r.mes.slice(5, 7)) - 1],
+        colegio: r.col_nombre,
+        alumno: r.baja ? `${r.alumno} (dado de baja)` : r.alumno,
+        estado: ETIQUETA_REGISTRO[r.estado],
+        valor: r.valor,
+        recaudado,
+        pagado_con: adelantado ? `${con} (adelantada)` : con,
+        fecha_pago: diaLegible(r.fecha_pago),
+        mes_pago: r.mes_pago ? nombreDeMes(r.mes_pago) : '',
+        disciplinas: r.disciplinas.join(', '),
+        representante: r.representante,
+        telefono: r.telefono,
+        correo: r.correo,
+        _mes: r.mes,
+        _mes_pago: r.mes_pago ?? '',
+        _estado: r.estado,
+        _del_periodo: delPeriodo,
+        _recaudado: r.aprobado ? recaudado : 0,
+        _en_revision: r.aprobado ? 0 : recaudado,
+        _debe: delPeriodo && (r.estado === 'pendiente' || r.estado === 'atrasado') ? r.valor : 0,
+      });
     }
     return filas.sort(
       (x, y) =>
         String(x._mes).localeCompare(String(y._mes)) ||
         String(x.colegio).localeCompare(String(y.colegio)) ||
-        ORDEN_ESTADO.indexOf(String(x._estado)) - ORDEN_ESTADO.indexOf(String(y._estado)) ||
+        ORDEN_REGISTRO.indexOf(String(x._estado)) - ORDEN_REGISTRO.indexOf(String(y._estado)) ||
         String(x.alumno).localeCompare(String(y.alumno)),
     );
   },
   totalesDeFilas: {
     calcular: (filas) => {
       const suma = (clave: string) => Math.round(filas.reduce((s, f) => s + Number(f[clave] ?? 0), 0) * 100) / 100;
-      const con = (...e: string[]) => filas.filter((f) => e.includes(String(f._estado))).length;
+      const del = filas.filter((f) => f._del_periodo === true);
+      const con = (...e: string[]) => del.filter((f) => e.includes(String(f._estado))).length;
       return {
         recaudado: suma('_recaudado'),
         en_revision: suma('_en_revision'),
@@ -1262,11 +1278,11 @@ const mensualidades: Definicion = {
       };
     },
     formato: [
-      { clave: 'recaudado', etiqueta: 'Recaudado', moneda: true },
+      { clave: 'recaudado', etiqueta: 'Recaudado en el periodo', moneda: true },
       { clave: 'en_revision', etiqueta: 'En revisión', moneda: true },
       { clave: 'por_cobrar', etiqueta: 'Por cobrar', moneda: true },
-      { clave: 'al_dia', etiqueta: 'Al día' },
-      { clave: 'por_pagar', etiqueta: 'Por pagar' },
+      { clave: 'al_dia', etiqueta: 'Alumnos al día' },
+      { clave: 'por_pagar', etiqueta: 'Alumnos por pagar' },
     ],
   },
 };

@@ -26,6 +26,7 @@ import {
   useReporte,
 } from '@/hooks/useTablero';
 import type { FiltrosReporte } from '@/api/reportes';
+import SelectorMeses from '@/components/reportes/SelectorMeses';
 
 const POR_PAGINA = 50;
 const TODOS = 'todos';
@@ -56,6 +57,7 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
   const [estado, setEstado] = useState(TODOS);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
+  const [meses, setMeses] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [conSensibles, setConSensibles] = useState(false);
   const [verAusencias, setVerAusencias] = useState(true);
@@ -82,6 +84,7 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
     estado: disponibles?.estado && estado !== TODOS ? Number(estado) : undefined,
     desde: disponibles?.fechas ? desde || undefined : undefined,
     hasta: disponibles?.fechas ? hasta || undefined : undefined,
+    meses: disponibles?.meses && meses.length > 0 ? meses : undefined,
     incluirSensibles: conSensibles || undefined,
     // Solo viaja cuando se quitan: por defecto salen.
     ausencias: disponibles?.ausencias && !verAusencias ? false : undefined,
@@ -243,6 +246,13 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+
+        {definicion.filtros.meses && (
+          <div className="space-y-1">
+            <Label className="text-xs">Meses</Label>
+            <SelectorMeses valor={meses} onChange={(m) => cambiarFiltro(() => setMeses(m))} />
           </div>
         )}
 
