@@ -42,6 +42,7 @@ export const EstadoMesBadge = ({ estado }: { estado: EstadoMes }) => {
 
 const debe = (e: EstadoMes) => e === 'pendiente' || e === 'atrasado';
 const centavos = (d: number) => Math.round(d * 100);
+const clave = (ninoId: number, mes: string) => `${ninoId}|${mes}`;
 
 interface Hijo {
   nino_id: number;
@@ -65,7 +66,9 @@ function estadoDeFamilia(estados: EstadoMes[]): EstadoMes {
  *      diciembre sigue pendiente (sale un aviso); quitar uno quita los
  *      siguientes.
  *   2. Los hijos: una tarjeta por hijo con los meses elegidos, su estado y
- *      su precio. Todos marcados al empezar; se puede quitar a uno.
+ *      su precio, cada mes con su casilla (diciembre para los dos y enero
+ *      solo para uno, en un mismo pago). Todo marcado al empezar. También
+ *      en orden por hijo: quitar su diciembre quita su enero.
  *   3. Total a pagar con el desglose por mes, la cuenta y un solo
  *      comprobante.
  *
@@ -114,13 +117,16 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
   }, [hijos, actual]);
 
   const [elegidos, setElegidos] = useState<string[]>([]);
-  const [sinHijos, setSinHijos] = useState<Set<number>>(new Set());
+  /** Meses de un hijo que se quitaron en su tarjeta ('nino|mes'). */
+  const [quitados, setQuitados] = useState<Set<string>>(new Set());
   const [avisoOrden, setAvisoOrden] = useState<string | null>(null);
+  const [avisoHijo, setAvisoHijo] = useState<{ k: string; texto: string } | null>(null);
   // Al cargar (o recargar) no se elige nada: el representante decide qué meses paga.
   useEffect(() => {
     setElegidos([]);
-    setSinHijos(new Set());
+    setQuitados(new Set());
     setAvisoOrden(null);
+    setAvisoHijo(null);
   }, [datos]);
 
   const alternarMes = (mes: string) => {
@@ -139,20 +145,48 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
     setElegidos([...elegidos, mes].sort());
   };
 
-  const alternarHijo = (id: number, si: boolean) =>
-    setSinHijos((antes) => {
+  /** Los meses que este hijo puede pagar entre los elegidos, en orden. */
+  const pagablesDe = (h: Hijo) => h.meses.filter((m) => elegidos.includes(m.mes) && debe(m.estado));
+
+  /** Todo el hijo: marcar pone todos sus meses elegidos; quitar los quita. */
+  const alternarHijo = (h: Hijo, si: boolean) => {
+    setAvisoHijo(null);
+    setQuitados((antes) => {
       const nuevo = new Set(antes);
-      if (si) nuevo.delete(id);
-      else nuevo.add(id);
+      for (const m of pagablesDe(h)) {
+        if (si) nuevo.delete(clave(h.nino_id, m.mes));
+        else nuevo.add(clave(h.nino_id, m.mes));
+      }
       return nuevo;
     });
+  };
 
-  /** Lo que se paga: los meses elegidos de los hijos marcados que se deben. */
-  const cuotas = hijos
-    .filter((h) => !sinHijos.has(h.nino_id))
-    .flatMap((h) =>
-      h.meses.filter((m) => elegidos.includes(m.mes) && debe(m.estado)).map((m) => ({ ...m, nino_id: h.nino_id })),
-    );
+  /** Un mes de un hijo, en orden: no se pone si falta uno anterior suyo; quitarlo quita los siguientes. */
+  const alternarMesDeHijo = (h: Hijo, mes: string, si: boolean) => {
+    const suyos = pagablesDe(h);
+    const i = suyos.findIndex((m) => m.mes === mes);
+    if (si) {
+      const falta = suyos.slice(0, i).find((m) => quitados.has(clave(h.nino_id, m.mes)));
+      if (falta) {
+        setAvisoHijo({ k: clave(h.nino_id, mes), texto: `Primero marca ${nombreDeMes(falta.mes)} de ${h.nombre}.` });
+        return;
+      }
+    }
+    setAvisoHijo(null);
+    setQuitados((antes) => {
+      const nuevo = new Set(antes);
+      if (si) nuevo.delete(clave(h.nino_id, mes));
+      else for (const m of suyos.slice(i)) nuevo.add(clave(h.nino_id, m.mes));
+      return nuevo;
+    });
+  };
+
+  /** Lo que se paga: los meses elegidos que cada hijo debe, menos los que se quitaron en su tarjeta. */
+  const cuotas = hijos.flatMap((h) =>
+    pagablesDe(h)
+      .filter((m) => !quitados.has(clave(h.nino_id, m.mes)))
+      .map((m) => ({ ...m, nino_id: h.nino_id })),
+  );
   const total = cuotas.reduce((s, m) => s + centavos(m.total), 0) / 100;
   const desglose = elegidos
     .map((mes) => {
@@ -326,17 +360,19 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
               <div className="grid gap-3 md:grid-cols-2">
                 {hijosDelPaso.map((h) => {
                   const suyos = h.meses.filter((m) => elegidos.includes(m.mes));
-                  const pagaAlgo = suyos.some((m) => debe(m.estado));
-                  const marcado = pagaAlgo && !sinHijos.has(h.nino_id);
+                  const pagables = pagablesDe(h);
+                  const puestos = pagables.filter((m) => !quitados.has(clave(h.nino_id, m.mes))).length;
+                  const marcado = puestos > 0;
                   const id = `hijo-${h.nino_id}`;
                   return (
                     <div key={h.nino_id} className={cn('rounded-md border p-3', marcado && 'border-primary')}>
                       <label htmlFor={id} className="mb-2 flex min-h-11 cursor-pointer items-center gap-3">
                         <Checkbox
                           id={id}
-                          checked={marcado}
-                          disabled={!pagaAlgo}
-                          onCheckedChange={(v) => alternarHijo(h.nino_id, v === true)}
+                          // Todo, parte (indeterminado) o nada. Tocarlo pone todo si falta algo; si está todo, lo quita.
+                          checked={marcado ? (puestos === pagables.length ? true : 'indeterminate') : false}
+                          disabled={pagables.length === 0}
+                          onCheckedChange={() => alternarHijo(h, puestos < pagables.length)}
                         />
                         <span className="min-w-0">
                           <span className="block font-medium">{h.nombre}</span>
@@ -344,15 +380,37 @@ const Contenido = ({ datos }: { datos: MisMensualidades }) => {
                         </span>
                       </label>
                       <ul className="space-y-1">
-                        {suyos.map((m) => (
-                          <li key={m.mes} className="flex flex-wrap items-center gap-2 text-sm">
-                            <span className="min-w-[7.5rem]">{nombreDeMes(m.mes)}</span>
-                            <EstadoMesBadge estado={m.estado} />
-                            <span className={cn('ml-auto whitespace-nowrap font-medium', !marcado && 'text-muted-foreground')}>
-                              {debe(m.estado) ? dinero(m.total) : '—'}
-                            </span>
-                          </li>
-                        ))}
+                        {suyos.map((m) => {
+                          const k = clave(h.nino_id, m.mes);
+                          const pagable = debe(m.estado);
+                          const puesto = pagable && !quitados.has(k);
+                          const idMes = `hijo-mes-${k}`;
+                          return (
+                            <li key={m.mes}>
+                              <label htmlFor={idMes} className={cn('flex min-h-11 items-center gap-2 text-sm', pagable && 'cursor-pointer')}>
+                                {pagable ? (
+                                  <Checkbox
+                                    id={idMes}
+                                    checked={puesto}
+                                    onCheckedChange={(v) => alternarMesDeHijo(h, m.mes, v === true)}
+                                  />
+                                ) : (
+                                  <span className="w-4" />
+                                )}
+                                <span className="min-w-[7.5rem]">{nombreDeMes(m.mes)}</span>
+                                <EstadoMesBadge estado={m.estado} />
+                                <span className={cn('ml-auto whitespace-nowrap font-medium', !puesto && 'text-muted-foreground')}>
+                                  {pagable ? dinero(m.total) : '—'}
+                                </span>
+                              </label>
+                              {avisoHijo?.k === k && (
+                                <p role="alert" className="ml-6 text-sm text-amber-700 dark:text-amber-400">
+                                  {avisoHijo.texto}
+                                </p>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   );
