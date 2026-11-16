@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Receipt, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Mail, MessageCircle, Receipt, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +25,7 @@ import {
 import { dinero } from '@/api/inscripciones';
 import { diaLegible, mesesCortos, nombreDeMes, type AlumnoDelMes, type EstadoMes, type PagoListado } from '@/api/mensualidades';
 import { cn } from '@/lib/utils';
-import { fechaHora } from '@/components/inscripciones/formato';
+import { enlaceWhatsApp, fechaHora } from '@/components/inscripciones/formato';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROL } from '@/hooks/useUserForm';
 import AnularPagoDialog from './AnularPagoDialog';
@@ -402,6 +402,7 @@ const DineroDeFila = ({ a, mes }: { a: AlumnoDelMes; mes: string }) => {
  */
 const EstadoDelMes = () => {
   const [abierto, setAbierto] = useState<number | null>(null);
+  const [contactar, setContactar] = useState<AlumnoDelMes | null>(null);
   const [mes, setMes] = useState<string | undefined>(undefined);
   const [colegio, setColegio] = useState(TODOS);
   const consulta = useEstadoDelMes(mes, colegio === TODOS ? undefined : Number(colegio));
@@ -507,6 +508,22 @@ const EstadoDelMes = () => {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
+                      {(a.estado === 'pendiente' || a.estado === 'atrasado') && (a.contactos?.length ?? 0) > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 flex-shrink-0 sm:h-9 sm:w-9"
+                          aria-label={`Contactar a la familia de ${a.nombre}`}
+                          title="Contactar"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setContactar(a);
+                          }}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                      )}
                       {a.estado ? (
                         <EstadoMesBadge estado={a.estado} />
                       ) : a.inscripcion_en_revision ? (
@@ -528,9 +545,67 @@ const EstadoDelMes = () => {
       })}
 
       <FichaPago id={abierto} onClose={() => setAbierto(null)} />
+      <ContactarFamilia alumno={contactar} mes={`${elegido}-01`} onClose={() => setContactar(null)} />
     </section>
   );
 };
+
+/**
+ * Contactar a la familia de un alumno que debe el mes (cliente, 2026-11-16):
+ * lo que debe y, por cada representante, teléfono, correo, WhatsApp y Correo.
+ * Está siempre, sea el día que sea.
+ */
+const ContactarFamilia = ({ alumno, mes, onClose }: { alumno: AlumnoDelMes | null; mes: string; onClose: () => void }) => (
+  <Dialog open={alumno !== null} onOpenChange={(v) => !v && onClose()}>
+    <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle>Contactar a la familia</DialogTitle>
+        <DialogDescription>{alumno?.nombre}</DialogDescription>
+      </DialogHeader>
+      {alumno && (
+        <div className="space-y-4 text-sm">
+          <div className="space-y-1 rounded-md border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">Mensualidad {nombreDeMes(mes).toLowerCase()}</span>
+              {alumno.estado && <EstadoMesBadge estado={alumno.estado} />}
+            </div>
+            {alumno.disciplinas.length > 0 && <p className="text-muted-foreground">{alumno.disciplinas.join(' · ')}</p>}
+            <p className="flex justify-between font-semibold">
+              <span>Por pagar</span>
+              <span>{dinero(alumno.valor)}</span>
+            </p>
+          </div>
+          {(alumno.contactos ?? []).map((c) => {
+            const whatsapp = c.telefono ? enlaceWhatsApp(c.telefono) : null;
+            return (
+              <div key={`${c.nombre}-${c.correo ?? ''}`} className="space-y-2 rounded-md border p-3">
+                <p className="text-base font-semibold">{c.nombre}</p>
+                {c.telefono && <p>Teléfono: {c.telefono}</p>}
+                {c.correo && <p className="break-words">Correo: {c.correo}</p>}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {whatsapp && (
+                    <Button variant="outline" size="sm" asChild className="h-10 sm:h-9">
+                      <a href={whatsapp} target="_blank" rel="noreferrer">
+                        <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+                      </a>
+                    </Button>
+                  )}
+                  {c.correo && (
+                    <Button variant="outline" size="sm" asChild className="h-10 sm:h-9">
+                      <a href={`mailto:${c.correo}`}>
+                        <Mail className="mr-2 h-4 w-4" /> Correo
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </DialogContent>
+  </Dialog>
+);
 
 /** Una fila del estado del mes: si tiene pago, se pulsa y abre su detalle, como en Por revisar. */
 const FilaAlumno = ({

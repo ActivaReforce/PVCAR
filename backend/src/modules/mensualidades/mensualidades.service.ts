@@ -328,6 +328,8 @@ export interface AlumnoDelMes {
   nino_id: number | null;
   nombre: string;
   representantes: string[];
+  /** Representantes con teléfono y correo, para contactarlos (vacío si está de baja). */
+  contactos: repo.Contacto[];
   /** null: ese mes no tiene cobro; sale porque pagó en él otros meses. */
   estado: MesDelHijo['estado'] | null;
   disciplinas: string[];
@@ -436,6 +438,7 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
       nino_id: ninoId,
       nombre: a.nombre,
       representantes: a.representantes_nombres,
+      contactos: a.contactos,
       estado: m?.estado ?? null,
       disciplinas: m?.disciplinas ?? [],
       inscripcion: m?.inscripcion ?? [],
@@ -479,6 +482,7 @@ export async function estadoDelMes(mesPedido: string | undefined, colegio: numbe
       nino_id: primera.nino_id,
       nombre: primera.nombre,
       representantes: [],
+      contactos: [],
       estado,
       disciplinas: [],
       inscripcion: [],

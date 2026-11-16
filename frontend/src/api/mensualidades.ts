@@ -76,10 +76,18 @@ export interface ListaPagos {
   conteos: { pendientes: number };
 }
 
+export interface ContactoRepresentante {
+  nombre: string;
+  telefono: string | null;
+  correo: string | null;
+}
+
 export interface AlumnoDelMes {
   nino_id: number | null;
   nombre: string;
   representantes: string[];
+  /** Para contactarlos. Opcional: Vercel publica antes que Railway. */
+  contactos?: ContactoRepresentante[];
   /** null: ese mes no tiene cobro; sale porque pagó en él otros meses. */
   estado: EstadoMes | null;
   disciplinas: string[];

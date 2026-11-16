@@ -82,6 +82,12 @@ export async function guardarCobroColegio(client: PoolClient, colId: number, c: 
 // ---------------------------------------------------------------------------
 // Alumnos y lo que ya está pagado
 
+export interface Contacto {
+  nombre: string;
+  telefono: string | null;
+  correo: string | null;
+}
+
 export interface AlumnoConDisciplinas {
   nino_id: number;
   nombre: string;
@@ -90,6 +96,8 @@ export interface AlumnoConDisciplinas {
   /** usu_id de sus representantes: arman las familias. */
   representantes: number[];
   representantes_nombres: string[];
+  /** Para contactar a la familia desde Estado del mes (2026-11-16). */
+  contactos: Contacto[];
   disciplinas: Array<{
     colacthor_id: number;
     actividad: string;
@@ -116,6 +124,12 @@ export async function alumnosActivos(client?: PoolClient): Promise<AlumnoConDisc
                         JOIN public.padre p ON p.padre_id = np.padre_id
                         JOIN public.usuario u ON u.usu_id = p.usu_id
                        WHERE np.nino_id = n.nino_id), '{}') AS representantes_nombres,
+            COALESCE((SELECT json_agg(DISTINCT jsonb_build_object(
+                                'nombre', u.usu_nombre, 'telefono', u.usu_telefono, 'correo', u.usu_correo))
+                        FROM public.nino_padre np
+                        JOIN public.padre p ON p.padre_id = np.padre_id
+                        JOIN public.usuario u ON u.usu_id = p.usu_id
+                       WHERE np.nino_id = n.nino_id), '[]'::json) AS contactos,
             COALESCE((
               SELECT json_agg(json_build_object(
                        'colacthor_id', d.colacthor_id,
