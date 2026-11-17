@@ -513,9 +513,9 @@ const EstadoDelMes = () => {
                   type="button"
                   onClick={() => setPagadosPrimero((v) => !v)}
                   className="inline-flex min-h-8 items-center gap-1 rounded px-2 font-medium hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label={pagadosPrimero ? 'Ordenar: por pagar primero' : 'Ordenar: pagados primero'}
+                  title={pagadosPrimero ? 'Pagados primero. Pulsa para ver pendientes primero' : 'Pendientes primero. Pulsa para ver pagados primero'}
                 >
-                  Estado: {pagadosPrimero ? 'pagados primero' : 'por pagar primero'}
+                  Ordenar: {pagadosPrimero ? 'Pagado' : 'Pendiente'}
                   <ArrowDownUp className="h-3.5 w-3.5" />
                 </button>
               </div>
