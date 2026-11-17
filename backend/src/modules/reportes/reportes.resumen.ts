@@ -549,6 +549,8 @@ const inscripciones: Constructor = (filas) => {
 const mensualidades: Constructor = (filas) => {
   const plata = (g: Fila[], clave: string) => Math.round(g.reduce((s, f) => s + numero(f[clave]), 0) * 100) / 100;
   const es = (...e: string[]) => (f: Fila) => e.includes(texto(f._estado));
+  /** Contar alumnos: como el Estado del mes, los de baja suman su dinero pero no cuentan. */
+  const alumnoEn = (...e: string[]) => (f: Fila) => f._cuenta === true && es(...e)(f);
   const del = filas.filter((f) => f._del_periodo === true);
   const cuentan = filas.filter((f) => f._cuenta === true);
   const porPagar = del.filter(es('pendiente', 'atrasado'));
@@ -575,9 +577,9 @@ const mensualidades: Constructor = (filas) => {
       del,
       [{ cabecera: 'Mes', de: mesDeLaFila('_mes') }],
       [
-        cuantos('Al día', es('pagado', 'inscripcion')),
-        cuantos('En revisión', es('revision', 'inscripcion_revision')),
-        cuantos('Por pagar', es('pendiente', 'atrasado')),
+        cuantos('Al día', alumnoEn('pagado', 'inscripcion')),
+        cuantos('En revisión', alumnoEn('revision', 'inscripcion_revision')),
+        cuantos('Por pagar', alumnoEn('pendiente', 'atrasado')),
         { cabecera: 'Valor pagado ($)', calc: (g) => plata(g.filter(es('pagado', 'inscripcion')), 'valor') },
         { cabecera: 'Por cobrar ($)', calc: (g) => plata(g, '_debe') },
       ],
@@ -599,8 +601,8 @@ const mensualidades: Constructor = (filas) => {
       del,
       [{ cabecera: 'Colegio', de: campo('colegio') }],
       [
-        cuantos('Al día', es('pagado', 'inscripcion')),
-        cuantos('Por pagar', es('pendiente', 'atrasado')),
+        cuantos('Al día', alumnoEn('pagado', 'inscripcion')),
+        cuantos('Por pagar', alumnoEn('pendiente', 'atrasado')),
         { cabecera: 'Por cobrar ($)', calc: (g) => plata(g, '_debe') },
       ],
     ),

@@ -153,3 +153,39 @@ describe('los demás reportes', () => {
     ]);
   });
 });
+
+describe('resumen de mensualidades', () => {
+  const fila = (estado: string, cuenta: boolean, valor: number) => ({
+    _mes: '2026-11-01',
+    mes: 'Noviembre',
+    colegio: 'CRISFE',
+    alumno: 'x',
+    _estado: estado,
+    _del_periodo: true,
+    _cuenta: cuenta,
+    valor,
+    _recaudado: valor,
+    _en_revision: 0,
+    _debe: 0,
+  });
+  // Cuatro al día y uno dado de baja (suma su dinero, no cuenta como alumno).
+  const filas = [
+    fila('inscripcion', true, 10),
+    fila('inscripcion', true, 10),
+    fila('pagado', true, 10),
+    fila('inscripcion', true, 10),
+    fila('inscripcion', false, 10),
+  ];
+  const bloques = resumenDe('mensualidades', filas, {});
+  const celda = (titulo: string, fila: number, col: number) => bloques.find((b) => b.titulo === titulo)!.filas[fila]![col];
+
+  it('los alumnos al día son los mismos en totales, por mes y por colegio', () => {
+    expect(celda('Totales', 3, 1)).toBe(4);
+    expect(celda('Por mes', 0, 1)).toBe(4);
+    expect(celda('Por colegio', 0, 1)).toBe(4);
+  });
+
+  it('el de baja sí suma su dinero', () => {
+    expect(celda('Totales', 0, 1)).toBe(50);
+  });
+});
