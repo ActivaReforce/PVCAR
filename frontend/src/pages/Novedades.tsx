@@ -10,6 +10,7 @@ import {
   UserCog,
   UserX,
   Users,
+  Wallet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,7 @@ const ETIQUETA_TIPO: Record<TipoNovedad, string> = {
   alumno: 'Alumnos',
   ausencia: 'Ausencia',
   correccion: 'Corrección',
+  mensualidad: 'Mensualidad atrasada',
 };
 
 const COLOR_TIPO: Record<TipoNovedad, string> = {
@@ -58,6 +60,7 @@ const COLOR_TIPO: Record<TipoNovedad, string> = {
   alumno: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
   ausencia: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
   correccion: 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200',
+  mensualidad: 'bg-orange-100 text-orange-900 dark:bg-orange-950 dark:text-orange-200',
 };
 
 const ICONO_TIPO: Record<TipoNovedad, typeof Megaphone> = {
@@ -67,6 +70,7 @@ const ICONO_TIPO: Record<TipoNovedad, typeof Megaphone> = {
   alumno: GraduationCap,
   ausencia: UserX,
   correccion: CheckCircle2,
+  mensualidad: Wallet,
 };
 
 const AVISOS_NOVEDADES: Aviso[] = [
@@ -284,6 +288,7 @@ const Novedades = () => {
               <SelectItem value="alumno">Sobre alumnos</SelectItem>
               <SelectItem value="ausencia">Ausencias</SelectItem>
               <SelectItem value="correccion">Correcciones de ausencia</SelectItem>
+              <SelectItem value="mensualidad">Mensualidades atrasadas</SelectItem>
             </SelectContent>
           </Select>
         </div>

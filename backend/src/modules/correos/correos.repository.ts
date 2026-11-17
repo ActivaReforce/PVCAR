@@ -13,8 +13,20 @@ import { getPool } from '../../config/db.js';
  * ausencias            — aviso automático de ausencia y su corrección (punto
  *                        9): a la lista fija `para` + CC; con
  *                        `notificar_representante`, también al representante.
+ * mensualidades_aviso  — pago de mensualidad nuevo: a la lista fija `para`.
+ *                        Con `notificar_representante`, al aprobarlo, un
+ *                        correo al representante (0045).
+ * mensualidades_atrasadas — el resumen de atrasados del mes: a la lista fija
+ *                        `para`, nunca al representante (0045).
  */
-export const TIPOS_CORREO = ['inscripciones', 'inscripciones_aviso', 'novedades', 'ausencias'] as const;
+export const TIPOS_CORREO = [
+  'inscripciones',
+  'inscripciones_aviso',
+  'novedades',
+  'ausencias',
+  'mensualidades_aviso',
+  'mensualidades_atrasadas',
+] as const;
 export type TipoCorreo = (typeof TIPOS_CORREO)[number];
 
 export interface ConfigCorreo {

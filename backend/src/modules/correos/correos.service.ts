@@ -16,13 +16,19 @@ import type { ConfigCorreoInput } from './correos.schemas.js';
  * la casilla Editar de Novedades (2026-10-12), que es su pestaña Configuración.
  */
 /** Tipos que van a una lista fija de destinatarios (avisos internos). */
-export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = ['inscripciones_aviso', 'novedades', 'ausencias'];
+export const TIPOS_CON_PARA: readonly repo.TipoCorreo[] = [
+  'inscripciones_aviso',
+  'novedades',
+  'ausencias',
+  'mensualidades_aviso',
+  'mensualidades_atrasadas',
+];
 
 /** Tipos que usan el switch `notificar_mencionado`. */
 export const TIPOS_CON_MENCIONADO: readonly repo.TipoCorreo[] = ['novedades'];
 
 /** Tipos que usan el switch `notificar_representante`. */
-export const TIPOS_CON_REPRESENTANTE: readonly repo.TipoCorreo[] = ['novedades', 'ausencias'];
+export const TIPOS_CON_REPRESENTANTE: readonly repo.TipoCorreo[] = ['novedades', 'ausencias', 'mensualidades_aviso'];
 
 /** Los dos de la pestaña Configuración de Novedades. */
 const TIPOS_DE_NOVEDADES: readonly repo.TipoCorreo[] = ['novedades', 'ausencias'];

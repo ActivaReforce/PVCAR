@@ -36,6 +36,8 @@ const NOMBRE_CORREO: Record<string, string> = {
   inscripciones_aviso: 'inscripción nueva',
   novedades: 'novedades',
   ausencias: 'ausencias',
+  mensualidades_aviso: 'mensualidades',
+  mensualidades_atrasadas: 'mensualidades atrasadas',
   recuperar_contrasena: 'recuperar contraseña',
 };
 

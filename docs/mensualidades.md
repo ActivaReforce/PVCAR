@@ -1,6 +1,6 @@
 # Mensualidades
 
-Pedido del cliente el 2026-10-30; segunda vuelta el 2026-11-16 (respuestas de Activa Reforce: entrega el jueves 26 de noviembre). Migraciones `0041_mensualidades.sql`, `0042_mensualidades_dias_por_colegio.sql`, `0043_mensualidades_quitar_dias_generales.sql` y `0044_mensualidades_por_anio.sql`. Código en `backend/src/modules/mensualidades` y `frontend/src/components/mensualidades`.
+Pedido del cliente el 2026-10-30; segunda vuelta el 2026-11-16 (respuestas de Activa Reforce: entrega el jueves 26 de noviembre). Migraciones `0041_mensualidades.sql`, `0042_mensualidades_dias_por_colegio.sql`, `0043_mensualidades_quitar_dias_generales.sql`, `0044_mensualidades_por_anio.sql` y `0045_mensualidades_avisos.sql`. Código en `backend/src/modules/mensualidades` y `frontend/src/components/mensualidades`.
 
 ## Qué es
 
@@ -49,6 +49,19 @@ No hay costo de inscripción: la inscripción es el pago del primer mes. Desde a
 - El representante paga y ve lo suyo sin casilla (su cuenta ya es el alcance). La `0041` le da **Ver** en Inscripciones para que el módulo le salga en el menú.
 - El personal (Propietario y Admin), con la casilla de Inscripciones: Ver = lista y estado del mes; Editar = aprobar y configurar; Eliminar = rechazar. El reporte, solo Propietario.
 
+## Avisos (0045, 2026-11-16)
+
+- **Correo: aviso de mensualidad nueva** (`mensualidades_aviso`, Configuración → Mensualidades): cada pago que envía un representante llega a esa lista con hijos, meses y total. Su casilla **"Enviar un correo al representante cuando se apruebe su pago"** (apagada por defecto) manda, al aprobar, un correo al representante con los meses pagados.
+- **Correo: aviso de mensualidad atrasada** (`mensualidades_atrasadas`): solo una lista (p. ej. el gerente), nunca el representante.
+- **Novedad "Mensualidad atrasada"** (tipo `mensualidad`, la ven solo Propietario y Admin): una sola, el día siguiente al día límite de cada colegio a las **7:00** de Ecuador, con todos los atrasados (alumno, colegio, meses, valor, representante y teléfono). El mismo detalle sale en un solo correo a la lista de atrasados. Si nadie debe, no sale nada. Corre a las 7:00 y al arrancar el servidor (por si estaba reiniciándose); `mensualidad_aviso_atraso` garantiza una sola vez por colegio y mes (`mensualidades.atrasos.ts`).
+- El aviso por clase sigue igual: el alumno atrasado sale ausente y al guardar la lista sale la novedad y el correo "Mensualidad pendiente" **al representante**.
+- **Configuración:** los meses anteriores al actual no se pueden marcar ni desmarcar (marcar uno dejaría a todos debiéndolo). El servidor lo exige.
+
+## Decidido no hacer (2026-11-16)
+
+- Inscripción aprobada después del día límite: el equipo aprueba enseguida; no se da gracia.
+- Disciplina añadida con meses ya pagados por adelantado: la diferencia la gestiona el equipo por fuera.
+
 ## Pendiente
 
-1. **Recordatorio por correo** antes del día límite (interruptor en Configuración; la columna y el remitente `mensualidades` de `correo_config` ya están en la `0041`). No pedido para el 26.
+1. **Recordatorio por correo** antes del día límite (la columna y el remitente `mensualidades` de `correo_config` ya están en la `0041`). No pedido.

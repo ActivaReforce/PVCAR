@@ -11,6 +11,9 @@ import {
   subirArchivo,
 } from '../../lib/storageInscripciones.js';
 import { ROL } from '../../lib/constants.js';
+import { frontendBaseUrl } from '../../config/env.js';
+import { escaparHtml } from '../../lib/correo.js';
+import { configuracion, enviarComo } from '../correos/correos.service.js';
 import {
   describirDisciplina,
   esPersonal,
@@ -231,6 +234,8 @@ export async function pagar(
       );
       return nuevo;
     });
+    // Aviso al equipo (lista de 'mensualidades_aviso'), después del COMMIT.
+    void avisarPagoNuevo(actor.usuario.usu_nombre, actor.usuario.usu_correo, detalle, total / 100);
     return { menpag_id: id, total: total / 100 };
   } catch (err) {
     await borrarArchivos([ruta]);
@@ -281,6 +286,64 @@ export async function aprobarPago(actor: AuthUser, id: number): Promise<void> {
     await repo.aprobarPago(client, id, actor.usuario.usu_id);
     await auditar({ actor, accion: 'editar', entidad: 'mensualidad_pago', entidadId: id, detalle: { aprobado: true } }, client);
   });
+  void avisarPagoAprobado(id);
+}
+
+// ---------------------------------------------------------------------------
+// Correos de pagos (0045)
+
+const tablaDePago = (cuotas: repo.CuotaDetalle[]) =>
+  cuotas
+    .map(
+      (c) => `<tr>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee;">${escaparHtml(c.nombre)}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee;">${escaparHtml(nombreDeMes(c.mes))}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee;">${escaparHtml(c.col_nombre)}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;">$${c.total.toFixed(2)}</td>
+      </tr>`,
+    )
+    .join('');
+
+const lineasDePago = (cuotas: repo.CuotaDetalle[]) =>
+  cuotas.map((c) => `${c.nombre} · ${nombreDeMes(c.mes)} · ${c.col_nombre}: $${c.total.toFixed(2)}`);
+
+/** Al equipo: llegó un pago de mensualidad por revisar. Nunca lanza. */
+async function avisarPagoNuevo(nombre: string, correo: string, cuotas: repo.CuotaDetalle[], total: number) {
+  try {
+    const enlace = `${frontendBaseUrl}/inscripciones`;
+    const asunto = `Pago de mensualidad por revisar: ${nombre} — $${total.toFixed(2)}`;
+    const html = `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;padding:16px;">
+      <h2 style="margin:0 0 8px 0;font-size:18px;">Pago de mensualidad por revisar</h2>
+      <p style="margin:0 0 12px 0;font-size:15px;"><strong>${escaparHtml(nombre)}</strong> (${escaparHtml(correo)}) envió un pago de <strong>$${total.toFixed(2)}</strong>.</p>
+      <table style="border-collapse:collapse;font-size:14px;">${tablaDePago(cuotas)}</table>
+      <p style="margin:12px 0 0 0;font-size:13px;">Revísalo en <a href="${escaparHtml(enlace)}">${escaparHtml(enlace)}</a> → Mensualidades → Por revisar.</p>
+    </body></html>`;
+    const texto = [asunto, '', ...lineasDePago(cuotas), '', `Revísalo en ${enlace}`].join('\n');
+    await enviarComo('mensualidades_aviso', { asunto, html, texto });
+  } catch (err) {
+    console.error('Aviso de pago de mensualidad no enviado:', err);
+  }
+}
+
+/** Al representante, si está encendido en 'mensualidades_aviso': su pago quedó aprobado. Nunca lanza. */
+async function avisarPagoAprobado(id: number) {
+  try {
+    const config = await configuracion('mensualidades_aviso');
+    if (!config?.notificar_representante) return;
+    const p = await repo.obtenerPago(id);
+    if (!p?.representante_correo) return;
+    const asunto = `Tu pago de mensualidad fue aprobado — $${p.total.toFixed(2)}`;
+    const html = `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;padding:16px;">
+      <h2 style="margin:0 0 8px 0;font-size:18px;color:#047857;">Pago aprobado</h2>
+      <p style="margin:0 0 12px 0;font-size:15px;">Hola ${escaparHtml(p.representante_nombre ?? '')}, aprobamos tu pago de <strong>$${p.total.toFixed(2)}</strong>. Estos meses quedan pagados:</p>
+      <table style="border-collapse:collapse;font-size:14px;">${tablaDePago(p.detalle)}</table>
+      <p style="margin:12px 0 0 0;font-size:13px;">Gracias.</p>
+    </body></html>`;
+    const texto = [asunto, '', ...lineasDePago(p.detalle)].join('\n');
+    await enviarComo('mensualidades_aviso', { asunto, html, texto, para: p.representante_correo });
+  } catch (err) {
+    console.error('Correo de pago aprobado no enviado:', err);
+  }
 }
 
 /**
@@ -720,6 +783,13 @@ export async function config() {
 }
 
 export async function guardarCobroColegio(actor: AuthUser, colId: number, c: repo.CobroDelColegio): Promise<void> {
+  // Los meses ya pasados no se tocan (2026-11-16): marcar uno dejaría a todos debiéndolo.
+  const actual = mesDe(hoyEc());
+  const antes = (await repo.colegios()).find((x) => x.col_id === colId);
+  const pasados = (lista: Mes[]) => lista.filter((m) => m < actual).sort().join();
+  if (antes && pasados(antes.meses) !== pasados(c.meses)) {
+    throw new ApiError(400, 'Los meses anteriores al actual no se pueden marcar ni desmarcar.');
+  }
   await enTransaccion(async (client) => {
     const hecho = await repo.guardarCobroColegio(client, colId, c);
     if (!hecho) throw new ApiError(404, 'Ese colegio no tiene valores configurados.');

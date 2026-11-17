@@ -1408,6 +1408,7 @@ const novedades: Definicion = {
                WHEN 'alumno'        THEN 'Sobre alumnos'
                WHEN 'ausencia'      THEN 'Ausencia'
                WHEN 'correccion'    THEN 'Corrección'
+               WHEN 'mensualidad'   THEN 'Mensualidad atrasada'
              END                                                   AS tipo,
              n.nov_texto,
              a.usu_nombre                                          AS autor,

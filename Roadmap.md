@@ -81,15 +81,15 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 
 - Activa Reforce respondió las preguntas: entrega el **jueves 26 de noviembre** (ese día se abre el pago de diciembre), mismo precio y 20 % de hermano cada mes, sin cambio de disciplina, se paga del 1 al 5 (abierto siempre), atraso = ausente. Reglas completas en `docs/mensualidades.md`.
 - Construido y en `dev`: meses de cobro con año y "Abrir siguiente año", sin "Cobrar desde" ni día de corte, mes de inicio elegido en el formulario de inscripción (en curso o siguiente), pago por adelantado en orden, Estado del mes por fecha de pago, bloqueo en Asistencias con correo y novedad de mensualidad pendiente, punto rojo en el menú y números en las pestañas, card **Mensualidades** en Reportes.
-- **Migración `0044_mensualidades_por_anio.sql`**: dev ahora; prod con la 0041–0043 antes del merge. Comunicados pasa a **`0045_comunicados.sql`**.
-- Siguiente: el cliente corre la 0044 en dev, prueba en pantalla, y PR a `main` antes del 26 con 0041 → 0044 en prod.
+- **Migración `0044_mensualidades_por_anio.sql`**: dev ahora; prod con la 0041–0043 antes del merge. Comunicados pasa a **`0046_comunicados.sql`**.
+- Siguiente: el cliente corre la 0044 en dev, prueba en pantalla, y PR a `main` antes del 26 con 0041 → 0045 en prod.
 
 ### Corte de sesión — 2026-11-11 (Mensualidades a producción; Comunicados aparcado)
 
 **Histórico: lo reemplaza el corte del 2026-11-16.**
 
 - **Mensualidades a producción** por decisión del cliente (2026-11-11), sin esperar las 3 preguntas del corte del 2026-11-05. Sin configurar, ningún colegio cobra mensualidades. Antes del merge: `0041` → `0042` → `0043` en prod (el 2026-11-11, por MCP, no estaba ninguna).
-- **Comunicados — PENDIENTE.** Construido en la rama `comunicados` (sin mezclar a `dev`; diseño en `docs/comunicados.md`; migración `0044_comunicados.sql`, renumerada a **`0045`** el 2026-11-16, **sin correr en ningún lado**). **Recordatorio:** cuando Mensualidades esté en producción, retomar Comunicados: el cliente corre la `0045` en dev, se mezcla la rama a `dev` y se prueba el módulo en pantalla.
+- **Comunicados — PENDIENTE.** Construido en la rama `comunicados` (sin mezclar a `dev`; diseño en `docs/comunicados.md`; migración `0044_comunicados.sql`, renumerada a **`0046`** el 2026-11-16, **sin correr en ningún lado**). **Recordatorio:** cuando Mensualidades esté en producción, retomar Comunicados: el cliente corre la `0046` en dev, se mezcla la rama a `dev` y se prueba el módulo en pantalla.
 - Los contactos y los 2 segmentos que hoy hay en Resend son **reales**: no se borran ni se hacen pruebas ni envíos contra Resend. Se limpian cuando estén importados en la plataforma y Comunicados esté en producción.
 
 ### Corte de sesión — 2026-11-05 (Mensualidades: preguntas reenviadas al cliente)

@@ -11,6 +11,7 @@ import { NOMBRES_DE_MES, type ConfigMensualidades as Config } from '@/api/mensua
 import { hoyEc } from '@/lib/fecha';
 import { cn } from '@/lib/utils';
 import TarjetaConfig from '@/components/inscripciones/TarjetaConfig';
+import ConfigCorreo from '@/components/correos/ConfigCorreo';
 
 type ColegioConfig = Config['colegios'][number];
 
@@ -71,6 +72,24 @@ const ConfigMensualidades = () => {
       </div>
       <Valores key={`v-${fila.col_id}`} colegio={fila} />
       <MesesDeCobro key={`m-${fila.col_id}`} colegio={fila} ano={ano} />
+      <ConfigCorreo
+        tipo="mensualidades_aviso"
+        titulo="Correo: aviso de mensualidad nueva"
+        descripcion="Sale cuando un representante envía un pago de mensualidad. Va al equipo, con el detalle de hijos, meses y total."
+        conPara
+        avisos={[
+          {
+            campo: 'notificar_representante',
+            texto: 'Enviar un correo al representante cuando se apruebe su pago',
+          },
+        ]}
+      />
+      <ConfigCorreo
+        tipo="mensualidades_atrasadas"
+        titulo="Correo: aviso de mensualidad atrasada"
+        descripcion="Sale una vez al mes, el día siguiente al día límite a las 7:00, con todos los alumnos atrasados. Solo a esta lista (por ejemplo, el gerente); nunca al representante."
+        conPara
+      />
     </div>
   );
 };
@@ -143,11 +162,12 @@ const MesesDeCobro = ({ colegio, ano }: { colegio: ColegioConfig; ano: number })
     });
 
   const anos = siguienteAbierto ? [ano, ano + 1] : [ano];
+  const actual = `${hoyEc().slice(0, 7)}-01`;
 
   return (
     <TarjetaConfig
       titulo="Meses de cobro"
-      descripcion="Los meses en que este colegio cobra mensualidad. Los que no marques quedan en pausa (vacaciones): ese mes no se cobra a nadie."
+      descripcion="Los meses en que este colegio cobra mensualidad. Los que no marques quedan en pausa (vacaciones): ese mes no se cobra a nadie. Los meses que ya pasaron no se pueden cambiar."
     >
       {anos.map((a) => (
         <div key={a} className="space-y-2">
@@ -159,17 +179,21 @@ const MesesDeCobro = ({ colegio, ano }: { colegio: ColegioConfig; ano: number })
             {NOMBRES_DE_MES.map((nombre, i) => {
               const m = mesDe(a, i + 1);
               const activo = meses.has(m);
+              // Los meses ya pasados no se tocan: marcar uno dejaría a todos debiéndolo.
+              const pasado = m < actual;
               return (
                 <button
                   key={m}
                   type="button"
                   aria-pressed={activo}
-                  aria-label={`${nombre} ${a}`}
-                  disabled={!puede}
+                  aria-label={`${nombre} ${a}${pasado ? ' (ya pasó)' : ''}`}
+                  title={pasado ? 'Ya pasó: no se puede cambiar' : undefined}
+                  disabled={!puede || pasado}
                   onClick={() => alternar(m)}
                   className={cn(
                     'min-h-11 rounded-md border px-2 text-sm transition-colors disabled:cursor-not-allowed sm:min-h-9',
                     activo ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted',
+                    pasado && 'opacity-50',
                   )}
                 >
                   {nombre.slice(0, 3)}
