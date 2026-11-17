@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/hooks/usePermissions';
+import { usePrecios } from '@/hooks/useInscripciones';
 import { useConfigMensualidades, useGuardarCobroColegio } from '@/hooks/useMensualidades';
 import { NOMBRES_DE_MES, type ConfigMensualidades as Config } from '@/api/mensualidades';
 import { hoyEc } from '@/lib/fecha';
@@ -25,6 +26,7 @@ const mesDe = (ano: number, n: number) => `${ano}-${String(n).padStart(2, '0')}-
  */
 const ConfigMensualidades = () => {
   const config = useConfigMensualidades();
+  const precios = usePrecios();
   const [colId, setColId] = useState<string>('');
 
   if (config.isLoading) return <p className="text-sm text-muted-foreground">Cargando colegios…</p>;
@@ -36,6 +38,9 @@ const ConfigMensualidades = () => {
     );
   }
   const colegios = config.data.colegios;
+  // Sin valores (precio) no se puede calcular la mensualidad: salen en el
+  // select, sin poder elegirse, para que se vea que existen y qué les falta.
+  const sinValores = (precios.data ?? []).filter((p) => !colegios.some((c) => c.col_id === p.col_id));
   if (colegios.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -62,6 +67,11 @@ const ConfigMensualidades = () => {
                 {c.meses.length === 0 ? ' · no cobra' : ''}
               </SelectItem>
             ))}
+            {sinValores.map((c) => (
+              <SelectItem key={c.col_id} value={`sin-${c.col_id}`} disabled>
+                {c.col_nombre} · sin valores
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <p className="text-sm text-muted-foreground">
@@ -69,9 +79,18 @@ const ConfigMensualidades = () => {
             ? 'Este colegio todavía no cobra mensualidades.'
             : `Cobra ${deEsteAno(fila)} ${deEsteAno(fila) === 1 ? 'mes' : 'meses'} en ${ano}.`}
         </p>
+        {sinValores.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {sinValores.map((c) => c.col_nombre).join(', ')}: sin valores. Ponlos en la pestaña Por colegio para que
+            pueda cobrar mensualidades.
+          </p>
+        )}
       </div>
       <Valores key={`v-${fila.col_id}`} colegio={fila} />
       <MesesDeCobro key={`m-${fila.col_id}`} colegio={fila} ano={ano} />
+      <p className="border-t pt-4 text-sm text-muted-foreground">
+        Los dos correos de abajo son generales: valen para todos los colegios.
+      </p>
       <ConfigCorreo
         tipo="mensualidades_aviso"
         titulo="Correo: aviso de mensualidad nueva"
