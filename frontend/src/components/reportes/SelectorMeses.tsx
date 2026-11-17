@@ -16,7 +16,8 @@ const mesDe = (ano: number, i: number) => `${ano}-${String(i + 1).padStart(2, '0
 
 /**
  * Elegir uno o varios meses (cliente, 2026-11-16): el año pasado, el actual
- * y el siguiente, que cambian solos con el año. Sin ninguno marcado, "Todo".
+ * y el siguiente, que cambian solos con el año. Sin ninguno marcado, "Todo"
+ * (Reportes → Pagos → Mensualidades).
  */
 const SelectorMeses = ({ valor, onChange }: Props) => {
   const ano = Number(hoyEc().slice(0, 4));
