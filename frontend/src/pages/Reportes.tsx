@@ -1,19 +1,59 @@
 import { Link } from 'react-router-dom';
-import { Archive, CalendarRange, ChevronRight, FileSpreadsheet } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Archive,
+  BookOpen,
+  Calendar,
+  ClipboardList,
+  FileSpreadsheet,
+  GraduationCap,
+  Megaphone,
+  MessageSquare,
+  School,
+  UserCheck,
+  UserCog,
+  UserRound,
+  Users,
+  Users2,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCatalogoReportes } from '@/hooks/useTablero';
+import { PAGOS } from '@/api/reportes';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLES_GLOBALES } from '@/hooks/useUserForm';
 
+/** El ícono de cada reporte: el mismo de su módulo en el menú. */
+const ICONOS: Record<string, LucideIcon> = {
+  usuarios: Users,
+  colegios: School,
+  actividades: BookOpen,
+  disciplinas: Calendar,
+  entrenadores: UserCog,
+  estudiantes: GraduationCap,
+  evaluaciones: ClipboardList,
+  'asistencias-alumnos': UserCheck,
+  'asistencias-entrenadores': Users2,
+  representantes: UserRound,
+  encuestas: MessageSquare,
+  novedades: Megaphone,
+};
+
+interface Tarjeta {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  ruta: string;
+  icono: LucideIcon;
+}
 
 /**
  * Índice de Reportes.
  *
  * La lista **la decide el backend**: solo salen los reportes para los que se
- * tiene el permiso del módulo de origen. Antes eran nueve rutas fijas en el
- * menú y un entrenador entraba al de Usuarios y se descargaba la tabla entera
- * de personas.
+ * tiene el permiso del módulo de origen. Tarjetas pequeñas (2026-11-16): el
+ * ícono y el nombre; la descripción, al pasar el cursor.
  */
 const Reportes = () => {
   const catalogo = useCatalogoReportes();
@@ -39,6 +79,33 @@ const Reportes = () => {
   }
 
   const reportes = catalogo.data ?? [];
+  const tarjetas: Tarjeta[] = [];
+  for (const r of reportes) {
+    if (PAGOS.reportes.includes(r.id)) {
+      if (!tarjetas.some((t) => t.id === PAGOS.id)) {
+        tarjetas.push({ ...PAGOS, ruta: '/reportes/pagos', icono: Wallet });
+      }
+      continue;
+    }
+    tarjetas.push({
+      id: r.id,
+      titulo: r.titulo,
+      descripcion: r.descripcion,
+      ruta: `/reportes/${r.id}`,
+      icono: ICONOS[r.id] ?? FileSpreadsheet,
+    });
+  }
+  if (esGlobal) {
+    // La plataforma anterior: solo para quien lo ve todo (el backend lo vuelve a exigir).
+    tarjetas.push({
+      id: 'data-anterior',
+      titulo: 'Data anterior',
+      descripcion:
+        'Todo lo de la plataforma anterior (oct 2025 – sep 2026): cifras, gráficas, cada tabla con filtros y exportación a Excel.',
+      ruta: '/reportes/data-anterior',
+      icono: Archive,
+    });
+  }
 
   return (
     <div className="container mx-auto min-w-0 max-w-5xl space-y-6 p-4 lg:p-6">
@@ -49,64 +116,34 @@ const Reportes = () => {
         </p>
       </div>
 
-      {reportes.length === 0 && (
+      {tarjetas.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <p className="text-lg">No tienes ningún reporte disponible</p>
-            <p className="mt-2 text-sm">
-              Cada reporte necesita el permiso de ver su módulo de origen.
-            </p>
+            <p className="mt-2 text-sm">Cada reporte necesita el permiso de ver su módulo de origen.</p>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {reportes.map((r) => (
-          <Link key={r.id} to={`/reportes/${r.id}`} className="block">
-            <Card className="h-full transition-colors hover:border-primary/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                  <span className="truncate">{r.titulo}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="text-sm text-muted-foreground">{r.descripcion}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">{r.columnas.length} columnas</Badge>
-                  {r.exigeRango && (
-                    <Badge variant="outline" className="gap-1">
-                      <CalendarRange className="h-3 w-3" />
-                      Pide fechas
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {tarjetas.map((t) => (
+          <Tooltip key={t.id}>
+            <TooltipTrigger asChild>
+              <Link
+                to={t.ruta}
+                aria-label={`${t.titulo}: ${t.descripcion}`}
+                className={`flex min-h-12 items-center gap-2.5 rounded-lg border bg-card px-3 py-2.5 text-sm font-medium transition-colors hover:border-primary/50 hover:bg-muted/40 ${
+                  t.id === 'data-anterior' ? 'border-amber-300/70 dark:border-amber-700/60' : ''
+                }`}
+              >
+                <t.icono className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span className="min-w-0 truncate">{t.titulo}</span>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">{t.descripcion}</TooltipContent>
+          </Tooltip>
         ))}
       </div>
-
-      {/* La plataforma anterior: solo para quien lo ve todo (el backend lo vuelve a exigir). */}
-      {esGlobal && (
-        <Link to="/reportes/data-anterior" className="block">
-          <Card className="border-amber-300/70 transition-colors hover:border-amber-400 dark:border-amber-700/60 dark:hover:border-amber-600">
-            <CardContent className="flex items-center gap-4 p-4 sm:p-5">
-              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
-                <Archive className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-foreground">Data anterior</p>
-                <p className="text-sm text-muted-foreground">
-                  Todo lo de la plataforma anterior (oct 2025 – sep 2026): cifras, gráficas, cada
-                  tabla con filtros y exportación a Excel.
-                </p>
-              </div>
-              <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-            </CardContent>
-          </Card>
-        </Link>
-      )}
     </div>
   );
 };

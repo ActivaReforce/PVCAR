@@ -356,6 +356,7 @@ function cuerpoDe(n: repo.Novedad): { html: string; texto: string } {
     alumno: 'Sobre alumnos',
     ausencia: 'Ausencia',
     correccion: 'Corrección',
+    mensualidad: 'Mensualidad atrasada',
   }[n.nov_tipo];
 
   const mencionesTexto =

@@ -36,6 +36,17 @@ const listaDeIds = z
     return ids.length > 0 ? ids : undefined;
   });
 
+/** Meses 'YYYY-MM', en texto ("2026-11,2026-12") o en lista: salen como 'YYYY-MM-01'. */
+const listaDeMeses = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .transform((valor) => {
+    if (valor === undefined) return undefined;
+    const partes = (Array.isArray(valor) ? valor : valor.split(',')).map((t) => t.trim());
+    const meses = [...new Set(partes.filter((t) => /^\d{4}-(0[1-9]|1[0-2])$/.test(t)))].map((t) => `${t}-01`);
+    return meses.length > 0 ? meses : undefined;
+  });
+
 export const filtrosSchema = z
   .object({
     buscar: z.string().trim().max(160).optional(),
@@ -44,6 +55,7 @@ export const filtrosSchema = z
     estado: z.coerce.number().int().positive().optional(),
     desde: fecha.optional(),
     hasta: fecha.optional(),
+    meses: listaDeMeses,
     /** Novedades: false quita ausencias y correcciones. Por defecto, salen. */
     ausencias: z
       .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])

@@ -1,0 +1,67 @@
+# Mensualidades
+
+Pedido del cliente el 2026-10-30; segunda vuelta el 2026-11-16 (respuestas de Activa Reforce: entrega el jueves 26 de noviembre). Migraciones `0041_mensualidades.sql`, `0042_mensualidades_dias_por_colegio.sql`, `0043_mensualidades_quitar_dias_generales.sql`, `0044_mensualidades_por_anio.sql` y `0045_mensualidades_avisos.sql`. Código en `backend/src/modules/mensualidades` y `frontend/src/components/mensualidades`.
+
+## Qué es
+
+No hay costo de inscripción: la inscripción es el pago del primer mes. Desde ahí, cada mes de cada alumno es una **cuota**: el representante la paga desde su cuenta (Inscripciones → Mensualidades) o desde `/inscripcion` → "Pagar mensualidad", con un comprobante, y el personal la aprueba o la rechaza. El 26 de noviembre de 2026 se abre el pago de diciembre: tiene que estar en producción antes.
+
+## Reglas (decididas con el cliente)
+
+| Tema | Regla |
+|---|---|
+| Primer mes | Lo paga la inscripción. En el formulario el representante elige **en qué mes empieza**: el en curso o el siguiente (`ins_mes_inicio`, 0044). Si elige diciembre, noviembre no se cobra. Sale como **"Pagado (Inscripción)"**. Todo lo inscrito antes de la 0044 (octubre y noviembre de 2026) es el pago de **noviembre de 2026**. |
+| Meses de cobro | Por colegio y **con año** (`colpre_meses`, 0044). La pantalla enseña el año en curso con su etiqueta y el botón **"Abrir siguiente año"**; al empezar el año nuevo, ese pasa a ser el principal. Los meses no marcados quedan **en pausa**. Lo de años pasados se conserva. Sin meses marcados, el colegio no cobra. |
+| Mes de la cuota | Es el mes que se paga, no la fecha del pago. |
+| Día límite | Por colegio (por defecto **5**, lo del contrato). Pasado ese día, el mes sin pagar sale **atrasado**; los meses anteriores sin pagar, también. Se puede pagar después, sin recargo: el pago está **siempre abierto**. |
+| Por adelantado | Sí: el representante ve todos los meses marcados de su colegio (año en curso y el siguiente si está abierto) y elige los que quiera, con **un solo comprobante**. **En orden**: no puede elegir enero si diciembre sigue por pagar (sale el aviso "Primero selecciona Diciembre…"); quitar un mes quita los siguientes. El servidor lo exige igual, por hijo. Al abrir no hay nada elegido. |
+| Atraso → Asistencias | El alumno que debe un mes vencido el día de la clase sale **Ausente sin poder cambiarlo**, con "Pago de mensualidad pendiente (dic)" en su tarjeta. Al guardar se crea una novedad y se manda un **correo distinto** (título "Mensualidad pendiente", meses que debe, enlace para pagar), que va **siempre** al representante. Uno cada vez que se guarda la lista con él ausente. Se mira con lo pagado **hoy**: en cuanto se aprueba el pago, esos días se pueden volver a editar (dentro de los 7 días de siempre). Un pago **en revisión no bloquea**. Vale para todos (entrenador y personal). |
+| Dinero por mes | Mensualidades **e inscripciones** (aprobadas = recaudado, pendientes = en revisión; cada hijo con su valor y el redondeo al primero, así suma exacto `ins_total`). Lo de antes de noviembre de 2026 cuenta en noviembre: Recaudado + En revisión de noviembre = Total recaudado del reporte de Inscripciones. Por **fecha de pago** (caja): quien paga $300 el 16 de noviembre por diciembre, enero y febrero suma $300 en noviembre ("incluye dic, ene y feb"), y en diciembre, enero y febrero sale **Pagado · $0 · pagado el 16/11/2026**. La fecha es la del envío del comprobante, no la de la aprobación. |
+| Cambiar de disciplina | **No** desde aquí: el contrato pide una solicitud y un contrato nuevo, cada trimestre. |
+| Varios hijos | Casilla por mes y por hijo, agrupados por colegio; el total cambia al marcar. |
+| Descuento de hermano | 20 % todos los meses (la regla de la inscripción). El importe de cada hijo se calcula con **toda la familia**, no con lo marcado: desmarcar a un hijo resta exactamente lo suyo. Familia = alumnos unidos por algún representante en común. |
+| Disciplina añadida | El mes que paga su inscripción, esa disciplina está pagada: la cuota de ese mes cobra solo las demás, con su parte proporcional. Si ese mes o los siguientes ya estaban pagados por adelantado, quedan como estaban: la diferencia se cobra aparte. |
+| Alta a mano | Una disciplina dada de alta desde Estudiantes (sin inscripción) cobra desde el mes del alta. **Arranque:** lo dado de alta a mano hasta noviembre de 2026 cuenta como noviembre pagado (`PRIMER_MES`), como lo inscrito; en prod eran 2 alumnos con una disciplina extra. |
+| Precio | Lo pagado queda con su precio; los meses sin pagar toman el precio vigente. |
+| Baja con meses adelantados | Esos meses siguen como pagados; la devolución va fuera de la plataforma. |
+| Rechazo | Sin motivo (2026-11-16): al pulsar Rechazar sale un modal con el representante, sus hijos y lo que pagaba, teléfono, correo y **WhatsApp**, y debajo **Confirmar rechazo**. Al confirmar, el pago se **borra entero** con su comprobante, como si nunca se hubiera subido: el representante vuelve a pagar esos meses. El personal lo contacta por fuera. No se guarda nada del rechazo, ni en auditoría. El estado `rechazado` de la tabla ya no se usa. |
+| Anular un pago aprobado | Solo Propietario, desde el detalle del pago ("Anular pago"). Mismo modal que Anular inscripción: datos de contacto y WhatsApp, qué se borra, qué más pasa y el nombre del representante escrito a mano. Mismo efecto que rechazar: se borra entero con su comprobante, sin registro; sus meses vuelven a deberse y, si ya vencieron, el alumno queda ausente en Asistencias hasta que vuelva a pagar. No se avisa al representante. |
+| Factura | No: solo se lleva el registro. |
+
+## Pantallas
+
+- **Menú lateral:** punto rojo **sin número** en Inscripciones si hay alguna inscripción o algún pago de mensualidad por revisar. Solo Propietario. Se refresca cada minuto.
+- **/inscripciones:** el número rojo va en cada pestaña (Inscripciones y Mensualidades).
+- **Pagar mensualidad (representante), en tres pasos:** 1) elegir el mes o los meses (los que se deben y, de este mes en adelante, también los pagados o en revisión, con su etiqueta y sin poder elegirlos); 2) una tarjeta por hijo con los meses elegidos, estado y precio, cada mes con su casilla (diciembre para los dos hijos y enero solo para uno, en un mismo pago), todo marcado al empezar y en orden por hijo; 3) total a pagar con el desglose "Mensualidad diciembre 2026 … $X" por mes, la cuenta y un solo comprobante.
+- **Pestaña Mensualidades (personal):** dos pestañas, **Por revisar** (pagos por revisar o aprobados: buscador, colegio, estado) y **Estado del mes**, solo lectura: por defecto el mes en curso; se elige entre enero del año pasado y diciembre del siguiente (cambia solo con el año); su select de colegio es independiente del de arriba. Las filas pagadas o en revisión abren el detalle del pago; las pendientes o atrasadas llevan un botón de mensaje (siempre, sea el día que sea) que abre lo que debe y los datos de cada representante con WhatsApp y Correo. Totales por colegio: recaudado en el mes, en revisión, por cobrar de ese mes, alumnos.
+- **Configuración → Mensualidades:** colegio; Valores (día límite); Meses de cobro (año en curso con etiqueta, "Abrir siguiente año").
+- **Reportes → Pagos** (solo Propietario, 2026-11-16): una tarjeta con dos pestañas, **Inscripciones** (como siempre) y **Mensualidades**: **una fila por alumno y por mes** (un registro). Columnas: año, mes, colegio, alumno, estado, **Valor** (lo que vale ese mes; nunca 0: un mes pagado con la inscripción vale la parte del alumno en ella), **Recaudado en el periodo** (lo que de ese valor entró en los meses elegidos), pagado con (Inscripción / Mensualidad / Sin pagar, «adelantada» si se pagó antes de su mes), fecha y mes de pago, disciplinas y contacto. Filtro de **meses** (varios; año pasado, actual y siguiente; por defecto «Todo»), colegio, estado y buscar. Un mes pagado por adelantado: al elegir su mes sale con su valor y recaudado 0; al elegir el mes en que se pagó, sale como adelantada con su dinero, para que la columna sume lo que entró. Con «Todo», lo futuro sin pagar no sale; eligiendo el mes, sí. Cifras: recaudado en el periodo, en revisión, por cobrar, alumnos al día y por pagar. Excel: Resumen (totales, por mes, dinero por mes de pago, por colegio, por pagar con teléfono) y detalle. Las filas salen de código (`fuente`), no de una consulta.
+
+## Qué se guarda
+
+- **Lo que se debe no se guarda:** se calcula cada vez (`mensualidades.calculo.ts`, puro y con tests) con las disciplinas activas, la configuración de cada colegio y lo ya pagado. Cambiar la configuración cambia lo que se debe desde ese momento.
+- **Lo pagado sí, congelado:** `mensualidad_pago` (un comprobante: estado, totales, copia del detalle, motivo, fecha de envío) y `mensualidad_cuota` (un mes de un alumno, con disciplinas e importes). Un mes de un alumno se paga una sola vez (índice único). Borrar un alumno no borra su contabilidad (`SET NULL`, con el nombre copiado).
+- Configuración: `colegio_precio.colpre_meses` (0044) y `colpre_mens_dia_limite` (0042). General: `inscripcion_config.inscfg_mens_recordatorio` (sin uso todavía). `inscripcion.ins_mes_inicio` (0044).
+- La novedad de mensualidad es una `ausencia` con `nov_datos.mensualidad` = meses que debe.
+
+## Permisos
+
+- El representante paga y ve lo suyo sin casilla (su cuenta ya es el alcance). La `0041` le da **Ver** en Inscripciones para que el módulo le salga en el menú.
+- El personal (Propietario y Admin), con la casilla de Inscripciones: Ver = lista y estado del mes; Editar = aprobar y configurar; Eliminar = rechazar. El reporte, solo Propietario.
+
+## Avisos (0045, 2026-11-16)
+
+- **Correo: aviso de mensualidad nueva** (`mensualidades_aviso`, Configuración → Mensualidades): cada pago que envía un representante llega a esa lista con hijos, meses y total. Su casilla **"Enviar un correo al representante cuando se apruebe su pago"** (apagada por defecto) manda, al aprobar, un correo al representante con los meses pagados.
+- **Correo: aviso de mensualidad atrasada** (`mensualidades_atrasadas`): solo una lista (p. ej. el gerente), nunca el representante.
+- **Novedad "Mensualidad atrasada"** (tipo `mensualidad`, la ven solo Propietario y Admin): una sola, el día siguiente al día límite de cada colegio a las **7:00** de Ecuador, con todos los atrasados (alumno, colegio, meses, valor, representante y teléfono). El mismo detalle sale en un solo correo a la lista de atrasados. Si nadie debe, no sale nada. Corre a las 7:00 y al arrancar el servidor (por si estaba reiniciándose); `mensualidad_aviso_atraso` garantiza una sola vez por colegio y mes (`mensualidades.atrasos.ts`).
+- El aviso por clase sigue igual: el alumno atrasado sale ausente y al guardar la lista sale la novedad y el correo "Mensualidad pendiente" **al representante**.
+- **Configuración:** los meses anteriores al actual no se pueden marcar ni desmarcar (marcar uno dejaría a todos debiéndolo). El servidor lo exige.
+
+## Decidido no hacer (2026-11-16)
+
+- Inscripción aprobada después del día límite: el equipo aprueba enseguida; no se da gracia.
+- Disciplina añadida con meses ya pagados por adelantado: la diferencia la gestiona el equipo por fuera.
+
+## Pendiente
+
+1. **Recordatorio por correo** antes del día límite (la columna y el remitente `mensualidades` de `correo_config` ya están en la `0041`). No pedido.

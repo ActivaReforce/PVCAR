@@ -28,6 +28,8 @@ export interface FiltrosDisponibles {
   fechas: boolean;
   /** Casilla "Ver ausencias" (solo Novedades). */
   ausencias?: boolean;
+  /** Selector de meses (varios) en vez de fechas (Mensualidades). */
+  meses?: boolean;
 }
 
 export interface ReporteDisponible {
@@ -110,6 +112,8 @@ export interface FiltrosReporte {
   incluirSensibles?: boolean;
   /** Novedades: false quita ausencias y correcciones. */
   ausencias?: boolean;
+  /** Meses elegidos, 'YYYY-MM'. Vacío = todo. */
+  meses?: string[];
 }
 
 function queryString(filtros: object): string {
@@ -134,4 +138,17 @@ export const reportesApi = {
   /** Los filtros van en el cuerpo: no quedan escritos en los logs del servidor. */
   exportar: (modulo: string, filtros: FiltrosReporte) =>
     api.descargar(`/reportes/${modulo}/export`, filtros, `${modulo}.xlsx`),
+};
+
+/**
+ * Pagos (cliente, 2026-11-16): Inscripciones y Mensualidades son el mismo
+ * dinero —la inscripción es la mensualidad del primer mes—, así que salen en
+ * una sola tarjeta con dos pestañas (/reportes/pagos). Ocupa el lugar de
+ * Inscripciones en el orden.
+ */
+export const PAGOS = {
+  id: 'pagos',
+  titulo: 'Pagos',
+  descripcion: 'Inscripciones y mensualidades: lo que entró, quién pagó cada mes y quién debe.',
+  reportes: ['inscripciones', 'mensualidades'],
 };

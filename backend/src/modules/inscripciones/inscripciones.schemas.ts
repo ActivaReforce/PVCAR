@@ -208,6 +208,14 @@ export const envioSchema = z.object({
     >,
   ),
   comprobante: comprobanteSchema,
+  /**
+   * El mes que paga la inscripción: el alumno empieza ese mes (cliente,
+   * 2026-11-16). El mes en curso o el siguiente; sin él, el en curso.
+   */
+  mes_inicio: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])-01$/, 'Mes de inicio inválido')
+    .optional(),
 });
 
 export type EnvioInscripcion = z.infer<typeof envioSchema>;

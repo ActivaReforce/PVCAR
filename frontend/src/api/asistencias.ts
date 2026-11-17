@@ -55,6 +55,11 @@ export interface AlumnoDeSesion {
   razon: string | null;
   registrado_en: string | null;
   registrado_por: string | null;
+  /**
+   * Meses de mensualidad vencidos sin pagar ese día ('YYYY-MM-01'): queda
+   * Ausente y no se puede cambiar. Opcional: Vercel publica antes que Railway.
+   */
+  mensualidad_pendiente?: string[] | null;
 }
 
 export interface ListaAlumnos {

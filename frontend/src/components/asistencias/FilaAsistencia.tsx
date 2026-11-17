@@ -1,4 +1,4 @@
-import { Clock, Info } from 'lucide-react';
+import { Clock, Info, Lock } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,11 @@ interface Props {
   detalle: string | null;
   /** Aviso en ámbar: ya no está inscrito / hoy no da clase aquí. */
   aviso: string | null;
+  /**
+   * Mensualidad atrasada (2026-11-16): queda Ausente, los botones no se
+   * pueden tocar y la tarjeta lo dice en rojo.
+   */
+  bloqueo?: string | null;
   marca: Borrador;
   sucia: boolean;
   incompleta: boolean;
@@ -55,6 +60,7 @@ const FilaAsistencia = ({
   fotoUrl,
   detalle,
   aviso,
+  bloqueo = null,
   marca,
   sucia,
   incompleta,
@@ -98,6 +104,12 @@ const FilaAsistencia = ({
                 <span className="truncate">{aviso}</span>
               </div>
             )}
+            {bloqueo && (
+              <div className="mt-0.5 flex items-start gap-1 text-xs font-medium text-destructive">
+                <Lock className="mt-px h-3 w-3 flex-shrink-0" />
+                <span>{bloqueo}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -112,7 +124,11 @@ const FilaAsistencia = ({
                 variant="outline"
                 aria-pressed={elegido}
                 aria-label={`${pinta.etiqueta} — ${nombre}`}
-                onClick={() => onEstado(clave, id)}
+                disabled={bloqueo !== null && !elegido}
+                aria-disabled={bloqueo !== null}
+                onClick={() => {
+                  if (bloqueo === null) onEstado(clave, id);
+                }}
                 // En el teléfono, la palabra entera en una línea: la letra se
                 // ajusta al ancho (≈10 px a 360 px) y el botón no cambia.
                 className={`h-11 whitespace-nowrap px-0.5 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tracking-tight sm:px-1 sm:text-sm sm:tracking-normal ${

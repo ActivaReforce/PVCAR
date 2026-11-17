@@ -27,6 +27,7 @@ import {
   inscripcionPublicaRouter,
   inscripcionesRouter,
 } from './modules/inscripciones/inscripciones.routes.js';
+import { mensualidadesRouter } from './modules/mensualidades/mensualidades.routes.js';
 
 export function createApp(): Application {
   const app = express();
@@ -54,6 +55,8 @@ export function createApp(): Application {
   // 2 MB, ~2,7 MB en texto). Solo esa ruta sube el limite; body-parser no
   // vuelve a parsear un cuerpo ya leido, asi que el de 1 MB no la toca.
   app.use('/api/v1/inscripcion', express.json({ limit: '4mb' }));
+  // El pago de la mensualidad trae el mismo comprobante.
+  app.use('/api/v1/mensualidades/pagos', express.json({ limit: '4mb' }));
   app.use(express.json({ limit: '1mb' }));
 
   // Rutas versionadas.
@@ -95,6 +98,7 @@ export function createApp(): Application {
   api.use('/perfil', perfilRouter);
   api.use('/inscripcion', inscripcionPublicaRouter);
   api.use('/inscripciones', inscripcionesRouter);
+  api.use('/mensualidades', mensualidadesRouter);
   api.use('/correos', correosRouter);
   api.use('/novedades', novedadesRouter);
 

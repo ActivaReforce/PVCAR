@@ -44,6 +44,7 @@ import AnularInscripcionDialog from './AnularInscripcionDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROL } from '@/hooks/useUserForm';
 import { fechaCorta, fechaHora, fechaNacimiento, enlaceWhatsApp } from './formato';
+import { nombreDeMes } from '@/api/mensualidades';
 
 interface Props {
   id: number | null;
@@ -405,6 +406,12 @@ const Contenido = ({
             </span>
           )}
         </h3>
+        {datos.ins_mes_inicio && (
+          <p className="text-sm">
+            Paga <strong>{nombreDeMes(datos.ins_mes_inicio)}</strong>: empieza ese mes y las mensualidades corren desde
+            el siguiente.
+          </p>
+        )}
         {datos.comprobante_url ? (
           <a
             href={datos.comprobante_url}

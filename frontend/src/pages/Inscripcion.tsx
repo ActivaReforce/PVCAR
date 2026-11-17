@@ -37,6 +37,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { diaDeCruce, horarioLargo } from '@/lib/horarios';
 import { esParaCurso } from '@/lib/cursos';
 import { compressImage } from '@/lib/imageCompression';
+import PagarMensualidad from '@/components/mensualidades/PagarMensualidad';
+import { nombreDeMes } from '@/api/mensualidades';
 import {
   dinero,
   documentoPara,
@@ -428,10 +430,11 @@ const Inscripcion = () => {
 
   const { user } = useAuth();
   /**
-   * inicio: "primera vez" o "ya inscribí antes". nuevo: el formulario de
-   * siempre, sin sesión. cuenta: entró con su cuenta y se le rellena todo (§9).
+   * inicio: "primera vez", "ya inscribí antes" o "pagar mensualidad". nuevo:
+   * el formulario de siempre, sin sesión. cuenta: entró con su cuenta y se le
+   * rellena todo (§9). pagar: la mensualidad de sus hijos, con su sesión.
    */
-  const [modo, setModo] = useState<'inicio' | 'nuevo' | 'cuenta'>('inicio');
+  const [modo, setModo] = useState<'inicio' | 'nuevo' | 'cuenta' | 'pagar'>('inicio');
   const conSesion = modo === 'cuenta' && user !== null;
   /** Al continuar en "Tus datos", si la cédula ya tiene cuenta: que entre. */
   const [pistaCuenta, setPistaCuenta] = useState<string | null | undefined>(undefined);
@@ -450,6 +453,13 @@ const Inscripcion = () => {
     () => Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, false])) as Record<TipoDocumento, boolean>,
   );
   const [comprobante, setComprobante] = useState<File | null>(null);
+  // El mes que paga la inscripción (cliente, 2026-11-16): el en curso o el siguiente.
+  const mesesDeInicio = useMemo(() => {
+    const [a, m] = hoyEc().split('-').map(Number) as [number, number];
+    const siguiente = m === 12 ? `${a + 1}-01-01` : `${a}-${String(m + 1).padStart(2, '0')}-01`;
+    return [`${a}-${String(m).padStart(2, '0')}-01`, siguiente];
+  }, []);
+  const [mesInicio, setMesInicio] = useState(() => mesesDeInicio[0]!);
   const [vista, setVista] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -633,6 +643,7 @@ const Inscripcion = () => {
         ...documentosLeidos(datos, alumnos),
         acepta: Object.fromEntries(TIPOS_DOCUMENTO.map((t) => [t, true])) as Record<TipoDocumento, true>,
         comprobante: { mime, base64: await aBase64(comprobante) },
+        mes_inicio: mesInicio,
       };
       const recibido = await conReintentos(() =>
         inscripcionesApi.enviar(envio, conSesion, claveEnvio.current),
@@ -692,20 +703,32 @@ const Inscripcion = () => {
         {formulario.isError && (
           <Aviso titulo="No se pudo abrir el formulario">Revisa tu conexión y recarga la página.</Aviso>
         )}
-        {formulario.data && !formulario.data.disponible && !resultado && (
+        {/* Cerradas, la puerta sigue para pagar la mensualidad. */}
+        {formulario.data && !formulario.data.disponible && !resultado && modo !== 'inicio' && modo !== 'pagar' && (
           <Aviso titulo="Las inscripciones no están abiertas">Vuelve a intentarlo más tarde o escríbenos.</Aviso>
         )}
 
         {resultado && <Exito resultado={resultado} correo={rep.correo.trim()} cuenta={conSesion} />}
 
-        {formulario.data?.disponible && !resultado && modo === 'inicio' && (
+        {formulario.data && !resultado && modo === 'inicio' && (
           <EntradaInscripcion
+            abiertas={formulario.data.disponible}
             onNuevo={(cedula) => {
               setRep((r) => ({ ...r, cedula }));
               setModo('nuevo');
             }}
             onCuenta={() => setModo('cuenta')}
+            onPagar={() => setModo('pagar')}
           />
+        )}
+
+        {modo === 'pagar' && user && (
+          <div className="space-y-4">
+            <Button variant="ghost" className="h-11" onClick={() => setModo('inicio')}>
+              ← Volver
+            </Button>
+            <PagarMensualidad />
+          </div>
         )}
 
         {formulario.data?.disponible && !resultado && modo === 'cuenta' && misDatos.isLoading && (
@@ -716,7 +739,9 @@ const Inscripcion = () => {
           <Aviso titulo="No se pudieron cargar tus datos">Revisa tu conexión y recarga la página.</Aviso>
         )}
 
-        {formulario.data?.disponible && !resultado && modo !== 'inicio' && !(modo === 'cuenta' && !misDatos.data) && (
+        {formulario.data?.disponible &&
+          !resultado &&
+          (modo === 'nuevo' || (modo === 'cuenta' && misDatos.data)) && (
           <div className="space-y-5">
             <ol className="grid grid-cols-5 gap-2" aria-label="Pasos">
               {PASOS.map((nombre, i) => (
@@ -798,6 +823,9 @@ const Inscripcion = () => {
                   cobro={cotizacion.data}
                   cargandoCobro={cotizacion.isFetching}
                   cuenta={conSesion}
+                  meses={mesesDeInicio}
+                  mesInicio={mesInicio}
+                  onMesInicio={setMesInicio}
                 />
               )}
             </section>
@@ -1063,17 +1091,26 @@ const FichaAlumno = ({
 
   /**
    * Las de su curso, agrupadas por actividad: "Fútbol" con sus grupos, cada
-   * uno con sus días. Sin curso elegido no se enseña ninguna.
+   * uno con sus días. Sin curso elegido no se enseña ninguna. Las que ya
+   * tiene activas salen siempre, aunque ya no sean de su curso (se le cambió
+   * el curso o a la disciplina se le quitó): cuentan para el máximo y, si no
+   * se vieran, el tope no se entendería.
    */
   const porActividad = useMemo(() => {
     const grupos = new Map<string, DisciplinaOfertada[]>();
     if (curso === null) return [];
     for (const d of colegio?.disciplinas ?? []) {
-      if (!esParaCurso(d.grados, curso)) continue;
+      const activa = alumno.activas.some((a) => a.colacthor_id === d.colacthor_id);
+      if (!activa && !esParaCurso(d.grados, curso)) continue;
       grupos.set(d.actividad, [...(grupos.get(d.actividad) ?? []), d]);
     }
     return [...grupos.entries()];
-  }, [colegio, curso]);
+  }, [colegio, curso, alumno.activas]);
+
+  /** Activas que el colegio ya no ofrece: no tienen casilla, pero se nombran. */
+  const activasFuera = alumno.activas.filter(
+    (a) => !(colegio?.disciplinas ?? []).some((d) => d.colacthor_id === a.colacthor_id),
+  );
 
   /** Al cambiar de curso se sueltan las elegidas que no son para el nuevo. */
   const cambiarCurso = (v: string) =>
@@ -1214,6 +1251,12 @@ const FichaAlumno = ({
             Puedes elegir hasta {maximo} {maximo === 1 ? 'disciplina' : 'disciplinas'}, sin que sus
             horarios se crucen. Cada una incluye todos sus días.
           </p>
+          {activasFuera.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Ya inscrito en:{' '}
+              {activasFuera.map((a) => `${a.actividad} (${horarioLargo(a.horarios)})`).join(', ')}
+            </p>
+          )}
           {porActividad.length === 0 && (
             <p className="text-sm text-muted-foreground">
               No hay disciplinas para este curso en {colegio.col_nombre}.
@@ -1653,6 +1696,9 @@ const PasoPago = ({
   cobro,
   cargandoCobro,
   cuenta,
+  meses,
+  mesInicio,
+  onMesInicio,
 }: {
   cuentaBancaria: string | null;
   vista: string | null;
@@ -1663,11 +1709,36 @@ const PasoPago = ({
   cargandoCobro: boolean;
   /** Entró con su cuenta: ya está activa, solo lo nuevo espera la aprobación. */
   cuenta: boolean;
+  /** El mes en curso y el siguiente. */
+  meses: string[];
+  mesInicio: string;
+  onMesInicio: (mes: string) => void;
 }) => (
   <>
     <div>
       <h1 className="text-xl font-semibold">Pago</h1>
     </div>
+
+    <fieldset className="space-y-2 rounded-md border p-3">
+      <legend className="px-1 text-sm font-semibold">¿En qué mes empieza?</legend>
+      <RadioGroup value={mesInicio} onValueChange={onMesInicio} className="grid gap-2 sm:grid-cols-2">
+        {meses.map((m) => (
+          <Label
+            key={m}
+            htmlFor={`mes-inicio-${m}`}
+            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3 font-normal has-[[data-state=checked]]:border-primary"
+          >
+            <RadioGroupItem id={`mes-inicio-${m}`} value={m} />
+            {nombreDeMes(m)}
+          </Label>
+        ))}
+      </RadioGroup>
+      <p className="text-xs text-muted-foreground">
+        Este pago es el del primer mes. Si eliges {nombreDeMes(meses[1]!)}, {alumnos.length > 1 ? 'tus hijos empiezan' : 'tu hijo empieza'} a
+        entrenar en {nombreDeMes(meses[1]!).split(' ')[0]!.toLowerCase()} y {nombreDeMes(meses[0]!).split(' ')[0]!.toLowerCase()} no se
+        cobra. Las mensualidades se pagan desde el mes siguiente al que elijas.
+      </p>
+    </fieldset>
 
     <div className="rounded-md border">
       {cobro ? (

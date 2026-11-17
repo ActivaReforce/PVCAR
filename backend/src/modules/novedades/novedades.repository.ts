@@ -23,10 +23,12 @@ export type TipoNovedad =
   | 'alumno'
   /** Las dos que escribe el sistema al guardar la asistencia (punto 9). */
   | 'ausencia'
-  | 'correccion';
+  | 'correccion'
+  /** La de mensualidades atrasadas, automática; solo Propietario y Admin (0045). */
+  | 'mensualidad';
 
 /** Tipos que se escriben a mano desde la pantalla. */
-export type TipoManual = Exclude<TipoNovedad, 'ausencia' | 'correccion'>;
+export type TipoManual = Exclude<TipoNovedad, 'ausencia' | 'correccion' | 'mensualidad'>;
 
 /**
  * La clase de una ausencia o corrección, tal como estaba al guardar. Es una
@@ -44,6 +46,11 @@ export interface DatosClase {
   estado: string;
   hora_tarde: string | null;
   razon: string | null;
+  /**
+   * Ausente por mensualidad atrasada (2026-11-16): los meses que debe
+   * ('YYYY-MM-01'). Sin el campo, una ausencia normal.
+   */
+  mensualidad?: string[];
 }
 
 export interface MencionPersona {

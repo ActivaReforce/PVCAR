@@ -546,6 +546,86 @@ const inscripciones: Constructor = (filas) => {
   ];
 };
 
+const mensualidades: Constructor = (filas) => {
+  const plata = (g: Fila[], clave: string) => Math.round(g.reduce((s, f) => s + numero(f[clave]), 0) * 100) / 100;
+  const es = (...e: string[]) => (f: Fila) => e.includes(texto(f._estado));
+  /** Contar alumnos: como el Estado del mes, los de baja suman su dinero pero no cuentan. */
+  const alumnoEn = (...e: string[]) => (f: Fila) => f._cuenta === true && es(...e)(f);
+  const del = filas.filter((f) => f._del_periodo === true);
+  const cuentan = filas.filter((f) => f._cuenta === true);
+  const porPagar = del.filter(es('pendiente', 'atrasado'));
+  const mesDeLaFila = (clave: string) => (f: Fila) => {
+    const m = texto(f[clave]);
+    return m ? `${m.slice(0, 7)} ${['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][Number(m.slice(5, 7)) - 1]}` : '—';
+  };
+
+  const bloques: Bloque[] = [
+    {
+      titulo: 'Totales',
+      cabeceras: ['Concepto', 'Cantidad'],
+      filas: [
+        ['Recaudado en el periodo ($)', plata(filas, '_recaudado')],
+        ['En revisión ($)', plata(filas, '_en_revision')],
+        ['Por cobrar ($)', plata(filas, '_debe')],
+        ['Alumnos al día', cuentan.filter(es('pagado', 'inscripcion')).length],
+        ['Alumnos por pagar', porPagar.length],
+      ],
+      destacadas: [],
+    },
+    agrupar(
+      'Por mes',
+      del,
+      [{ cabecera: 'Mes', de: mesDeLaFila('_mes') }],
+      [
+        cuantos('Al día', alumnoEn('pagado', 'inscripcion')),
+        cuantos('En revisión', alumnoEn('revision', 'inscripcion_revision')),
+        cuantos('Por pagar', alumnoEn('pendiente', 'atrasado')),
+        { cabecera: 'Valor pagado ($)', calc: (g) => plata(g.filter(es('pagado', 'inscripcion')), 'valor') },
+        { cabecera: 'Por cobrar ($)', calc: (g) => plata(g, '_debe') },
+      ],
+      { nota: 'Lo que vale cada mes, lo haya pagado cuando lo haya pagado.' },
+    ),
+    agrupar(
+      'Dinero por mes de pago',
+      filas.filter((f) => numero(f._recaudado) + numero(f._en_revision) > 0),
+      [{ cabecera: 'Mes de pago', de: mesDeLaFila('_mes_pago') }],
+      [
+        cuenta('Meses pagados'),
+        { cabecera: 'Recaudado ($)', calc: (g) => plata(g, '_recaudado') },
+        { cabecera: 'En revisión ($)', calc: (g) => plata(g, '_en_revision') },
+      ],
+      { nota: 'Lo que entró cada mes, incluidos los adelantos de meses siguientes.' },
+    ),
+    agrupar(
+      'Por colegio',
+      del,
+      [{ cabecera: 'Colegio', de: campo('colegio') }],
+      [
+        cuantos('Al día', alumnoEn('pagado', 'inscripcion')),
+        cuantos('Por pagar', alumnoEn('pendiente', 'atrasado')),
+        { cabecera: 'Por cobrar ($)', calc: (g) => plata(g, '_debe') },
+      ],
+    ),
+  ];
+  if (porPagar.length > 0) {
+    bloques.push(
+      agrupar(
+        'Por pagar',
+        porPagar,
+        [
+          { cabecera: 'Mes', de: mesDeLaFila('_mes') },
+          { cabecera: 'Alumno', de: campo('alumno') },
+          { cabecera: 'Representante', de: campo('representante') },
+          { cabecera: 'Teléfono', de: campo('telefono') },
+        ],
+        [{ cabecera: 'Debe ($)', calc: (g) => plata(g, '_debe') }],
+        { total: false },
+      ),
+    );
+  }
+  return bloques;
+};
+
 const encuestas: Constructor = (filas) => {
   const sinRespuestas = filas.filter((f) => numero(f.respondidas) === 0).map((f) => texto(f.encu_titulo));
   const bloques: Bloque[] = [
@@ -591,6 +671,7 @@ const RESUMENES: Record<string, Constructor> = {
   evaluaciones,
   representantes,
   inscripciones,
+  mensualidades,
   encuestas,
   novedades,
 };

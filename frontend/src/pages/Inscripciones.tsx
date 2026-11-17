@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, ClipboardList, Copy, StickyNote, UserCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -14,14 +15,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
 import { useToast } from '@/hooks/use-toast';
 import { useInscripciones, usePrecios } from '@/hooks/useInscripciones';
-import { dinero, type EstadoInscripcion } from '@/api/inscripciones';
+import { dinero, inscripcionesApi, type EstadoInscripcion } from '@/api/inscripciones';
 import FichaInscripcion from '@/components/inscripciones/FichaInscripcion';
 import DocumentosLegales from '@/components/inscripciones/DocumentosLegales';
 import { EstadoGeneral } from '@/components/inscripciones/EstadoInscripciones';
 import { fechaHora } from '@/components/inscripciones/formato';
 import MisInscripciones from '@/components/inscripciones/MisInscripciones';
+import MensualidadesPersonal from '@/components/mensualidades/MensualidadesPersonal';
 import { useAuth } from '@/contexts/AuthContext';
-import { ROLES_GLOBALES } from '@/hooks/useUserForm';
+import { ROL, ROLES_GLOBALES } from '@/hooks/useUserForm';
 
 
 /**
@@ -36,6 +38,17 @@ const Inscripciones = () => {
 
 const TODAS = 'todas';
 
+/** El número rojo de una pestaña (cliente, 2026-11-16). Nada si es cero. */
+const Contador = ({ n }: { n: number }) =>
+  n > 0 ? (
+    <span
+      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground"
+      aria-label={`${n} por revisar`}
+    >
+      {n}
+    </span>
+  ) : null;
+
 /**
  * Inscripciones (Fase 14B). Solo Propietario.
  *
@@ -45,6 +58,15 @@ const TODAS = 'todas';
  */
 const InscripcionesPersonal = () => {
   const { toast } = useToast();
+  const { user, hasPermission } = useAuth();
+  // La misma consulta del punto rojo del menú (misma clave): solo el Propietario.
+  const esPropietario = user?.roles.some((r) => r.rol_id === ROL.PROPIETARIO) ?? false;
+  const aviso = useQuery({
+    queryKey: ['inscripciones', 'aviso-menu'],
+    queryFn: () => inscripcionesApi.aviso(),
+    enabled: esPropietario && hasPermission('inscripciones', 'editar'),
+    refetchInterval: 60_000,
+  });
   const [estado, setEstado] = useState<string>('pendiente');
   const [busqueda, setBusqueda] = useState('');
   const [colegio, setColegio] = useState<string>(TODAS);
@@ -93,7 +115,14 @@ const InscripcionesPersonal = () => {
         {/* Cuatro pestañas no caben en 360 px: la fila se desplaza en vez de partirse. */}
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TabsList className="w-max">
-            <TabsTrigger value="inscripciones">Inscripciones</TabsTrigger>
+            <TabsTrigger value="inscripciones" className="gap-2">
+              Inscripciones
+              <Contador n={aviso.data?.pendientes ?? 0} />
+            </TabsTrigger>
+            <TabsTrigger value="mensualidades" className="gap-2">
+              Mensualidades
+              <Contador n={aviso.data?.mensualidades ?? 0} />
+            </TabsTrigger>
             <TabsTrigger value="documentos">Configuración</TabsTrigger>
           </TabsList>
         </div>
@@ -253,6 +282,10 @@ const InscripcionesPersonal = () => {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="mensualidades" className="pt-2">
+          <MensualidadesPersonal />
         </TabsContent>
 
         <TabsContent value="documentos" className="pt-2">

@@ -48,13 +48,13 @@ export function AppSidebar() {
   const { setOpenMobile } = useSidebar();
 
   /**
-   * Inscripciones pendientes de aprobar: un número rojo en el menú (pedido
-   * del cliente, 2026-10-07). Solo para el Propietario (2026-10-20: el
-   * representante también tiene editar, para las suyas, y no debe verlo); para
-   * el resto no hay ni una llamada. Se repite cada minuto **solo mientras las
-   * inscripciones están abiertas** (cerradas no llegan nuevas; las que queden
-   * pendientes se ven igual). La clave empieza por 'inscripciones', así que
-   * aprobar o rechazar la refresca al momento.
+   * Inscripciones o mensualidades por revisar: un punto rojo en el menú, sin
+   * número (cliente, 2026-11-16; los números van en las pestañas de
+   * /inscripciones). Solo para el Propietario (2026-10-20: el representante
+   * también tiene editar, para las suyas, y no debe verlo); para el resto no
+   * hay ni una llamada. Se repite cada minuto: los pagos de mensualidad
+   * llegan aunque las inscripciones estén cerradas. La clave empieza por
+   * 'inscripciones', así que aprobar o rechazar la refresca al momento.
    */
   const puedeAprobar =
     hasPermission("inscripciones", "editar") &&
@@ -63,16 +63,18 @@ export function AppSidebar() {
     queryKey: ["inscripciones", "aviso-menu"],
     queryFn: () => inscripcionesApi.aviso(),
     enabled: puedeAprobar,
-    refetchInterval: (q) => (q.state.data?.abiertas ? 60_000 : false),
+    refetchInterval: 60_000,
   });
   /** Novedades nuevas desde la última vista: solo Propietario y Admin. */
   const esGlobal = user?.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id)) ?? false;
   const avisoNovedades = useAvisoNovedades(esGlobal && hasPermission("novedades", "ver"));
 
   const avisos: Record<string, number> = {
-    "/inscripciones": aviso.data?.pendientes ?? 0,
+    "/inscripciones": (aviso.data?.pendientes ?? 0) + (aviso.data?.mensualidades ?? 0),
     "/novedades": avisoNovedades.data?.nuevas ?? 0,
   };
+  /** Los que llevan solo el punto, sin número. */
+  const soloPunto = new Set(["/inscripciones"]);
 
   const handleLogout = async () => {
     try {
@@ -144,14 +146,21 @@ export function AppSidebar() {
                       )}
                     </span>
                     <span>{item.title}</span>
-                    {(avisos[item.path] ?? 0) > 0 && (
-                      <span
-                        className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground"
-                        aria-label={`${avisos[item.path]} pendientes`}
-                      >
-                        {avisos[item.path]}
-                      </span>
-                    )}
+                    {(avisos[item.path] ?? 0) > 0 &&
+                      (soloPunto.has(item.path) ? (
+                        <span
+                          className="ml-auto h-2.5 w-2.5 rounded-full bg-destructive group-data-[collapsible=icon]:hidden"
+                          role="status"
+                          aria-label="Hay pendientes por revisar"
+                        />
+                      ) : (
+                        <span
+                          className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground"
+                          aria-label={`${avisos[item.path]} pendientes`}
+                        >
+                          {avisos[item.path]}
+                        </span>
+                      ))}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

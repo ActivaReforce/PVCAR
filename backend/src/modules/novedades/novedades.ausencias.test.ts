@@ -10,7 +10,7 @@ const insertarAviso = vi.fn(async (_c: unknown, _a: unknown) => 900 + insertarAv
 vi.mock('./novedades.repository.js', () => ({ ultimoAvisoDeClase, nombresDeAlumnos, insertarAviso }));
 vi.mock('../correos/correos.service.js', () => ({ configuracion: vi.fn(), enviarComo: vi.fn() }));
 vi.mock('../../config/db.js', () => ({ getPool: () => ({ query: vi.fn() }) }));
-vi.mock('../../config/env.js', () => ({ env: {} }));
+vi.mock('../../config/env.js', () => ({ env: {}, frontendBaseUrl: 'https://activareforce.com' }));
 
 const aus = await import('./novedades.ausencias.js');
 const { hoyEc } = await import('../../lib/fecha.js');

@@ -22,6 +22,7 @@ import {
   useGuardarAsistenciaAlumnos,
 } from '@/hooks/useAsistencias';
 import { useBorradorAsistencia, type FilaOriginal } from '@/hooks/useBorradorAsistencia';
+import { mesesCortos } from '@/api/mensualidades';
 import type { MarcaAlumno } from '@/api/asistencias';
 import { ESTADO_ASISTENCIA } from '@/api/asistencias';
 import type { Disciplina, HorarioDisciplina } from '@/api/disciplinas';
@@ -177,6 +178,7 @@ const AsistenciasAlumnos = () => {
         asisest_id: a.asisest_id,
         hora_tarde: a.hora_tarde,
         razon: a.razon,
+        bloqueada: (a.mensualidad_pendiente?.length ?? 0) > 0,
       })),
     [alumnos],
   );
@@ -412,6 +414,11 @@ const AsistenciasAlumnos = () => {
                                 alumno.inscrito
                                   ? null
                                   : 'Ya no está inscrito en esta disciplina; sale porque tiene asistencia registrada ese día'
+                              }
+                              bloqueo={
+                                alumno.mensualidad_pendiente?.length
+                                  ? `Pago de mensualidad pendiente (${mesesCortos(alumno.mensualidad_pendiente)})`
+                                  : null
                               }
                               marca={marca}
                               sucia={borrador.sucias.includes(clave)}

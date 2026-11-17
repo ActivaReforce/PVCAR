@@ -64,6 +64,7 @@ import DatosColegio from './DatosColegio';
 import Membrete from './Membrete';
 import CuentaBancaria from './CuentaBancaria';
 import MaxDisciplinas from './MaxDisciplinas';
+import ConfigMensualidades from '@/components/mensualidades/ConfigMensualidades';
 import ConfigCorreo from '@/components/correos/ConfigCorreo';
 import { EstadoDelColegio } from './EstadoInscripciones';
 import { REGLAS, porcentaje, problemasDePlantilla, tarifa, type DatosDocumento } from './documento';
@@ -174,6 +175,7 @@ const DocumentosLegales = () => {
         <TabsList>
           <TabsTrigger value="generales">Generales</TabsTrigger>
           <TabsTrigger value="colegio">Por colegio</TabsTrigger>
+          <TabsTrigger value="mensualidades">Mensualidades</TabsTrigger>
           <TabsTrigger value="configuracion">Más</TabsTrigger>
         </TabsList>
         <TabsContent value="generales" className="space-y-3 pt-3">
@@ -186,6 +188,9 @@ const DocumentosLegales = () => {
         </TabsContent>
         <TabsContent value="colegio" className="pt-3">
           <PorColegio datos={documentos.data} />
+        </TabsContent>
+        <TabsContent value="mensualidades" className="pt-3">
+          <ConfigMensualidades />
         </TabsContent>
         <TabsContent value="configuracion" className="space-y-3 pt-3">
           <CuentaBancaria />

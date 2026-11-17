@@ -3,6 +3,10 @@ import { ESTADO } from '../../lib/constants.js';
 import { resumenDe, type Bloque, type Fila } from './reportes.resumen.js';
 
 // Las definiciones tiran de `config/db`, que sin variables de entorno (CI) sale.
+// Reportes tira de Mensualidades e Inscripciones, que cargan `config/env`:
+// sin variables de entorno (CI) sale con process.exit.
+vi.mock('../../config/env.js', () => ({ env: {}, frontendBaseUrl: 'https://activareforce.com', allowedOrigins: [] }));
+vi.mock('../../config/supabase.js', () => ({ getSupabaseAdmin: () => ({}), getSupabaseAnon: () => ({}) }));
 vi.mock('../../config/db.js', () => ({ getPool: () => ({}) }));
 const { DEFINICIONES } = await import('./reportes.definiciones.js');
 
@@ -151,5 +155,41 @@ describe('los demás reportes', () => {
       ['Coordinador', 1, 0, 1],
       ['Entrenador', 1, 1, 2],
     ]);
+  });
+});
+
+describe('resumen de mensualidades', () => {
+  const fila = (estado: string, cuenta: boolean, valor: number) => ({
+    _mes: '2026-11-01',
+    mes: 'Noviembre',
+    colegio: 'CRISFE',
+    alumno: 'x',
+    _estado: estado,
+    _del_periodo: true,
+    _cuenta: cuenta,
+    valor,
+    _recaudado: valor,
+    _en_revision: 0,
+    _debe: 0,
+  });
+  // Cuatro al día y uno dado de baja (suma su dinero, no cuenta como alumno).
+  const filas = [
+    fila('inscripcion', true, 10),
+    fila('inscripcion', true, 10),
+    fila('pagado', true, 10),
+    fila('inscripcion', true, 10),
+    fila('inscripcion', false, 10),
+  ];
+  const bloques = resumenDe('mensualidades', filas, {});
+  const celda = (titulo: string, fila: number, col: number) => bloques.find((b) => b.titulo === titulo)!.filas[fila]![col];
+
+  it('los alumnos al día son los mismos en totales, por mes y por colegio', () => {
+    expect(celda('Totales', 3, 1)).toBe(4);
+    expect(celda('Por mes', 0, 1)).toBe(4);
+    expect(celda('Por colegio', 0, 1)).toBe(4);
+  });
+
+  it('el de baja sí suma su dinero', () => {
+    expect(celda('Totales', 0, 1)).toBe(50);
   });
 });

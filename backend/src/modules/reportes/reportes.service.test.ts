@@ -3,6 +3,11 @@ import { ESTADO, ROL } from '../../lib/constants.js';
 import { DEFINICIONES } from './reportes.definiciones.js';
 import { GRAFICAS } from './reportes.analisis.js';
 
+
+// Reportes tira de Mensualidades e Inscripciones, que cargan `config/env`:
+// sin variables de entorno (CI) sale con process.exit.
+vi.mock('../../config/env.js', () => ({ env: {}, frontendBaseUrl: 'https://activareforce.com', allowedOrigins: [] }));
+vi.mock('../../config/supabase.js', () => ({ getSupabaseAdmin: () => ({}), getSupabaseAnon: () => ({}) }));
 /**
  * Reportes, sin base de datos.
  *
@@ -77,8 +82,8 @@ beforeEach(() => {
 });
 
 describe('el catalogo', () => {
-  it('trae los trece reportes a quien tiene todos los permisos', () => {
-    expect(service.catalogo(TODO)).toHaveLength(13);
+  it('trae los catorce reportes a quien tiene todos los permisos', () => {
+    expect(service.catalogo(TODO)).toHaveLength(14);
   });
 
   /**
@@ -100,6 +105,7 @@ describe('el catalogo', () => {
       'asistencias-entrenadores',
       'representantes',
       'inscripciones',
+      'mensualidades',
       'encuestas',
       'novedades',
     ]);
@@ -123,8 +129,8 @@ describe('el catalogo', () => {
     const def = DEFINICIONES.find((d) => d.id === 'novedades')!;
     expect(service.catalogo(TODO).find((r) => r.id === 'novedades')!.filtros.ausencias).toBe(true);
     const ctx = { global: true, colegios: [], disciplinas: [], actorId: 1 };
-    expect(def.construir({ ausencias: false }, ctx).params.at(-1)).toBe(false);
-    expect(def.construir({}, ctx).params.at(-1)).toBeNull();
+    expect(def.construir!({ ausencias: false }, ctx).params.at(-1)).toBe(false);
+    expect(def.construir!({}, ctx).params.at(-1)).toBeNull();
     expect(def.hojaExtra!.sale({})).toBe(true);
     expect(def.hojaExtra!.sale({ ausencias: false })).toBe(false);
     expect(def.hojaExtra!.incluye({ tipo: 'Ausencia' })).toBe(true);
@@ -300,6 +306,7 @@ describe('las definiciones', () => {
   it('cada consulta usa tantos parametros como declara', () => {
     const ctx = { global: false, colegios: [1], disciplinas: [2], actorId: 3 };
     for (const d of DEFINICIONES) {
+      if (!d.construir) continue;
       const { sql, params } = d.construir(
         { desde: '2026-01-01', hasta: '2026-01-31' },
         ctx,

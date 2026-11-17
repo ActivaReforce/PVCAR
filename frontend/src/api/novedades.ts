@@ -11,10 +11,12 @@ export type TipoNovedad =
   | 'alumno'
   /** Las escribe el sistema al guardar la asistencia (punto 9). */
   | 'ausencia'
-  | 'correccion';
+  | 'correccion'
+  /** Mensualidades atrasadas: automática, solo Propietario y Admin (0045). */
+  | 'mensualidad';
 
 /** Los que se escriben a mano. */
-export type TipoManual = Exclude<TipoNovedad, 'ausencia' | 'correccion'>;
+export type TipoManual = Exclude<TipoNovedad, 'ausencia' | 'correccion' | 'mensualidad'>;
 
 /** La clase de una ausencia o corrección, tal como estaba al guardar. */
 export interface DatosClase {

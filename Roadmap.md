@@ -75,9 +75,58 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
 
-### 2026-10-30 — Entrenador en varias disciplinas a la misma hora (PR aparte, sin SQL)
+### Corte de sesión — 2026-11-16 (Mensualidades terminado en dev; siguiente: pruebas de correos)
 
-Pedido del cliente: un mismo entrenador puede dar Fútbol Sub 8 y Fútbol Sub 10 a la vez; la empresa lo resuelve en la cancha y el sistema lo permite. Se quitó el bloqueo al asignar y al editar horarios; en su lugar sale un **aviso** ("se cruzan el lunes") y se guarda igual. Los alumnos siguen sin poder cruzarse. Al cambiar de entrenador, la historia queda como siempre (se cierra una asignación y se abre otra). Va en su propio PR para no subir Mensualidades, que sigue en `dev`.
+**Si pregunta "¿en qué nos quedamos?", es esto, y debajo el corte del 2026-11-11.**
+
+- **Mensualidades está terminado en `dev`** y el cliente está conforme con cómo funciona. Reglas y pantallas en `docs/mensualidades.md`. **Tiene que estar en producción antes del jueves 26 de noviembre de 2026** (ese día se abre el pago de diciembre).
+- **SQL:** `0041`–`0045` aplicadas en dev y verificadas por MCP. En prod **ninguna**: antes del merge, en orden, `0041` → `0042` → `0043` → `0044` → `0045`. Comunicados pasó a **`0046_comunicados.sql`** (rama `comunicados` y `SQL/`).
+- Hecho en esta sesión (todo en `dev`): meses de cobro con año y "Abrir siguiente año" (los pasados bloqueados); mes de inicio en el formulario de inscripción (en curso o siguiente); pagar en tres pasos (meses → hijos con casilla por mes → total con desglose), en orden y con un comprobante; Estado del mes en pestañas Por revisar / Estado del mes, por fecha de pago, con inscripciones incluidas (noviembre cuadra con el reporte de Inscripciones), filas que abren el pago y botón de contactar a la familia; rechazar y anular (solo Propietario) borran el pago sin registro; bloqueo en Asistencias por atraso con correo y novedad al representante; punto rojo en el menú y números en las pestañas; Reportes con tarjetas pequeñas y **Pagos** (Inscripciones + Mensualidades, una fila por alumno y mes, filtro de meses, valor y recaudado en el periodo, Excel con filtros en la primera fila); correos de pago nuevo (al equipo) y aprobado (al representante, con casilla) y **aviso diario de atrasados** (novedad solo Propietario/Admin y un correo a la lista, el día siguiente al límite a las 7:00).
+- **Siguiente sesión: pruebas de correos** en dev, en este orden:
+  1. Pago nuevo → llega a la lista de "Correo: aviso de mensualidad nueva".
+  2. Encender la casilla y aprobar un pago → le llega al representante.
+  3. Asistencias con un alumno atrasado (día límite del colegio en 1, alumno que deba el mes) → novedad y correo "Mensualidad pendiente" al representante.
+  4. Aviso diario de atrasados: en dev noviembre ya quedó marcado "sin atrasados" (`mensualidad_aviso_atraso`, col 1, nov_id nulo); el primero real sale el **6 de diciembre a las 7:00**. Revisarlo por MCP ese día.
+- Después de las pruebas: PR a `main` (comprobar por MCP que 0041–0045 estén en prod) y configurar en prod cada colegio (marcar **noviembre 2026** en adelante, día límite 5, las dos cards de correo).
+- Decidido no hacer: gracia para inscripciones aprobadas tarde; cobrar la diferencia de una disciplina añadida a meses ya pagados (lo gestiona el equipo).
+- Trampa de despliegue vista hoy: Railway y Vercel a veces no despliegan (redeploy con commit viejo o aviso de GitHub perdido). Tras cada push, comprobar el commit en `railway deployment list` y el status "Vercel" en GitHub; un push que toque `backend/**` o `frontend/**` lo arregla.
+
+### Corte de sesión — 2026-11-11 (Mensualidades a producción; Comunicados aparcado)
+
+**Histórico: lo reemplaza el corte del 2026-11-16.**
+
+- **Mensualidades a producción** por decisión del cliente (2026-11-11), sin esperar las 3 preguntas del corte del 2026-11-05. Sin configurar, ningún colegio cobra mensualidades. Antes del merge: `0041` → `0042` → `0043` en prod (el 2026-11-11, por MCP, no estaba ninguna).
+- **Comunicados — PENDIENTE.** Construido en la rama `comunicados` (sin mezclar a `dev`; diseño en `docs/comunicados.md`; migración `0044_comunicados.sql`, renumerada a **`0046`** el 2026-11-16, **sin correr en ningún lado**). **Recordatorio:** cuando Mensualidades esté en producción, retomar Comunicados: el cliente corre la `0046` en dev, se mezcla la rama a `dev` y se prueba el módulo en pantalla.
+- Los contactos y los 2 segmentos que hoy hay en Resend son **reales**: no se borran ni se hacen pruebas ni envíos contra Resend. Se limpian cuando estén importados en la plataforma y Comunicados esté en producción.
+
+### Corte de sesión — 2026-11-05 (Mensualidades: preguntas reenviadas al cliente)
+
+**Histórico: lo reemplaza el corte del 2026-11-11.** Mensualidades sigue en `dev`, sin PR. Se le mandaron al cliente final estas preguntas (redactadas en sesión), **sin respuesta todavía**:
+
+0. ¿Para qué fecha necesitan el módulo? (se le explicó el flujo: el representante entra, ve a sus hijos y sus meses, marca, sube un comprobante y el personal aprueba). ¿La mensualidad cuesta lo mismo que la inscripción y lleva el mismo descuento de hermano (20 %)?
+1. ¿El padre debería poder cambiar la disciplina de su hijo al pagar la mensualidad, o eso ni siquiera es una opción?
+2. ¿Desde qué día del mes se cobra (p. ej. el 1 o el último del mes anterior)? ¿Hasta qué día se puede pagar? ¿Qué pasa si no paga a tiempo (recargo, aviso, sigue asistiendo)?
+
+**Lo decidimos nosotros con esas respuestas, no se pregunta:** el recordatorio por correo (cuándo, cuántos, a quién), la forma del reporte de Mensualidades y el "cobrar desde" de prod (noviembre ya empezó sin el módulo en prod; probablemente diciembre). Esto reemplaza las 4 preguntas del corte del 2026-10-30.
+
+Aparte, el 2026-11-05: revisada la novedad #8 de prod (ausencia de EMILIA ENRIQUEZ QUIROZ, 29/10 09:57) que salía "Sin representante activo": es normal, Pablo anuló su inscripción a las 09:59 y eso dio de baja a la alumna y a su representante (usu 27). El cliente no quiere cambio.
+
+### Corte de sesión — 2026-10-30, cierre (Mensualidades, se retoma el 2026-10-31)
+
+**Histórico: las preguntas de abajo las reemplaza el corte del 2026-11-05.** Mensualidades sigue en `dev`, **sin PR a `main`**. Mañana se continúa con Mensualidades; el cliente aún tiene otros cambios que pedir.
+
+- **Diseño y reglas:** `docs/mensualidades.md` (manda). Cada mes de cada alumno es una cuota; la inscripción paga el primer mes ("Pagado (Inscripción)"); día de corte, día límite, meses de cobro (pausa) y "cobrar desde", **todo por colegio**; atrasado sin bloquear; sin pago adelantado; descuento de hermano con toda la familia; rechazo con motivo y "Volver a intentar" que lo borra.
+- **SQL:** `0041`, `0042` y `0043_mensualidades_quitar_dias_generales.sql` (quita las `inscfg_mens_dia_*` sin uso) **aplicadas y verificadas en dev** (la 0043 verificada por MCP el 2026-10-30). **En prod no está ninguna:** van las tres, en orden (0041 → 0042 → 0043), antes del merge a `main`.
+- **En `dev`** (commits `cd094ba` y `1bb3ebd`): backend `modules/mensualidades` (cálculo puro con 15 tests); padre en Inscripciones → pestaña Mensualidades (casillas por hijo y mes, total en vivo, comprobante, historial); `/inscripcion` con "Pagar mensualidad" en la entrada (con y sin sesión, tarjetas iguales, "No soy [nombre]" como enlace); personal en Inscripciones → Mensualidades (pagos por revisar con aprobar/rechazar, estado del mes por colegio); Configuración → pestaña Mensualidades (colegio, Valores, Meses de cobro). También en `dev`: disciplinas activas fuera de curso se ven como "Ya inscrito" (`440ce51`).
+- **Falta construir:** pestaña Mensualidades en Reportes → Inscripciones (pantalla y Excel) y el recordatorio por correo (columna y remitente ya en la 0041).
+- **Preguntas hechas al cliente, sin respuesta todavía** (retomar por aquí):
+  1. Cambiar de disciplina desde Mensualidades: ¿el representante puede, o solo el personal desde Estudiantes?
+  2. Recordatorio: ¿cuándo sale (días antes del límite, el día límite, al quedar atrasado)?, ¿uno solo o se repite?, ¿solo al representante o copia al personal?
+  3. Reporte: propuesta por alumno y mes (colegio, estado, importe, total recaudado y por cobrar). ¿Así o por familia?
+  4. Prod: "cobrar desde" = noviembre 2026, ¿para todos los colegios?
+- **Sin probar en pantalla por el cliente:** todo lo de Mensualidades.
+- **Hecho hoy aparte, en producción desde el PR #25** (sin SQL, sin Mensualidades): un entrenador puede dar varias disciplinas a la misma hora; al asignar (aviso ámbar en la lista + toast) o al editar horarios sale un aviso del cruce y se guarda igual. Los alumnos siguen sin poder cruzarse. Revisado: auxiliares y asistencia de personal (upsert por día y colegio) no fallan. Le falta al cliente verlo en pantalla (aviso en móvil y oscuro).
+- **Ojo al hacer el PR de Mensualidades:** `dev` y `main` llevan cada uno su copia del cambio del entrenador (cherry-pick); el merge de `dev` a `main` puede dar conflicto en `Roadmap.md` (sección del 2026-10-30 de `main`): quedarse con la de `dev`.
 
 ### Corte de sesión — 2026-10-20
 

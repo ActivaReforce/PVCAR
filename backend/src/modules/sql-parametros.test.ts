@@ -39,6 +39,10 @@ const query = vi.fn(async (sql: string, params: unknown[] = []) => {
   return { rows: [fila, fila], rowCount: 1 };
 });
 
+// Reportes tira de Mensualidades e Inscripciones, que cargan `config/env`:
+// sin variables de entorno (CI) sale con process.exit.
+vi.mock('../config/env.js', () => ({ env: {}, frontendBaseUrl: 'https://activareforce.com', allowedOrigins: [] }));
+vi.mock('../config/supabase.js', () => ({ getSupabaseAdmin: () => ({}), getSupabaseAnon: () => ({}) }));
 vi.mock('../config/db.js', () => ({ getPool: () => ({ query }) }));
 
 const cliente = { query };
@@ -166,6 +170,8 @@ it('cada consulta manda tantos valores como marcadores, y sin huecos', async () 
   const { DEFINICIONES } = await import('./reportes/reportes.definiciones.js');
   const ctx = { global: false, colegios: [1], disciplinas: [1], actorId: 1 };
   for (const definicion of DEFINICIONES) {
+    // Los de filas calculadas en código (Mensualidades) no tienen consulta propia.
+    if (!definicion.construir) continue;
     for (const [variante, f] of [
       {},
       { buscar: 'a', colegio: [1], disciplina: 1, estado: 1, desde: '2026-01-01', hasta: '2026-09-18' },

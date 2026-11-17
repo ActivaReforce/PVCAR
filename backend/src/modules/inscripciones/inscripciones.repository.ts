@@ -514,12 +514,14 @@ export async function insertarInscripcion(
     fecha: Date;
     /** La cuenta que ya tenía (sesión iniciada o dada de baja por cédula); null si es nuevo. */
     usuId: number | null;
+    /** El mes que paga ('YYYY-MM-01'): el alumno empieza ese mes. */
+    mesInicio: string;
   },
 ): Promise<number> {
   const { rows } = await client.query<{ ins_id: number }>(
     `INSERT INTO public.inscripcion
-         (ins_representante, ins_comprobante, ins_ip, ins_navegador, ins_total, ins_fecha, usu_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (ins_representante, ins_comprobante, ins_ip, ins_navegador, ins_total, ins_fecha, usu_id, ins_mes_inicio)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date)
      RETURNING ins_id`,
     [
       JSON.stringify(datos.representante),
@@ -529,6 +531,7 @@ export async function insertarInscripcion(
       datos.total,
       datos.fecha,
       datos.usuId,
+      datos.mesInicio,
     ],
   );
   return rows[0]!.ins_id;
@@ -727,12 +730,21 @@ export async function listar(
  * El aviso del menú (2026-10-07): cuántas pendientes y si el interruptor
  * general está encendido. Una sola consulta, sin listas: se pide cada minuto.
  */
-export async function avisoDelMenu(): Promise<{ pendientes: number; abiertas: boolean }> {
-  const { rows } = await getPool().query<{ pendientes: number; abiertas: boolean }>(
+export interface AvisoDelMenu {
+  /** Inscripciones por revisar. */
+  pendientes: number;
+  /** Pagos de mensualidad por revisar (0041). */
+  mensualidades: number;
+  abiertas: boolean;
+}
+
+export async function avisoDelMenu(): Promise<AvisoDelMenu> {
+  const { rows } = await getPool().query<AvisoDelMenu>(
     `SELECT (SELECT count(*) FROM public.inscripcion WHERE ins_estado = 'pendiente')::int AS pendientes,
+            (SELECT count(*) FROM public.mensualidad_pago WHERE menpag_estado = 'pendiente')::int AS mensualidades,
             COALESCE((SELECT inscfg_abiertas FROM public.inscripcion_config WHERE inscfg_id = 1), false) AS abiertas`,
   );
-  return rows[0] ?? { pendientes: 0, abiertas: false };
+  return rows[0] ?? { pendientes: 0, mensualidades: 0, abiertas: false };
 }
 
 export async function contarPorEstado(
@@ -761,6 +773,8 @@ export interface InscripcionFila {
   aprobada_por_nombre: string | null;
   ins_fecha_aprobacion: string | null;
   ins_total: number | null;
+  /** El mes que paga ('YYYY-MM-01', 0044). */
+  ins_mes_inicio: string;
 }
 
 export interface NinoDeInscripcion {
@@ -786,7 +800,8 @@ export async function obtener(
     `SELECT i.ins_id, i.ins_estado, i.ins_fecha, i.ins_representante, i.ins_comprobante,
             i.ins_ip, i.ins_navegador, i.usu_id, i.ins_aprobada_por,
             ap.usu_nombre AS aprobada_por_nombre, i.ins_fecha_aprobacion,
-            i.ins_total::float8 AS ins_total
+            i.ins_total::float8 AS ins_total,
+            to_char(i.ins_mes_inicio, 'YYYY-MM-DD') AS ins_mes_inicio
        FROM public.inscripcion i
        LEFT JOIN public.usuario ap ON ap.usu_id = i.ins_aprobada_por
       WHERE i.ins_id = $1

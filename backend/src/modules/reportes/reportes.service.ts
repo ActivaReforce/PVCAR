@@ -15,6 +15,7 @@ import {
   type FiltrosReporte,
   type TotalPantalla,
 } from './reportes.definiciones.js';
+import { nombreDeMes } from '../mensualidades/mensualidades.calculo.js';
 import { GRAFICAS, type DefinicionGrafica, type FormaGrafica, type SerieGrafica } from './reportes.analisis.js';
 import type { ConsultaQuery, FiltrosQuery } from './reportes.schemas.js';
 import { ahoraEc, hoyEc } from '../../lib/fecha.js';
@@ -120,6 +121,11 @@ function columnasVisibles(definicion: Definicion, incluirSensibles: boolean): Co
   return definicion.columnas.filter((c) => !sensibles.includes(c.clave));
 }
 
+function consultaDe(definicion: Definicion, filtros: FiltrosReporte, ctx: ContextoReporte) {
+  if (!definicion.construir) throw new Error(`El reporte ${definicion.id} no tiene consulta`);
+  return definicion.construir(filtros, ctx);
+}
+
 async function contextoDe(actor: AuthUser): Promise<ContextoReporte> {
   const alcance = await alcanceDe(actor.usuario);
   return {
@@ -167,9 +173,28 @@ export async function ejecutar(
 ): Promise<PaginaReporte> {
   const definicion = exigirDefinicion(actor, id);
   const filtros = exigirRango(definicion, query);
-  const { sql, params } = definicion.construir(filtros, await contextoDe(actor));
-
   const offset = (query.page - 1) * query.limit;
+
+  // Filas calculadas en código (Mensualidades): se paginan aquí.
+  if (definicion.fuente) {
+    const todas = await definicion.fuente(filtros, await contextoDe(actor));
+    const columnas = columnasVisibles(definicion, query.incluirSensibles === true);
+    const t = definicion.totalesDeFilas;
+    const cifras = t?.calcular(todas);
+    return {
+      id: definicion.id,
+      titulo: definicion.titulo,
+      columnas,
+      filas: todas.slice(offset, offset + query.limit).map((f) => proyectar(f, columnas)),
+      total: todas.length,
+      page: query.page,
+      limit: query.limit,
+      totalPages: todas.length === 0 ? 0 : Math.ceil(todas.length / query.limit),
+      ...(t && cifras ? { totales: t.formato.map((x) => ({ ...x, valor: cifras[x.clave] ?? 0 })) } : {}),
+    };
+  }
+  const { sql, params } = consultaDe(definicion, filtros, await contextoDe(actor));
+
   const n = params.length;
 
   const totalesDef = definicion.totales?.(filtros, await contextoDe(actor));
@@ -216,6 +241,43 @@ export interface Exportacion {
   filas: number;
 }
 
+/** Letra de columna de Excel: 1 → A, 27 → AA. */
+function letraDe(n: number): string {
+  let s = '';
+  for (let x = n; x > 0; x = Math.floor((x - 1) / 26)) s = String.fromCharCode(65 + ((x - 1) % 26)) + s;
+  return s;
+}
+
+/**
+ * Los botones de filtro de la primera fila del detalle (cliente, 2026-11-16).
+ *
+ * El escritor en streaming de ExcelJS escribe `<autoFilter>` pero no el nombre
+ * oculto `_xlnm._FilterDatabase` de cada hoja, y sin él Excel no siempre
+ * enseña los botones. Aquí se ponen los dos: el rango (cabecera y filas) en
+ * la hoja y el nombre, con su hoja (`localSheetId`, desde 0), en el libro.
+ */
+function filtrosDeHojas(libro: ExcelJS.stream.xlsx.WorkbookWriter) {
+  const nombres: Array<{ name: string; localSheetId: number; ranges: string[] }> = [];
+  // El libro lee `_definedNames.model` al cerrarse: se sustituye por estos nombres.
+  (libro as unknown as { _definedNames: { model: unknown[] } })._definedNames = {
+    get model() {
+      return nombres;
+    },
+  };
+  return {
+    poner(hoja: ExcelJS.Worksheet, nombreHoja: string, indice: number, columnas: number, filas: number) {
+      const ultima = `${letraDe(columnas)}${Math.max(filas + 1, 1)}`;
+      hoja.autoFilter = `A1:${ultima}`;
+      const hojaCitada = `'${nombreHoja.replace(/'/g, "''")}'`;
+      nombres.push({
+        name: '_xlnm._FilterDatabase',
+        localSheetId: indice,
+        ranges: [`${hojaCitada}!$A$1:$${letraDe(columnas)}$${Math.max(filas + 1, 1)}`],
+      });
+    },
+  };
+}
+
 /**
  * Genera el xlsx **en streaming**.
  *
@@ -237,7 +299,7 @@ export async function exportar(
 ): Promise<Exportacion> {
   const definicion = exigirDefinicion(actor, id);
   const filtros = exigirRango(definicion, filtrosQuery);
-  const { sql, params } = definicion.construir(filtros, await contextoDe(actor));
+  const contexto = await contextoDe(actor);
 
   const libro = new ExcelJS.stream.xlsx.WorkbookWriter({
     stream: destino,
@@ -253,20 +315,34 @@ export async function exportar(
    * Las filas se traen antes de abrir ninguna hoja: el Resumen va primero y
    * se calcula sobre ellas. Ya se tenían enteras en memoria igualmente.
    */
-  const { rows } = await getPool().query<Record<string, unknown>>(
-    `SELECT * FROM (${sql}) r LIMIT $${params.length + 1}`,
-    [...params, TOPE_EXPORTACION],
-  );
+  const rows = definicion.fuente
+    ? (await definicion.fuente(filtros, contexto)).slice(0, TOPE_EXPORTACION)
+    : await (async () => {
+        const { sql, params } = consultaDe(definicion, filtros, contexto);
+        const r = await getPool().query<Record<string, unknown>>(
+          `SELECT * FROM (${sql}) r LIMIT $${params.length + 1}`,
+          [...params, TOPE_EXPORTACION],
+        );
+        return r.rows;
+      })();
 
   const cortado = rows.length === TOPE_EXPORTACION;
   const avisos = [`Generado el ${ahoraEc()} (hora de Ecuador) por ${actor.usuario.usu_nombre}.`];
   if (filtros.desde && filtros.hasta) avisos.unshift(`Del ${diaTexto(filtros.desde)} al ${diaTexto(filtros.hasta)}.`);
+  if (definicion.filtros.meses) {
+    avisos.unshift(
+      filtros.meses && filtros.meses.length > 0
+        ? `Meses: ${filtros.meses.map((m) => nombreDeMes(m)).join(', ')}.`
+        : 'Meses: todos (del año pasado al siguiente).',
+    );
+  }
   if (conSensibles && (definicion.columnasSensibles ?? []).length > 0) {
     avisos.push('Incluye información de salud: dato médico de menores, no reenviar.');
   }
   if (cortado) avisos.push(`Cortado en el tope de ${TOPE_EXPORTACION} filas: acota el rango.`);
 
   escribirResumen(libro, definicion.titulo, avisos, resumenDe(definicion.id, rows, filtros));
+  const filtrosExcel = filtrosDeHojas(libro);
 
   /*
    * La fila de cabecera fija va en las opciones de `addWorksheet`: en el
@@ -282,10 +358,11 @@ export async function exportar(
     width: c.ancho,
   }));
   estiloCabecera(hoja.getRow(1), columnas.length);
-  hoja.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columnas.length } };
 
   const extra = definicion.hojaExtra;
   const delDetalle = extra?.aparte ? rows.filter((f) => !extra.incluye(f)) : rows;
+  // La hoja del detalle es la segunda (la primera es el Resumen).
+  filtrosExcel.poner(hoja, definicion.titulo.slice(0, 31), 1, columnas.length, delDetalle.length);
   for (const fila of delDetalle) {
     hoja.addRow(proyectar(fila, columnas)).commit();
   }
@@ -298,11 +375,9 @@ export async function exportar(
     });
     hojaExtra.columns = extra.columnas.map((c) => ({ header: c.cabecera, key: c.clave, width: c.ancho }));
     estiloCabecera(hojaExtra.getRow(1), extra.columnas.length);
-    hojaExtra.autoFilter = {
-      from: { row: 1, column: 1 },
-      to: { row: 1, column: extra.columnas.length },
-    };
-    for (const fila of rows.filter(extra.incluye)) {
+    const deLaExtra = rows.filter(extra.incluye);
+    filtrosExcel.poner(hojaExtra, extra.titulo.slice(0, 31), 2, extra.columnas.length, deLaExtra.length);
+    for (const fila of deLaExtra) {
       hojaExtra.addRow(proyectar(fila, extra.columnas)).commit();
     }
     hojaExtra.commit();

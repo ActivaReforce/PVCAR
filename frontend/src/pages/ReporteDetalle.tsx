@@ -26,6 +26,7 @@ import {
   useReporte,
 } from '@/hooks/useTablero';
 import type { FiltrosReporte } from '@/api/reportes';
+import SelectorMeses from '@/components/reportes/SelectorMeses';
 
 const POR_PAGINA = 50;
 const TODOS = 'todos';
@@ -42,8 +43,13 @@ const TODOS = 'todos';
  * la pestaña de análisis y la de exportar tenían filtros distintos y nadie
  * podía saber con qué criterios se había sacado una hoja.
  */
-const ReporteDetalle = () => {
-  const { modulo = '' } = useParams();
+/**
+ * `id` y `embebido`: dentro de una pestaña de Reportes → Pagos (2026-11-16),
+ * sin la flecha de vuelta ni el título grande, que ya pone la página.
+ */
+const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: boolean } = {}) => {
+  const { modulo: deLaRuta = '' } = useParams();
+  const modulo = id ?? deLaRuta;
 
   const [busqueda, setBusqueda] = useState('');
   const [colegio, setColegio] = useState(TODOS);
@@ -51,6 +57,7 @@ const ReporteDetalle = () => {
   const [estado, setEstado] = useState(TODOS);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
+  const [meses, setMeses] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [conSensibles, setConSensibles] = useState(false);
   const [verAusencias, setVerAusencias] = useState(true);
@@ -77,6 +84,7 @@ const ReporteDetalle = () => {
     estado: disponibles?.estado && estado !== TODOS ? Number(estado) : undefined,
     desde: disponibles?.fechas ? desde || undefined : undefined,
     hasta: disponibles?.fechas ? hasta || undefined : undefined,
+    meses: disponibles?.meses && meses.length > 0 ? meses : undefined,
     incluirSensibles: conSensibles || undefined,
     // Solo viaja cuando se quitan: por defecto salen.
     ausencias: disponibles?.ausencias && !verAusencias ? false : undefined,
@@ -121,16 +129,20 @@ const ReporteDetalle = () => {
   const totalPages = reporte.data?.totalPages ?? 0;
 
   return (
-    <div className="container mx-auto min-w-0 space-y-6 p-4 lg:p-6">
+    <div className={embebido ? 'min-w-0 space-y-6' : 'container mx-auto min-w-0 space-y-6 p-4 lg:p-6'}>
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div className="min-w-0">
-          <Button asChild variant="ghost" className="-ml-3 mb-1 h-8">
-            <Link to="/reportes">
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Reportes
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{definicion.titulo}</h1>
+          {!embebido && (
+            <>
+              <Button asChild variant="ghost" className="-ml-3 mb-1 h-8">
+                <Link to="/reportes">
+                  <ArrowLeft className="mr-1 h-4 w-4" />
+                  Reportes
+                </Link>
+              </Button>
+              <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{definicion.titulo}</h1>
+            </>
+          )}
           <p className="mt-1 text-sm text-muted-foreground">
             {definicion.descripcion}
             {listo && ` · ${total} fila${total === 1 ? '' : 's'}`}
@@ -234,6 +246,13 @@ const ReporteDetalle = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+
+        {definicion.filtros.meses && (
+          <div className="space-y-1">
+            <Label className="text-xs">Meses</Label>
+            <SelectorMeses valor={meses} onChange={(m) => cambiarFiltro(() => setMeses(m))} />
           </div>
         )}
 

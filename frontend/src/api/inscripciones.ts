@@ -188,6 +188,8 @@ export interface Envio {
   documentos_colegio: Record<string, Partial<Record<'ficha_matricula' | 'contrato', number>>>;
   acepta: Record<TipoDocumento, true>;
   comprobante: { mime: string; base64: string };
+  /** El mes que paga la inscripción ('YYYY-MM-01'): el en curso o el siguiente. */
+  mes_inicio: string;
 }
 
 export interface EnvioRecibido {
@@ -292,6 +294,8 @@ export interface InscripcionDetalle {
   aprobada_por_nombre: string | null;
   ins_fecha_aprobacion: string | null;
   ins_total: number | null;
+  /** El mes que paga la inscripción ('YYYY-MM-01'). Opcional: Vercel puede publicar antes que Railway. */
+  ins_mes_inicio?: string;
   comprobante_url: string | null;
   ninos: NinoDetalle[];
   coincidencias: UsuarioCoincidente[];
@@ -511,7 +515,8 @@ export const inscripcionesApi = {
   },
   detalle: (id: number) => api.get<InscripcionDetalle>(`/inscripciones/${id}`),
   /** El número rojo del menú: pendientes y si las inscripciones están abiertas. */
-  aviso: () => api.get<{ pendientes: number; abiertas: boolean }>('/inscripciones/aviso'),
+  /** `mensualidades`: opcional, Vercel puede publicar antes que Railway. */
+  aviso: () => api.get<{ pendientes: number; mensualidades?: number; abiertas: boolean }>('/inscripciones/aviso'),
   documentosDeRepresentante: (usuId: number) =>
     api.get<DocumentoDeRepresentante[]>(`/inscripciones/representantes/${usuId}/documentos`),
   /** `mismos`: { insnino_id: nino_id } de los que el admin dijo que son el mismo alumno. */
