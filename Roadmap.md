@@ -75,9 +75,21 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
 
+### Corte de sesión — 2026-11-17 (Mensualidades en producción)
+
+**Si pregunta "¿en qué nos quedamos?", es esto.**
+
+- **Mensualidades en producción** desde el **PR #26** (2026-11-17). `0041`–`0045` corridas en prod por el cliente; esquema idéntico a dev, verificado por MCP (columnas, funciones, permisos, buckets).
+- Correos probados: el cliente comprobó en dev el de pago nuevo y el de pago aprobado. "Mensualidad pendiente" y el aviso de atrasados se simularon con el código real, mandados por Resend solo a su correo y sin tocar la base. **Se quedan como están**: el de mensualidad pendiente es un solo correo con la lista de Ausencias y el representante en el Para.
+- **PR #27** (sin SQL): Estado del mes con la cabecera de cada colegio en una fila, unas cinco filas a la vista con scroll propio y botón "Ordenar: Pendiente / Pagado"; el select de colegio enseña siempre todos; en Configuración → Mensualidades, los colegios sin valores salen en gris ("sin valores") y una nota dice que los dos correos son generales.
+- CI de `dev` arreglada: los tests de Reportes salían con `process.exit` sin variables de entorno (mock de `config/env` y `config/supabase`).
+- **Configuración de prod:** día límite 5 en los dos colegios. Correos de mensualidad nueva y de atrasados con la lista del cliente. La casilla de correo al representante al aprobar está apagada. **Meses de cobro: solo noviembre.** El cliente marcará **diciembre más tarde, antes del jueves 26** (ese día se abre su pago). Los 207 alumnos activos tienen noviembre pagado con la inscripción (206 por inscripción, 1 alta a mano de octubre por la regla de arranque).
+- **Comunicados queda aparte, sin fecha** (decisión del cliente, 2026-11-17): rama `comunicados`, `0046` sin correr en ningún lado. **Puede que nunca salga a producción.** No retomarlo ni proponerlo salvo que el cliente lo pida.
+- **Siguiente:** nada empezado. Comprobar por MCP que diciembre quedó marcado en los dos colegios de prod.
+
 ### Corte de sesión — 2026-11-16 (Mensualidades terminado en dev; siguiente: pruebas de correos)
 
-**Si pregunta "¿en qué nos quedamos?", es esto, y debajo el corte del 2026-11-11.**
+**Histórico: lo reemplaza el corte del 2026-11-17.**
 
 - **Mensualidades está terminado en `dev`** y el cliente está conforme con cómo funciona. Reglas y pantallas en `docs/mensualidades.md`. **Tiene que estar en producción antes del jueves 26 de noviembre de 2026** (ese día se abre el pago de diciembre).
 - **SQL:** `0041`–`0045` aplicadas en dev y verificadas por MCP. En prod **ninguna**: antes del merge, en orden, `0041` → `0042` → `0043` → `0044` → `0045`. Comunicados pasó a **`0046_comunicados.sql`** (rama `comunicados` y `SQL/`).
@@ -96,7 +108,7 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 **Histórico: lo reemplaza el corte del 2026-11-16.**
 
 - **Mensualidades a producción** por decisión del cliente (2026-11-11), sin esperar las 3 preguntas del corte del 2026-11-05. Sin configurar, ningún colegio cobra mensualidades. Antes del merge: `0041` → `0042` → `0043` en prod (el 2026-11-11, por MCP, no estaba ninguna).
-- **Comunicados — PENDIENTE.** Construido en la rama `comunicados` (sin mezclar a `dev`; diseño en `docs/comunicados.md`; migración `0044_comunicados.sql`, renumerada a **`0046`** el 2026-11-16, **sin correr en ningún lado**). **Recordatorio:** cuando Mensualidades esté en producción, retomar Comunicados: el cliente corre la `0046` en dev, se mezcla la rama a `dev` y se prueba el módulo en pantalla.
+- **Comunicados — PENDIENTE.** Construido en la rama `comunicados` (sin mezclar a `dev`; diseño en `docs/comunicados.md`; migración `0044_comunicados.sql`, renumerada a **`0046`** el 2026-11-16, **sin correr en ningún lado**). ~~Recordatorio: retomar Comunicados cuando Mensualidades esté en producción.~~ Anulado el 2026-11-17: Comunicados queda aparte, sin fecha, y quizá nunca salga.
 - Los contactos y los 2 segmentos que hoy hay en Resend son **reales**: no se borran ni se hacen pruebas ni envíos contra Resend. Se limpian cuando estén importados en la plataforma y Comunicados esté en producción.
 
 ### Corte de sesión — 2026-11-05 (Mensualidades: preguntas reenviadas al cliente)
