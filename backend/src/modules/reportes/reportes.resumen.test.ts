@@ -3,6 +3,10 @@ import { ESTADO } from '../../lib/constants.js';
 import { resumenDe, type Bloque, type Fila } from './reportes.resumen.js';
 
 // Las definiciones tiran de `config/db`, que sin variables de entorno (CI) sale.
+// Reportes tira de Mensualidades e Inscripciones, que cargan `config/env`:
+// sin variables de entorno (CI) sale con process.exit.
+vi.mock('../../config/env.js', () => ({ env: {}, frontendBaseUrl: 'https://activareforce.com', allowedOrigins: [] }));
+vi.mock('../../config/supabase.js', () => ({ getSupabaseAdmin: () => ({}), getSupabaseAnon: () => ({}) }));
 vi.mock('../../config/db.js', () => ({ getPool: () => ({}) }));
 const { DEFINICIONES } = await import('./reportes.definiciones.js');
 

@@ -3,6 +3,11 @@ import { ESTADO, ROL } from '../../lib/constants.js';
 import { DEFINICIONES } from './reportes.definiciones.js';
 import { GRAFICAS } from './reportes.analisis.js';
 
+
+// Reportes tira de Mensualidades e Inscripciones, que cargan `config/env`:
+// sin variables de entorno (CI) sale con process.exit.
+vi.mock('../../config/env.js', () => ({ env: {}, frontendBaseUrl: 'https://activareforce.com', allowedOrigins: [] }));
+vi.mock('../../config/supabase.js', () => ({ getSupabaseAdmin: () => ({}), getSupabaseAnon: () => ({}) }));
 /**
  * Reportes, sin base de datos.
  *

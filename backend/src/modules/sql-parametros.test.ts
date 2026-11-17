@@ -39,6 +39,10 @@ const query = vi.fn(async (sql: string, params: unknown[] = []) => {
   return { rows: [fila, fila], rowCount: 1 };
 });
 
+// Reportes tira de Mensualidades e Inscripciones, que cargan `config/env`:
+// sin variables de entorno (CI) sale con process.exit.
+vi.mock('../config/env.js', () => ({ env: {}, frontendBaseUrl: 'https://activareforce.com', allowedOrigins: [] }));
+vi.mock('../config/supabase.js', () => ({ getSupabaseAdmin: () => ({}), getSupabaseAnon: () => ({}) }));
 vi.mock('../config/db.js', () => ({ getPool: () => ({ query }) }));
 
 const cliente = { query };
