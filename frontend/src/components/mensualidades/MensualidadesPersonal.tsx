@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Mail, MessageCircle, Receipt, X } from 'lucide-react';
+import { ArrowDownUp, Check, ChevronLeft, ChevronRight, Mail, MessageCircle, Receipt, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -365,16 +365,18 @@ const FichaPago = ({ id, onClose }: { id: number | null; onClose: () => void }) 
   );
 };
 
-const ORDEN: Array<EstadoMes | null> = ['atrasado', 'pendiente', 'revision', 'pagado', 'inscripcion', null];
+/** Por pagar primero (lo que hay que atender) o pagados primero. */
+const ORDEN_POR_PAGAR: Array<EstadoMes | null> = ['atrasado', 'pendiente', 'revision', 'pagado', 'inscripcion', null];
+const ORDEN_PAGADOS: Array<EstadoMes | null> = ['pagado', 'inscripcion', 'revision', 'pendiente', 'atrasado', null];
 
-/** Una cifra de la cabecera de cada colegio: etiqueta arriba, número grande debajo. */
+/** Una cifra de la cabecera de cada colegio, en línea: etiqueta y número. */
 const Cifra = ({ etiqueta, valor, nota }: { etiqueta: string; valor: string | number; nota?: string }) => (
-  <div className="min-w-0">
-    <dt className="truncate text-xs text-muted-foreground sm:text-sm" title={etiqueta}>
-      {etiqueta}
-    </dt>
-    <dd className="text-base font-semibold tabular-nums sm:text-lg">{valor}</dd>
-    {nota && <dd className="text-xs text-destructive">{nota}</dd>}
+  <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+    <dt className="text-xs text-muted-foreground">{etiqueta}</dt>
+    <dd className="font-semibold tabular-nums">
+      {valor}
+      {nota && <span className="ml-1 text-xs font-normal text-destructive">({nota})</span>}
+    </dd>
   </div>
 );
 
@@ -405,6 +407,10 @@ const EstadoDelMes = () => {
   const [contactar, setContactar] = useState<AlumnoDelMes | null>(null);
   const [mes, setMes] = useState<string | undefined>(undefined);
   const [colegio, setColegio] = useState(TODOS);
+  const [pagadosPrimero, setPagadosPrimero] = useState(false);
+  // La lista del select sale de todos los colegios, no de lo filtrado: si no,
+  // al elegir uno desaparecían los demás.
+  const colegios = usePrecios();
   const consulta = useEstadoDelMes(mes, colegio === TODOS ? undefined : Number(colegio));
   const datos = consulta.data;
 
@@ -448,7 +454,7 @@ const EstadoDelMes = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={TODOS}>Todos los colegios</SelectItem>
-            {(datos?.colegios ?? []).map((c) => (
+            {(colegios.data ?? []).map((c) => (
               <SelectItem key={c.col_id} value={String(c.col_id)}>
                 {c.col_nombre}
               </SelectItem>
@@ -468,24 +474,26 @@ const EstadoDelMes = () => {
 
       {visibles.map((c) => {
         const t = c.totales;
+        const orden = pagadosPrimero ? ORDEN_PAGADOS : ORDEN_POR_PAGAR;
         const alumnos = [...c.alumnos].sort(
-          (x, y) => ORDEN.indexOf(x.estado) - ORDEN.indexOf(y.estado) || x.nombre.localeCompare(y.nombre),
+          (x, y) => orden.indexOf(x.estado) - orden.indexOf(y.estado) || x.nombre.localeCompare(y.nombre),
         );
         return (
           <div key={c.col_id} className="overflow-hidden rounded-lg border">
-            <div className="space-y-2 border-b bg-muted/40 px-4 py-3">
-              <p className="font-semibold">{c.col_nombre}</p>
-              {!c.cobra && <p className="text-sm text-muted-foreground">Este mes está en pausa para este colegio.</p>}
-              <dl className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm">
-                <Cifra etiqueta={`Recaudado en ${nombreElegido}`} valor={dinero(t.recaudado)} />
+            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-b bg-muted/40 px-4 py-2 text-sm">
+              <p className="mr-auto font-semibold">
+                {c.col_nombre}
+                {!c.cobra && <span className="ml-2 text-xs font-normal text-muted-foreground">· en pausa este mes</span>}
+              </p>
+              <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <Cifra etiqueta={`Recaudado ${nombreElegido}`} valor={dinero(t.recaudado)} />
                 <Cifra etiqueta="En revisión" valor={dinero(t.en_revision)} />
-                <Cifra etiqueta={`Por cobrar de ${nombreElegido}`} valor={dinero(t.por_cobrar)} />
-              </dl>
-              <dl className="grid grid-cols-3 gap-x-4 gap-y-1 border-t pt-2 text-sm">
-                <Cifra etiqueta="Alumnos al día" valor={t.pagados + t.inscripcion} />
-                <Cifra etiqueta="Alumnos en revisión" valor={t.revision} />
+                <Cifra etiqueta="Por cobrar" valor={dinero(t.por_cobrar)} />
+                <span className="hidden h-4 w-px self-center bg-border sm:block" aria-hidden />
+                <Cifra etiqueta="Al día" valor={t.pagados + t.inscripcion} />
+                <Cifra etiqueta="En revisión" valor={t.revision} />
                 <Cifra
-                  etiqueta="Alumnos por pagar"
+                  etiqueta="Por pagar"
                   valor={t.pendientes + t.atrasados}
                   nota={t.atrasados > 0 ? `${t.atrasados} atrasado${t.atrasados === 1 ? '' : 's'}` : undefined}
                 />
@@ -494,6 +502,23 @@ const EstadoDelMes = () => {
             {alumnos.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">Ningún alumno con cobro este mes.</p>
             ) : (
+              // Unas cinco filas a la vista, con scroll propio: con muchos alumnos
+              // los demás colegios quedaban muy abajo.
+              <div className="max-h-[18rem] overflow-y-auto overscroll-contain">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background px-4 py-1.5 text-xs text-muted-foreground">
+                <span>
+                  {alumnos.length} {alumnos.length === 1 ? 'alumno' : 'alumnos'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPagadosPrimero((v) => !v)}
+                  className="inline-flex min-h-8 items-center gap-1 rounded px-2 font-medium hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title={pagadosPrimero ? 'Pagados primero. Pulsa para ver pendientes primero' : 'Pendientes primero. Pulsa para ver pagados primero'}
+                >
+                  Ordenar: {pagadosPrimero ? 'Pagado' : 'Pendiente'}
+                  <ArrowDownUp className="h-3.5 w-3.5" />
+                </button>
+              </div>
               <ul className="divide-y">
                 {alumnos.map((a) => (
                   <li key={a.nino_id ?? `n-${a.nombre}`}>
@@ -539,6 +564,7 @@ const EstadoDelMes = () => {
                   </li>
                 ))}
               </ul>
+              </div>
             )}
           </div>
         );
