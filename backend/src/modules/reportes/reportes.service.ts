@@ -241,6 +241,43 @@ export interface Exportacion {
   filas: number;
 }
 
+/** Letra de columna de Excel: 1 → A, 27 → AA. */
+function letraDe(n: number): string {
+  let s = '';
+  for (let x = n; x > 0; x = Math.floor((x - 1) / 26)) s = String.fromCharCode(65 + ((x - 1) % 26)) + s;
+  return s;
+}
+
+/**
+ * Los botones de filtro de la primera fila del detalle (cliente, 2026-11-16).
+ *
+ * El escritor en streaming de ExcelJS escribe `<autoFilter>` pero no el nombre
+ * oculto `_xlnm._FilterDatabase` de cada hoja, y sin él Excel no siempre
+ * enseña los botones. Aquí se ponen los dos: el rango (cabecera y filas) en
+ * la hoja y el nombre, con su hoja (`localSheetId`, desde 0), en el libro.
+ */
+function filtrosDeHojas(libro: ExcelJS.stream.xlsx.WorkbookWriter) {
+  const nombres: Array<{ name: string; localSheetId: number; ranges: string[] }> = [];
+  // El libro lee `_definedNames.model` al cerrarse: se sustituye por estos nombres.
+  (libro as unknown as { _definedNames: { model: unknown[] } })._definedNames = {
+    get model() {
+      return nombres;
+    },
+  };
+  return {
+    poner(hoja: ExcelJS.Worksheet, nombreHoja: string, indice: number, columnas: number, filas: number) {
+      const ultima = `${letraDe(columnas)}${Math.max(filas + 1, 1)}`;
+      hoja.autoFilter = `A1:${ultima}`;
+      const hojaCitada = `'${nombreHoja.replace(/'/g, "''")}'`;
+      nombres.push({
+        name: '_xlnm._FilterDatabase',
+        localSheetId: indice,
+        ranges: [`${hojaCitada}!$A$1:$${letraDe(columnas)}$${Math.max(filas + 1, 1)}`],
+      });
+    },
+  };
+}
+
 /**
  * Genera el xlsx **en streaming**.
  *
@@ -305,6 +342,7 @@ export async function exportar(
   if (cortado) avisos.push(`Cortado en el tope de ${TOPE_EXPORTACION} filas: acota el rango.`);
 
   escribirResumen(libro, definicion.titulo, avisos, resumenDe(definicion.id, rows, filtros));
+  const filtrosExcel = filtrosDeHojas(libro);
 
   /*
    * La fila de cabecera fija va en las opciones de `addWorksheet`: en el
@@ -320,10 +358,11 @@ export async function exportar(
     width: c.ancho,
   }));
   estiloCabecera(hoja.getRow(1), columnas.length);
-  hoja.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columnas.length } };
 
   const extra = definicion.hojaExtra;
   const delDetalle = extra?.aparte ? rows.filter((f) => !extra.incluye(f)) : rows;
+  // La hoja del detalle es la segunda (la primera es el Resumen).
+  filtrosExcel.poner(hoja, definicion.titulo.slice(0, 31), 1, columnas.length, delDetalle.length);
   for (const fila of delDetalle) {
     hoja.addRow(proyectar(fila, columnas)).commit();
   }
@@ -336,11 +375,9 @@ export async function exportar(
     });
     hojaExtra.columns = extra.columnas.map((c) => ({ header: c.cabecera, key: c.clave, width: c.ancho }));
     estiloCabecera(hojaExtra.getRow(1), extra.columnas.length);
-    hojaExtra.autoFilter = {
-      from: { row: 1, column: 1 },
-      to: { row: 1, column: extra.columnas.length },
-    };
-    for (const fila of rows.filter(extra.incluye)) {
+    const deLaExtra = rows.filter(extra.incluye);
+    filtrosExcel.poner(hojaExtra, extra.titulo.slice(0, 31), 2, extra.columnas.length, deLaExtra.length);
+    for (const fila of deLaExtra) {
       hojaExtra.addRow(proyectar(fila, extra.columnas)).commit();
     }
     hojaExtra.commit();
