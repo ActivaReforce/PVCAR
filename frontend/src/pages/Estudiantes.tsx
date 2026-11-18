@@ -15,7 +15,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -31,6 +33,7 @@ import {
   useDarDeBajaEstudiante,
   useEstudiantes,
   useFichaEstudiante,
+  useDisciplinasDeFiltro,
   useGrados,
   useReactivarEstudiante,
 } from '@/hooks/useEstudiantes';
@@ -55,6 +58,7 @@ const Estudiantes = () => {
   const [busqueda, setBusqueda] = useState('');
   const [colegio, setColegio] = useState(TODOS);
   const [grado, setGrado] = useState(TODOS);
+  const [disciplina, setDisciplina] = useState(TODOS);
   const [estado, setEstado] = useState('1');
 
   const [creando, setCreando] = useState(false);
@@ -67,6 +71,25 @@ const Estudiantes = () => {
 
   const colegios = useColegiosVisibles();
   const grados = useGrados();
+  const disciplinas = useDisciplinasDeFiltro();
+  // Solo las del colegio elegido; agrupadas por colegio cuando son de varios.
+  const opcionesDisciplina = (disciplinas.data ?? []).filter(
+    (d) => colegio === TODOS || d.col_id === Number(colegio),
+  );
+  // Los colegios visibles más los de sus disciplinas: un entrenador sin
+  // permiso sobre Colegios o Disciplinas igual ve los suyos.
+  const opcionesColegio = [
+    ...new Map(
+      [
+        ...(colegios.data?.items ?? []),
+        ...(disciplinas.data ?? []).map((d) => ({ col_id: d.col_id, col_nombre: d.col_nombre })),
+      ].map((c) => [c.col_id, c] as const),
+    ).values(),
+  ].sort((a, b) => a.col_nombre.localeCompare(b.col_nombre, 'es'));
+  const gruposDisciplina = [...new Set(opcionesDisciplina.map((d) => d.col_nombre))].map((nombre) => ({
+    nombre,
+    items: opcionesDisciplina.filter((d) => d.col_nombre === nombre),
+  }));
   const baja = useDarDeBajaEstudiante();
   const reactivar = useReactivarEstudiante();
   const fichaEdicion = useFichaEstudiante(editandoId, false);
@@ -79,6 +102,7 @@ const Estudiantes = () => {
     buscar: busqueda || undefined,
     colegio: colegio === TODOS ? undefined : [Number(colegio)],
     grado: grado === TODOS ? undefined : Number(grado),
+    disciplina: disciplina === TODOS ? undefined : Number(disciplina),
     estado: estado === TODOS ? undefined : Number(estado),
     orden: 'nombre',
   };
@@ -136,7 +160,7 @@ const Estudiantes = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <DebouncedSearchInput
           placeholder="Buscar por nombre o cédula..."
           value={busqueda}
@@ -144,16 +168,45 @@ const Estudiantes = () => {
           className="w-full"
         />
 
-        <Select value={colegio} onValueChange={(v) => cambiarFiltro(() => setColegio(v))}>
+        <Select
+          value={colegio}
+          onValueChange={(v) =>
+            cambiarFiltro(() => {
+              setColegio(v);
+              // La disciplina elegida puede no ser de ese colegio.
+              setDisciplina(TODOS);
+            })
+          }
+        >
           <SelectTrigger className="h-11 sm:h-10">
             <SelectValue placeholder="Todos los colegios" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={TODOS}>Todos los colegios</SelectItem>
-            {(colegios.data?.items ?? []).map((c) => (
+            {opcionesColegio.map((c) => (
               <SelectItem key={c.col_id} value={String(c.col_id)}>
                 {c.col_nombre}
               </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={disciplina} onValueChange={(v) => cambiarFiltro(() => setDisciplina(v))}>
+          <SelectTrigger className="h-11 sm:h-10">
+            <SelectValue placeholder="Todas las disciplinas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todas las disciplinas</SelectItem>
+            {gruposDisciplina.map((g) => (
+              <SelectGroup key={g.nombre}>
+                {gruposDisciplina.length > 1 && <SelectLabel>{g.nombre}</SelectLabel>}
+                {g.items.map((d) => (
+                  <SelectItem key={d.colacthor_id} value={String(d.colacthor_id)}>
+                    {d.act_nombre}
+                    {d.horario_texto ? ` · ${d.horario_texto}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             ))}
           </SelectContent>
         </Select>

@@ -14,6 +14,15 @@ function mensajeDe(error: unknown): string {
   return 'Error inesperado';
 }
 
+/** Alumnos nuevos de sus disciplinas (vista del coordinador). */
+export function useAlumnosNuevos(filtros: { buscar?: string; colegio?: number; page?: number }) {
+  return useQuery({
+    queryKey: ['inscripciones', 'nuevos', filtros],
+    queryFn: () => inscripcionesApi.nuevos(filtros),
+    placeholderData: (anterior) => anterior,
+  });
+}
+
 export function useInscripciones(filtros: {
   estado?: EstadoInscripcion;
   buscar?: string;

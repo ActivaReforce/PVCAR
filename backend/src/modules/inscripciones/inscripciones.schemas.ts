@@ -297,6 +297,14 @@ export const listarSchema = paginacionSchema.extend({
 
 export type ListarInscripcionesQuery = z.infer<typeof listarSchema>;
 
+/** Alumnos nuevos (vista del coordinador): solo aprobadas, de su alcance. */
+export const listarNuevosSchema = paginacionSchema.extend({
+  buscar: z.string().trim().max(160).optional(),
+  colegio: z.coerce.number().int().positive().optional(),
+});
+
+export type ListarNuevosQuery = z.infer<typeof listarNuevosSchema>;
+
 export const idParamSchema = z.object({ id: z.coerce.number().int().positive() });
 
 export const rechazarSchema = z.object({

@@ -12,13 +12,13 @@ Vigente desde la migración `0026_permisos_crud.sql` (2026-10-07). Sale de las r
 | Actividades | Catálogo | Crear | Editar | Borrar |
 | Disciplinas | Lista y horarios | Crear | Horario, dar de baja o reactivar | Borrar |
 | Entrenadores | Lista y fichas | *(se crean en Usuarios)* | Asignar disciplinas y auxiliares | *(no existe)* |
-| Alumnos | Lista y fichas | Crear | Datos, foto, inscribir en disciplinas, representantes, baja | Borrar |
+| Alumnos | Lista y fichas (filtro por disciplina, solo las de su alcance) | Crear | Datos, foto, inscribir en disciplinas, representantes, baja | Borrar |
 | Evaluaciones (plantillas) | Ver las plantillas; el representante, las notas de sus hijos con su detalle (pestaña Mis hijos) | Crear plantilla | Datos, parámetros, vincular a disciplinas, baja | Borrar |
 | Calificar evaluaciones | Notas y pendientes de los alumnos | — | Calificar y quitar la pendiente de un alumno | — |
 | Asistencia de alumnos | Consultar listas e historial | — | Pasar lista | — |
 | Asistencia de personal | Consultar listas | — | Pasar lista | — |
 | Encuestas | Lista, vista previa y resultados (solo de las familias de su alcance) | Crear | Preguntas, finalizar, publicar, volver a borrador | Borrar |
-| Inscripciones | Lista (el representante, solo las suyas) | *(las crea el representante desde el formulario)* | Aprobar, documentos, precios, abrir y cerrar | Rechazar |
+| Inscripciones | Propietario: todo. Coordinador: alumnos nuevos (aprobadas) de sus disciplinas, sin montos. Representante: las suyas y sus mensualidades | *(las crea el representante desde el formulario)* | Aprobar, documentos, precios, abrir y cerrar | Rechazar |
 | Novedades | Las suyas y las que le tocan (ver abajo) | Escribir una novedad | Pestaña Configuración: correo y avisos | Quitar novedades de la pantalla (también las propias; siguen en Reportes), ver quién escribió cada una y el reporte de Novedades |
 | Reportes | Ver, gráficas y Data anterior | Exportar a Excel | — | — |
 | Perfil | Ver y editar el propio perfil | — | — | — |
@@ -34,7 +34,7 @@ El backend las rechaza con 400 aunque lleguen por otro lado (`permisos.service.t
 ## Reglas que van por encima de la casilla
 
 - **Plantilla de evaluación compartida:** quien no es Propietario ni Admin solo la cambia si **todas** las disciplinas que la usan están en su alcance (`exigirEditable` en `evaluaciones.service.ts`). Si no, 409.
-- **Inscripciones:** Editar y Eliminar solo funcionan para Propietario y Admin, se marquen a quien se marquen (`esPersonal`).
+- **Inscripciones y Mensualidades (2026-11-18):** administrar, Mensualidades y Configuración son **solo del Propietario**, se marque a quien se marque (`esPersonal`); el Admin tampoco. Cualquier otro con Ver: el coordinador (o quien tenga disciplinas en su alcance) ve los alumnos nuevos de sus disciplinas (`GET /inscripciones/nuevos`); el representante, las suyas y el pago de sus mensualidades.
 - **Encuestas (gestión):** el representante no entra aunque tenga la casilla (`requirePersonal`).
 - **Permisos:** guardar exige además ser Propietario o Admin. Al Propietario no se le pueden quitar Ver ni Editar de Permisos: sin ellas nadie podría volver a repartirlos.
 - **Correos** (Configuración de Inscripciones): solo Propietario, sin casilla. El de Novedades lo abre la casilla Editar de Novedades (`0029`: Propietario y Admin).

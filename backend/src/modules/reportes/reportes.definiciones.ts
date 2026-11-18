@@ -5,6 +5,7 @@ import { HOY_EC, diaEc, hoyEc, textoEc } from '../../lib/fecha.js';
 import { CTE_VISIBLES } from '../usuarios/usuarios.repository.js';
 import { nombreDeMes } from '../mensualidades/mensualidades.calculo.js';
 import { registrosMensuales } from '../mensualidades/mensualidades.service.js';
+import { cursosDeAlumnos } from '../mensualidades/mensualidades.repository.js';
 
 /**
  * El catálogo de reportes.
@@ -965,6 +966,7 @@ const SQL_ANULADAS = `
              COALESCE(a.aud_detalle->'representante'->>'correo', ''),
              COALESCE(a.aud_detalle->'representante'->>'telefono', ''),
              COALESCE((SELECT string_agg(h->>'nombre', ', ') FROM ${HIJOS_ANULADA} h), ''),
+             COALESCE((SELECT string_agg(COALESCE(h->>'curso', '—'), ', ') FROM ${HIJOS_ANULADA} h), ''),
              jsonb_array_length(COALESCE(a.aud_detalle->'hijos', '[]'::jsonb)),
              COALESCE((SELECT string_agg(DISTINCT h->>'colegio', ', ' ORDER BY h->>'colegio')
                          FROM ${HIJOS_ANULADA} h
@@ -978,6 +980,9 @@ const SQL_ANULADAS = `
                    ELSE COALESCE((SELECT SUM((h->>'valor')::numeric) FROM ${HIJOS_ANULADA} h
                                    WHERE ${HIJO_ANULADO_EN_COLEGIO}), 0)
               END)::float8,
+             COALESCE((SELECT string_agg((h->>'nombre') || ': ' || (h->>'observacion'), ' | ')
+                         FROM ${HIJOS_ANULADA} h
+                        WHERE btrim(COALESCE(h->>'observacion', '')) <> ''), ''),
              COALESCE(a.aud_detalle->>'aprobada_por', ''),
              COALESCE(${textoEc("(a.aud_detalle->>'ins_fecha_aprobacion')::timestamptz", 'DD/MM/YYYY')}, ''),
              COALESCE(a.aud_detalle->>'anulada_por', a.aud_actor_correo, ''),
@@ -1015,6 +1020,11 @@ const SQL_INSCRIPCIONES = `
                  FROM public.inscripcion_nino inn
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS hijos,
+             COALESCE((
+               SELECT string_agg(COALESCE(inn.insnino_datos->'documento'->>'curso', '—'), ', ' ORDER BY inn.insnino_orden)
+                 FROM public.inscripcion_nino inn
+                WHERE inn.ins_id = i.ins_id
+             ), '')                                                   AS cursos,
              (SELECT count(*) FROM public.inscripcion_nino WHERE ins_id = i.ins_id)::int AS cantidad_hijos,
              COALESCE((
                SELECT string_agg(DISTINCT c.col_nombre, ', ' ORDER BY c.col_nombre)
@@ -1043,6 +1053,17 @@ const SQL_INSCRIPCIONES = `
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS disciplinas,
              ${VALOR_INSCRIPCION}::float8                             AS valor,
+             COALESCE((
+               SELECT string_agg(
+                        btrim(
+                          COALESCE(inn.insnino_datos->>'nombres', inn.insnino_datos->>'nombre', '') ||
+                          ' ' || COALESCE(inn.insnino_datos->>'apellidos', '')
+                        ) || ': ' || btrim(inn.insnino_datos->>'observacion_extra'),
+                        ' | ' ORDER BY inn.insnino_orden)
+                 FROM public.inscripcion_nino inn
+                WHERE inn.ins_id = i.ins_id
+                  AND btrim(COALESCE(inn.insnino_datos->>'observacion_extra', '')) <> ''
+             ), '')                                                   AS observaciones,
              COALESCE(ap.usu_nombre, '')                              AS aprobada_por,
              COALESCE(${textoEc('i.ins_fecha_aprobacion', 'DD/MM/YYYY')}, '') AS fecha_aprobacion,
              ''                                                       AS anulada_por,
@@ -1084,10 +1105,12 @@ const inscripciones: Definicion = {
     { clave: 'correo', cabecera: 'Correo', ancho: 30 },
     { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
     { clave: 'hijos', cabecera: 'Hijos', ancho: 40 },
+    { clave: 'cursos', cabecera: 'Curso', ancho: 30 },
     { clave: 'cantidad_hijos', cabecera: 'N° hijos', ancho: 10 },
     { clave: 'colegios', cabecera: 'Colegios', ancho: 30 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
     { clave: 'valor', cabecera: 'Valor ($)', ancho: 12 },
+    { clave: 'observaciones', cabecera: 'Observaciones', ancho: 50 },
     { clave: 'aprobada_por', cabecera: 'Aprobada por', ancho: 28 },
     { clave: 'fecha_aprobacion', cabecera: 'Aprobada el', ancho: 14 },
     { clave: 'anulada_por', cabecera: 'Anulada por', ancho: 28 },
@@ -1201,6 +1224,7 @@ const mensualidades: Definicion = {
     { clave: 'mes', cabecera: 'Mes', ancho: 12 },
     { clave: 'colegio', cabecera: 'Colegio', ancho: 28 },
     { clave: 'alumno', cabecera: 'Alumno', ancho: 30 },
+    { clave: 'curso', cabecera: 'Curso', ancho: 20 },
     { clave: 'estado', cabecera: 'Estado', ancho: 22 },
     { clave: 'valor', cabecera: 'Valor ($)', ancho: 11 },
     { clave: 'recaudado', cabecera: 'Recaudado en el periodo ($)', ancho: 16 },
@@ -1216,6 +1240,9 @@ const mensualidades: Definicion = {
     const explicitos = Boolean(f.meses && f.meses.length > 0);
     const elegidos = new Set(explicitos ? f.meses : mesesDeTodo());
     const registros = await registrosMensuales(f.colegio && f.colegio.length > 0 ? f.colegio : null);
+    const cursos = await cursosDeAlumnos([
+      ...new Set(registros.map((r) => r.nino_id).filter((id): id is number => id !== null)),
+    ]);
     const estados = f.estado ? ESTADOS_DEL_FILTRO[f.estado] : null;
     const buscar = f.buscar?.trim() ? plano(f.buscar.trim()) : null;
 
@@ -1237,6 +1264,7 @@ const mensualidades: Definicion = {
         mes: NOMBRES_MES[Number(r.mes.slice(5, 7)) - 1],
         colegio: r.col_nombre,
         alumno: r.baja ? `${r.alumno} (dado de baja)` : r.alumno,
+        curso: (r.nino_id !== null && cursos.get(r.nino_id)) || '',
         estado: ETIQUETA_REGISTRO[r.estado],
         valor: r.valor,
         recaudado,

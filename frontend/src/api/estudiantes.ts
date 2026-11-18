@@ -135,6 +135,15 @@ export interface DisciplinaDisponible {
   fue_inscrito: boolean;
 }
 
+/** Opción del filtro por disciplina de /estudiantes (ya en el alcance). */
+export interface DisciplinaDeFiltro {
+  colacthor_id: number;
+  col_id: number;
+  col_nombre: string;
+  act_nombre: string;
+  horario_texto: string | null;
+}
+
 export interface Grado {
   catninograd_id: number;
   catninograd_nombre: string;
@@ -194,6 +203,8 @@ export const estudiantesApi = {
     api.get<PaginaEstudiantes>(`/estudiantes${queryString(filtros)}`),
 
   grados: () => api.get<Grado[]>('/estudiantes/grados'),
+
+  disciplinasDeFiltro: () => api.get<DisciplinaDeFiltro[]>('/estudiantes/disciplinas'),
 
   ficha: (id: number, historial = false) =>
     api.get<FichaEstudiante>(`/estudiantes/${id}${historial ? '?historial=true' : ''}`),

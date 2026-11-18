@@ -21,19 +21,52 @@ import DocumentosLegales from '@/components/inscripciones/DocumentosLegales';
 import { EstadoGeneral } from '@/components/inscripciones/EstadoInscripciones';
 import { fechaHora } from '@/components/inscripciones/formato';
 import MisInscripciones from '@/components/inscripciones/MisInscripciones';
+import AlumnosNuevos from '@/components/inscripciones/AlumnosNuevos';
 import MensualidadesPersonal from '@/components/mensualidades/MensualidadesPersonal';
 import { useAuth } from '@/contexts/AuthContext';
-import { ROL, ROLES_GLOBALES } from '@/hooks/useUserForm';
+import { ROL } from '@/hooks/useUserForm';
 
 
 /**
- * El personal (Propietario y Admin) administra; cualquier otro con permiso de
- * ver (un representante) solo ve las suyas. El backend aplica lo mismo.
+ * Solo el Propietario administra (con Mensualidades y Configuración; cliente,
+ * 2026-11-18). El resto del personal con permiso de ver (el coordinador) ve
+ * los alumnos nuevos de sus disciplinas; el representante, las suyas y sus
+ * mensualidades. Quien es las dos cosas, las dos pestañas. El backend aplica
+ * lo mismo.
  */
 const Inscripciones = () => {
   const { user } = useAuth();
-  const esPersonal = user?.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id)) ?? false;
-  return esPersonal ? <InscripcionesPersonal /> : <MisInscripciones />;
+  const roles = user?.roles ?? [];
+  if (roles.some((r) => r.rol_id === ROL.PROPIETARIO)) return <InscripcionesPersonal />;
+  const esRepresentante = roles.some((r) => r.rol_id === ROL.REPRESENTANTE);
+  const esPersonal = roles.some((r) => r.rol_id !== ROL.REPRESENTANTE);
+  if (!esPersonal) return <MisInscripciones />;
+  return (
+    <div className="container mx-auto min-w-0 space-y-6 p-4 lg:p-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Inscripciones</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Los alumnos que entraron en tus disciplinas, del más reciente al más antiguo.
+        </p>
+      </div>
+      {esRepresentante ? (
+        <Tabs defaultValue="nuevos">
+          <TabsList>
+            <TabsTrigger value="nuevos">Alumnos nuevos</TabsTrigger>
+            <TabsTrigger value="mias">Mis inscripciones</TabsTrigger>
+          </TabsList>
+          <TabsContent value="nuevos" className="pt-2">
+            <AlumnosNuevos />
+          </TabsContent>
+          <TabsContent value="mias" className="pt-2">
+            <MisInscripciones />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <AlumnosNuevos />
+      )}
+    </div>
+  );
 };
 
 const TODAS = 'todas';

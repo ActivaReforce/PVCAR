@@ -58,6 +58,19 @@ estudiantesRouter.get(
   },
 );
 
+/** Disciplinas para el filtro de la lista, dentro del alcance. */
+estudiantesRouter.get(
+  '/disciplinas',
+  requirePermission('estudiantes', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.disciplinasDeFiltro(actor(req)), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 estudiantesRouter.get(
   '/candidatos-representante',
   requirePermission('estudiantes', 'editar'),

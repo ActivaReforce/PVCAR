@@ -825,3 +825,35 @@ export async function listarGrados(): Promise<Grado[]> {
   );
   return rows;
 }
+
+/**
+ * Disciplinas del filtro de /estudiantes (2026-11-18). Solo las del alcance:
+ * el coordinador, todas las de sus colegios (`alcance.disciplinas` ya las
+ * trae); el entrenador y sus auxiliares, las suyas. El filtro va siempre
+ * junto al de alcance en la lista, así que tampoco podría ampliarlo.
+ */
+export interface DisciplinaDeFiltro {
+  colacthor_id: number;
+  col_id: number;
+  col_nombre: string;
+  act_nombre: string;
+  horario_texto: string | null;
+}
+
+export async function listarDisciplinasDeFiltro(alcance: Alcance): Promise<DisciplinaDeFiltro[]> {
+  const { rows } = await getPool().query<DisciplinaDeFiltro>(
+    `SELECT cah.colacthor_id,
+            cah.col_id,
+            col.col_nombre,
+            act.act_nombre,
+            ${horarioTexto('cah')} AS horario_texto
+       FROM public.colegio_actividad_horario cah
+       JOIN public.colegio   col ON col.col_id = cah.col_id
+       JOIN public.actividad act ON act.act_id = cah.act_id
+      WHERE cah.est_id = ${ESTADO.ACTIVO}
+        AND ($1::boolean OR cah.colacthor_id = ANY($2::int[]))
+      ORDER BY col.col_nombre, act.act_nombre, ${primerHorario('cah')}`,
+    [alcance.global, alcance.disciplinas],
+  );
+  return rows;
+}

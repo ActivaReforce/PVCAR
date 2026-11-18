@@ -13,6 +13,7 @@ const CLAVE = {
   ficha: (id: number, historial: boolean) => ['estudiantes', 'ficha', id, historial] as const,
   disponibles: (id: number) => ['estudiantes', 'disponibles', id] as const,
   grados: ['estudiantes', 'grados'] as const,
+  disciplinasDeFiltro: ['estudiantes', 'disciplinas-filtro'] as const,
   candidatos: ['estudiantes', 'candidatos-representante'] as const,
   impacto: (id: number) => ['estudiantes', 'impacto', id] as const,
 };
@@ -47,6 +48,15 @@ export function useGrados() {
     queryKey: CLAVE.grados,
     queryFn: () => estudiantesApi.grados(),
     staleTime: 30 * 60 * 1000,
+  });
+}
+
+/** Disciplinas del filtro de la lista: solo las del alcance de quien mira. */
+export function useDisciplinasDeFiltro() {
+  return useQuery({
+    queryKey: CLAVE.disciplinasDeFiltro,
+    queryFn: () => estudiantesApi.disciplinasDeFiltro(),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

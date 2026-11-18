@@ -602,6 +602,11 @@ export async function soltarRepresentante(
   return repo.listarRepresentantes(ninoId);
 }
 
+/** Opciones del filtro por disciplina, dentro del alcance de quien pregunta. */
+export async function disciplinasDeFiltro(actor: AuthUser): Promise<repo.DisciplinaDeFiltro[]> {
+  return repo.listarDisciplinasDeFiltro(await alcanceDe(actor.usuario));
+}
+
 export async function grados(): Promise<repo.Grado[]> {
   return repo.listarGrados();
 }

@@ -229,6 +229,29 @@ export interface ListaInscripciones {
   conteos: { pendientes: number; aprobadas: number };
 }
 
+/** Un alumno de una inscripción aprobada, para el coordinador (sin montos). */
+export interface AlumnoNuevo {
+  insnino_id: number;
+  ins_id: number;
+  alumno: string;
+  curso: string | null;
+  colegio: string | null;
+  /** Solo las de su alcance, con horario. */
+  disciplinas: string[];
+  representante: string;
+  telefono: string | null;
+  fecha_aprobacion: string | null;
+  activo: boolean;
+}
+
+export interface ListaAlumnosNuevos {
+  items: AlumnoNuevo[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface UsuarioCoincidente {
   usu_id: number;
   usu_nombre: string;
@@ -514,6 +537,15 @@ export const inscripcionesApi = {
     return api.get<ListaInscripciones>(`/inscripciones${sufijo ? `?${sufijo}` : ''}`);
   },
   detalle: (id: number) => api.get<InscripcionDetalle>(`/inscripciones/${id}`),
+  /** Alumnos nuevos de sus disciplinas (coordinador): solo aprobadas, sin montos. */
+  nuevos: (filtros: { buscar?: string; colegio?: number; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (filtros.colegio) qs.set('colegio', String(filtros.colegio));
+    if (filtros.buscar) qs.set('buscar', filtros.buscar);
+    if (filtros.page) qs.set('page', String(filtros.page));
+    const sufijo = qs.toString();
+    return api.get<ListaAlumnosNuevos>(`/inscripciones/nuevos${sufijo ? `?${sufijo}` : ''}`);
+  },
   /** El número rojo del menú: pendientes y si las inscripciones están abiertas. */
   /** `mensualidades`: opcional, Vercel puede publicar antes que Railway. */
   aviso: () => api.get<{ pendientes: number; mensualidades?: number; abiertas: boolean }>('/inscripciones/aviso'),

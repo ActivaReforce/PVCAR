@@ -6,7 +6,8 @@ import { frontendBaseUrl } from '../../config/env.js';
 import { ApiError } from '../../middleware/error.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { auditar } from '../../lib/auditoria.js';
-import { ESTADO, ROL, ROLES_GLOBALES } from '../../lib/constants.js';
+import { ESTADO, ROL } from '../../lib/constants.js';
+import { alcanceDe } from '../../lib/alcance.js';
 import { diaDeCruce, horarioLargo, type HorarioDisciplina } from '../../lib/horarios.js';
 import { enTransaccion } from '../../lib/tx.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
@@ -48,6 +49,7 @@ import {
   PARENTESCOS,
   type EnvioInscripcion,
   type ListarInscripcionesQuery,
+  type ListarNuevosQuery,
   type RepresentanteFormulario,
 } from './inscripciones.schemas.js';
 
@@ -808,8 +810,29 @@ export function veAvisoDelMenu(actor: AuthUser): boolean {
   return actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO);
 }
 
+/**
+ * Quien administra Inscripciones y Mensualidades: solo el Propietario
+ * (cliente, 2026-11-18: "nadie más"). Antes también el Admin. El resto, con
+ * permiso de ver, tiene la vista de alumnos nuevos (`nuevos`) o, si es
+ * representante, las suyas.
+ */
 export function esPersonal(actor: AuthUser): boolean {
-  return actor.usuario.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id));
+  return actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO);
+}
+
+/**
+ * Alumnos nuevos de las disciplinas de su alcance (cliente, 2026-11-18): el
+ * coordinador ve quién entró en sus colegios. Solo aprobadas, una fila por
+ * alumno, sin montos, comprobantes ni documentos.
+ */
+export async function nuevos(
+  actor: AuthUser,
+  query: ListarNuevosQuery,
+): Promise<Pagina<repo.AlumnoNuevo>> {
+  const alcance = await alcanceDe(actor.usuario);
+  if (!alcance.global && alcance.disciplinas.length === 0) return armarPagina([], 0, query);
+  const { items, total } = await repo.listarNuevos(query, alcance.global ? null : alcance.disciplinas);
+  return armarPagina(items, total, query);
 }
 
 export async function listar(actor: AuthUser, query: ListarInscripcionesQuery): Promise<ListaInscripciones> {
