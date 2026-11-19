@@ -28,6 +28,15 @@ export function useAlumnosNuevos(filtros: {
   });
 }
 
+/** Ficha de un alumno nuevo (coordinador). */
+export function useFichaDeNuevo(insninoId: number | null) {
+  return useQuery({
+    queryKey: ['inscripciones', 'nuevos', 'ficha', insninoId ?? 0],
+    queryFn: () => inscripcionesApi.fichaDeNuevo(insninoId as number),
+    enabled: insninoId !== null,
+  });
+}
+
 /** Opciones del filtro de disciplinas de alumnos nuevos (su alcance). */
 export function useDisciplinasDeNuevos() {
   return useQuery({

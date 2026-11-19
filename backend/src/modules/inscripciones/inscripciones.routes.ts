@@ -177,7 +177,11 @@ inscripcionesRouter.use((req: Request, _res: Response, next: NextFunction) => {
     if (service.esPersonal(actor(req))) return next();
     const lectura =
       req.method === 'GET' &&
-      (req.path === '/' || req.path === '/nuevos' || req.path === '/nuevos/disciplinas' || /^\/\d+$/.test(req.path));
+      (req.path === '/' ||
+        req.path === '/nuevos' ||
+        req.path === '/nuevos/disciplinas' ||
+        /^\/nuevos\/\d+$/.test(req.path) ||
+        /^\/\d+$/.test(req.path));
     if (!lectura) throw new ApiError(403, 'Solo el personal de Activa Reforce puede hacer esto');
     next();
   } catch (err) {
@@ -218,6 +222,20 @@ inscripcionesRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       res.json({ data: await service.disciplinasDeNuevos(actor(req)), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Ficha de un alumno nuevo (coordinador): sin dinero ni documentos. */
+inscripcionesRouter.get(
+  '/nuevos/:id',
+  requirePermission('inscripciones', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      res.json({ data: await service.fichaDeNuevo(actor(req), id), error: null });
     } catch (err) {
       next(err);
     }

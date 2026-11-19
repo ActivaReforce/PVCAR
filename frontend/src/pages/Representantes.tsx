@@ -171,108 +171,109 @@ const Representantes = () => {
       {representantes.length > 0 && (
         <ul className="divide-y overflow-hidden rounded-lg border">
           {representantes.map((r) => (
+            /* Móvil: avatar y datos arriba, los hijos a todo el ancho y las
+               acciones al pie. Desde sm: acciones a la derecha y los hijos
+               alineados con el texto. */
             <li
               key={r.usu_id}
-              className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start"
+              className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
             >
-              <div className="flex min-w-0 flex-1 items-start gap-3">
-                <Avatar className="h-10 w-10 flex-shrink-0">
-                  <AvatarImage src={r.usu_foto_url ?? undefined} alt="" />
-                  <AvatarFallback>{iniciales(r.usu_nombre)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium" title={r.usu_nombre}>
-                    {r.usu_nombre}
-                  </div>
-                  <div className="truncate text-sm text-muted-foreground">
-                    {r.usu_correo}
-                    {r.usu_telefono && (
-                      <span className="whitespace-nowrap">
-                        {' · '}
-                        <Phone className="inline h-3 w-3 align-[-1px]" aria-hidden /> {r.usu_telefono}
-                      </span>
-                    )}
-                  </div>
-                  {/* Los hijos a la vista (2026-11-18), para llegar al
-                      representante de un alumno sin abrir su ficha. */}
-                  {r.hijos_lista.length > 0 && (
-                    <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Representados">
-                      {r.hijos_lista.map((h) => {
-                        const coincide = buscado.length > 0 && plano(h.nino_nombre).includes(buscado);
-                        return (
-                          <li
-                            key={h.nino_id}
-                            className={
-                              'rounded-md border px-2 py-1 text-xs leading-tight ' +
-                              (coincide
-                                ? 'border-amber-500 bg-amber-50 text-foreground dark:border-amber-400 dark:bg-amber-950/40'
-                                : 'bg-muted/40 text-foreground')
-                            }
-                          >
-                            <span className="font-medium">{h.nino_nombre}</span>
-                            <span className="text-muted-foreground">
-                              {' · '}
-                              {[h.catninograd_nombre, h.col_nombre].filter(Boolean).join(' · ')}
-                              {h.est_id !== 1 && ' · inactivo'}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={r.usu_foto_url ?? undefined} alt="" />
+                <AvatarFallback>{iniciales(r.usu_nombre)}</AvatarFallback>
+              </Avatar>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="break-words font-medium">{r.usu_nombre}</span>
+                  {r.padre_id === null ? (
+                    <Badge variant="destructive">Sin ficha</Badge>
+                  ) : r.hijos === 0 ? (
+                    <Badge variant="secondary">Sin representados</Badge>
+                  ) : null}
                 </div>
+                <div className="break-all text-sm text-muted-foreground">{r.usu_correo}</div>
+                {r.usu_telefono && (
+                  <div className="text-sm text-muted-foreground">
+                    <Phone className="mr-1 inline h-3 w-3 align-[-1px]" aria-hidden />
+                    {r.usu_telefono}
+                  </div>
+                )}
+                {r.encuestasRespondidas > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {r.encuestasRespondidas} encuesta{r.encuestasRespondidas === 1 ? '' : 's'} respondida
+                    {r.encuestasRespondidas === 1 ? '' : 's'}
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center gap-3 sm:flex-shrink-0">
-                {r.padre_id === null ? (
-                  <Badge variant="destructive">Sin ficha</Badge>
-                ) : r.hijos === 0 ? (
-                  <Badge variant="secondary">Sin representados</Badge>
-                ) : null}
+              {/* Los hijos a la vista (2026-11-18), para llegar al
+                  representante de un alumno sin abrir su ficha. */}
+              {r.hijos_lista.length > 0 && (
+                <ul
+                  className="col-span-2 flex flex-wrap gap-1.5 sm:col-span-1 sm:col-start-2"
+                  aria-label="Representados"
+                >
+                  {r.hijos_lista.map((h) => {
+                    const coincide = buscado.length > 0 && plano(h.nino_nombre).includes(buscado);
+                    return (
+                      <li
+                        key={h.nino_id}
+                        className={
+                          'max-w-full break-words rounded-md border px-2 py-1 text-xs leading-tight ' +
+                          (coincide
+                            ? 'border-amber-500 bg-amber-50 text-foreground dark:border-amber-400 dark:bg-amber-950/40'
+                            : 'bg-muted/40 text-foreground')
+                        }
+                      >
+                        <span className="font-medium">{h.nino_nombre}</span>
+                        <span className="text-muted-foreground">
+                          {' · '}
+                          {[h.catninograd_nombre, h.col_nombre].filter(Boolean).join(' · ')}
+                          {h.est_id !== 1 && ' · inactivo'}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
 
-                {r.encuestasRespondidas > 0 && (
-                  <span className="text-sm text-muted-foreground">
-                    {r.encuestasRespondidas} encuesta{r.encuestasRespondidas === 1 ? '' : 's'}
-                  </span>
-                )}
-
-                {/* Acciones, como en las demás listas de personas: solo iconos. */}
-                <div className="ml-auto flex items-center gap-1 sm:ml-0">
+              {/* Acciones, como en las demás listas de personas: solo iconos. */}
+              <div className="col-span-2 flex items-center justify-end gap-1 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:self-start">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 md:h-9 md:w-9"
+                  onClick={() => setViendoId(r.usu_id)}
+                  title="Ver ficha"
+                  aria-label={`Ver la ficha de ${r.usu_nombre}`}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <ConditionalAction module="estudiantes" action="editar">
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-11 w-11 md:h-9 md:w-9"
-                    onClick={() => setViendoId(r.usu_id)}
-                    title="Ver ficha"
-                    aria-label={`Ver la ficha de ${r.usu_nombre}`}
+                    onClick={() => setEditandoId(r.usu_id)}
+                    title="Representados"
+                    aria-label={`Representados de ${r.usu_nombre}`}
                   >
-                    <Eye className="h-4 w-4" />
+                    <UserRoundPlus className="h-4 w-4" />
                   </Button>
-                  <ConditionalAction module="estudiantes" action="editar">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 md:h-9 md:w-9"
-                      onClick={() => setEditandoId(r.usu_id)}
-                      title="Representados"
-                      aria-label={`Representados de ${r.usu_nombre}`}
-                    >
-                      <UserRoundPlus className="h-4 w-4" />
-                    </Button>
-                  </ConditionalAction>
-                  {veDocumentos && r.inscripciones > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 md:h-9 md:w-9"
-                      onClick={() => setDocumentosDe({ usuId: r.usu_id, nombre: r.usu_nombre })}
-                      title="Ver contrato y documentos"
-                      aria-label={`Ver contrato y documentos de ${r.usu_nombre}`}
-                    >
-                      <FileText className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+                </ConditionalAction>
+                {veDocumentos && r.inscripciones > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 md:h-9 md:w-9"
+                    onClick={() => setDocumentosDe({ usuId: r.usu_id, nombre: r.usu_nombre })}
+                    title="Ver contrato y documentos"
+                    aria-label={`Ver contrato y documentos de ${r.usu_nombre}`}
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </li>
           ))}

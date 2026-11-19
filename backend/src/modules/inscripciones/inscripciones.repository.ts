@@ -737,6 +737,8 @@ export interface AlumnoNuevo {
   insnino_id: number;
   ins_id: number;
   alumno: string;
+  /** Trae observaciones extra (borde ámbar, como en la lista del Propietario). */
+  con_observacion: boolean;
   curso: string | null;
   colegio: string | null;
   disciplinas: string[];
@@ -756,6 +758,7 @@ export async function listarNuevos(
     `SELECT n.insnino_id,
             i.ins_id,
             n.insnino_datos->>'nombre'                 AS alumno,
+            btrim(COALESCE(n.insnino_datos->>'observacion_extra', '')) <> '' AS con_observacion,
             n.insnino_datos->'documento'->>'curso'     AS curso,
             d.colegio,
             d.disciplinas,
@@ -876,6 +879,15 @@ export async function obtener(
     [insId],
   );
   return rows[0] ?? null;
+}
+
+/** La inscripción de un alumno inscrito (ficha del coordinador). */
+export async function inscripcionDeNino(insninoId: number): Promise<number | null> {
+  const { rows } = await getPool().query<{ ins_id: number }>(
+    'SELECT ins_id FROM public.inscripcion_nino WHERE insnino_id = $1',
+    [insninoId],
+  );
+  return rows[0]?.ins_id ?? null;
 }
 
 export async function ninosDe(insId: number, client?: PoolClient): Promise<NinoDeInscripcion[]> {

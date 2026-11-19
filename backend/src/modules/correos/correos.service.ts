@@ -30,6 +30,9 @@ export const TIPOS_CON_MENCIONADO: readonly repo.TipoCorreo[] = ['novedades'];
 /** Tipos que usan el switch `notificar_representante`. */
 export const TIPOS_CON_REPRESENTANTE: readonly repo.TipoCorreo[] = ['novedades', 'ausencias', 'mensualidades_aviso'];
 
+/** Tipos que usan el switch `notificar_coordinador` (0047). */
+export const TIPOS_CON_COORDINADOR: readonly repo.TipoCorreo[] = ['ausencias'];
+
 /** Los dos de la pestaña Configuración de Novedades. */
 const TIPOS_DE_NOVEDADES: readonly repo.TipoCorreo[] = ['novedades', 'ausencias'];
 
@@ -75,6 +78,10 @@ export async function guardar(
       notificar_mencionado: TIPOS_CON_MENCIONADO.includes(tipo) && input.notificar_mencionado,
       notificar_representante:
         TIPOS_CON_REPRESENTANTE.includes(tipo) && input.notificar_representante,
+      notificar_coordinador:
+        TIPOS_CON_COORDINADOR.includes(tipo) && input.notificar_coordinador !== undefined
+          ? input.notificar_coordinador
+          : antes.notificar_coordinador,
     });
     await auditar(
       {

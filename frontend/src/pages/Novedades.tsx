@@ -87,6 +87,11 @@ const AVISOS_AUSENCIAS: Aviso[] = [
     texto:
       'La notificación de ausencia del alumno se avisa también al representante (correo y en sus Novedades)',
   },
+  {
+    campo: 'notificar_coordinador',
+    texto:
+      'La notificación de ausencia del alumno se avisa también a los coordinadores de su colegio (correo y en sus Novedades)',
+  },
 ];
 
 /** 2026-10-12 → 12/10/2026 */

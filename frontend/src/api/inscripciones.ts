@@ -243,6 +243,24 @@ export interface AlumnoNuevo {
   telefono: string | null;
   fecha_aprobacion: string | null;
   activo: boolean;
+  /** Opcional: Vercel puede publicar antes que Railway. */
+  con_observacion?: boolean;
+}
+
+/** Ficha de un alumno nuevo para el coordinador: sin dinero ni documentos. */
+export interface FichaDeNuevo {
+  ins_id: number;
+  ins_fecha: string;
+  ins_fecha_aprobacion: string | null;
+  representante: { nombre: string; cedula: string; correo: string; telefono: string };
+  alumno: {
+    insnino_id: number;
+    datos: Omit<NinoGuardado, 'documento'>;
+    curso: string | null;
+    colegio: string | null;
+    disciplinas: string[];
+    constancias: ConstanciaDetalle[];
+  };
 }
 
 export interface ListaAlumnosNuevos {
@@ -549,6 +567,7 @@ export const inscripcionesApi = {
     const sufijo = qs.toString();
     return api.get<ListaAlumnosNuevos>(`/inscripciones/nuevos${sufijo ? `?${sufijo}` : ''}`);
   },
+  fichaDeNuevo: (insninoId: number) => api.get<FichaDeNuevo>(`/inscripciones/nuevos/${insninoId}`),
   disciplinasDeNuevos: () => api.get<DisciplinaDeFiltro[]>('/inscripciones/nuevos/disciplinas'),
   /** El número rojo del menú: pendientes y si las inscripciones están abiertas. */
   /** `mensualidades`: opcional, Vercel puede publicar antes que Railway. */

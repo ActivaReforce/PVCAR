@@ -839,6 +839,75 @@ export async function nuevos(
   return armarPagina(items, total, query);
 }
 
+/**
+ * La ficha de un alumno nuevo para el coordinador (cliente, 2026-11-18): lo
+ * que le sirve para recibirlo —datos, contactos, salud, permisos de imagen y
+ * lo que aceptó en cada documento— y nada de dinero: sin comprobante, sin
+ * cobro, sin factura, sin el PDF (lleva tarifas) y sin la foto del colegio
+ * con sus precios. Solo aprobadas y con alguna disciplina de su alcance; de
+ * las disciplinas, solo las suyas.
+ */
+export interface FichaDeNuevo {
+  ins_id: number;
+  ins_fecha: string;
+  ins_fecha_aprobacion: string | null;
+  representante: { nombre: string; cedula: string; correo: string; telefono: string };
+  alumno: {
+    insnino_id: number;
+    datos: Omit<repo.NinoGuardado, 'documento'>;
+    curso: string | null;
+    colegio: string | null;
+    disciplinas: string[];
+    constancias: ConstanciaDetalle[];
+  };
+}
+
+export async function fichaDeNuevo(actor: AuthUser, insninoId: number): Promise<FichaDeNuevo> {
+  const noEsta = new ApiError(404, 'Alumno no encontrado');
+  const insId = await repo.inscripcionDeNino(insninoId);
+  if (insId === null) throw noEsta;
+  const fila = await repo.obtener(insId);
+  if (!fila || fila.ins_estado !== 'aprobada') throw noEsta;
+
+  const alcance = await alcanceDe(actor.usuario);
+  const [ninos, aceptaciones] = await Promise.all([repo.ninosDe(insId), repo.aceptacionesDe(insId)]);
+  const n = ninos.find((x) => x.insnino_id === insninoId);
+  if (!n) throw noEsta;
+  const suyas = alcance.global
+    ? n.insnino_disciplinas
+    : n.insnino_disciplinas.filter((id) => alcance.disciplinas.includes(id));
+  if (suyas.length === 0) throw noEsta;
+
+  const [disciplinas, grados] = await Promise.all([
+    repo.disciplinasPorId(suyas),
+    repo.nombresDeGrados([n.insnino_datos.catninograd_id]),
+  ]);
+  const { documento, ...datos } = n.insnino_datos;
+  const rep = fila.ins_representante;
+  return {
+    ins_id: fila.ins_id,
+    ins_fecha: fila.ins_fecha,
+    ins_fecha_aprobacion: fila.ins_fecha_aprobacion,
+    representante: { nombre: rep.nombre, cedula: rep.cedula, correo: rep.correo, telefono: rep.telefono },
+    alumno: {
+      insnino_id: n.insnino_id,
+      datos,
+      curso: grados.get(n.insnino_datos.catninograd_id) ?? documento?.curso ?? null,
+      colegio: disciplinas[0]?.col_nombre ?? documento?.colegio.sede ?? null,
+      disciplinas: disciplinas.map(describirDisciplina),
+      constancias: aceptaciones
+        .filter((a) => a.insnino_id === n.insnino_id)
+        .map((a) => ({
+          tipo: a.doc_tipo,
+          nombre: NOMBRE_DOCUMENTO[a.doc_tipo],
+          version: a.doc_version,
+          sha256: a.acep_texto_sha256,
+          opciones: a.acep_opciones,
+        })),
+    },
+  };
+}
+
 /** Las disciplinas del filtro de alumnos nuevos: las de su alcance. */
 export async function disciplinasDeNuevos(actor: AuthUser): Promise<estudiantesRepo.DisciplinaDeFiltro[]> {
   return estudiantesRepo.listarDisciplinasDeFiltro(await alcanceDe(actor.usuario));

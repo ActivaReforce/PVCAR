@@ -100,6 +100,8 @@ export interface FiltrosListar {
     verComoRepresentante: boolean;
     /** Hijos del actor para ausencias y correcciones; vacío si el aviso está apagado. */
     ninosAusencias: number[];
+    /** Colegios que coordina, para sus ausencias y correcciones (0047); vacío si el aviso está apagado. */
+    colegiosAusencias: number[];
   } | null;
   limit: number;
   offset: number;
@@ -212,6 +214,13 @@ export async function listar(filtros: FiltrosListar, client?: PoolClient): Promi
       params.push(v.ninosAusencias);
       partes.push(
         `(n.nov_tipo IN ('ausencia', 'correccion') AND EXISTS (SELECT 1 FROM public.novedad_alumno na WHERE na.nov_id = n.nov_id AND na.nino_id = ANY($${params.length}::int[])))`,
+      );
+    }
+
+    if (v.colegiosAusencias.length > 0) {
+      params.push(v.colegiosAusencias);
+      partes.push(
+        `(n.nov_tipo IN ('ausencia', 'correccion') AND EXISTS (SELECT 1 FROM public.novedad_alumno na JOIN public.nino nn ON nn.nino_id = na.nino_id WHERE na.nov_id = n.nov_id AND nn.col_id = ANY($${params.length}::int[])))`,
       );
     }
 
@@ -534,6 +543,24 @@ export async function correosDeRepresentantesDe(nino_ids: number[]): Promise<str
        JOIN public.usuario u    ON u.usu_id = p.usu_id
        JOIN public.nino_padre np ON np.padre_id = p.padre_id
       WHERE np.nino_id = ANY($1::int[])
+        AND u.est_id = 1
+        AND u.usu_correo IS NOT NULL
+        AND length(btrim(u.usu_correo)) > 0`,
+    [nino_ids],
+  );
+  return rows.map((r) => r.correo);
+}
+
+/** Correos de los coordinadores activos de los colegios de esos alumnos (0047). */
+export async function correosDeCoordinadoresDe(nino_ids: number[]): Promise<string[]> {
+  if (nino_ids.length === 0) return [];
+  const { rows } = await getPool().query<{ correo: string }>(
+    `SELECT DISTINCT lower(u.usu_correo) AS correo
+       FROM public.nino n
+       JOIN public.colegio_coordinador cc ON cc.col_id = n.col_id
+       JOIN public.usuario u ON u.usu_id = cc.usu_id
+       JOIN public.usuario_rol ur ON ur.usu_id = u.usu_id AND ur.rol_id = 2 -- Coordinador
+      WHERE n.nino_id = ANY($1::int[])
         AND u.est_id = 1
         AND u.usu_correo IS NOT NULL
         AND length(btrim(u.usu_correo)) > 0`,

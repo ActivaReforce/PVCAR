@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { UserPlus } from 'lucide-react';
+import { StickyNote, UserPlus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import FichaAlumnoNuevo from './FichaAlumnoNuevo';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -28,6 +30,7 @@ const AlumnosNuevos = () => {
   const [colegio, setColegio] = useState(TODOS);
   const [disciplina, setDisciplina] = useState(TODOS);
   const [pagina, setPagina] = useState(1);
+  const [abierto, setAbierto] = useState<number | null>(null);
 
   // Colegios y disciplinas salen de su alcance (las de sus colegios).
   const disciplinas = useDisciplinasDeNuevos();
@@ -130,7 +133,16 @@ const AlumnosNuevos = () => {
       {items.length > 0 && (
         <ul className="divide-y overflow-hidden rounded-lg border">
           {items.map((a) => (
-            <li key={a.insnino_id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
+            <li key={a.insnino_id}>
+              <button
+                type="button"
+                onClick={() => setAbierto(a.insnino_id)}
+                className={cn(
+                  'flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none sm:flex-row sm:items-center',
+                  // Como en la lista del Propietario: trae observaciones extra.
+                  a.con_observacion && 'border-2 border-amber-500 dark:border-amber-400',
+                )}
+              >
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium" title={a.alumno}>
                   {a.alumno}
@@ -145,15 +157,26 @@ const AlumnosNuevos = () => {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0 sm:justify-end">
+                {a.con_observacion && (
+                  <Badge
+                    variant="outline"
+                    className="gap-1 border-amber-500 text-amber-700 dark:border-amber-400 dark:text-amber-400"
+                  >
+                    <StickyNote className="h-3 w-3" /> Observación
+                  </Badge>
+                )}
                 {!a.activo && <Badge variant="outline">Ya no está activo</Badge>}
                 {a.fecha_aprobacion && (
                   <span className="text-xs text-muted-foreground">Entró el {fechaCorta(a.fecha_aprobacion)}</span>
                 )}
               </div>
+              </button>
             </li>
           ))}
         </ul>
       )}
+
+      <FichaAlumnoNuevo id={abierto} onClose={() => setAbierto(null)} />
 
       {datos && items.length > 0 && (
         <DataPagination
