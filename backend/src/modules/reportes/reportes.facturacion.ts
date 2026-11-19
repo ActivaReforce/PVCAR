@@ -86,6 +86,8 @@ export const COLUMNAS_FACTURA: Record<string, ColumnaFactura[]> = {
   inscripciones: [
     { clave: 'estado', cabecera: 'Estado', ancho: 12, grupo: 'pago' },
     { clave: 'fecha_pago', cabecera: 'Fecha de pago', ancho: 13, grupo: 'pago' },
+    // El mes que paga la inscripción (cliente, 2026-11-18).
+    { clave: 'mes_inscrito', cabecera: 'Mes inscrito', ancho: 15, grupo: 'pago' },
     ...persona,
     ...montos,
     ...factura,
@@ -93,7 +95,7 @@ export const COLUMNAS_FACTURA: Record<string, ColumnaFactura[]> = {
   mensualidades: [
     { clave: 'estado', cabecera: 'Estado', ancho: 22, grupo: 'pago' },
     { clave: 'ano', cabecera: 'Año', ancho: 8, grupo: 'pago' },
-    { clave: 'mes', cabecera: 'Mes', ancho: 22, grupo: 'pago' },
+    { clave: 'mes', cabecera: 'Mes inscrito', ancho: 22, grupo: 'pago' },
     { clave: 'fecha_pago', cabecera: 'Fecha de pago', ancho: 13, grupo: 'pago' },
     { clave: 'mes_pago', cabecera: 'Mes de pago', ancho: 15, grupo: 'pago' },
     ...persona,
@@ -120,6 +122,7 @@ const SUMA = (campo: string) => `COALESCE((
 const SQL_FACTURA_INSCRIPCIONES = `
   SELECT CASE i.ins_estado WHEN 'aprobada' THEN 'Aprobada' ELSE 'Pendiente' END AS estado,
          ${textoEc('i.ins_fecha', 'DD/MM/YYYY')}                    AS fecha_pago,
+         to_char(i.ins_mes_inicio, 'YYYY-MM-DD')                     AS mes_inscrito,
          COALESCE(i.ins_representante->>'nombre', '')               AS representante,
          COALESCE(i.ins_representante->>'cedula', '')               AS cedula,
          COALESCE(i.ins_representante->>'correo', '')               AS correo,
@@ -152,6 +155,7 @@ const SQL_FACTURA_INSCRIPCIONES = `
   UNION ALL
   SELECT 'Anulada',
          ${textoEc(FECHA_ANULADA, 'DD/MM/YYYY')},
+         NULL::text,
          COALESCE(a.aud_detalle->'representante'->>'nombre', ''),
          COALESCE(a.aud_detalle->'representante'->>'cedula', ''),
          COALESCE(a.aud_detalle->'representante'->>'correo', ''),
@@ -182,6 +186,8 @@ export async function filasInscripciones(f: FiltrosReporte, tope: number): Promi
   );
   return rows.map((r) => ({
     ...r,
+    // Las anuladas no guardaron el mes que pagaban.
+    mes_inscrito: r.mes_inscrito ? nombreDeMes(String(r.mes_inscrito)) : '',
     subtotal: r.subtotal === null ? '' : dinero(r.subtotal),
     descuento: r.descuento === null ? '' : dinero(r.descuento),
     iva: r.iva === null ? '' : dinero(r.iva),
