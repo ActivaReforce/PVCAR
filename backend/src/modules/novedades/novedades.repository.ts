@@ -551,24 +551,6 @@ export async function correosDeRepresentantesDe(nino_ids: number[]): Promise<str
   return rows.map((r) => r.correo);
 }
 
-/** Correos de los coordinadores activos de los colegios de esos alumnos (0047). */
-export async function correosDeCoordinadoresDe(nino_ids: number[]): Promise<string[]> {
-  if (nino_ids.length === 0) return [];
-  const { rows } = await getPool().query<{ correo: string }>(
-    `SELECT DISTINCT lower(u.usu_correo) AS correo
-       FROM public.nino n
-       JOIN public.colegio_coordinador cc ON cc.col_id = n.col_id
-       JOIN public.usuario u ON u.usu_id = cc.usu_id
-       JOIN public.usuario_rol ur ON ur.usu_id = u.usu_id AND ur.rol_id = 2 -- Coordinador
-      WHERE n.nino_id = ANY($1::int[])
-        AND u.est_id = 1
-        AND u.usu_correo IS NOT NULL
-        AND length(btrim(u.usu_correo)) > 0`,
-    [nino_ids],
-  );
-  return rows.map((r) => r.correo);
-}
-
 /**
  * Número del menú: novedades de otros posteriores a la última que vio.
  *

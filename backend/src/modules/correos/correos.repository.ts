@@ -41,7 +41,7 @@ export interface ConfigCorreo {
   notificar_mencionado: boolean;
   /** 'novedades': las de alumno avisan también al representante. 'ausencias': igual. */
   notificar_representante: boolean;
-  /** Solo 'ausencias' (0047): también a los coordinadores del colegio del alumno. */
+  /** Solo 'ausencias' (0047): los coordinadores del colegio del alumno la ven en Novedades (sin correo). */
   notificar_coordinador: boolean;
 }
 

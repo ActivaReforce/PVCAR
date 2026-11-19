@@ -90,7 +90,7 @@ const AVISOS_AUSENCIAS: Aviso[] = [
   {
     campo: 'notificar_coordinador',
     texto:
-      'La notificación de ausencia del alumno se avisa también a los coordinadores de su colegio (correo y en sus Novedades)',
+      'La notificación de ausencia del alumno se avisa también a los coordinadores de su colegio (solo en sus Novedades, sin correo)',
   },
 ];
 

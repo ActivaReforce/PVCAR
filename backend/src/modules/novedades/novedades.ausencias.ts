@@ -187,14 +187,11 @@ export async function enviarAvisos(ids: number[]): Promise<void> {
     for (const [i, n] of novedades.entries()) {
       if (i > 0) await esperar(PAUSA_ENTRE_CORREOS);
       // La de mensualidad va siempre al representante.
-      const ids = n.alumnos.map((a) => a.id);
-      const representantes =
+      // A los coordinadores no les va correo: lo ven solo en Novedades (0047).
+      const paraExtra =
         config.notificar_representante || n.datos?.mensualidad?.length
-          ? await repo.correosDeRepresentantesDe(ids)
+          ? await repo.correosDeRepresentantesDe(n.alumnos.map((a) => a.id))
           : [];
-      // Y a los coordinadores del colegio del alumno (0047).
-      const coordinadores = config.notificar_coordinador ? await repo.correosDeCoordinadoresDe(ids) : [];
-      const paraExtra = [...new Set([...representantes, ...coordinadores])];
       await enviarComo('ausencias', { ...correoDe(n), paraExtra });
     }
   } catch (err) {
