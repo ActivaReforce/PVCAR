@@ -145,6 +145,10 @@ export const reportesApi = {
   /** Los filtros van en el cuerpo: no quedan escritos en los logs del servidor. */
   exportar: (modulo: string, filtros: FiltrosReporte) =>
     api.descargar(`/reportes/${modulo}/export`, filtros, `${modulo}.xlsx`),
+
+  /** "Sacar datos para facturación" (Inscripciones y Mensualidades). Mismos filtros. */
+  facturacion: (modulo: string, filtros: FiltrosReporte) =>
+    api.descargar(`/reportes/${modulo}/facturacion`, filtros, `facturacion-${modulo}.xlsx`),
 };
 
 /**
@@ -153,6 +157,9 @@ export const reportesApi = {
  * una sola tarjeta con dos pestañas (/reportes/pagos). Ocupa el lugar de
  * Inscripciones en el orden.
  */
+/** Los reportes con el botón "Sacar datos para facturación". */
+export const CON_FACTURACION = ['inscripciones', 'mensualidades'];
+
 export const PAGOS = {
   id: 'pagos',
   titulo: 'Pagos',

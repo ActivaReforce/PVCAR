@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, ReceiptText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,9 +24,10 @@ import {
   useAnalisisReporte,
   useCatalogoReportes,
   useExportarReporte,
+  useFacturacionReporte,
   useReporte,
 } from '@/hooks/useTablero';
-import type { FiltrosReporte } from '@/api/reportes';
+import { CON_FACTURACION, type FiltrosReporte } from '@/api/reportes';
 import SelectorMeses from '@/components/reportes/SelectorMeses';
 
 const POR_PAGINA = 50;
@@ -80,6 +81,7 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
   const grados = useGrados(Boolean(disponibles?.grado));
   const paralelos = useParalelos(Boolean(disponibles?.paralelo));
   const exportar = useExportarReporte();
+  const facturacion = useFacturacionReporte();
 
   // Solo viajan los filtros que el reporte usa: lo que no se ve no filtra.
   const filtros: FiltrosReporte = {
@@ -156,22 +158,42 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
           </p>
         </div>
 
-        {/* Exportar exige `reportes:crear`; la ruta lo vuelve a comprobar. */}
-        <ConditionalAction module="reportes" action="crear">
-          <Button
-            variant="brand"
-            className="h-11 w-full sm:h-10 sm:w-auto"
-            disabled={!listo || exportar.isPending || total === 0}
-            onClick={() => exportar.mutate({ modulo, filtros })}
-          >
-            {exportar.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            Exportar a Excel
-          </Button>
-        </ConditionalAction>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {/* Exportar exige `reportes:crear`; la ruta lo vuelve a comprobar. */}
+          <ConditionalAction module="reportes" action="crear">
+            <Button
+              variant="brand"
+              className="h-11 w-full sm:h-10 sm:w-auto"
+              disabled={!listo || exportar.isPending || total === 0}
+              onClick={() => exportar.mutate({ modulo, filtros })}
+            >
+              {exportar.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Exportar a Excel
+            </Button>
+          </ConditionalAction>
+          {/* Inscripciones y Mensualidades: el Excel para facturar, con los mismos filtros. */}
+          {CON_FACTURACION.includes(modulo) && (
+            <ConditionalAction module="reportes" action="crear">
+              <Button
+                variant="outline"
+                className="h-11 w-full sm:h-10 sm:w-auto"
+                disabled={!listo || facturacion.isPending || total === 0}
+                onClick={() => facturacion.mutate({ modulo, filtros })}
+              >
+                {facturacion.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ReceiptText className="mr-2 h-4 w-4" />
+                )}
+                Sacar datos para facturación
+              </Button>
+            </ConditionalAction>
+          )}
+        </div>
       </div>
 
       {/*

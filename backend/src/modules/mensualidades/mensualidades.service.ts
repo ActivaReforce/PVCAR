@@ -616,6 +616,58 @@ export interface RegistroMensual {
   futuro: boolean;
 }
 
+/**
+ * Lo que se debe, alumno por alumno y mes por mes (pendiente o atrasado), con
+ * su desglose y el representante: para el Excel de facturación de
+ * Mensualidades (2026-11-18). Mismo cálculo que el Estado del mes.
+ */
+export interface Deuda {
+  nino_id: number;
+  alumno: string;
+  col_id: number;
+  col_nombre: string;
+  mes: Mes;
+  estado: 'pendiente' | 'atrasado';
+  subtotal: number;
+  descuento: number;
+  iva: number;
+  total: number;
+  disciplinas: string[];
+  contacto: repo.Contacto | null;
+  /** Un mes que aún no llega. */
+  futuro: boolean;
+}
+
+export async function deudas(colegios: number[] | null): Promise<Deuda[]> {
+  const hoy = hoyEc();
+  const actual = mesDe(hoy);
+  const calculo = await calcular(null, hoy);
+  const salida: Deuda[] = [];
+  for (const [ninoId, meses] of calculo.meses) {
+    const a = calculo.alumnos.get(ninoId);
+    if (!a || (colegios && !colegios.includes(a.col_id))) continue;
+    for (const m of meses) {
+      if (m.estado !== 'pendiente' && m.estado !== 'atrasado') continue;
+      salida.push({
+        nino_id: ninoId,
+        alumno: a.nombre,
+        col_id: a.col_id,
+        col_nombre: a.col_nombre,
+        mes: m.mes,
+        estado: m.estado,
+        subtotal: m.subtotal,
+        descuento: m.descuento,
+        iva: m.iva,
+        total: m.total,
+        disciplinas: m.disciplinas.map(soloActividad),
+        contacto: a.contactos[0] ?? null,
+        futuro: m.mes > actual,
+      });
+    }
+  }
+  return salida;
+}
+
 /** "Danza — Martes y Jueves 15:00–16:00" → "Danza". */
 const soloActividad = (d: string) => d.split(' — ')[0]!;
 

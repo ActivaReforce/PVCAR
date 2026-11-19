@@ -932,7 +932,7 @@ const representantes: Definicion = {
  * se guarda en la inscripción: sale de sus disciplinas (cada disciplina es de
  * un colegio).
  */
-const HIJO_EN_COLEGIO = `EXISTS (
+export const HIJO_EN_COLEGIO = `EXISTS (
                 SELECT 1
                   FROM unnest(inn.insnino_disciplinas) AS cid
                   JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
@@ -940,7 +940,7 @@ const HIJO_EN_COLEGIO = `EXISTS (
               )`;
 
 /** Filtros comunes al detalle y a los totales de Inscripciones. */
-const FILTRO_INSCRIPCION = `($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
+export const FILTRO_INSCRIPCION = `($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
          AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
          AND ($3::text IS NULL
               OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
@@ -975,11 +975,11 @@ const VALOR_INSCRIPCION = `CASE WHEN $5::int[] IS NULL THEN COALESCE(i.ins_total
  * `fotoDeAnulada` en Inscripciones). Salen aquí con su valor, pero no suman
  * al recaudado.
  */
-const FECHA_ANULADA = "(a.aud_detalle->>'ins_fecha')::timestamptz";
-const HIJOS_ANULADA = "jsonb_array_elements(COALESCE(a.aud_detalle->'hijos', '[]'::jsonb))";
-const HIJO_ANULADO_EN_COLEGIO = "($5::int[] IS NULL OR (h->>'col_id')::int = ANY($5::int[]))";
+export const FECHA_ANULADA = "(a.aud_detalle->>'ins_fecha')::timestamptz";
+export const HIJOS_ANULADA = "jsonb_array_elements(COALESCE(a.aud_detalle->'hijos', '[]'::jsonb))";
+export const HIJO_ANULADO_EN_COLEGIO = "($5::int[] IS NULL OR (h->>'col_id')::int = ANY($5::int[]))";
 
-const FILTRO_ANULADA = `a.aud_entidad = 'inscripcion' AND a.aud_accion = 'eliminar'
+export const FILTRO_ANULADA = `a.aud_entidad = 'inscripcion' AND a.aud_accion = 'eliminar'
          AND a.aud_detalle->>'anulada' = 'true'
          AND ($1::date IS NULL OR ${diaEc(FECHA_ANULADA)} >= $1::date)
          AND ($2::date IS NULL OR ${diaEc(FECHA_ANULADA)} <= $2::date)
@@ -1026,7 +1026,7 @@ const SQL_ANULADAS = `
         FROM public.auditoria a
        WHERE ${FILTRO_ANULADA}`;
 
-const paramsInscripcion = (f: FiltrosReporte) => [
+export const paramsInscripcion = (f: FiltrosReporte) => [
   oNulo(f.desde),
   oNulo(f.hasta),
   textoONulo(f.buscar),
@@ -1203,7 +1203,7 @@ const inscripciones: Definicion = {
  *
  * Lo que se debe no se guarda: por eso las filas salen de código.
  */
-const ETIQUETA_REGISTRO: Record<string, string> = {
+export const ETIQUETA_REGISTRO: Record<string, string> = {
   pagado: 'Pagado',
   inscripcion: 'Pagado (Inscripción)',
   revision: 'En revisión',
@@ -1213,23 +1213,23 @@ const ETIQUETA_REGISTRO: Record<string, string> = {
 };
 const ORDEN_REGISTRO = ['atrasado', 'pendiente', 'revision', 'inscripcion_revision', 'pagado', 'inscripcion'];
 /** Filtro de estado: 1 pagado (también por inscripción), 2 en revisión, 3 pendiente, 4 atrasado. */
-const ESTADOS_DEL_FILTRO: Record<number, string[]> = {
+export const ESTADOS_DEL_FILTRO: Record<number, string[]> = {
   1: ['pagado', 'inscripcion'],
   2: ['revision', 'inscripcion_revision'],
   3: ['pendiente'],
   4: ['atrasado'],
 };
-const NOMBRES_MES = [
+export const NOMBRES_MES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 /** Para buscar sin tildes ni mayúsculas en filas calculadas en código. */
-const plano = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const diaLegible = (dia: string | null) => (dia ? dia.split('-').reverse().join('/') : '');
+export const plano = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+export const diaLegible = (dia: string | null) => (dia ? dia.split('-').reverse().join('/') : '');
 
 /** "Todo": del año pasado al siguiente, como el filtro de la pantalla. */
-function mesesDeTodo(): string[] {
+export function mesesDeTodo(): string[] {
   const ano = Number(hoyEc().slice(0, 4));
   return [ano - 1, ano, ano + 1].flatMap((a) =>
     NOMBRES_MES.map((_, i) => `${a}-${String(i + 1).padStart(2, '0')}-01`),

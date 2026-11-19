@@ -83,6 +83,8 @@ export async function guardarCobroColegio(client: PoolClient, colId: number, c: 
 // Alumnos y lo que ya está pagado
 
 export interface Contacto {
+  /** Para los datos de factura del representante (2026-11-18). */
+  usu_id: number;
   nombre: string;
   /** Para Reportes → Mensualidades (2026-11-18). */
   cedula: string | null;
@@ -129,7 +131,7 @@ export async function alumnosActivos(client?: PoolClient): Promise<AlumnoConDisc
                         JOIN public.usuario u ON u.usu_id = p.usu_id
                        WHERE np.nino_id = n.nino_id), '{}') AS representantes_nombres,
             COALESCE((SELECT json_agg(DISTINCT jsonb_build_object(
-                                'nombre', u.usu_nombre, 'cedula', u.usu_cedula,
+                                'usu_id', u.usu_id, 'nombre', u.usu_nombre, 'cedula', u.usu_cedula,
                                 'telefono', u.usu_telefono, 'correo', u.usu_correo))
                         FROM public.nino_padre np
                         JOIN public.padre p ON p.padre_id = np.padre_id
