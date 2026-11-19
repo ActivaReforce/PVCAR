@@ -179,3 +179,12 @@ Las consultas nuevas, ejecutadas contra `PVCAR_Dev` por MCP antes de subirlas.
 El reporte lleva la columna *Información de salud*, igual que el del sistema anterior. Es dato médico de menores en un archivo que se manda por correo y se reenvía.
 
 No la he quitado porque quitarla cambiaría en silencio un informe que ya usas. Pero conviene decidirlo: **se puede sacar de la exportación, dejarla solo en la ficha del alumno, o restringir el reporte a ciertos roles.** Dime cuál y lo cambio.
+
+## Cambios del 2026-11-18
+
+- La exportación a Excel usa **siempre los mismos filtros** que la pantalla.
+- **Alumnos:** filtros de Grado y Paralelo; columna Paralelo.
+- **Representantes:** Hijos, Curso y Paralelo en tres columnas, en el mismo orden ("—" donde falta).
+- **Pagos → Inscripciones:** Curso, Paralelo y Observaciones ("Alumno: texto", separadas por " | ").
+- **Pagos → Mensualidades:** Curso, Paralelo y Cédula.
+- **"Sacar datos para facturación"** en Pagos (Inscripciones y Mensualidades): `POST /reportes/:modulo/facturacion`, mismos permisos (`reportes:crear` + solo Propietario) y filtros que exportar. Hoja Resumen por estado con "Total a facturar"; columnas por bloque de color (pago, montos en verde y factura en azul); filas en rojo (no pagado) y en amarillo (pagado con la inscripción). Detalle en `docs/mensualidades.md`.

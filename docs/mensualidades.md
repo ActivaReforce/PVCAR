@@ -65,3 +65,15 @@ No hay costo de inscripción: la inscripción es el pago del primer mes. Desde a
 ## Pendiente
 
 1. **Recordatorio por correo** antes del día límite (la columna y el remitente `mensualidades` de `correo_config` ya están en la `0041`). No pedido.
+
+## Cambios del 2026-11-18
+
+- **Reporte de Mensualidades:** columnas Curso, Paralelo y Cédula del representante; el buscador también encuentra por cédula.
+- **"Sacar datos para facturación"** (Reportes → Pagos, `reportes.facturacion.ts`), con decisiones del cliente:
+  - una fila por pago (una transferencia = una factura), con sus meses ("Mes inscrito"), hijos, colegios y disciplinas;
+  - lo pagado con la inscripción, en amarillo y sumando al total a facturar;
+  - lo que está en revisión, en rojo;
+  - al final, en rojo, lo que se debe: una fila por representante y mes;
+  - montos en subtotal, descuento, IVA y total, más "Recaudado en el periodo";
+  - datos de factura de la ficha del representante (en las de inscripción, los de su formulario).
+- Solo el Propietario ve Mensualidades: ningún otro rol, aunque tenga `inscripciones:ver`.

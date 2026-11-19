@@ -75,9 +75,26 @@ Detalle y pruebas de 3, 4 y 5 en `docs/fase9-entrenadores.md` §1b.
 3. **No hay respaldo fuera de la base.** El 2026-10-12, al dar de baja la plataforma anterior, el cliente decidió borrar también el respaldo local. Lo que no está en `archivo` (contraseñas, salud, fotos) ya no existe.
 4. **Libertad para cambiar el modelo:** sin datos anteriores en `public`, ningún cambio de schema tiene que respetarlos.
 
-### Corte de sesión — 2026-11-17 (Mensualidades en producción)
+### Corte de sesión — 2026-11-18 (todo en `dev`; mañana a producción con 0047 y 0048)
 
 **Si pregunta "¿en qué nos quedamos?", es esto.**
+
+Todo lo de abajo está en `dev` (commits `1f5f026` → `b73435c`), probado y aprobado por el cliente en pantalla. **Siguiente (2026-11-19): PR `dev` → `main`**, con **`0047` y `0048` corridas antes en prod** y comprobadas por MCP (columnas `correo_config.corcfg_notificar_coordinador` y `nino.nino_paralelo` con `ck_nino_paralelo`). En prod hoy no está ninguna de las dos. **La 0048 va antes del merge sí o sí:** el backend nuevo lee `nino_paralelo` en Alumnos, Asistencias, Evaluaciones, Tablero, Novedades, Representantes y Reportes; sin la columna todo eso da error.
+
+- **Reportes:** Curso (y Paralelo, en columnas separadas) junto al alumno en Inscripciones, Mensualidades y Representantes; Observaciones en Inscripciones; Cédula del representante en Mensualidades; filtros de Grado y Paralelo en Alumnos. El Excel sale siempre con los mismos filtros que la pantalla.
+- **Sacar datos para facturación** (Reportes → Pagos, botón junto a Exportar, `POST /reportes/:modulo/facturacion`, `reportes.facturacion.ts`). Decisiones del cliente: Mensualidades **una fila por pago** (una transferencia = una factura); lo pagado con la inscripción **en amarillo y sumando** al total a facturar; lo no pagado en rojo y, al final, lo que se debe por representante y mes; montos en subtotal, descuento, IVA y total; Inscripciones con las anuladas en rojo, sin datos de factura y sin sumar; columna "Mes inscrito". Datos de factura: los del formulario en una inscripción; los de la ficha del representante en una mensualidad o una deuda.
+- **/estudiantes:** filtro por disciplina (solo las del alcance, `GET /estudiantes/disciplinas`) y por paralelo (`GET /estudiantes/paralelos`, 'sin' = sin paralelo); columna Paralelo.
+- **Paralelo** (`0048`): una letra mayúscula. Obligatorio en el formulario público (el backend lo valida si viene pero no lo exige, para no tumbar envíos de pestañas abiertas con la versión anterior). Editable por el personal; null en los alumnos anteriores. Sale en fichas, PDF de la ficha ("Curso" = curso + paralelo), Asistencias, Evaluaciones, Tablero, Novedades, Representantes y Reportes.
+- **Inscripciones y Mensualidades, solo del Propietario** (`esPersonal`; el Admin tampoco). El **coordinador** ve "alumnos nuevos": aprobadas de sus disciplinas, una fila por alumno, filtro de disciplinas y de colegio, paginador de 10, borde ámbar si hay observación y ficha de solo lectura sin dinero, comprobante, factura ni PDF (`GET /inscripciones/nuevos`, `/nuevos/disciplinas`, `/nuevos/:id`).
+- **/representantes:** hijos a la vista (solo los del alcance) con curso y colegio; buscador por alumno, cédula y teléfono; paginado de 20; arreglado en móvil.
+- **Novedades** (`0047`, decisión del cliente): el coordinador ve **solo** las ausencias y correcciones de los alumnos de sus colegios, **en Novedades y sin correo**. Casilla en Configuración → Notificación por ausencia, encendida por defecto.
+- Paginador: "Mostrando 1 a N" en vez de "0 a N" en todas las listas.
+- **Ojo en dev:** ningún coordinador está asignado a un colegio (`colegio_coordinador` vacía). Sin eso, un coordinador no ve alumnos, alumnos nuevos ni ausencias.
+- **Pendiente del cliente en prod:** marcar **diciembre** en los meses de cobro de los dos colegios **antes del jueves 26** (hoy solo noviembre, comprobado por MCP).
+
+### Corte de sesión — 2026-11-17 (Mensualidades en producción)
+
+**Histórico: lo reemplaza el corte del 2026-11-18.**
 
 - **Mensualidades en producción** desde el **PR #26** (2026-11-17). `0041`–`0045` corridas en prod por el cliente; esquema idéntico a dev, verificado por MCP (columnas, funciones, permisos, buckets).
 - Correos probados: el cliente comprobó en dev el de pago nuevo y el de pago aprobado. "Mensualidad pendiente" y el aviso de atrasados se simularon con el código real, mandados por Resend solo a su correo y sin tocar la base. **Se quedan como están**: el de mensualidad pendiente es un solo correo con la lista de Ausencias y el representante en el Para.

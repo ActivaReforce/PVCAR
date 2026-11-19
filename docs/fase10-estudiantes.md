@@ -106,3 +106,8 @@ Los **11 tests en `describe.skip`** que arrastraba el repo desde la Fase 1 se bo
 - **Datos que conviene saber:** 98 alumnos sin grado, solo 3 con cédula, 3 con información de salud, 5 activos sin ninguna inscripción y **0 inscripciones cruzadas de colegio**.
 - **16 pruebas de servicio nuevas** + 15 rutas cerradas sin token → **213 en el backend**.
 - `typecheck`, `lint` (0 errores) y `build` en verde.
+
+## Cambios del 2026-11-18
+
+- **Paralelo (`0048`):** `nino.nino_paralelo`, una letra A–Z o null. Va en la columna junto a Grado (en el móvil, junto a la edad), con filtro "Todos los paralelos" / "Sin paralelo" (`GET /estudiantes/paralelos`). Se edita en el modal (no es obligatorio aquí) y sale en la ficha.
+- **Filtro por disciplina** (`GET /estudiantes/disciplinas`): solo las del alcance. Al coordinador, las de sus colegios; al entrenador y sus auxiliares, las suyas. Va siempre junto al filtro de alcance, así que no lo amplía.

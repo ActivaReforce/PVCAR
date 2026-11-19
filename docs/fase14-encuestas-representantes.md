@@ -116,3 +116,9 @@ Eso lo convierte en **el único sitio del sistema donde el esquema se puede corr
 Representantes **no existe** como módulo del catálogo y no me lo inventé: ver la lista pide `usuarios:ver` y atar representados pide `estudiantes:editar`, el mismo permiso que ya pedía el endpoint gemelo en Estudiantes.
 
 **2. Publicar no manda correo. Cerrado.** La encuesta le aparece al representante la próxima vez que entra, que es lo que ya hace el código. No se monta ningún envío, ni al publicar ni después.
+
+## Cambios del 2026-11-18 — /representantes
+
+- Cada representante enseña sus hijos (solo los del alcance de quien mira) con curso, paralelo y colegio, además del teléfono.
+- El buscador encuentra por representante, alumno, cédula, correo o teléfono; el hijo que coincide se marca en ámbar.
+- Paginado en el servidor (20 por página). En el móvil, los hijos van a todo el ancho y las acciones al pie.
