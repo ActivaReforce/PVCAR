@@ -3,6 +3,7 @@ import { alcanceDe } from '../../lib/alcance.js';
 import { auditar } from '../../lib/auditoria.js';
 import { firmarFoto, firmarFotos } from '../../lib/storage.js';
 import { enTransaccion } from '../../lib/tx.js';
+import { offsetDe, paginacionSchema } from '../../lib/paginacion.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { ApiError } from '../../middleware/error.js';
 import * as repo from './representantes.repository.js';
@@ -23,7 +24,7 @@ import * as repo from './representantes.repository.js';
  * Encuestas.
  */
 
-export const listarSchema = z.object({
+export const listarSchema = paginacionSchema.extend({
   buscar: z.string().trim().max(160).optional(),
   estado: z.coerce.number().int().positive().optional(),
 });
@@ -59,8 +60,12 @@ const vacioANulo = (v: string | undefined | null): string | null => {
 export type RepresentanteConFoto = repo.RepresentanteListado & { usu_foto_url: string | null };
 
 export interface ListaRepresentantes {
-  representantes: RepresentanteConFoto[];
+  representantes: Array<RepresentanteConFoto & { hijos_lista: repo.HijoEnLista[] }>;
   conteos: repo.ConteosRepresentantes;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export async function listar(
@@ -69,11 +74,12 @@ export async function listar(
 ): Promise<ListaRepresentantes> {
   const alcance = await alcanceDe(actor.usuario);
 
-  const [lista, conteos] = await Promise.all([
+  const [{ items: lista, total }, conteos] = await Promise.all([
     repo.listarRepresentantes(
       alcance,
       query.buscar && query.buscar.length > 0 ? query.buscar : null,
       query.estado ?? null,
+      { limit: query.limit, offset: offsetDe(query) },
     ),
     repo.contarRepresentantes(alcance),
   ]);
@@ -86,6 +92,10 @@ export async function listar(
       usu_foto_url: r.usu_foto ? (firmadas.get(r.usu_foto) ?? r.usu_foto) : null,
     })),
     conteos,
+    total,
+    page: query.page,
+    limit: query.limit,
+    totalPages: total === 0 ? 0 : Math.ceil(total / query.limit),
   };
 }
 
@@ -107,7 +117,7 @@ async function exigirVisible(
   const alcance = await alcanceDe(actor.usuario);
   if (alcance.global) return { representante, alcance };
 
-  const visibles = await repo.listarRepresentantes(alcance, null, null);
+  const { items: visibles } = await repo.listarRepresentantes(alcance, null, null);
   if (!visibles.some((r) => r.usu_id === usuId)) {
     throw new ApiError(403, 'Ese representante esta fuera de tu alcance');
   }

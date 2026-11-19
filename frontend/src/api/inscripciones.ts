@@ -1,5 +1,6 @@
 import type { HorarioDisciplina } from '@/api/disciplinas';
 import { api, apiFetch } from '@/lib/api';
+import type { DisciplinaDeFiltro } from '@/api/estudiantes';
 
 /**
  * Cliente de Inscripciones (Fase 14B).
@@ -538,14 +539,17 @@ export const inscripcionesApi = {
   },
   detalle: (id: number) => api.get<InscripcionDetalle>(`/inscripciones/${id}`),
   /** Alumnos nuevos de sus disciplinas (coordinador): solo aprobadas, sin montos. */
-  nuevos: (filtros: { buscar?: string; colegio?: number; page?: number }) => {
+  nuevos: (filtros: { buscar?: string; colegio?: number; disciplina?: number; page?: number }) => {
     const qs = new URLSearchParams();
+    qs.set('limit', '10');
     if (filtros.colegio) qs.set('colegio', String(filtros.colegio));
+    if (filtros.disciplina) qs.set('disciplina', String(filtros.disciplina));
     if (filtros.buscar) qs.set('buscar', filtros.buscar);
     if (filtros.page) qs.set('page', String(filtros.page));
     const sufijo = qs.toString();
     return api.get<ListaAlumnosNuevos>(`/inscripciones/nuevos${sufijo ? `?${sufijo}` : ''}`);
   },
+  disciplinasDeNuevos: () => api.get<DisciplinaDeFiltro[]>('/inscripciones/nuevos/disciplinas'),
   /** El número rojo del menú: pendientes y si las inscripciones están abiertas. */
   /** `mensualidades`: opcional, Vercel puede publicar antes que Railway. */
   aviso: () => api.get<{ pendientes: number; mensualidades?: number; abiertas: boolean }>('/inscripciones/aviso'),

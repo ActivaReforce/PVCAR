@@ -831,8 +831,17 @@ export async function nuevos(
 ): Promise<Pagina<repo.AlumnoNuevo>> {
   const alcance = await alcanceDe(actor.usuario);
   if (!alcance.global && alcance.disciplinas.length === 0) return armarPagina([], 0, query);
+  // Una disciplina fuera de su alcance no amplía nada: no hay nadie que ver.
+  if (query.disciplina && !alcance.global && !alcance.disciplinas.includes(query.disciplina)) {
+    return armarPagina([], 0, query);
+  }
   const { items, total } = await repo.listarNuevos(query, alcance.global ? null : alcance.disciplinas);
   return armarPagina(items, total, query);
+}
+
+/** Las disciplinas del filtro de alumnos nuevos: las de su alcance. */
+export async function disciplinasDeNuevos(actor: AuthUser): Promise<estudiantesRepo.DisciplinaDeFiltro[]> {
+  return estudiantesRepo.listarDisciplinasDeFiltro(await alcanceDe(actor.usuario));
 }
 
 export async function listar(actor: AuthUser, query: ListarInscripcionesQuery): Promise<ListaInscripciones> {

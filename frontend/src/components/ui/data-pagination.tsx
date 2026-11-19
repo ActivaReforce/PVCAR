@@ -28,7 +28,7 @@ export function DataPagination({
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
       <div className="text-sm text-muted-foreground order-2 sm:order-1">
-        Mostrando {startIndex} a {endIndex} de {totalItems} {itemName}
+        Mostrando {totalItems === 0 ? 0 : startIndex + 1} a {endIndex} de {totalItems} {itemName}
       </div>
       
       <div className="flex items-center space-x-2 order-1 sm:order-2">

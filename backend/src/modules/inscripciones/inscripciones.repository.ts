@@ -781,12 +781,13 @@ export async function listarNuevos(
       WHERE i.ins_estado = 'aprobada'
         AND d.disciplinas IS NOT NULL
         AND ($3::int IS NULL OR d.col_id = $3)
+        AND ($6::int IS NULL OR $6 = ANY(n.insnino_disciplinas))
         AND ($2::text IS NULL
              OR ${contieneSinTildes("COALESCE(n.insnino_datos->>'nombre', '')", '$2')}
              OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre', '')", '$2')})
       ORDER BY i.ins_fecha_aprobacion DESC NULLS LAST, i.ins_id DESC, n.insnino_orden
       LIMIT $4 OFFSET $5`,
-    [disciplinas, buscar, query.colegio ?? null, query.limit, offsetDe(query)],
+    [disciplinas, buscar, query.colegio ?? null, query.limit, offsetDe(query), query.disciplina ?? null],
   );
   const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
   return { items: rows.map(({ total: _t, ...resto }) => resto), total };

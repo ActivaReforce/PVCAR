@@ -1,17 +1,18 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import DebouncedSearchInput from '@/components/ui/debounced-search-input';
-import { useAlumnosNuevos } from '@/hooks/useInscripciones';
-import { useColegiosVisibles } from '@/hooks/useColegios';
+import { DataPagination } from '@/components/ui/data-pagination';
+import { useAlumnosNuevos, useDisciplinasDeNuevos } from '@/hooks/useInscripciones';
 import { fechaCorta } from './formato';
 
 const TODOS = 'todos';
@@ -25,21 +26,33 @@ const TODOS = 'todos';
 const AlumnosNuevos = () => {
   const [busqueda, setBusqueda] = useState('');
   const [colegio, setColegio] = useState(TODOS);
+  const [disciplina, setDisciplina] = useState(TODOS);
   const [pagina, setPagina] = useState(1);
 
-  const colegios = useColegiosVisibles();
+  // Colegios y disciplinas salen de su alcance (las de sus colegios).
+  const disciplinas = useDisciplinasDeNuevos();
+  const todas = disciplinas.data ?? [];
+  const opcionesColegio = [...new Map(todas.map((d) => [d.col_id, d.col_nombre] as const)).entries()]
+    .map(([col_id, col_nombre]) => ({ col_id, col_nombre }))
+    .sort((a, b) => a.col_nombre.localeCompare(b.col_nombre, 'es'));
+  const opcionesDisciplina = todas.filter((d) => colegio === TODOS || d.col_id === Number(colegio));
+  const grupos = [...new Set(opcionesDisciplina.map((d) => d.col_nombre))].map((nombre) => ({
+    nombre,
+    items: opcionesDisciplina.filter((d) => d.col_nombre === nombre),
+  }));
+
   const lista = useAlumnosNuevos({
     buscar: busqueda || undefined,
     colegio: colegio === TODOS ? undefined : Number(colegio),
+    disciplina: disciplina === TODOS ? undefined : Number(disciplina),
     page: pagina,
   });
   const datos = lista.data;
   const items = datos?.items ?? [];
-  const opcionesColegio = colegios.data?.items ?? [];
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <DebouncedSearchInput
           placeholder="Buscar por alumno o representante..."
           value={busqueda}
@@ -47,13 +60,39 @@ const AlumnosNuevos = () => {
             setBusqueda(v);
             setPagina(1);
           }}
-          className="w-full lg:col-span-2"
+          className="w-full sm:col-span-2"
         />
+        <Select
+          value={disciplina}
+          onValueChange={(v) => {
+            setDisciplina(v);
+            setPagina(1);
+          }}
+        >
+          <SelectTrigger className="h-11 sm:h-10" aria-label="Disciplina">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todas las disciplinas</SelectItem>
+            {grupos.map((g) => (
+              <SelectGroup key={g.nombre}>
+                {grupos.length > 1 && <SelectLabel>{g.nombre}</SelectLabel>}
+                {g.items.map((d) => (
+                  <SelectItem key={d.colacthor_id} value={String(d.colacthor_id)}>
+                    {d.act_nombre}
+                    {d.horario_texto ? ` · ${d.horario_texto}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
         {opcionesColegio.length > 1 && (
           <Select
             value={colegio}
             onValueChange={(v) => {
               setColegio(v);
+              setDisciplina(TODOS);
               setPagina(1);
             }}
           >
@@ -81,7 +120,7 @@ const AlumnosNuevos = () => {
         <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
           <UserPlus className="mx-auto mb-3 h-10 w-10 opacity-50" />
           <p className="text-lg">
-            {busqueda || colegio !== TODOS
+            {busqueda || colegio !== TODOS || disciplina !== TODOS
               ? 'Nadie con ese filtro'
               : 'Aún no hay alumnos inscritos en tus disciplinas'}
           </p>
@@ -116,32 +155,18 @@ const AlumnosNuevos = () => {
         </ul>
       )}
 
-      {datos && datos.totalPages > 1 && (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-muted-foreground">
-            Página {datos.page} de {datos.totalPages} · {datos.total} en total
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Página anterior"
-              disabled={datos.page <= 1}
-              onClick={() => setPagina((p) => p - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Página siguiente"
-              disabled={datos.page >= datos.totalPages}
-              onClick={() => setPagina((p) => p + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      {datos && items.length > 0 && (
+        <DataPagination
+          currentPage={datos.page}
+          totalPages={datos.totalPages}
+          onPageChange={setPagina}
+          canGoNext={datos.page < datos.totalPages}
+          canGoPrevious={datos.page > 1}
+          startIndex={(datos.page - 1) * datos.limit}
+          endIndex={Math.min(datos.page * datos.limit, datos.total)}
+          totalItems={datos.total}
+          itemName="alumnos"
+        />
       )}
     </div>
   );

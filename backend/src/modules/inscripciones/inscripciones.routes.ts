@@ -176,7 +176,8 @@ inscripcionesRouter.use((req: Request, _res: Response, next: NextFunction) => {
   try {
     if (service.esPersonal(actor(req))) return next();
     const lectura =
-      req.method === 'GET' && (req.path === '/' || req.path === '/nuevos' || /^\/\d+$/.test(req.path));
+      req.method === 'GET' &&
+      (req.path === '/' || req.path === '/nuevos' || req.path === '/nuevos/disciplinas' || /^\/\d+$/.test(req.path));
     if (!lectura) throw new ApiError(403, 'Solo el personal de Activa Reforce puede hacer esto');
     next();
   } catch (err) {
@@ -205,6 +206,18 @@ inscripcionesRouter.get(
     try {
       const query = listarNuevosSchema.parse(req.query);
       res.json({ data: await service.nuevos(actor(req), query), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+inscripcionesRouter.get(
+  '/nuevos/disciplinas',
+  requirePermission('inscripciones', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.disciplinasDeNuevos(actor(req)), error: null });
     } catch (err) {
       next(err);
     }

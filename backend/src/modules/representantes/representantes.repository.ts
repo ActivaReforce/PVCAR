@@ -48,6 +48,17 @@ export interface RepresentanteListado {
   encuestasRespondidas: number;
 }
 
+/** Un hijo de la lista (2026-11-18): solo los del alcance de quien mira. */
+export interface HijoEnLista {
+  nino_id: number;
+  nino_nombre: string;
+  col_nombre: string;
+  catninograd_nombre: string | null;
+  est_id: number;
+}
+
+export type RepresentanteConHijos = RepresentanteListado & { hijos_lista: HijoEnLista[] };
+
 export interface HijoListado {
   ninopadre_id: number;
   nino_id: number;
@@ -88,12 +99,28 @@ const DESDE = `
     LEFT JOIN public.padre p ON p.usu_id = u.usu_id
 `;
 
+/** El niño `n` está en el alcance ($1 global, $2 colegios, $3 disciplinas). */
+const HIJO_EN_ALCANCE = `($1::boolean
+         OR n.col_id = ANY($2::int[])
+         OR EXISTS (SELECT 1 FROM public.nino_asignacion na
+                     WHERE na.nino_id = n.nino_id
+                       AND na.est_id = ${ESTADO.ACTIVO}
+                       AND na.colacthor_id = ANY($3::int[])))`;
+
+/**
+ * La lista (2026-11-18): con los hijos a la vista —solo los del alcance: a
+ * un coordinador no se le enseñan los hermanos de otro colegio— y buscando
+ * también por el nombre del hijo, para llegar al representante de un alumno
+ * sin pasar por su ficha. Paginada; sin `pagina` las trae todas (la usa
+ * `exigirVisible`).
+ */
 export async function listarRepresentantes(
   alcance: Alcance,
   buscar: string | null,
   estado: number | null,
-): Promise<RepresentanteListado[]> {
-  const { rows } = await getPool().query<RepresentanteListado>(
+  pagina?: { limit: number; offset: number },
+): Promise<{ items: RepresentanteConHijos[]; total: number }> {
+  const { rows } = await getPool().query<RepresentanteConHijos & { total: string }>(
     `SELECT u.usu_id,
             u.usu_nombre,
             u.usu_correo,
@@ -110,16 +137,48 @@ export async function listarRepresentantes(
             COALESCE((SELECT count(*) FROM public.nino_padre np
                        WHERE np.padre_id = p.padre_id), 0)::int AS hijos,
             COALESCE((SELECT count(*) FROM public.encuesta_respondida er
-                       WHERE er.padre_id = p.padre_id), 0)::int AS "encuestasRespondidas"
+                       WHERE er.padre_id = p.padre_id), 0)::int AS "encuestasRespondidas",
+            COALESCE((
+              SELECT json_agg(json_build_object(
+                       'nino_id', n.nino_id,
+                       'nino_nombre', n.nino_nombre,
+                       'col_nombre', c.col_nombre,
+                       'catninograd_nombre', g.catninograd_nombre,
+                       'est_id', n.est_id) ORDER BY n.nino_nombre)
+                FROM public.nino_padre np
+                JOIN public.nino n ON n.nino_id = np.nino_id
+                JOIN public.colegio c ON c.col_id = n.col_id
+                LEFT JOIN public.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id
+               WHERE np.padre_id = p.padre_id AND ${HIJO_EN_ALCANCE}
+            ), '[]'::json) AS hijos_lista,
+            count(*) OVER() AS total
      ${DESDE}
      WHERE ${F_ALCANCE}
-       AND ($4::text IS NULL OR ${contieneSinTildes('u.usu_nombre', '$4')}
-                             OR ${contieneSinTildes('u.usu_correo', '$4')})
+       AND ($4::text IS NULL
+            OR ${contieneSinTildes('u.usu_nombre', '$4')}
+            OR ${contieneSinTildes('u.usu_correo', '$4')}
+            OR ${contieneSinTildes("COALESCE(u.usu_cedula, '')", '$4')}
+            OR ${contieneSinTildes("COALESCE(u.usu_telefono, '')", '$4')}
+            OR EXISTS (SELECT 1 FROM public.nino_padre np
+                         JOIN public.nino n ON n.nino_id = np.nino_id
+                        WHERE np.padre_id = p.padre_id
+                          AND ${HIJO_EN_ALCANCE}
+                          AND ${contieneSinTildes('n.nino_nombre', '$4')}))
        AND ($5::int IS NULL OR u.est_id = $5)
-     ORDER BY u.usu_nombre`,
-    [alcance.global, alcance.colegios, alcance.disciplinas, buscar, estado],
+     ORDER BY u.usu_nombre, u.usu_id
+     LIMIT $6 OFFSET $7`,
+    [
+      alcance.global,
+      alcance.colegios,
+      alcance.disciplinas,
+      buscar,
+      estado,
+      pagina?.limit ?? null,
+      pagina?.offset ?? 0,
+    ],
   );
-  return rows;
+  const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
+  return { items: rows.map(({ total: _t, ...resto }) => resto), total };
 }
 
 export interface ConteosRepresentantes {

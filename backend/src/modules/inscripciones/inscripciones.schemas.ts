@@ -301,6 +301,8 @@ export type ListarInscripcionesQuery = z.infer<typeof listarSchema>;
 export const listarNuevosSchema = paginacionSchema.extend({
   buscar: z.string().trim().max(160).optional(),
   colegio: z.coerce.number().int().positive().optional(),
+  /** Una disciplina (colacthor_id) de su alcance. */
+  disciplina: z.coerce.number().int().positive().optional(),
 });
 
 export type ListarNuevosQuery = z.infer<typeof listarNuevosSchema>;

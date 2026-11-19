@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, FileText, Search, UserRoundPlus, Users } from 'lucide-react';
+import { Eye, FileText, Phone, Search, UserRoundPlus, Users } from 'lucide-react';
+import { DataPagination } from '@/components/ui/data-pagination';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,10 @@ import FichaRepresentanteDialog from '@/components/representantes/FichaRepresent
 import DocumentosRepresentanteDialog from '@/components/representantes/DocumentosRepresentanteDialog';
 
 const TODOS = 'todos';
+const POR_PAGINA = 20;
+
+/** Para resaltar el hijo que coincide con la búsqueda (sin tildes ni mayúsculas). */
+const plano = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 /**
  * Representantes.
@@ -54,6 +59,7 @@ const TODOS = 'todos';
 const Representantes = () => {
   const [busqueda, setBusqueda] = useState('');
   const [estado, setEstado] = useState('1');
+  const [page, setPage] = useState(1);
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [viendoId, setViendoId] = useState<number | null>(null);
   const [documentosDe, setDocumentosDe] = useState<{ usuId: number; nombre: string } | null>(null);
@@ -63,10 +69,15 @@ const Representantes = () => {
   const lista = useRepresentantes({
     buscar: busqueda || undefined,
     estado: estado === TODOS ? undefined : Number(estado),
+    page,
+    limit: POR_PAGINA,
   });
 
   const representantes = lista.data?.representantes ?? [];
   const conteos = lista.data?.conteos;
+  const totalItems = lista.data?.total ?? 0;
+  const totalPages = lista.data?.totalPages ?? 0;
+  const buscado = plano(busqueda.trim());
 
   if (lista.isLoading && !lista.data) {
     return (
@@ -113,12 +124,21 @@ const Representantes = () => {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <DebouncedSearchInput
-          placeholder="Buscar por nombre o correo..."
+          placeholder="Buscar por representante, alumno, cédula, correo o teléfono..."
           value={busqueda}
-          onChange={setBusqueda}
+          onChange={(v) => {
+            setBusqueda(v);
+            setPage(1);
+          }}
           className="w-full sm:col-span-2"
         />
-        <Select value={estado} onValueChange={setEstado}>
+        <Select
+          value={estado}
+          onValueChange={(v) => {
+            setEstado(v);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="h-11 sm:h-10">
             <SelectValue />
           </SelectTrigger>
@@ -130,7 +150,14 @@ const Representantes = () => {
         </Select>
       </div>
 
-      {representantes.length === 0 && (
+      {representantes.length === 0 && (busqueda || estado !== '1') && (conteos?.total ?? 0) > 0 && (
+        <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
+          <Search className="mx-auto mb-3 h-10 w-10 opacity-50" />
+          <p className="text-lg">Nadie coincide con la búsqueda</p>
+        </div>
+      )}
+
+      {representantes.length === 0 && (conteos?.total ?? 0) === 0 && (
         <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
           <Users className="mx-auto mb-3 h-10 w-10 opacity-50" />
           <p className="text-lg">Todavía no hay representantes</p>
@@ -146,20 +173,53 @@ const Representantes = () => {
           {representantes.map((r) => (
             <li
               key={r.usu_id}
-              className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center"
+              className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start"
             >
-              <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
                 <Avatar className="h-10 w-10 flex-shrink-0">
                   <AvatarImage src={r.usu_foto_url ?? undefined} alt="" />
                   <AvatarFallback>{iniciales(r.usu_nombre)}</AvatarFallback>
                 </Avatar>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="truncate font-medium" title={r.usu_nombre}>
                     {r.usu_nombre}
                   </div>
                   <div className="truncate text-sm text-muted-foreground">
                     {r.usu_correo}
+                    {r.usu_telefono && (
+                      <span className="whitespace-nowrap">
+                        {' · '}
+                        <Phone className="inline h-3 w-3 align-[-1px]" aria-hidden /> {r.usu_telefono}
+                      </span>
+                    )}
                   </div>
+                  {/* Los hijos a la vista (2026-11-18), para llegar al
+                      representante de un alumno sin abrir su ficha. */}
+                  {r.hijos_lista.length > 0 && (
+                    <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Representados">
+                      {r.hijos_lista.map((h) => {
+                        const coincide = buscado.length > 0 && plano(h.nino_nombre).includes(buscado);
+                        return (
+                          <li
+                            key={h.nino_id}
+                            className={
+                              'rounded-md border px-2 py-1 text-xs leading-tight ' +
+                              (coincide
+                                ? 'border-amber-500 bg-amber-50 text-foreground dark:border-amber-400 dark:bg-amber-950/40'
+                                : 'bg-muted/40 text-foreground')
+                            }
+                          >
+                            <span className="font-medium">{h.nino_nombre}</span>
+                            <span className="text-muted-foreground">
+                              {' · '}
+                              {[h.catninograd_nombre, h.col_nombre].filter(Boolean).join(' · ')}
+                              {h.est_id !== 1 && ' · inactivo'}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
               </div>
 
@@ -168,11 +228,7 @@ const Representantes = () => {
                   <Badge variant="destructive">Sin ficha</Badge>
                 ) : r.hijos === 0 ? (
                   <Badge variant="secondary">Sin representados</Badge>
-                ) : (
-                  <Badge variant="default">
-                    {r.hijos} representado{r.hijos === 1 ? '' : 's'}
-                  </Badge>
-                )}
+                ) : null}
 
                 {r.encuestasRespondidas > 0 && (
                   <span className="text-sm text-muted-foreground">
@@ -221,6 +277,20 @@ const Representantes = () => {
             </li>
           ))}
         </ul>
+      )}
+
+      {representantes.length > 0 && (
+        <DataPagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          canGoNext={page < totalPages}
+          canGoPrevious={page > 1}
+          startIndex={(page - 1) * POR_PAGINA}
+          endIndex={Math.min(page * POR_PAGINA, totalItems)}
+          totalItems={totalItems}
+          itemName="representantes"
+        />
       )}
 
       <DialogoRepresentados usuId={editandoId} onClose={() => setEditandoId(null)} />

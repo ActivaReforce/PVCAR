@@ -15,11 +15,25 @@ function mensajeDe(error: unknown): string {
 }
 
 /** Alumnos nuevos de sus disciplinas (vista del coordinador). */
-export function useAlumnosNuevos(filtros: { buscar?: string; colegio?: number; page?: number }) {
+export function useAlumnosNuevos(filtros: {
+  buscar?: string;
+  colegio?: number;
+  disciplina?: number;
+  page?: number;
+}) {
   return useQuery({
     queryKey: ['inscripciones', 'nuevos', filtros],
     queryFn: () => inscripcionesApi.nuevos(filtros),
     placeholderData: (anterior) => anterior,
+  });
+}
+
+/** Opciones del filtro de disciplinas de alumnos nuevos (su alcance). */
+export function useDisciplinasDeNuevos() {
+  return useQuery({
+    queryKey: ['inscripciones', 'nuevos', 'disciplinas'],
+    queryFn: () => inscripcionesApi.disciplinasDeNuevos(),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
