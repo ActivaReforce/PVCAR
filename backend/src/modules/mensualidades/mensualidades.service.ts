@@ -608,6 +608,7 @@ export interface RegistroMensual {
   aprobado: boolean;
   disciplinas: string[];
   representante: string;
+  cedula: string;
   telefono: string;
   correo: string;
   baja: boolean;
@@ -657,6 +658,7 @@ export async function registrosMensuales(colegios: number[] | null): Promise<Reg
       nino_id: ninoId,
       alumno: a.nombre,
       representante: contacto?.nombre ?? a.representantes_nombres[0] ?? '',
+      cedula: contacto?.cedula ?? '',
       telefono: contacto?.telefono ?? '',
       correo: contacto?.correo ?? '',
       baja: false,
@@ -727,6 +729,7 @@ export async function registrosMensuales(colegios: number[] | null): Promise<Reg
       aprobado,
       disciplinas: [...new Set(regs.flatMap((x) => x.disciplinas.map(soloActividad)))],
       representante: contacto?.nombre ?? '',
+      cedula: contacto?.cedula ?? '',
       telefono: contacto?.telefono ?? '',
       correo: contacto?.correo ?? '',
       // De baja: tenía alumno y ya no está activo (una inscripción sin aprobar aún no tiene alumno).

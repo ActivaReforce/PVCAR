@@ -1275,6 +1275,7 @@ const mensualidades: Definicion = {
     { clave: 'mes_pago', cabecera: 'Mes de pago', ancho: 15 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 30 },
     { clave: 'representante', cabecera: 'Representante', ancho: 30 },
+    { clave: 'cedula', cabecera: 'Cédula', ancho: 14 },
     { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
     { clave: 'correo', cabecera: 'Correo', ancho: 30 },
   ],
@@ -1297,7 +1298,7 @@ const mensualidades: Definicion = {
       // Con «Todo», lo que aún no llega y está sin pagar no sale; eligiendo el mes, sí.
       if (r.futuro && !explicitos) continue;
       if (estados && !estados.includes(r.estado)) continue;
-      if (buscar && !plano(`${r.alumno} ${r.representante} ${r.correo}`).includes(buscar)) continue;
+      if (buscar && !plano(`${r.alumno} ${r.representante} ${r.cedula} ${r.correo}`).includes(buscar)) continue;
       const recaudado = entroEnElPeriodo ? r.valor : 0;
       const adelantado = r.mes_pago !== null && r.mes_pago < r.mes;
       const con = r.pagado_con === 'inscripcion' ? 'Inscripción' : r.pagado_con === 'mensualidad' ? 'Mensualidad' : 'Sin pagar';
@@ -1316,6 +1317,7 @@ const mensualidades: Definicion = {
         mes_pago: r.mes_pago ? nombreDeMes(r.mes_pago) : '',
         disciplinas: r.disciplinas.join(', '),
         representante: r.representante,
+        cedula: r.cedula,
         telefono: r.telefono,
         correo: r.correo,
         _mes: r.mes,
