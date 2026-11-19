@@ -19,6 +19,8 @@ export interface EstudianteListado {
   col_nombre: string;
   catninograd_id: number | null;
   catninograd_nombre: string | null;
+  /** Una letra (0048); null en los anteriores. */
+  nino_paralelo: string | null;
   est_id: number;
   nino_fecha_creacion: string | null;
   /** Inscripciones activas. */
@@ -135,6 +137,9 @@ const F_SIN_ASIGNAR = `(NOT $7::boolean OR COALESCE(insc.n, 0) = 0)`;
 const fGrado = (p: string) => `(${p}::int IS NULL OR n.catninograd_id = ${p})`;
 const F_GRADO = fGrado('$8');
 const F_ESTADO = `($9::int IS NULL OR n.est_id = $9)`;
+/** Paralelo (0048): una letra, o 'sin' para los que aún no lo tienen. Numerado aparte, como el grado. */
+const fParalelo = (p: string) =>
+  `(${p}::text IS NULL OR (${p} = 'sin' AND n.nino_paralelo IS NULL) OR n.nino_paralelo = ${p})`;
 
 const COLUMNAS_ORDEN: Record<string, string> = {
   nombre: 'n.nino_nombre',
@@ -167,6 +172,7 @@ const COLUMNAS = `
         col.col_nombre,
         n.catninograd_id,
         g.catninograd_nombre,
+        n.nino_paralelo,
         n.est_id,
         n.nino_fecha_creacion,
         COALESCE(insc.n, 0)::int AS disciplinas,
@@ -208,11 +214,11 @@ export async function listarEstudiantes(
     SELECT ${COLUMNAS}, count(*) OVER() AS total
     ${DESDE}
     WHERE ${F_ALCANCE} AND ${F_BUSCAR} AND ${F_COLEGIO} AND ${F_DISCIPLINA}
-      AND ${F_SIN_ASIGNAR} AND ${F_GRADO} AND ${F_ESTADO}
+      AND ${F_SIN_ASIGNAR} AND ${F_GRADO} AND ${F_ESTADO} AND ${fParalelo('$12')}
     ORDER BY ${columna} ${direccion} NULLS LAST, n.nino_id ASC
     LIMIT $10 OFFSET $11
     `,
-    [...params(query, alcance), paginacion.limit, offsetDe(paginacion)],
+    [...params(query, alcance), paginacion.limit, offsetDe(paginacion), query.paralelo ?? null],
   );
 
   const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
@@ -243,7 +249,7 @@ export async function contarEstudiantes(
     WITH base AS (
         SELECT n.est_id, COALESCE(insc.n, 0) AS inscripciones
         ${DESDE}
-        WHERE ${F_ALCANCE} AND ${F_BUSCAR} AND ${F_COLEGIO} AND ${fGrado('$6')}
+        WHERE ${F_ALCANCE} AND ${F_BUSCAR} AND ${F_COLEGIO} AND ${fGrado('$6')} AND ${fParalelo('$7')}
     )
     SELECT count(*)                                            AS total,
            count(*) FILTER (WHERE est_id = ${ESTADO.ACTIVO})   AS activos,
@@ -258,6 +264,7 @@ export async function contarEstudiantes(
   const { rows } = await getPool().query<Record<string, string>>(sql, [
     ...params(query, alcance).slice(0, 5),
     query.grado ?? null,
+    query.paralelo ?? null,
   ]);
 
   const n = (k: string): number => Number(rows[0]?.[k] ?? 0);
@@ -854,6 +861,31 @@ export async function listarDisciplinasDeFiltro(alcance: Alcance): Promise<Disci
         AND ($1::boolean OR cah.colacthor_id = ANY($2::int[]))
       ORDER BY col.col_nombre, act.act_nombre, ${primerHorario('cah')}`,
     [alcance.global, alcance.disciplinas],
+  );
+  return rows;
+}
+
+/** Paralelo del alumno (0048). null lo quita. */
+export async function fijarParalelo(client: PoolClient, ninoId: number, paralelo: string | null): Promise<void> {
+  await client.query(
+    'UPDATE public.nino SET nino_paralelo = $2, nino_fecha_modificacion = now() WHERE nino_id = $1',
+    [ninoId, paralelo],
+  );
+}
+
+/** Opciones del filtro de paralelo: las letras en uso y los que no tienen, con sus activos. */
+export interface ParaleloConteo {
+  paralelo: string | null;
+  estudiantes: number;
+}
+
+export async function listarParalelos(): Promise<ParaleloConteo[]> {
+  const { rows } = await getPool().query<ParaleloConteo>(
+    `SELECT n.nino_paralelo AS paralelo, count(*)::int AS estudiantes
+       FROM public.nino n
+      WHERE n.est_id = ${ESTADO.ACTIVO}
+      GROUP BY n.nino_paralelo
+      ORDER BY n.nino_paralelo NULLS LAST`,
   );
   return rows;
 }

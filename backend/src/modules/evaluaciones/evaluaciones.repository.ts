@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
+import { cursoConParaleloSql } from '../../lib/paralelo.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
@@ -711,7 +712,7 @@ export async function listarPendientes(query: ListarPendientesQuery): Promise<Al
             n.nino_id,
             n.nino_nombre,
             n.nino_foto,
-            g.catninograd_nombre,
+            ${cursoConParaleloSql('g.catninograd_nombre', 'n.nino_paralelo')} AS catninograd_nombre,
             np.est_id,
             np.evaninopen_fecha_finalizacion,
             reg.usu_nombre AS evaluado_por,
@@ -729,7 +730,7 @@ export async function listarPendientes(query: ListarPendientesQuery): Promise<Al
         AND ($3::int IS NULL OR np.est_id = $3)
         AND ($4::text IS NULL OR ${contieneSinTildes('n.nino_nombre', '$4')})
       GROUP BY np.evaninopen_id, n.nino_id, n.nino_nombre, n.nino_foto,
-               g.catninograd_nombre, np.est_id, np.evaninopen_fecha_finalizacion, reg.usu_nombre
+               g.catninograd_nombre, n.nino_paralelo, np.est_id, np.evaninopen_fecha_finalizacion, reg.usu_nombre
       ORDER BY n.nino_nombre`,
     [
       query.evaluacion,

@@ -10,6 +10,7 @@ import { ESTADO, ROL } from '../../lib/constants.js';
 import { alcanceDe } from '../../lib/alcance.js';
 import { diaDeCruce, horarioLargo, type HorarioDisciplina } from '../../lib/horarios.js';
 import { enTransaccion } from '../../lib/tx.js';
+import { cursoConParalelo } from '../../lib/paralelo.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { escaparHtml } from '../../lib/correo.js';
 import { borrarFoto } from '../../lib/storage.js';
@@ -232,7 +233,8 @@ export function datosDelPaquete(
     alumno: {
       nombre: nino.nombre,
       fecha_nacimiento: nino.fecha_nacimiento,
-      curso: nino.documento.curso,
+      // Con su paralelo (0048). Las guardadas antes no lo traen: salen igual que siempre.
+      curso: cursoConParalelo(nino.documento.curso, nino.paralelo),
       actividades: nino.documento.actividades,
       horarios: nino.documento.horarios,
       modalidad_salida: nino.modalidad_salida,
@@ -892,7 +894,10 @@ export async function fichaDeNuevo(actor: AuthUser, insninoId: number): Promise<
     alumno: {
       insnino_id: n.insnino_id,
       datos,
-      curso: grados.get(n.insnino_datos.catninograd_id) ?? documento?.curso ?? null,
+      curso: cursoConParalelo(
+        grados.get(n.insnino_datos.catninograd_id) ?? documento?.curso ?? null,
+        n.insnino_datos.paralelo,
+      ),
       colegio: disciplinas[0]?.col_nombre ?? documento?.colegio.sede ?? null,
       disciplinas: disciplinas.map(describirDisciplina),
       constancias: aceptaciones
@@ -1364,6 +1369,7 @@ export async function aprobar(
           // Si se dio de baja (p. ej. al anular una inscripción suya con
           // historia) y vuelve, vuelve activo.
           await estudiantesRepo.cambiarEstado(client, destino, ESTADO.ACTIVO);
+          if (d.paralelo) await estudiantesRepo.fijarParalelo(client, destino, d.paralelo);
           await repo.marcarSaludAutorizada(client, destino, d.salud.autoriza);
           await estudiantesRepo.sumarObservacion(client, destino, d.observacion_extra ?? null);
           await estudiantesRepo.guardarContacto(client, destino, 'emergencia', { ...d.emergencia, cedula: null });
@@ -1392,6 +1398,7 @@ export async function aprobar(
           foto: null,
         });
         await repo.marcarSaludAutorizada(client, ninoId, d.salud.autoriza);
+        if (d.paralelo) await estudiantesRepo.fijarParalelo(client, ninoId, d.paralelo);
         await estudiantesRepo.sumarObservacion(client, ninoId, d.observacion_extra ?? null);
         await estudiantesRepo.guardarContacto(client, ninoId, 'emergencia', { ...d.emergencia, cedula: null });
         await estudiantesRepo.guardarContacto(client, ninoId, 'retiro', d.retiro);

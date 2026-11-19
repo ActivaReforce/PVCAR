@@ -152,6 +152,7 @@ export async function crear(
       imagen: input.imagen ?? null,
       foto: vacioANulo(input.nino_foto ?? undefined),
     });
+    if (input.nino_paralelo) await repo.fijarParalelo(client, nuevoId, input.nino_paralelo);
     if (input.contacto_emergencia) {
       await repo.guardarContacto(client, nuevoId, 'emergencia', input.contacto_emergencia);
     }
@@ -267,6 +268,7 @@ export async function actualizar(
       foto: input.nino_foto === null ? null : vacioANulo(input.nino_foto ?? undefined),
       tocarFoto: input.nino_foto !== undefined,
     });
+    if (input.nino_paralelo !== undefined) await repo.fijarParalelo(client, ninoId, input.nino_paralelo);
     if (input.contacto_emergencia !== undefined) {
       await repo.guardarContacto(client, ninoId, 'emergencia', input.contacto_emergencia);
     }
@@ -605,6 +607,10 @@ export async function soltarRepresentante(
 /** Opciones del filtro por disciplina, dentro del alcance de quien pregunta. */
 export async function disciplinasDeFiltro(actor: AuthUser): Promise<repo.DisciplinaDeFiltro[]> {
   return repo.listarDisciplinasDeFiltro(await alcanceDe(actor.usuario));
+}
+
+export async function paralelos(): Promise<repo.ParaleloConteo[]> {
+  return repo.listarParalelos();
 }
 
 export async function grados(): Promise<repo.Grado[]> {

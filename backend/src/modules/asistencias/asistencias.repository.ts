@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
+import { cursoConParaleloSql } from '../../lib/paralelo.js';
 import { ESTADO } from '../../lib/constants.js';
 import { horarioTexto, horariosJson, tieneDia, type HorarioDisciplina } from '../../lib/horarios.js';
 import { diaEc, textoEc } from '../../lib/fecha.js';
@@ -168,7 +169,7 @@ export async function listarAlumnosDeSesion(
      SELECT n.nino_id,
             n.nino_nombre,
             n.nino_foto,
-            g.catninograd_nombre,
+            ${cursoConParaleloSql('g.catninograd_nombre', 'n.nino_paralelo')} AS catninograd_nombre,
             (i.nino_id IS NOT NULL) AS inscrito,
             an.asisest_id,
             to_char(an.asisnino_hora_tarde, 'HH24:MI')  AS hora_tarde,

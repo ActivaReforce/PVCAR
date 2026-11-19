@@ -531,6 +531,7 @@ const FichaNino = ({
         <Fila etiqueta="Nacimiento">{fechaNacimiento(d.fecha_nacimiento)}</Fila>
         <Fila etiqueta="Parentesco">{d.parentesco}</Fila>
         <Fila etiqueta="Curso">{n.grado ?? d.documento.curso ?? '—'}</Fila>
+        <Fila etiqueta="Paralelo">{d.paralelo ?? '—'}</Fila>
         <Fila etiqueta="Colegio">{n.colegio ?? d.documento.colegio.sede}</Fila>
         <Fila etiqueta="Salida">
           {d.modalidad_salida === 'escolar' ? 'Transporte escolar' : 'Transporte privado'}

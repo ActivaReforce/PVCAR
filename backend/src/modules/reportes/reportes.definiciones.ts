@@ -1,6 +1,7 @@
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
+import { cursoConParaleloSql } from '../../lib/paralelo.js';
 import { HOY_EC, diaEc, hoyEc, textoEc } from '../../lib/fecha.js';
 import { CTE_VISIBLES } from '../usuarios/usuarios.repository.js';
 import { nombreDeMes } from '../mensualidades/mensualidades.calculo.js';
@@ -491,6 +492,7 @@ const estudiantes: Definicion = {
     { clave: 'nino_edad', cabecera: 'Edad', ancho: 8 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
     { clave: 'catninograd_nombre', cabecera: 'Grado', ancho: 20 },
+    { clave: 'nino_paralelo', cabecera: 'Paralelo', ancho: 10 },
     { clave: 'transporte', cabecera: 'Salida', ancho: 18 },
     { clave: 'estado', cabecera: 'Estado', ancho: 12 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
@@ -506,6 +508,7 @@ const estudiantes: Definicion = {
              date_part('year', age(${HOY_EC}, n.nino_fecha_nacimiento))::int AS nino_edad,
              c.col_nombre,
              COALESCE(g.catninograd_nombre, '')                    AS catninograd_nombre,
+             COALESCE(n.nino_paralelo, '')                         AS nino_paralelo,
              CASE n.nino_modalidad_salida WHEN 'escolar' THEN 'Transporte escolar'
                                           WHEN 'privado' THEN 'Transporte privado'
                                           ELSE '' END              AS transporte,
@@ -836,7 +839,7 @@ const representantes: Definicion = {
                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO})::int AS hijos_activos,
              COALESCE((
                SELECT string_agg(
-                        n.nino_nombre || COALESCE(' (' || g.catninograd_nombre || ')', ''),
+                        n.nino_nombre || COALESCE(' (' || ${cursoConParaleloSql('g.catninograd_nombre', 'n.nino_paralelo')} || ')', ''),
                         ', ' ORDER BY n.nino_nombre)
                  FROM public.nino_padre np
                  JOIN public.nino n ON n.nino_id = np.nino_id
@@ -1021,7 +1024,9 @@ const SQL_INSCRIPCIONES = `
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS hijos,
              COALESCE((
-               SELECT string_agg(COALESCE(inn.insnino_datos->'documento'->>'curso', '—'), ', ' ORDER BY inn.insnino_orden)
+               SELECT string_agg(
+                        COALESCE(${cursoConParaleloSql("inn.insnino_datos->'documento'->>'curso'", "inn.insnino_datos->>'paralelo'")}, '—'),
+                        ', ' ORDER BY inn.insnino_orden)
                  FROM public.inscripcion_nino inn
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS cursos,

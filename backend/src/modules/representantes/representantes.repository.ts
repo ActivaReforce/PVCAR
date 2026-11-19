@@ -3,6 +3,7 @@ import { getPool } from '../../config/db.js';
 import type { Alcance } from '../../lib/alcance.js';
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { contieneSinTildes } from '../../lib/sql.js';
+import { cursoConParaleloSql } from '../../lib/paralelo.js';
 
 /**
  * Consultas de Representantes.
@@ -143,7 +144,7 @@ export async function listarRepresentantes(
                        'nino_id', n.nino_id,
                        'nino_nombre', n.nino_nombre,
                        'col_nombre', c.col_nombre,
-                       'catninograd_nombre', g.catninograd_nombre,
+                       'catninograd_nombre', ${cursoConParaleloSql('g.catninograd_nombre', 'n.nino_paralelo')},
                        'est_id', n.est_id) ORDER BY n.nino_nombre)
                 FROM public.nino_padre np
                 JOIN public.nino n ON n.nino_id = np.nino_id
@@ -244,7 +245,7 @@ export async function listarHijos(padreId: number): Promise<HijoListado[]> {
             n.nino_nombre,
             n.nino_foto,
             c.col_nombre,
-            g.catninograd_nombre,
+            ${cursoConParaleloSql('g.catninograd_nombre', 'n.nino_paralelo')} AS catninograd_nombre,
             n.est_id,
             (SELECT count(*) FROM public.nino_asignacion na
               WHERE na.nino_id = n.nino_id AND na.est_id = ${ESTADO.ACTIVO})::int AS disciplinas

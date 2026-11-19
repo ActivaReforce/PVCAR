@@ -22,6 +22,8 @@ export interface Estudiante {
   col_nombre: string;
   catninograd_id: number | null;
   catninograd_nombre: string | null;
+  /** Una letra (0048); null en los anteriores. Opcional: Vercel puede publicar antes que Railway. */
+  nino_paralelo?: string | null;
   est_id: number;
   nino_fecha_creacion: string | null;
   disciplinas: number;
@@ -118,6 +120,8 @@ export interface FiltrosEstudiantes {
   colegio?: number[];
   disciplina?: number;
   grado?: number;
+  /** Una letra, o 'sin' para los que no tienen paralelo. */
+  paralelo?: string;
   estado?: number;
   orden?: 'nombre' | 'colegio' | 'grado' | 'edad' | 'creacion';
   dir?: 'asc' | 'desc';
@@ -167,6 +171,7 @@ export interface DatosEstudiante {
   nino_nombre?: string;
   col_id?: number;
   catninograd_id?: number | null;
+  nino_paralelo?: string | null;
   nino_fecha_nacimiento?: string | null;
   nino_modalidad_salida?: ModalidadSalida | null;
   nino_detalle_retiro?: string;
@@ -203,6 +208,8 @@ export const estudiantesApi = {
     api.get<PaginaEstudiantes>(`/estudiantes${queryString(filtros)}`),
 
   grados: () => api.get<Grado[]>('/estudiantes/grados'),
+
+  paralelos: () => api.get<Array<{ paralelo: string | null; estudiantes: number }>>('/estudiantes/paralelos'),
 
   disciplinasDeFiltro: () => api.get<DisciplinaDeFiltro[]>('/estudiantes/disciplinas'),
 

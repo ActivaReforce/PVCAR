@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
+import { cursoConParaleloSql } from '../../lib/paralelo.js';
 
 /**
  * Acceso a datos de Novedades.
@@ -134,7 +135,7 @@ const SQL_SELECT = `
                     'nombre', nn.nino_nombre,
                     'col_id', nn.col_id,
                     'col_nombre', c.col_nombre,
-                    'grado', g.catninograd_nombre,
+                    'grado', ${cursoConParaleloSql('g.catninograd_nombre', 'nn.nino_paralelo')},
                     'representantes', COALESCE((
                       SELECT jsonb_agg(jsonb_build_object(
                                'nombre', ru.usu_nombre,
@@ -522,7 +523,7 @@ export async function alumnosDisponibles(opts: {
     SELECT n.nino_id,
            n.nino_nombre,
            c.col_nombre,
-           g.catninograd_nombre AS grado
+           ${cursoConParaleloSql('g.catninograd_nombre', 'n.nino_paralelo')} AS grado
       FROM public.nino n
       LEFT JOIN public.colegio c ON c.col_id = n.col_id
       LEFT JOIN public.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id

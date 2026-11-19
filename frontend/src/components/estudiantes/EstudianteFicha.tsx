@@ -142,6 +142,7 @@ const EstudianteFicha = ({ ninoId }: Props) => {
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <Dato etiqueta="Colegio" valor={estudiante.col_nombre} />
           <Dato etiqueta="Grado" valor={estudiante.catninograd_nombre} />
+          <Dato etiqueta="Paralelo" valor={estudiante.nino_paralelo ?? null} />
           <Dato
             etiqueta="Edad"
             valor={estudiante.nino_edad != null ? `${estudiante.nino_edad} años` : null}

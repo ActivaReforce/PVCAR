@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { limpiarParalelo } from '@/lib/paralelo';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -113,6 +114,7 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
   const [gradoId, setGradoId] = useState(
     estudiante?.catninograd_id ? String(estudiante.catninograd_id) : SIN_GRADO,
   );
+  const [paralelo, setParalelo] = useState(estudiante?.nino_paralelo ?? '');
   const [nacimiento, setNacimiento] = useState(estudiante?.nino_fecha_nacimiento ?? '');
   const [salida, setSalida] = useState<string>(estudiante?.nino_modalidad_salida ?? SIN_SALIDA);
   const [detalleRetiro, setDetalleRetiro] = useState(estudiante?.nino_detalle_retiro ?? '');
@@ -175,6 +177,8 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
       nino_nombre: nombre.trim(),
       col_id: Number(colId),
       catninograd_id: gradoId === SIN_GRADO ? null : Number(gradoId),
+      // Vacío lo quita; los anteriores no lo tienen y no es obligatorio aquí.
+      nino_paralelo: paralelo || null,
       nino_fecha_nacimiento: nacimiento || null,
       nino_modalidad_salida: salida === SIN_SALIDA ? null : (salida as ModalidadSalida),
       nino_detalle_retiro: detalleRetiro.trim(),
@@ -233,7 +237,7 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_6rem_minmax(0,1fr)]">
             <div className="space-y-2">
               <Label htmlFor="grado">Grado</Label>
               <Select value={gradoId} onValueChange={setGradoId}>
@@ -249,6 +253,20 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="paralelo">Paralelo</Label>
+              <Input
+                id="paralelo"
+                value={paralelo}
+                onChange={(e) => setParalelo(limpiarParalelo(e.target.value))}
+                placeholder="A"
+                maxLength={1}
+                autoCapitalize="characters"
+                autoComplete="off"
+                className="h-11 text-center font-semibold uppercase sm:h-10"
+              />
             </div>
 
             <div className="space-y-2">

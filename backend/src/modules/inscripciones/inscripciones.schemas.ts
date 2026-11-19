@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paraleloSchema } from '../../lib/paralelo.js';
 import { paginacionSchema } from '../../lib/paginacion.js';
 import { TIPOS_DOCUMENTO, type TipoDocumento } from './inscripciones.documentos.js';
 
@@ -101,6 +102,15 @@ export const ninoSchema = z
     col_id: z.number().int().positive(),
     /** "Curso" en la ficha. */
     catninograd_id: z.number().int().positive(),
+    /**
+     * Paralelo del curso: una letra (0048). El formulario lo exige desde
+     * 2026-11-18; aquí se valida si viene pero no se exige, para no tumbar el
+     * envío de quien tenía abierta la versión anterior al publicarse.
+     */
+    paralelo: paraleloSchema
+      .nullable()
+      .optional()
+      .transform((v) => v ?? null),
     parentesco: z.enum(PARENTESCOS),
     /**
      * El alumno que ya existe, cuando un representante con sesión le añade
@@ -242,6 +252,7 @@ const CAMPO: Record<string, string> = {
   relacion: 'relación con el menor',
   fecha_nacimiento: 'fecha de nacimiento',
   catninograd_id: 'curso',
+  paralelo: 'paralelo',
   col_id: 'colegio',
   parentesco: 'parentesco',
   disciplinas: 'disciplinas',

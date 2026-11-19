@@ -144,6 +144,8 @@ export interface NinoEnvio {
   col_id: number;
   /** "Curso" en la ficha. */
   catninograd_id: number;
+  /** Paralelo: una letra (0048). Obligatorio al enviar. */
+  paralelo: string;
   parentesco: string;
   /** El hijo que ya existe, si se le añaden disciplinas (§9); null si es nuevo. */
   nino_id: number | null;
@@ -169,7 +171,9 @@ export interface ColegioDocumento {
 }
 
 /** Lo que se guarda de cada alumno: lo enviado y lo que el sistema puso en sus documentos. */
-export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id' | 'observacion_extra'> {
+export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id' | 'observacion_extra' | 'paralelo'> {
+  /** Falta en las inscripciones de antes del 2026-11-18. */
+  paralelo?: string | null;
   /** Falta en las inscripciones de antes del 2026-10-20. */
   observacion_extra?: string | null;
   documento: {
@@ -366,6 +370,8 @@ export interface HijoDelRepresentante {
   col_id: number;
   col_nombre: string;
   catninograd_id: number | null;
+  /** Opcional: Vercel puede publicar antes que Railway. */
+  paralelo?: string | null;
   parentesco: string | null;
   modalidad_salida: ModalidadSalida | null;
   detalle_retiro: string | null;
