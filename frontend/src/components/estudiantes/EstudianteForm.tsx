@@ -237,7 +237,9 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_6rem_minmax(0,1fr)]">
+          {/* Grado y paralelo en una fila (el paralelo es una letra); la fecha
+              en la suya: los tres juntos no caben en el modal (2026-11-18). */}
+          <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-4">
             <div className="space-y-2">
               <Label htmlFor="grado">Grado</Label>
               <Select value={gradoId} onValueChange={setGradoId}>
@@ -268,7 +270,9 @@ const EstudianteForm = ({ estudiante, onSuccess, onCancel }: Props) => {
                 className="h-11 text-center font-semibold uppercase sm:h-10"
               />
             </div>
+          </div>
 
+          <div>
             <div className="space-y-2">
               <Label htmlFor="nacimiento">Fecha de nacimiento</Label>
               <Input

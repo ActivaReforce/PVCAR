@@ -282,7 +282,8 @@ describe('envioSchema', () => {
 
   it('el paralelo es una letra y sale en mayuscula; sin el (pestaña vieja) queda null (0048)', () => {
     expect(envioSchema.parse(valido).ninos[0]!.paralelo).toBe('B');
-    const { paralelo: _p, ...sinParalelo } = valido.ninos[0]!;
+    const sinParalelo: Record<string, unknown> = { ...valido.ninos[0]! };
+    delete sinParalelo.paralelo;
     expect(envioSchema.parse({ ...valido, ninos: [sinParalelo] }).ninos[0]!.paralelo).toBeNull();
     for (const malo of ['', 'AB', '3']) {
       expect(() => envioSchema.parse({ ...valido, ninos: [{ ...valido.ninos[0]!, paralelo: malo }] })).toThrow();

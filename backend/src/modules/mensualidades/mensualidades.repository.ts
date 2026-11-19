@@ -480,15 +480,17 @@ export async function registrosDePago(): Promise<RegistroDePago[]> {
   return rows;
 }
 
-/** Curso actual de cada alumno (Reportes → Mensualidades, columna Curso). */
-export async function cursosDeAlumnos(ninoIds: number[]): Promise<Map<number, string>> {
+/** Curso y paralelo actuales de cada alumno (Reportes → Mensualidades). */
+export async function cursosDeAlumnos(
+  ninoIds: number[],
+): Promise<Map<number, { curso: string | null; paralelo: string | null }>> {
   if (ninoIds.length === 0) return new Map();
-  const { rows } = await getPool().query<{ nino_id: number; curso: string }>(
-    `SELECT n.nino_id, concat_ws(' ', g.catninograd_nombre, n.nino_paralelo) AS curso
+  const { rows } = await getPool().query<{ nino_id: number; curso: string | null; paralelo: string | null }>(
+    `SELECT n.nino_id, g.catninograd_nombre AS curso, n.nino_paralelo AS paralelo
        FROM public.nino n
-       JOIN public.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id
+       LEFT JOIN public.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id
       WHERE n.nino_id = ANY($1::int[])`,
     [ninoIds],
   );
-  return new Map(rows.map((r) => [r.nino_id, r.curso]));
+  return new Map(rows.map((r) => [r.nino_id, { curso: r.curso, paralelo: r.paralelo }]));
 }

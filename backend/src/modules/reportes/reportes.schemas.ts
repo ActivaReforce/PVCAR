@@ -56,6 +56,12 @@ export const filtrosSchema = z
     desde: fecha.optional(),
     hasta: fecha.optional(),
     meses: listaDeMeses,
+    /** Alumnos: grado (catninograd_id) y paralelo (una letra, o 'sin'). */
+    grado: z.coerce.number().int().positive().optional(),
+    paralelo: z
+      .string()
+      .regex(/^([A-Z]|sin)$/)
+      .optional(),
     /** Novedades: false quita ausencias y correcciones. Por defecto, salen. */
     ausencias: z
       .union([z.boolean(), z.enum(['true', 'false', '1', '0'])])

@@ -1,7 +1,6 @@
 import { ESTADO, ROL } from '../../lib/constants.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { contieneSinTildes } from '../../lib/sql.js';
-import { cursoConParaleloSql } from '../../lib/paralelo.js';
 import { HOY_EC, diaEc, hoyEc, textoEc } from '../../lib/fecha.js';
 import { CTE_VISIBLES } from '../usuarios/usuarios.repository.js';
 import { nombreDeMes } from '../mensualidades/mensualidades.calculo.js';
@@ -67,6 +66,10 @@ export interface FiltrosReporte {
   ausencias?: boolean;
   /** Meses elegidos ('YYYY-MM-01'), en vez de fechas (Mensualidades). Vacío = todo. */
   meses?: string[];
+  /** Grado (catninograd_id). Alumnos. */
+  grado?: number;
+  /** Paralelo: una letra, o 'sin' para los que no tienen (0048). Alumnos. */
+  paralelo?: string;
 }
 
 /** Una opción de un desplegable de filtro. */
@@ -94,6 +97,9 @@ export interface FiltrosDisponibles {
   ausencias?: boolean;
   /** Selector de meses (varios), del año pasado al siguiente (Mensualidades). */
   meses?: boolean;
+  /** Desplegables de grado y de paralelo (Alumnos, 2026-11-18). */
+  grado?: boolean;
+  paralelo?: boolean;
 }
 
 const ACTIVO_INACTIVO = (etiqueta = 'Estado') => ({
@@ -482,7 +488,14 @@ const estudiantes: Definicion = {
   descripcion: 'Los alumnos con su colegio, su grado y sus disciplinas.',
   modulo: 'estudiantes',
   exigeRango: false,
-  filtros: { colegio: true, disciplina: true, estado: ACTIVO_INACTIVO(), fechas: false },
+  filtros: {
+    colegio: true,
+    disciplina: true,
+    estado: ACTIVO_INACTIVO(),
+    fechas: false,
+    grado: true,
+    paralelo: true,
+  },
   /** Dato médico de un menor: se incluye a propósito, no por defecto. */
   columnasSensibles: ['nino_info_salud'],
   columnas: [
@@ -553,6 +566,8 @@ const estudiantes: Definicion = {
                                           WHERE na.nino_id = n.nino_id
                                             AND na.colacthor_id = $7
                                             AND na.est_id = ${ESTADO.ACTIVO}))
+         AND ($8::int IS NULL OR n.catninograd_id = $8)
+         AND ($9::text IS NULL OR ($9 = 'sin' AND n.nino_paralelo IS NULL) OR n.nino_paralelo = $9)
        ORDER BY c.col_nombre, n.nino_nombre`,
     params: [
       ctx.global,
@@ -562,6 +577,8 @@ const estudiantes: Definicion = {
       oNulo(f.colegio),
       oNulo(f.estado),
       oNulo(f.disciplina),
+      oNulo(f.grado),
+      oNulo(f.paralelo),
     ],
   }),
 };
@@ -815,7 +832,9 @@ const representantes: Definicion = {
     { clave: 'usu_correo', cabecera: 'Correo', ancho: 32 },
     { clave: 'usu_telefono', cabecera: 'Teléfono', ancho: 14 },
     { clave: 'hijos_activos', cabecera: 'Hijos activos', ancho: 12 },
-    { clave: 'hijos', cabecera: 'Hijos', ancho: 48 },
+    { clave: 'hijos', cabecera: 'Hijos', ancho: 40 },
+    { clave: 'cursos', cabecera: 'Curso', ancho: 30 },
+    { clave: 'paralelos', cabecera: 'Paralelo', ancho: 10 },
     { clave: 'colegios', cabecera: 'Colegios', ancho: 32 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 36 },
     { clave: 'estado', cabecera: 'Estado', ancho: 12 },
@@ -837,15 +856,27 @@ const representantes: Definicion = {
                 FROM public.nino_padre np
                 JOIN public.nino n ON n.nino_id = np.nino_id
                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO})::int AS hijos_activos,
+             -- Hijos, Curso y Paralelo en el mismo orden (2026-11-18): el
+             -- primer curso y el primer paralelo son del primer hijo.
              COALESCE((
-               SELECT string_agg(
-                        n.nino_nombre || COALESCE(' (' || ${cursoConParaleloSql('g.catninograd_nombre', 'n.nino_paralelo')} || ')', ''),
-                        ', ' ORDER BY n.nino_nombre)
+               SELECT string_agg(n.nino_nombre, ', ' ORDER BY n.nino_nombre, n.nino_id)
+                 FROM public.nino_padre np
+                 JOIN public.nino n ON n.nino_id = np.nino_id
+                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
+             ), '')                                               AS hijos,
+             COALESCE((
+               SELECT string_agg(COALESCE(g.catninograd_nombre, '—'), ', ' ORDER BY n.nino_nombre, n.nino_id)
                  FROM public.nino_padre np
                  JOIN public.nino n ON n.nino_id = np.nino_id
                  LEFT JOIN public.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id
                 WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
-             ), '')                                               AS hijos,
+             ), '')                                               AS cursos,
+             COALESCE((
+               SELECT string_agg(COALESCE(n.nino_paralelo, '—'), ', ' ORDER BY n.nino_nombre, n.nino_id)
+                 FROM public.nino_padre np
+                 JOIN public.nino n ON n.nino_id = np.nino_id
+                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
+             ), '')                                               AS paralelos,
              COALESCE((
                SELECT string_agg(DISTINCT c.col_nombre, ', ' ORDER BY c.col_nombre)
                  FROM public.nino_padre np
@@ -970,6 +1001,7 @@ const SQL_ANULADAS = `
              COALESCE(a.aud_detalle->'representante'->>'telefono', ''),
              COALESCE((SELECT string_agg(h->>'nombre', ', ') FROM ${HIJOS_ANULADA} h), ''),
              COALESCE((SELECT string_agg(COALESCE(h->>'curso', '—'), ', ') FROM ${HIJOS_ANULADA} h), ''),
+             COALESCE((SELECT string_agg(COALESCE(h->>'paralelo', '—'), ', ') FROM ${HIJOS_ANULADA} h), ''),
              jsonb_array_length(COALESCE(a.aud_detalle->'hijos', '[]'::jsonb)),
              COALESCE((SELECT string_agg(DISTINCT h->>'colegio', ', ' ORDER BY h->>'colegio')
                          FROM ${HIJOS_ANULADA} h
@@ -1024,12 +1056,15 @@ const SQL_INSCRIPCIONES = `
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS hijos,
              COALESCE((
-               SELECT string_agg(
-                        COALESCE(${cursoConParaleloSql("inn.insnino_datos->'documento'->>'curso'", "inn.insnino_datos->>'paralelo'")}, '—'),
-                        ', ' ORDER BY inn.insnino_orden)
+               SELECT string_agg(COALESCE(inn.insnino_datos->'documento'->>'curso', '—'), ', ' ORDER BY inn.insnino_orden)
                  FROM public.inscripcion_nino inn
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS cursos,
+             COALESCE((
+               SELECT string_agg(COALESCE(NULLIF(inn.insnino_datos->>'paralelo', ''), '—'), ', ' ORDER BY inn.insnino_orden)
+                 FROM public.inscripcion_nino inn
+                WHERE inn.ins_id = i.ins_id
+             ), '')                                                   AS paralelos,
              (SELECT count(*) FROM public.inscripcion_nino WHERE ins_id = i.ins_id)::int AS cantidad_hijos,
              COALESCE((
                SELECT string_agg(DISTINCT c.col_nombre, ', ' ORDER BY c.col_nombre)
@@ -1111,6 +1146,7 @@ const inscripciones: Definicion = {
     { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
     { clave: 'hijos', cabecera: 'Hijos', ancho: 40 },
     { clave: 'cursos', cabecera: 'Curso', ancho: 30 },
+    { clave: 'paralelos', cabecera: 'Paralelo', ancho: 10 },
     { clave: 'cantidad_hijos', cabecera: 'N° hijos', ancho: 10 },
     { clave: 'colegios', cabecera: 'Colegios', ancho: 30 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
@@ -1230,6 +1266,7 @@ const mensualidades: Definicion = {
     { clave: 'colegio', cabecera: 'Colegio', ancho: 28 },
     { clave: 'alumno', cabecera: 'Alumno', ancho: 30 },
     { clave: 'curso', cabecera: 'Curso', ancho: 20 },
+    { clave: 'paralelo', cabecera: 'Paralelo', ancho: 10 },
     { clave: 'estado', cabecera: 'Estado', ancho: 22 },
     { clave: 'valor', cabecera: 'Valor ($)', ancho: 11 },
     { clave: 'recaudado', cabecera: 'Recaudado en el periodo ($)', ancho: 16 },
@@ -1269,7 +1306,8 @@ const mensualidades: Definicion = {
         mes: NOMBRES_MES[Number(r.mes.slice(5, 7)) - 1],
         colegio: r.col_nombre,
         alumno: r.baja ? `${r.alumno} (dado de baja)` : r.alumno,
-        curso: (r.nino_id !== null && cursos.get(r.nino_id)) || '',
+        curso: (r.nino_id !== null && cursos.get(r.nino_id)?.curso) || '',
+        paralelo: (r.nino_id !== null && cursos.get(r.nino_id)?.paralelo) || '',
         estado: ETIQUETA_REGISTRO[r.estado],
         valor: r.valor,
         recaudado,

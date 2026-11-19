@@ -1453,6 +1453,7 @@ export interface FotoDeAnulada {
   hijos: Array<{
     nombre: string;
     curso: string | null;
+    paralelo: string | null;
     observacion: string | null;
     col_id: number | null; colegio: string | null; disciplinas: string[]; valor: number }>;
   valor: number;
@@ -1472,7 +1473,8 @@ export async function fotoDeAnulada(insId: number, client: PoolClient): Promise<
               SELECT json_agg(json_build_object(
                        'nombre', btrim(COALESCE(inn.insnino_datos->>'nombres', inn.insnino_datos->>'nombre', '') ||
                                        ' ' || COALESCE(inn.insnino_datos->>'apellidos', '')),
-                       'curso', ${cursoConParaleloSql("inn.insnino_datos->'documento'->>'curso'", "inn.insnino_datos->>'paralelo'")},
+                       'curso', inn.insnino_datos->'documento'->>'curso',
+                       'paralelo', NULLIF(inn.insnino_datos->>'paralelo', ''),
                        'observacion', NULLIF(btrim(COALESCE(inn.insnino_datos->>'observacion_extra', '')), ''),
                        'col_id', c.col_id,
                        'colegio', c.col_nombre,

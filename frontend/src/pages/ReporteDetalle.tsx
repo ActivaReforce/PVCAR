@@ -19,6 +19,7 @@ import { DataPagination } from '@/components/ui/data-pagination';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { useColegiosVisibles } from '@/hooks/useColegios';
 import { useDisciplinas } from '@/hooks/useDisciplinas';
+import { useGrados, useParalelos } from '@/hooks/useEstudiantes';
 import {
   useAnalisisReporte,
   useCatalogoReportes,
@@ -58,6 +59,8 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [meses, setMeses] = useState<string[]>([]);
+  const [grado, setGrado] = useState(TODOS);
+  const [paralelo, setParalelo] = useState(TODOS);
   const [page, setPage] = useState(1);
   const [conSensibles, setConSensibles] = useState(false);
   const [verAusencias, setVerAusencias] = useState(true);
@@ -74,6 +77,8 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
     },
     Boolean(disponibles?.disciplina),
   );
+  const grados = useGrados(Boolean(disponibles?.grado));
+  const paralelos = useParalelos(Boolean(disponibles?.paralelo));
   const exportar = useExportarReporte();
 
   // Solo viajan los filtros que el reporte usa: lo que no se ve no filtra.
@@ -85,6 +90,8 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
     desde: disponibles?.fechas ? desde || undefined : undefined,
     hasta: disponibles?.fechas ? hasta || undefined : undefined,
     meses: disponibles?.meses && meses.length > 0 ? meses : undefined,
+    grado: disponibles?.grado && grado !== TODOS ? Number(grado) : undefined,
+    paralelo: disponibles?.paralelo && paralelo !== TODOS ? paralelo : undefined,
     incluirSensibles: conSensibles || undefined,
     // Solo viaja cuando se quitan: por defecto salen.
     ausencias: disponibles?.ausencias && !verAusencias ? false : undefined,
@@ -242,6 +249,44 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
                 {definicion.filtros.estado.opciones.map((o) => (
                   <SelectItem key={o.id} value={String(o.id)}>
                     {o.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {definicion.filtros.grado && (
+          <div className="space-y-1">
+            <Label className="text-xs">Grado</Label>
+            <Select value={grado} onValueChange={(v) => cambiarFiltro(() => setGrado(v))}>
+              <SelectTrigger className="h-11 sm:h-10" aria-label="Grado">
+                <SelectValue placeholder="Todos los grados" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos los grados</SelectItem>
+                {(grados.data ?? []).map((g) => (
+                  <SelectItem key={g.catninograd_id} value={String(g.catninograd_id)}>
+                    {g.catninograd_nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {definicion.filtros.paralelo && (
+          <div className="space-y-1">
+            <Label className="text-xs">Paralelo</Label>
+            <Select value={paralelo} onValueChange={(v) => cambiarFiltro(() => setParalelo(v))}>
+              <SelectTrigger className="h-11 sm:h-10" aria-label="Paralelo">
+                <SelectValue placeholder="Todos los paralelos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos los paralelos</SelectItem>
+                {(paralelos.data ?? []).map((p) => (
+                  <SelectItem key={p.paralelo ?? 'sin'} value={p.paralelo ?? 'sin'}>
+                    {p.paralelo ? `Paralelo ${p.paralelo}` : 'Sin paralelo'}
                   </SelectItem>
                 ))}
               </SelectContent>

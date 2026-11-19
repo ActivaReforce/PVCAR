@@ -30,6 +30,9 @@ export interface FiltrosDisponibles {
   ausencias?: boolean;
   /** Selector de meses (varios) en vez de fechas (Mensualidades). */
   meses?: boolean;
+  /** Desplegables de grado y paralelo (Alumnos). Opcionales: Vercel puede publicar antes que Railway. */
+  grado?: boolean;
+  paralelo?: boolean;
 }
 
 export interface ReporteDisponible {
@@ -114,6 +117,10 @@ export interface FiltrosReporte {
   ausencias?: boolean;
   /** Meses elegidos, 'YYYY-MM'. Vacío = todo. */
   meses?: string[];
+  /** Alumnos: grado (catninograd_id). */
+  grado?: number;
+  /** Alumnos: una letra, o 'sin'. */
+  paralelo?: string;
 }
 
 function queryString(filtros: object): string {

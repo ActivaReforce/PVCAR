@@ -45,18 +45,20 @@ export function useDisponiblesEstudiante(id: number | null) {
 }
 
 /** Paralelos en uso, para el filtro (0048). */
-export function useParalelos() {
+export function useParalelos(enabled = true) {
   return useQuery({
     queryKey: CLAVE.paralelos,
     queryFn: () => estudiantesApi.paralelos(),
     staleTime: 5 * 60 * 1000,
+    enabled,
   });
 }
 
-export function useGrados() {
+export function useGrados(enabled = true) {
   return useQuery({
     queryKey: CLAVE.grados,
     queryFn: () => estudiantesApi.grados(),
+    enabled,
     staleTime: 30 * 60 * 1000,
   });
 }
