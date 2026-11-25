@@ -27,13 +27,15 @@ export interface ConfigCorreo {
   notificar_mencionado: boolean;
   /** Solo para 'novedades': las de alumno avisan también al representante. */
   notificar_representante: boolean;
+  /** Solo 'ausencias' (0047). Opcional: Vercel puede publicar antes que Railway. */
+  notificar_coordinador?: boolean;
   /** El dominio verificado (CORREO_DOMINIO de Railway). null si falta. */
   dominio: string | null;
 }
 
 export type ConfigCorreoInput = Pick<
   ConfigCorreo,
-  'nombre' | 'usuario' | 'para' | 'cc' | 'responder_a' | 'notificar_mencionado' | 'notificar_representante'
+  'nombre' | 'usuario' | 'para' | 'cc' | 'responder_a' | 'notificar_mencionado' | 'notificar_representante' | 'notificar_coordinador'
 >;
 
 export const correosApi = {

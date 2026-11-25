@@ -187,6 +187,7 @@ export async function enviarAvisos(ids: number[]): Promise<void> {
     for (const [i, n] of novedades.entries()) {
       if (i > 0) await esperar(PAUSA_ENTRE_CORREOS);
       // La de mensualidad va siempre al representante.
+      // A los coordinadores no les va correo: lo ven solo en Novedades (0047).
       const paraExtra =
         config.notificar_representante || n.datos?.mensualidad?.length
           ? await repo.correosDeRepresentantesDe(n.alumnos.map((a) => a.id))

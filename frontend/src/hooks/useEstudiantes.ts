@@ -13,6 +13,8 @@ const CLAVE = {
   ficha: (id: number, historial: boolean) => ['estudiantes', 'ficha', id, historial] as const,
   disponibles: (id: number) => ['estudiantes', 'disponibles', id] as const,
   grados: ['estudiantes', 'grados'] as const,
+  paralelos: ['estudiantes', 'paralelos'] as const,
+  disciplinasDeFiltro: ['estudiantes', 'disciplinas-filtro'] as const,
   candidatos: ['estudiantes', 'candidatos-representante'] as const,
   impacto: (id: number) => ['estudiantes', 'impacto', id] as const,
 };
@@ -42,11 +44,31 @@ export function useDisponiblesEstudiante(id: number | null) {
   });
 }
 
-export function useGrados() {
+/** Paralelos en uso, para el filtro (0048). */
+export function useParalelos(enabled = true) {
+  return useQuery({
+    queryKey: CLAVE.paralelos,
+    queryFn: () => estudiantesApi.paralelos(),
+    staleTime: 5 * 60 * 1000,
+    enabled,
+  });
+}
+
+export function useGrados(enabled = true) {
   return useQuery({
     queryKey: CLAVE.grados,
     queryFn: () => estudiantesApi.grados(),
+    enabled,
     staleTime: 30 * 60 * 1000,
+  });
+}
+
+/** Disciplinas del filtro de la lista: solo las del alcance de quien mira. */
+export function useDisciplinasDeFiltro() {
+  return useQuery({
+    queryKey: CLAVE.disciplinasDeFiltro,
+    queryFn: () => estudiantesApi.disciplinasDeFiltro(),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

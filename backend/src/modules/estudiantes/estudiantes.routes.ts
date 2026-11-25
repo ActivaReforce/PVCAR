@@ -58,6 +58,32 @@ estudiantesRouter.get(
   },
 );
 
+/** Paralelos en uso, para el filtro de la lista (0048). */
+estudiantesRouter.get(
+  '/paralelos',
+  requirePermission('estudiantes', 'ver'),
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.paralelos(), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Disciplinas para el filtro de la lista, dentro del alcance. */
+estudiantesRouter.get(
+  '/disciplinas',
+  requirePermission('estudiantes', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.disciplinasDeFiltro(actor(req)), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 estudiantesRouter.get(
   '/candidatos-representante',
   requirePermission('estudiantes', 'editar'),

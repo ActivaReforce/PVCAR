@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, ReceiptText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,13 +19,15 @@ import { DataPagination } from '@/components/ui/data-pagination';
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { useColegiosVisibles } from '@/hooks/useColegios';
 import { useDisciplinas } from '@/hooks/useDisciplinas';
+import { useGrados, useParalelos } from '@/hooks/useEstudiantes';
 import {
   useAnalisisReporte,
   useCatalogoReportes,
   useExportarReporte,
+  useFacturacionReporte,
   useReporte,
 } from '@/hooks/useTablero';
-import type { FiltrosReporte } from '@/api/reportes';
+import { CON_FACTURACION, type FiltrosReporte } from '@/api/reportes';
 import SelectorMeses from '@/components/reportes/SelectorMeses';
 
 const POR_PAGINA = 50;
@@ -58,6 +60,8 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [meses, setMeses] = useState<string[]>([]);
+  const [grado, setGrado] = useState(TODOS);
+  const [paralelo, setParalelo] = useState(TODOS);
   const [page, setPage] = useState(1);
   const [conSensibles, setConSensibles] = useState(false);
   const [verAusencias, setVerAusencias] = useState(true);
@@ -74,7 +78,10 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
     },
     Boolean(disponibles?.disciplina),
   );
+  const grados = useGrados(Boolean(disponibles?.grado));
+  const paralelos = useParalelos(Boolean(disponibles?.paralelo));
   const exportar = useExportarReporte();
+  const facturacion = useFacturacionReporte();
 
   // Solo viajan los filtros que el reporte usa: lo que no se ve no filtra.
   const filtros: FiltrosReporte = {
@@ -85,6 +92,8 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
     desde: disponibles?.fechas ? desde || undefined : undefined,
     hasta: disponibles?.fechas ? hasta || undefined : undefined,
     meses: disponibles?.meses && meses.length > 0 ? meses : undefined,
+    grado: disponibles?.grado && grado !== TODOS ? Number(grado) : undefined,
+    paralelo: disponibles?.paralelo && paralelo !== TODOS ? paralelo : undefined,
     incluirSensibles: conSensibles || undefined,
     // Solo viaja cuando se quitan: por defecto salen.
     ausencias: disponibles?.ausencias && !verAusencias ? false : undefined,
@@ -149,22 +158,42 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
           </p>
         </div>
 
-        {/* Exportar exige `reportes:crear`; la ruta lo vuelve a comprobar. */}
-        <ConditionalAction module="reportes" action="crear">
-          <Button
-            variant="brand"
-            className="h-11 w-full sm:h-10 sm:w-auto"
-            disabled={!listo || exportar.isPending || total === 0}
-            onClick={() => exportar.mutate({ modulo, filtros })}
-          >
-            {exportar.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            Exportar a Excel
-          </Button>
-        </ConditionalAction>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {/* Exportar exige `reportes:crear`; la ruta lo vuelve a comprobar. */}
+          <ConditionalAction module="reportes" action="crear">
+            <Button
+              variant="brand"
+              className="h-11 w-full sm:h-10 sm:w-auto"
+              disabled={!listo || exportar.isPending || total === 0}
+              onClick={() => exportar.mutate({ modulo, filtros })}
+            >
+              {exportar.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Exportar a Excel
+            </Button>
+          </ConditionalAction>
+          {/* Inscripciones y Mensualidades: el Excel para facturar, con los mismos filtros. */}
+          {CON_FACTURACION.includes(modulo) && (
+            <ConditionalAction module="reportes" action="crear">
+              <Button
+                variant="outline"
+                className="h-11 w-full sm:h-10 sm:w-auto"
+                disabled={!listo || facturacion.isPending || total === 0}
+                onClick={() => facturacion.mutate({ modulo, filtros })}
+              >
+                {facturacion.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ReceiptText className="mr-2 h-4 w-4" />
+                )}
+                Sacar datos para facturación
+              </Button>
+            </ConditionalAction>
+          )}
+        </div>
       </div>
 
       {/*
@@ -242,6 +271,44 @@ const ReporteDetalle = ({ id, embebido = false }: { id?: string; embebido?: bool
                 {definicion.filtros.estado.opciones.map((o) => (
                   <SelectItem key={o.id} value={String(o.id)}>
                     {o.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {definicion.filtros.grado && (
+          <div className="space-y-1">
+            <Label className="text-xs">Grado</Label>
+            <Select value={grado} onValueChange={(v) => cambiarFiltro(() => setGrado(v))}>
+              <SelectTrigger className="h-11 sm:h-10" aria-label="Grado">
+                <SelectValue placeholder="Todos los grados" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos los grados</SelectItem>
+                {(grados.data ?? []).map((g) => (
+                  <SelectItem key={g.catninograd_id} value={String(g.catninograd_id)}>
+                    {g.catninograd_nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {definicion.filtros.paralelo && (
+          <div className="space-y-1">
+            <Label className="text-xs">Paralelo</Label>
+            <Select value={paralelo} onValueChange={(v) => cambiarFiltro(() => setParalelo(v))}>
+              <SelectTrigger className="h-11 sm:h-10" aria-label="Paralelo">
+                <SelectValue placeholder="Todos los paralelos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODOS}>Todos los paralelos</SelectItem>
+                {(paralelos.data ?? []).map((p) => (
+                  <SelectItem key={p.paralelo ?? 'sin'} value={p.paralelo ?? 'sin'}>
+                    {p.paralelo ? `Paralelo ${p.paralelo}` : 'Sin paralelo'}
                   </SelectItem>
                 ))}
               </SelectContent>

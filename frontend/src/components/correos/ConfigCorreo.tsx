@@ -21,7 +21,7 @@ interface Props {
   avisos?: Aviso[];
 }
 
-type CampoAviso = 'notificar_mencionado' | 'notificar_representante';
+type CampoAviso = 'notificar_mencionado' | 'notificar_representante' | 'notificar_coordinador';
 export interface Aviso {
   campo: CampoAviso;
   texto: string;
@@ -72,6 +72,7 @@ const ConfigCorreo = ({
   const [avisos, setAvisos] = useState<Avisos>({
     notificar_mencionado: false,
     notificar_representante: false,
+    notificar_coordinador: true,
   });
 
   const datos = config.data;
@@ -85,6 +86,7 @@ const ConfigCorreo = ({
     setAvisos({
       notificar_mencionado: datos.notificar_mencionado,
       notificar_representante: datos.notificar_representante,
+      notificar_coordinador: datos.notificar_coordinador ?? true,
     });
   }, [datos]);
 
@@ -245,6 +247,9 @@ const ConfigCorreo = ({
             notificar_mencionado: AVISOS.some((a) => a.campo === 'notificar_mencionado') && avisos.notificar_mencionado,
             notificar_representante:
               AVISOS.some((a) => a.campo === 'notificar_representante') && avisos.notificar_representante,
+            ...(AVISOS.some((a) => a.campo === 'notificar_coordinador')
+              ? { notificar_coordinador: avisos.notificar_coordinador }
+              : {}),
           })
         }
       >

@@ -41,6 +41,8 @@ export interface ConfigCorreo {
   notificar_mencionado: boolean;
   /** 'novedades': las de alumno avisan también al representante. 'ausencias': igual. */
   notificar_representante: boolean;
+  /** Solo 'ausencias' (0047): los coordinadores del colegio del alumno la ven en Novedades (sin correo). */
+  notificar_coordinador: boolean;
 }
 
 export async function obtenerConfig(
@@ -51,8 +53,10 @@ export async function obtenerConfig(
     `SELECT corcfg_tipo AS tipo, corcfg_nombre AS nombre, corcfg_usuario AS usuario,
             corcfg_para AS para, corcfg_cc AS cc, corcfg_responder_a AS responder_a,
             corcfg_notificar_mencionado AS notificar_mencionado,
-            corcfg_notificar_representante AS notificar_representante
-       FROM public.correo_config
+            corcfg_notificar_representante AS notificar_representante,
+            -- Por to_jsonb: sigue funcionando si la 0047 aún no se ha corrido.
+            COALESCE((to_jsonb(cc)->>'corcfg_notificar_coordinador')::boolean, true) AS notificar_coordinador
+       FROM public.correo_config cc
       WHERE corcfg_tipo = $1`,
     [tipo],
   );
@@ -64,10 +68,11 @@ export async function guardarConfig(client: PoolClient, c: ConfigCorreo): Promis
     `UPDATE public.correo_config
         SET corcfg_nombre = $2, corcfg_usuario = $3, corcfg_para = $4, corcfg_cc = $5,
             corcfg_responder_a = $6, corcfg_notificar_mencionado = $7,
-            corcfg_notificar_representante = $8, corcfg_fecha_modificacion = now()
+            corcfg_notificar_representante = $8, corcfg_notificar_coordinador = $9,
+            corcfg_fecha_modificacion = now()
       WHERE corcfg_tipo = $1`,
     [c.tipo, c.nombre, c.usuario, c.para, c.cc, c.responder_a, c.notificar_mencionado,
-     c.notificar_representante],
+     c.notificar_representante, c.notificar_coordinador],
   );
   return (rowCount ?? 0) > 0;
 }

@@ -180,7 +180,7 @@ export function useResponderEncuesta() {
 // ---------------------------------------------------------------------------
 // Representantes
 
-export function useRepresentantes(filtros: { buscar?: string; estado?: number }) {
+export function useRepresentantes(filtros: { buscar?: string; estado?: number; page?: number; limit?: number }) {
   return useQuery({
     queryKey: ['representantes', 'lista', filtros],
     queryFn: () => representantesApi.listar(filtros),

@@ -246,6 +246,7 @@ describe('envioSchema', () => {
         fecha_nacimiento: '2016-05-01',
         col_id: 1,
         catninograd_id: 3,
+        paralelo: 'b',
         parentesco: 'Madre',
         disciplinas: [1],
         emergencia: persona,
@@ -277,6 +278,16 @@ describe('envioSchema', () => {
   it('normaliza el correo y acepta un envio completo', () => {
     const r = envioSchema.parse(valido);
     expect(r.representante.correo).toBe('ana@x.co');
+  });
+
+  it('el paralelo es una letra y sale en mayuscula; sin el (pestaña vieja) queda null (0048)', () => {
+    expect(envioSchema.parse(valido).ninos[0]!.paralelo).toBe('B');
+    const sinParalelo: Record<string, unknown> = { ...valido.ninos[0]! };
+    delete sinParalelo.paralelo;
+    expect(envioSchema.parse({ ...valido, ninos: [sinParalelo] }).ninos[0]!.paralelo).toBeNull();
+    for (const malo of ['', 'AB', '3']) {
+      expect(() => envioSchema.parse({ ...valido, ninos: [{ ...valido.ninos[0]!, paralelo: malo }] })).toThrow();
+    }
   });
 
   it('las observaciones extra son opcionales: vacias o ausentes quedan en null', () => {

@@ -27,6 +27,15 @@ export interface Representante {
   encuestasRespondidas: number;
 }
 
+/** Un hijo en la lista: solo los del alcance de quien mira. */
+export interface HijoEnLista {
+  nino_id: number;
+  nino_nombre: string;
+  col_nombre: string;
+  catninograd_nombre: string | null;
+  est_id: number;
+}
+
 export interface Hijo {
   ninopadre_id: number;
   nino_id: number;
@@ -55,8 +64,12 @@ export interface ConteosRepresentantes {
 }
 
 export interface ListaRepresentantes {
-  representantes: Representante[];
+  representantes: Array<Representante & { hijos_lista: HijoEnLista[] }>;
   conteos: ConteosRepresentantes;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface FichaRepresentante {
@@ -83,7 +96,7 @@ export interface DatosFactura {
 }
 
 export const representantesApi = {
-  listar: (filtros: { buscar?: string; estado?: number }) =>
+  listar: (filtros: { buscar?: string; estado?: number; page?: number; limit?: number }) =>
     api.get<ListaRepresentantes>(`/representantes${queryString(filtros)}`),
 
   ficha: (usuId: number) => api.get<FichaRepresentante>(`/representantes/${usuId}`),

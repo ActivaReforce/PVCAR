@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { getPool } from '../../config/db.js';
+import { cursoConParaleloSql } from '../../lib/paralelo.js';
 
 /**
  * Acceso a datos de Novedades.
@@ -100,6 +101,8 @@ export interface FiltrosListar {
     verComoRepresentante: boolean;
     /** Hijos del actor para ausencias y correcciones; vacío si el aviso está apagado. */
     ninosAusencias: number[];
+    /** Colegios que coordina, para sus ausencias y correcciones (0047); vacío si el aviso está apagado. */
+    colegiosAusencias: number[];
   } | null;
   limit: number;
   offset: number;
@@ -132,7 +135,7 @@ const SQL_SELECT = `
                     'nombre', nn.nino_nombre,
                     'col_id', nn.col_id,
                     'col_nombre', c.col_nombre,
-                    'grado', g.catninograd_nombre,
+                    'grado', ${cursoConParaleloSql('g.catninograd_nombre', 'nn.nino_paralelo')},
                     'representantes', COALESCE((
                       SELECT jsonb_agg(jsonb_build_object(
                                'nombre', ru.usu_nombre,
@@ -212,6 +215,13 @@ export async function listar(filtros: FiltrosListar, client?: PoolClient): Promi
       params.push(v.ninosAusencias);
       partes.push(
         `(n.nov_tipo IN ('ausencia', 'correccion') AND EXISTS (SELECT 1 FROM public.novedad_alumno na WHERE na.nov_id = n.nov_id AND na.nino_id = ANY($${params.length}::int[])))`,
+      );
+    }
+
+    if (v.colegiosAusencias.length > 0) {
+      params.push(v.colegiosAusencias);
+      partes.push(
+        `(n.nov_tipo IN ('ausencia', 'correccion') AND EXISTS (SELECT 1 FROM public.novedad_alumno na JOIN public.nino nn ON nn.nino_id = na.nino_id WHERE na.nov_id = n.nov_id AND nn.col_id = ANY($${params.length}::int[])))`,
       );
     }
 
@@ -513,7 +523,7 @@ export async function alumnosDisponibles(opts: {
     SELECT n.nino_id,
            n.nino_nombre,
            c.col_nombre,
-           g.catninograd_nombre AS grado
+           ${cursoConParaleloSql('g.catninograd_nombre', 'n.nino_paralelo')} AS grado
       FROM public.nino n
       LEFT JOIN public.colegio c ON c.col_id = n.col_id
       LEFT JOIN public.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id

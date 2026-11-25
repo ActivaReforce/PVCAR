@@ -1,5 +1,6 @@
 import type { HorarioDisciplina } from '@/api/disciplinas';
 import { api, apiFetch } from '@/lib/api';
+import type { DisciplinaDeFiltro } from '@/api/estudiantes';
 
 /**
  * Cliente de Inscripciones (Fase 14B).
@@ -143,6 +144,8 @@ export interface NinoEnvio {
   col_id: number;
   /** "Curso" en la ficha. */
   catninograd_id: number;
+  /** Paralelo: una letra (0048). Obligatorio al enviar. */
+  paralelo: string;
   parentesco: string;
   /** El hijo que ya existe, si se le añaden disciplinas (§9); null si es nuevo. */
   nino_id: number | null;
@@ -168,7 +171,9 @@ export interface ColegioDocumento {
 }
 
 /** Lo que se guarda de cada alumno: lo enviado y lo que el sistema puso en sus documentos. */
-export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id' | 'observacion_extra'> {
+export interface NinoGuardado extends Omit<NinoEnvio, 'disciplinas' | 'nino_id' | 'observacion_extra' | 'paralelo'> {
+  /** Falta en las inscripciones de antes del 2026-11-18. */
+  paralelo?: string | null;
   /** Falta en las inscripciones de antes del 2026-10-20. */
   observacion_extra?: string | null;
   documento: {
@@ -227,6 +232,47 @@ export interface ListaInscripciones {
   limit: number;
   totalPages: number;
   conteos: { pendientes: number; aprobadas: number };
+}
+
+/** Un alumno de una inscripción aprobada, para el coordinador (sin montos). */
+export interface AlumnoNuevo {
+  insnino_id: number;
+  ins_id: number;
+  alumno: string;
+  curso: string | null;
+  colegio: string | null;
+  /** Solo las de su alcance, con horario. */
+  disciplinas: string[];
+  representante: string;
+  telefono: string | null;
+  fecha_aprobacion: string | null;
+  activo: boolean;
+  /** Opcional: Vercel puede publicar antes que Railway. */
+  con_observacion?: boolean;
+}
+
+/** Ficha de un alumno nuevo para el coordinador: sin dinero ni documentos. */
+export interface FichaDeNuevo {
+  ins_id: number;
+  ins_fecha: string;
+  ins_fecha_aprobacion: string | null;
+  representante: { nombre: string; cedula: string; correo: string; telefono: string };
+  alumno: {
+    insnino_id: number;
+    datos: Omit<NinoGuardado, 'documento'>;
+    curso: string | null;
+    colegio: string | null;
+    disciplinas: string[];
+    constancias: ConstanciaDetalle[];
+  };
+}
+
+export interface ListaAlumnosNuevos {
+  items: AlumnoNuevo[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface UsuarioCoincidente {
@@ -324,6 +370,8 @@ export interface HijoDelRepresentante {
   col_id: number;
   col_nombre: string;
   catninograd_id: number | null;
+  /** Opcional: Vercel puede publicar antes que Railway. */
+  paralelo?: string | null;
   parentesco: string | null;
   modalidad_salida: ModalidadSalida | null;
   detalle_retiro: string | null;
@@ -514,6 +562,19 @@ export const inscripcionesApi = {
     return api.get<ListaInscripciones>(`/inscripciones${sufijo ? `?${sufijo}` : ''}`);
   },
   detalle: (id: number) => api.get<InscripcionDetalle>(`/inscripciones/${id}`),
+  /** Alumnos nuevos de sus disciplinas (coordinador): solo aprobadas, sin montos. */
+  nuevos: (filtros: { buscar?: string; colegio?: number; disciplina?: number; page?: number }) => {
+    const qs = new URLSearchParams();
+    qs.set('limit', '10');
+    if (filtros.colegio) qs.set('colegio', String(filtros.colegio));
+    if (filtros.disciplina) qs.set('disciplina', String(filtros.disciplina));
+    if (filtros.buscar) qs.set('buscar', filtros.buscar);
+    if (filtros.page) qs.set('page', String(filtros.page));
+    const sufijo = qs.toString();
+    return api.get<ListaAlumnosNuevos>(`/inscripciones/nuevos${sufijo ? `?${sufijo}` : ''}`);
+  },
+  fichaDeNuevo: (insninoId: number) => api.get<FichaDeNuevo>(`/inscripciones/nuevos/${insninoId}`),
+  disciplinasDeNuevos: () => api.get<DisciplinaDeFiltro[]>('/inscripciones/nuevos/disciplinas'),
   /** El número rojo del menú: pendientes y si las inscripciones están abiertas. */
   /** `mensualidades`: opcional, Vercel puede publicar antes que Railway. */
   aviso: () => api.get<{ pendientes: number; mensualidades?: number; abiertas: boolean }>('/inscripciones/aviso'),

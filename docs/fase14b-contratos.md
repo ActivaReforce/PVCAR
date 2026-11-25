@@ -129,3 +129,9 @@ Botón "Anular inscripción" al pie de la ficha de una aprobada, **solo Propieta
 - **Cuenta:** se queda si ya existía, tiene otra inscripción, otros roles, otros hijos o es quien anula. Si no: borrada (con su acceso en Auth), o **baja** si le queda un hijo con historia o respondió encuestas / sale en novedades.
 - **La inscripción** se borra con sus PDF y el comprobante. Queda una línea en `auditoria` (`eliminar`, `inscripcion`, `anulada: true`) con la foto de la fila; el reporte de Inscripciones la saca como **Anulada** (estado 3), con su valor pero **sin sumar** al recaudado.
 - **Al volver:** la cuenta de baja se reactiva al aprobar (§9) y el alumno de baja se elige como "el mismo" y `aprobar` lo reactiva.
+
+## Cambios del 2026-11-18
+
+- **Solo del Propietario:** administrar Inscripciones, Mensualidades y Configuración (`esPersonal` = rol Propietario; el Admin ya no entra).
+- **Coordinador → "Alumnos nuevos":** con `inscripciones:ver`, quien no es Propietario ni solo representante ve las inscripciones **aprobadas** de las disciplinas de su alcance, una fila por alumno (curso, colegio, sus disciplinas, representante y teléfono). Tiene filtro de disciplinas y de colegio, paginador de 10 y borde ámbar si hay observación. La ficha es de solo lectura: datos, contactos, salud, uso de imagen y lo que aceptó; **sin** comprobante, montos, factura ni PDF (lleva tarifas). Rutas: `GET /inscripciones/nuevos`, `/nuevos/disciplinas`, `/nuevos/:insnino_id`.
+- **Paralelo (`0048`):** el formulario pide el paralelo (una letra) después de Colegio y Curso, obligatorio en pantalla. El backend lo valida si viene pero no lo exige, para no tumbar envíos de pestañas abiertas con la versión anterior. Se guarda en `insnino_datos.paralelo` y, al aprobar, en `nino.nino_paralelo`. En el PDF, "Curso" lleva el paralelo; las inscripciones anteriores se regeneran idénticas.

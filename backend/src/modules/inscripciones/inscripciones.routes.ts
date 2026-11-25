@@ -18,6 +18,7 @@ import {
   maxDisciplinasSchema,
   idParamSchema,
   listarSchema,
+  listarNuevosSchema,
   membreteSchema,
   precioSchema,
   problemasDeEnvio,
@@ -166,15 +167,21 @@ function actor(req: Request) {
 }
 
 /**
- * Quien no es Propietario ni Admin (un representante con permiso de ver)
- * solo puede pedir su lista y la ficha de las suyas. Todo lo demás
+ * Quien no es Propietario (un representante o un coordinador con permiso de ver)
+ * solo puede pedir su lista, la ficha de las suyas y los alumnos nuevos. Todo lo demás
  * (documentos, valores de los colegios, configuración, abrir y cerrar,
  * aprobar, rechazar) es del personal, tenga el permiso que tenga.
  */
 inscripcionesRouter.use((req: Request, _res: Response, next: NextFunction) => {
   try {
     if (service.esPersonal(actor(req))) return next();
-    const lectura = req.method === 'GET' && (req.path === '/' || /^\/\d+$/.test(req.path));
+    const lectura =
+      req.method === 'GET' &&
+      (req.path === '/' ||
+        req.path === '/nuevos' ||
+        req.path === '/nuevos/disciplinas' ||
+        /^\/nuevos\/\d+$/.test(req.path) ||
+        /^\/\d+$/.test(req.path));
     if (!lectura) throw new ApiError(403, 'Solo el personal de Activa Reforce puede hacer esto');
     next();
   } catch (err) {
@@ -189,6 +196,46 @@ inscripcionesRouter.get(
     try {
       const query = listarSchema.parse(req.query);
       res.json({ data: await service.listar(actor(req), query), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Alumnos nuevos de las disciplinas de su alcance (coordinador). Solo aprobadas, sin montos. */
+inscripcionesRouter.get(
+  '/nuevos',
+  requirePermission('inscripciones', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const query = listarNuevosSchema.parse(req.query);
+      res.json({ data: await service.nuevos(actor(req), query), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+inscripcionesRouter.get(
+  '/nuevos/disciplinas',
+  requirePermission('inscripciones', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ data: await service.disciplinasDeNuevos(actor(req)), error: null });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Ficha de un alumno nuevo (coordinador): sin dinero ni documentos. */
+inscripcionesRouter.get(
+  '/nuevos/:id',
+  requirePermission('inscripciones', 'ver'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = idParamSchema.parse(req.params);
+      res.json({ data: await service.fichaDeNuevo(actor(req), id), error: null });
     } catch (err) {
       next(err);
     }

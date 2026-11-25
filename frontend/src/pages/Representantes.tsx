@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, FileText, Search, UserRoundPlus, Users } from 'lucide-react';
+import { Eye, FileText, Phone, Search, UserRoundPlus, Users } from 'lucide-react';
+import { DataPagination } from '@/components/ui/data-pagination';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,10 @@ import FichaRepresentanteDialog from '@/components/representantes/FichaRepresent
 import DocumentosRepresentanteDialog from '@/components/representantes/DocumentosRepresentanteDialog';
 
 const TODOS = 'todos';
+const POR_PAGINA = 20;
+
+/** Para resaltar el hijo que coincide con la búsqueda (sin tildes ni mayúsculas). */
+const plano = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 /**
  * Representantes.
@@ -54,6 +59,7 @@ const TODOS = 'todos';
 const Representantes = () => {
   const [busqueda, setBusqueda] = useState('');
   const [estado, setEstado] = useState('1');
+  const [page, setPage] = useState(1);
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [viendoId, setViendoId] = useState<number | null>(null);
   const [documentosDe, setDocumentosDe] = useState<{ usuId: number; nombre: string } | null>(null);
@@ -63,10 +69,15 @@ const Representantes = () => {
   const lista = useRepresentantes({
     buscar: busqueda || undefined,
     estado: estado === TODOS ? undefined : Number(estado),
+    page,
+    limit: POR_PAGINA,
   });
 
   const representantes = lista.data?.representantes ?? [];
   const conteos = lista.data?.conteos;
+  const totalItems = lista.data?.total ?? 0;
+  const totalPages = lista.data?.totalPages ?? 0;
+  const buscado = plano(busqueda.trim());
 
   if (lista.isLoading && !lista.data) {
     return (
@@ -113,12 +124,21 @@ const Representantes = () => {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <DebouncedSearchInput
-          placeholder="Buscar por nombre o correo..."
+          placeholder="Buscar por representante, alumno, cédula, correo o teléfono..."
           value={busqueda}
-          onChange={setBusqueda}
+          onChange={(v) => {
+            setBusqueda(v);
+            setPage(1);
+          }}
           className="w-full sm:col-span-2"
         />
-        <Select value={estado} onValueChange={setEstado}>
+        <Select
+          value={estado}
+          onValueChange={(v) => {
+            setEstado(v);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="h-11 sm:h-10">
             <SelectValue />
           </SelectTrigger>
@@ -130,7 +150,14 @@ const Representantes = () => {
         </Select>
       </div>
 
-      {representantes.length === 0 && (
+      {representantes.length === 0 && (busqueda || estado !== '1') && (conteos?.total ?? 0) > 0 && (
+        <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
+          <Search className="mx-auto mb-3 h-10 w-10 opacity-50" />
+          <p className="text-lg">Nadie coincide con la búsqueda</p>
+        </div>
+      )}
+
+      {representantes.length === 0 && (conteos?.total ?? 0) === 0 && (
         <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
           <Users className="mx-auto mb-3 h-10 w-10 opacity-50" />
           <p className="text-lg">Todavía no hay representantes</p>
@@ -144,83 +171,127 @@ const Representantes = () => {
       {representantes.length > 0 && (
         <ul className="divide-y overflow-hidden rounded-lg border">
           {representantes.map((r) => (
+            /* Móvil: avatar y datos arriba, los hijos a todo el ancho y las
+               acciones al pie. Desde sm: acciones a la derecha y los hijos
+               alineados con el texto. */
             <li
               key={r.usu_id}
-              className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center"
+              className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
             >
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <Avatar className="h-10 w-10 flex-shrink-0">
-                  <AvatarImage src={r.usu_foto_url ?? undefined} alt="" />
-                  <AvatarFallback>{iniciales(r.usu_nombre)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <div className="truncate font-medium" title={r.usu_nombre}>
-                    {r.usu_nombre}
-                  </div>
-                  <div className="truncate text-sm text-muted-foreground">
-                    {r.usu_correo}
-                  </div>
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={r.usu_foto_url ?? undefined} alt="" />
+                <AvatarFallback>{iniciales(r.usu_nombre)}</AvatarFallback>
+              </Avatar>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="break-words font-medium">{r.usu_nombre}</span>
+                  {r.padre_id === null ? (
+                    <Badge variant="destructive">Sin ficha</Badge>
+                  ) : r.hijos === 0 ? (
+                    <Badge variant="secondary">Sin representados</Badge>
+                  ) : null}
                 </div>
+                <div className="break-all text-sm text-muted-foreground">{r.usu_correo}</div>
+                {r.usu_telefono && (
+                  <div className="text-sm text-muted-foreground">
+                    <Phone className="mr-1 inline h-3 w-3 align-[-1px]" aria-hidden />
+                    {r.usu_telefono}
+                  </div>
+                )}
+                {r.encuestasRespondidas > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {r.encuestasRespondidas} encuesta{r.encuestasRespondidas === 1 ? '' : 's'} respondida
+                    {r.encuestasRespondidas === 1 ? '' : 's'}
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center gap-3 sm:flex-shrink-0">
-                {r.padre_id === null ? (
-                  <Badge variant="destructive">Sin ficha</Badge>
-                ) : r.hijos === 0 ? (
-                  <Badge variant="secondary">Sin representados</Badge>
-                ) : (
-                  <Badge variant="default">
-                    {r.hijos} representado{r.hijos === 1 ? '' : 's'}
-                  </Badge>
-                )}
+              {/* Los hijos a la vista (2026-11-18), para llegar al
+                  representante de un alumno sin abrir su ficha. */}
+              {r.hijos_lista.length > 0 && (
+                <ul
+                  className="col-span-2 flex flex-wrap gap-1.5 sm:col-span-1 sm:col-start-2"
+                  aria-label="Representados"
+                >
+                  {r.hijos_lista.map((h) => {
+                    const coincide = buscado.length > 0 && plano(h.nino_nombre).includes(buscado);
+                    return (
+                      <li
+                        key={h.nino_id}
+                        className={
+                          'max-w-full break-words rounded-md border px-2 py-1 text-xs leading-tight ' +
+                          (coincide
+                            ? 'border-amber-500 bg-amber-50 text-foreground dark:border-amber-400 dark:bg-amber-950/40'
+                            : 'bg-muted/40 text-foreground')
+                        }
+                      >
+                        <span className="font-medium">{h.nino_nombre}</span>
+                        <span className="text-muted-foreground">
+                          {' · '}
+                          {[h.catninograd_nombre, h.col_nombre].filter(Boolean).join(' · ')}
+                          {h.est_id !== 1 && ' · inactivo'}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
 
-                {r.encuestasRespondidas > 0 && (
-                  <span className="text-sm text-muted-foreground">
-                    {r.encuestasRespondidas} encuesta{r.encuestasRespondidas === 1 ? '' : 's'}
-                  </span>
-                )}
-
-                {/* Acciones, como en las demás listas de personas: solo iconos. */}
-                <div className="ml-auto flex items-center gap-1 sm:ml-0">
+              {/* Acciones, como en las demás listas de personas: solo iconos. */}
+              <div className="col-span-2 flex items-center justify-end gap-1 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:self-start">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 md:h-9 md:w-9"
+                  onClick={() => setViendoId(r.usu_id)}
+                  title="Ver ficha"
+                  aria-label={`Ver la ficha de ${r.usu_nombre}`}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <ConditionalAction module="estudiantes" action="editar">
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-11 w-11 md:h-9 md:w-9"
-                    onClick={() => setViendoId(r.usu_id)}
-                    title="Ver ficha"
-                    aria-label={`Ver la ficha de ${r.usu_nombre}`}
+                    onClick={() => setEditandoId(r.usu_id)}
+                    title="Representados"
+                    aria-label={`Representados de ${r.usu_nombre}`}
                   >
-                    <Eye className="h-4 w-4" />
+                    <UserRoundPlus className="h-4 w-4" />
                   </Button>
-                  <ConditionalAction module="estudiantes" action="editar">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 md:h-9 md:w-9"
-                      onClick={() => setEditandoId(r.usu_id)}
-                      title="Representados"
-                      aria-label={`Representados de ${r.usu_nombre}`}
-                    >
-                      <UserRoundPlus className="h-4 w-4" />
-                    </Button>
-                  </ConditionalAction>
-                  {veDocumentos && r.inscripciones > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 md:h-9 md:w-9"
-                      onClick={() => setDocumentosDe({ usuId: r.usu_id, nombre: r.usu_nombre })}
-                      title="Ver contrato y documentos"
-                      aria-label={`Ver contrato y documentos de ${r.usu_nombre}`}
-                    >
-                      <FileText className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+                </ConditionalAction>
+                {veDocumentos && r.inscripciones > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 md:h-9 md:w-9"
+                    onClick={() => setDocumentosDe({ usuId: r.usu_id, nombre: r.usu_nombre })}
+                    title="Ver contrato y documentos"
+                    aria-label={`Ver contrato y documentos de ${r.usu_nombre}`}
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {representantes.length > 0 && (
+        <DataPagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          canGoNext={page < totalPages}
+          canGoPrevious={page > 1}
+          startIndex={(page - 1) * POR_PAGINA}
+          endIndex={Math.min(page * POR_PAGINA, totalItems)}
+          totalItems={totalItems}
+          itemName="representantes"
+        />
       )}
 
       <DialogoRepresentados usuId={editandoId} onClose={() => setEditandoId(null)} />

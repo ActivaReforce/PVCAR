@@ -33,17 +33,13 @@ import {
 import { ConditionalAction } from '@/components/ui/conditional-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useAprobarInscripcion, useFichaInscripcion } from '@/hooks/useInscripciones';
-import {
-  dinero,
-  type ConstanciaDetalle,
-  type InscripcionDetalle,
-  type NinoDetalle,
-} from '@/api/inscripciones';
+import { dinero, type InscripcionDetalle, type NinoDetalle } from '@/api/inscripciones';
+import Fila from './Fila';
 import RechazarInscripcionDialog from './RechazarInscripcionDialog';
 import AnularInscripcionDialog from './AnularInscripcionDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROL } from '@/hooks/useUserForm';
-import { fechaCorta, fechaHora, fechaNacimiento, enlaceWhatsApp } from './formato';
+import { fechaCorta, fechaHora, fechaNacimiento, enlaceWhatsApp, resumenConstancia, siNo } from './formato';
 import { nombreDeMes } from '@/api/mensualidades';
 
 interface Props {
@@ -273,13 +269,6 @@ const ResumenAprobacion = ({ datos, mismos }: { datos: InscripcionDetalle; mismo
   );
 };
 
-const Fila = ({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) => (
-  <div className="min-w-0">
-    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{etiqueta}</dt>
-    <dd className="mt-0.5 break-words text-sm">{children}</dd>
-  </div>
-);
-
 const Contenido = ({
   datos,
   mismos,
@@ -464,18 +453,6 @@ const Contenido = ({
   );
 };
 
-const siNo = (v: unknown) => (v ? 'Sí' : 'No');
-
-/** Lo que marcó en cada documento, en corto. */
-function resumenConstancia(c: ConstanciaDetalle): string {
-  const o = c.opciones;
-  if (c.tipo === 'datos_medicos') return `Condición: ${siNo(o.tiene)} · Autoriza: ${siNo(o.autoriza)}`;
-  if (c.tipo === 'imagen') {
-    return `Familias: ${siNo(o.familias)} · Redes: ${siNo(o.redes)} · Promocional: ${siNo(o.promocional)}`;
-  }
-  return 'Aceptado';
-}
-
 const FichaNino = ({
   n,
   pendiente,
@@ -554,6 +531,7 @@ const FichaNino = ({
         <Fila etiqueta="Nacimiento">{fechaNacimiento(d.fecha_nacimiento)}</Fila>
         <Fila etiqueta="Parentesco">{d.parentesco}</Fila>
         <Fila etiqueta="Curso">{n.grado ?? d.documento.curso ?? '—'}</Fila>
+        <Fila etiqueta="Paralelo">{d.paralelo ?? '—'}</Fila>
         <Fila etiqueta="Colegio">{n.colegio ?? d.documento.colegio.sede}</Fila>
         <Fila etiqueta="Salida">
           {d.modalidad_salida === 'escolar' ? 'Transporte escolar' : 'Transporte privado'}

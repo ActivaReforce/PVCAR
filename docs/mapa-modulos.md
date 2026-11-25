@@ -58,7 +58,7 @@ Dos triggers escriben solos y hay que tenerlos presentes al diseñar la API:
 | Asistente, Respaldo | las disciplinas de su(s) titular(es) | `disciplinas` (`entrenador_auxiliar`) |
 | Representante | solo sus hijos y las disciplinas de sus hijos | `ninos`, `disciplinasDeHijos` |
 
-Varios roles = unión. `colegios` **no** se deduce de las disciplinas (antes sí, y el entrenador veía el colegio entero). Encuestas (gestión) e Inscripciones no filtran por alcance: llevan guarda de personal.
+Varios roles = unión. `colegios` **no** se deduce de las disciplinas (antes sí, y el entrenador veía el colegio entero). Encuestas (gestión) e Inscripciones no filtran por alcance: llevan guarda de personal. Desde el 2026-11-18, Inscripciones y Mensualidades son solo del Propietario; el coordinador ve "alumnos nuevos" por sus disciplinas (alcance).
 
 ## 3. Los módulos
 

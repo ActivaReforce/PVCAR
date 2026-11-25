@@ -83,7 +83,11 @@ export async function guardarCobroColegio(client: PoolClient, colId: number, c: 
 // Alumnos y lo que ya está pagado
 
 export interface Contacto {
+  /** Para los datos de factura del representante (2026-11-18). */
+  usu_id: number;
   nombre: string;
+  /** Para Reportes → Mensualidades (2026-11-18). */
+  cedula: string | null;
   telefono: string | null;
   correo: string | null;
 }
@@ -127,7 +131,8 @@ export async function alumnosActivos(client?: PoolClient): Promise<AlumnoConDisc
                         JOIN public.usuario u ON u.usu_id = p.usu_id
                        WHERE np.nino_id = n.nino_id), '{}') AS representantes_nombres,
             COALESCE((SELECT json_agg(DISTINCT jsonb_build_object(
-                                'nombre', u.usu_nombre, 'telefono', u.usu_telefono, 'correo', u.usu_correo))
+                                'usu_id', u.usu_id, 'nombre', u.usu_nombre, 'cedula', u.usu_cedula,
+                                'telefono', u.usu_telefono, 'correo', u.usu_correo))
                         FROM public.nino_padre np
                         JOIN public.padre p ON p.padre_id = np.padre_id
                         JOIN public.usuario u ON u.usu_id = p.usu_id
@@ -478,4 +483,19 @@ export async function registrosDePago(): Promise<RegistroDePago[]> {
     [PRIMER_MES],
   );
   return rows;
+}
+
+/** Curso y paralelo actuales de cada alumno (Reportes → Mensualidades). */
+export async function cursosDeAlumnos(
+  ninoIds: number[],
+): Promise<Map<number, { curso: string | null; paralelo: string | null }>> {
+  if (ninoIds.length === 0) return new Map();
+  const { rows } = await getPool().query<{ nino_id: number; curso: string | null; paralelo: string | null }>(
+    `SELECT n.nino_id, g.catninograd_nombre AS curso, n.nino_paralelo AS paralelo
+       FROM public.nino n
+       LEFT JOIN public.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id
+      WHERE n.nino_id = ANY($1::int[])`,
+    [ninoIds],
+  );
+  return new Map(rows.map((r) => [r.nino_id, { curso: r.curso, paralelo: r.paralelo }]));
 }

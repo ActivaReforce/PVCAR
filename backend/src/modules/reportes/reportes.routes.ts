@@ -78,6 +78,38 @@ reportesRouter.get(
  * primera fila, la descarga se corta: por eso los permisos, la definición y el
  * rango se comprueban antes de tocar la respuesta.
  */
+/**
+ * POST /api/v1/reportes/:modulo/facturacion — "Sacar datos para facturación"
+ * (Inscripciones y Mensualidades, 2026-11-18). Mismos permisos y filtros que
+ * exportar; el archivo sale en streaming igual.
+ */
+reportesRouter.post(
+  '/:modulo/facturacion',
+  requirePermission('reportes', 'crear'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { modulo } = idParamSchema.parse(req.params);
+      if (!service.tieneFacturacion(modulo)) throw new ApiError(404, 'Este reporte no tiene datos para facturación');
+      const filtros = filtrosSchema.parse(req.body ?? {});
+      const sello = hoyEc();
+      // Antes de las cabeceras: permisos y definición (lanza si no puede).
+      service.comprobarAcceso(actor(req), modulo);
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="facturacion-${modulo}-${sello}.xlsx"`);
+      res.setHeader('Cache-Control', 'no-store');
+
+      await service.exportarFacturacion(actor(req), modulo, filtros, res);
+    } catch (err) {
+      if (res.headersSent) {
+        res.destroy();
+        return;
+      }
+      next(err);
+    }
+  },
+);
+
 reportesRouter.post(
   '/:modulo/export',
   requirePermission('reportes', 'crear'),

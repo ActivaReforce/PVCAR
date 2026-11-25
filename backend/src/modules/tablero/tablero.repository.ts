@@ -1,4 +1,5 @@
 import { getPool } from '../../config/db.js';
+import { cursoConParaleloSql } from '../../lib/paralelo.js';
 import { horarioTexto, primerHorario } from '../../lib/horarios.js';
 import { ESTADO } from '../../lib/constants.js';
 import { HOY_EC, textoEc } from '../../lib/fecha.js';
@@ -253,7 +254,7 @@ export async function tableroRepresentante(
             'nino_id',            n.nino_id,
             'nino_nombre',        n.nino_nombre,
             'col_nombre',         c.col_nombre,
-            'catninograd_nombre', g.catninograd_nombre,
+            'catninograd_nombre', ${cursoConParaleloSql('g.catninograd_nombre', 'n.nino_paralelo')},
             'disciplinas', COALESCE((
                 SELECT json_agg(json_build_object(
                     'act_nombre', act.act_nombre,

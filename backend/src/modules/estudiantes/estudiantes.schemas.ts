@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { paginacionSchema } from '../../lib/paginacion.js';
+import { paraleloSchema } from '../../lib/paralelo.js';
 
 /**
  * Validacion de entrada de Estudiantes.
@@ -59,6 +60,11 @@ export const listarEstudiantesSchema = paginacionSchema.extend({
   /** Solo los que no tienen ninguna inscripcion activa. */
   sinAsignar: bandera,
   grado: z.coerce.number().int().positive().optional(),
+  /** Una letra, o 'sin' para los que no tienen paralelo (0048). */
+  paralelo: z
+    .string()
+    .regex(/^([A-Z]|sin)$/)
+    .optional(),
   estado: z.coerce.number().int().positive().optional(),
   orden: z.enum(['nombre', 'colegio', 'grado', 'edad', 'creacion']).optional(),
   dir: z.enum(['asc', 'desc']).optional(),
@@ -101,6 +107,8 @@ export const crearEstudianteSchema = z.object({
   nino_nombre: nombre,
   col_id: z.number().int().positive(),
   catninograd_id: z.number().int().positive().nullable().optional(),
+  /** Una letra (0048). Opcional aquí: los alumnos anteriores no lo tienen. */
+  nino_paralelo: paraleloSchema.nullable().optional(),
   nino_fecha_nacimiento: fechaNacimiento,
   ...camposFicha,
   nino_foto: foto,
@@ -115,6 +123,7 @@ export const actualizarEstudianteSchema = z
     nino_nombre: nombre.optional(),
     col_id: z.number().int().positive().optional(),
     catninograd_id: z.number().int().positive().nullable().optional(),
+    nino_paralelo: paraleloSchema.nullable().optional(),
     nino_fecha_nacimiento: fechaNacimiento,
     ...camposFicha,
     nino_foto: foto,

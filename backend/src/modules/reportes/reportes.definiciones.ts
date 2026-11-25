@@ -5,6 +5,7 @@ import { HOY_EC, diaEc, hoyEc, textoEc } from '../../lib/fecha.js';
 import { CTE_VISIBLES } from '../usuarios/usuarios.repository.js';
 import { nombreDeMes } from '../mensualidades/mensualidades.calculo.js';
 import { registrosMensuales } from '../mensualidades/mensualidades.service.js';
+import { cursosDeAlumnos } from '../mensualidades/mensualidades.repository.js';
 
 /**
  * El catálogo de reportes.
@@ -65,6 +66,10 @@ export interface FiltrosReporte {
   ausencias?: boolean;
   /** Meses elegidos ('YYYY-MM-01'), en vez de fechas (Mensualidades). Vacío = todo. */
   meses?: string[];
+  /** Grado (catninograd_id). Alumnos. */
+  grado?: number;
+  /** Paralelo: una letra, o 'sin' para los que no tienen (0048). Alumnos. */
+  paralelo?: string;
 }
 
 /** Una opción de un desplegable de filtro. */
@@ -92,6 +97,9 @@ export interface FiltrosDisponibles {
   ausencias?: boolean;
   /** Selector de meses (varios), del año pasado al siguiente (Mensualidades). */
   meses?: boolean;
+  /** Desplegables de grado y de paralelo (Alumnos, 2026-11-18). */
+  grado?: boolean;
+  paralelo?: boolean;
 }
 
 const ACTIVO_INACTIVO = (etiqueta = 'Estado') => ({
@@ -480,7 +488,14 @@ const estudiantes: Definicion = {
   descripcion: 'Los alumnos con su colegio, su grado y sus disciplinas.',
   modulo: 'estudiantes',
   exigeRango: false,
-  filtros: { colegio: true, disciplina: true, estado: ACTIVO_INACTIVO(), fechas: false },
+  filtros: {
+    colegio: true,
+    disciplina: true,
+    estado: ACTIVO_INACTIVO(),
+    fechas: false,
+    grado: true,
+    paralelo: true,
+  },
   /** Dato médico de un menor: se incluye a propósito, no por defecto. */
   columnasSensibles: ['nino_info_salud'],
   columnas: [
@@ -490,6 +505,7 @@ const estudiantes: Definicion = {
     { clave: 'nino_edad', cabecera: 'Edad', ancho: 8 },
     { clave: 'col_nombre', cabecera: 'Colegio', ancho: 30 },
     { clave: 'catninograd_nombre', cabecera: 'Grado', ancho: 20 },
+    { clave: 'nino_paralelo', cabecera: 'Paralelo', ancho: 10 },
     { clave: 'transporte', cabecera: 'Salida', ancho: 18 },
     { clave: 'estado', cabecera: 'Estado', ancho: 12 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
@@ -505,6 +521,7 @@ const estudiantes: Definicion = {
              date_part('year', age(${HOY_EC}, n.nino_fecha_nacimiento))::int AS nino_edad,
              c.col_nombre,
              COALESCE(g.catninograd_nombre, '')                    AS catninograd_nombre,
+             COALESCE(n.nino_paralelo, '')                         AS nino_paralelo,
              CASE n.nino_modalidad_salida WHEN 'escolar' THEN 'Transporte escolar'
                                           WHEN 'privado' THEN 'Transporte privado'
                                           ELSE '' END              AS transporte,
@@ -549,6 +566,8 @@ const estudiantes: Definicion = {
                                           WHERE na.nino_id = n.nino_id
                                             AND na.colacthor_id = $7
                                             AND na.est_id = ${ESTADO.ACTIVO}))
+         AND ($8::int IS NULL OR n.catninograd_id = $8)
+         AND ($9::text IS NULL OR ($9 = 'sin' AND n.nino_paralelo IS NULL) OR n.nino_paralelo = $9)
        ORDER BY c.col_nombre, n.nino_nombre`,
     params: [
       ctx.global,
@@ -558,6 +577,8 @@ const estudiantes: Definicion = {
       oNulo(f.colegio),
       oNulo(f.estado),
       oNulo(f.disciplina),
+      oNulo(f.grado),
+      oNulo(f.paralelo),
     ],
   }),
 };
@@ -811,7 +832,9 @@ const representantes: Definicion = {
     { clave: 'usu_correo', cabecera: 'Correo', ancho: 32 },
     { clave: 'usu_telefono', cabecera: 'Teléfono', ancho: 14 },
     { clave: 'hijos_activos', cabecera: 'Hijos activos', ancho: 12 },
-    { clave: 'hijos', cabecera: 'Hijos', ancho: 48 },
+    { clave: 'hijos', cabecera: 'Hijos', ancho: 40 },
+    { clave: 'cursos', cabecera: 'Curso', ancho: 30 },
+    { clave: 'paralelos', cabecera: 'Paralelo', ancho: 10 },
     { clave: 'colegios', cabecera: 'Colegios', ancho: 32 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 36 },
     { clave: 'estado', cabecera: 'Estado', ancho: 12 },
@@ -833,15 +856,27 @@ const representantes: Definicion = {
                 FROM public.nino_padre np
                 JOIN public.nino n ON n.nino_id = np.nino_id
                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO})::int AS hijos_activos,
+             -- Hijos, Curso y Paralelo en el mismo orden (2026-11-18): el
+             -- primer curso y el primer paralelo son del primer hijo.
              COALESCE((
-               SELECT string_agg(
-                        n.nino_nombre || COALESCE(' (' || g.catninograd_nombre || ')', ''),
-                        ', ' ORDER BY n.nino_nombre)
+               SELECT string_agg(n.nino_nombre, ', ' ORDER BY n.nino_nombre, n.nino_id)
+                 FROM public.nino_padre np
+                 JOIN public.nino n ON n.nino_id = np.nino_id
+                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
+             ), '')                                               AS hijos,
+             COALESCE((
+               SELECT string_agg(COALESCE(g.catninograd_nombre, '—'), ', ' ORDER BY n.nino_nombre, n.nino_id)
                  FROM public.nino_padre np
                  JOIN public.nino n ON n.nino_id = np.nino_id
                  LEFT JOIN public.categoria_nino_grado g ON g.catninograd_id = n.catninograd_id
                 WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
-             ), '')                                               AS hijos,
+             ), '')                                               AS cursos,
+             COALESCE((
+               SELECT string_agg(COALESCE(n.nino_paralelo, '—'), ', ' ORDER BY n.nino_nombre, n.nino_id)
+                 FROM public.nino_padre np
+                 JOIN public.nino n ON n.nino_id = np.nino_id
+                WHERE np.padre_id = p.padre_id AND n.est_id = ${ESTADO.ACTIVO}
+             ), '')                                               AS paralelos,
              COALESCE((
                SELECT string_agg(DISTINCT c.col_nombre, ', ' ORDER BY c.col_nombre)
                  FROM public.nino_padre np
@@ -897,7 +932,7 @@ const representantes: Definicion = {
  * se guarda en la inscripción: sale de sus disciplinas (cada disciplina es de
  * un colegio).
  */
-const HIJO_EN_COLEGIO = `EXISTS (
+export const HIJO_EN_COLEGIO = `EXISTS (
                 SELECT 1
                   FROM unnest(inn.insnino_disciplinas) AS cid
                   JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
@@ -905,7 +940,7 @@ const HIJO_EN_COLEGIO = `EXISTS (
               )`;
 
 /** Filtros comunes al detalle y a los totales de Inscripciones. */
-const FILTRO_INSCRIPCION = `($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
+export const FILTRO_INSCRIPCION = `($1::date IS NULL OR ${diaEc('i.ins_fecha')} >= $1::date)
          AND ($2::date IS NULL OR ${diaEc('i.ins_fecha')} <= $2::date)
          AND ($3::text IS NULL
               OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre','')", '$3')}
@@ -940,11 +975,11 @@ const VALOR_INSCRIPCION = `CASE WHEN $5::int[] IS NULL THEN COALESCE(i.ins_total
  * `fotoDeAnulada` en Inscripciones). Salen aquí con su valor, pero no suman
  * al recaudado.
  */
-const FECHA_ANULADA = "(a.aud_detalle->>'ins_fecha')::timestamptz";
-const HIJOS_ANULADA = "jsonb_array_elements(COALESCE(a.aud_detalle->'hijos', '[]'::jsonb))";
-const HIJO_ANULADO_EN_COLEGIO = "($5::int[] IS NULL OR (h->>'col_id')::int = ANY($5::int[]))";
+export const FECHA_ANULADA = "(a.aud_detalle->>'ins_fecha')::timestamptz";
+export const HIJOS_ANULADA = "jsonb_array_elements(COALESCE(a.aud_detalle->'hijos', '[]'::jsonb))";
+export const HIJO_ANULADO_EN_COLEGIO = "($5::int[] IS NULL OR (h->>'col_id')::int = ANY($5::int[]))";
 
-const FILTRO_ANULADA = `a.aud_entidad = 'inscripcion' AND a.aud_accion = 'eliminar'
+export const FILTRO_ANULADA = `a.aud_entidad = 'inscripcion' AND a.aud_accion = 'eliminar'
          AND a.aud_detalle->>'anulada' = 'true'
          AND ($1::date IS NULL OR ${diaEc(FECHA_ANULADA)} >= $1::date)
          AND ($2::date IS NULL OR ${diaEc(FECHA_ANULADA)} <= $2::date)
@@ -965,6 +1000,8 @@ const SQL_ANULADAS = `
              COALESCE(a.aud_detalle->'representante'->>'correo', ''),
              COALESCE(a.aud_detalle->'representante'->>'telefono', ''),
              COALESCE((SELECT string_agg(h->>'nombre', ', ') FROM ${HIJOS_ANULADA} h), ''),
+             COALESCE((SELECT string_agg(COALESCE(h->>'curso', '—'), ', ') FROM ${HIJOS_ANULADA} h), ''),
+             COALESCE((SELECT string_agg(COALESCE(h->>'paralelo', '—'), ', ') FROM ${HIJOS_ANULADA} h), ''),
              jsonb_array_length(COALESCE(a.aud_detalle->'hijos', '[]'::jsonb)),
              COALESCE((SELECT string_agg(DISTINCT h->>'colegio', ', ' ORDER BY h->>'colegio')
                          FROM ${HIJOS_ANULADA} h
@@ -978,6 +1015,9 @@ const SQL_ANULADAS = `
                    ELSE COALESCE((SELECT SUM((h->>'valor')::numeric) FROM ${HIJOS_ANULADA} h
                                    WHERE ${HIJO_ANULADO_EN_COLEGIO}), 0)
               END)::float8,
+             COALESCE((SELECT string_agg((h->>'nombre') || ': ' || (h->>'observacion'), ' | ')
+                         FROM ${HIJOS_ANULADA} h
+                        WHERE btrim(COALESCE(h->>'observacion', '')) <> ''), ''),
              COALESCE(a.aud_detalle->>'aprobada_por', ''),
              COALESCE(${textoEc("(a.aud_detalle->>'ins_fecha_aprobacion')::timestamptz", 'DD/MM/YYYY')}, ''),
              COALESCE(a.aud_detalle->>'anulada_por', a.aud_actor_correo, ''),
@@ -986,7 +1026,7 @@ const SQL_ANULADAS = `
         FROM public.auditoria a
        WHERE ${FILTRO_ANULADA}`;
 
-const paramsInscripcion = (f: FiltrosReporte) => [
+export const paramsInscripcion = (f: FiltrosReporte) => [
   oNulo(f.desde),
   oNulo(f.hasta),
   textoONulo(f.buscar),
@@ -1015,6 +1055,16 @@ const SQL_INSCRIPCIONES = `
                  FROM public.inscripcion_nino inn
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS hijos,
+             COALESCE((
+               SELECT string_agg(COALESCE(inn.insnino_datos->'documento'->>'curso', '—'), ', ' ORDER BY inn.insnino_orden)
+                 FROM public.inscripcion_nino inn
+                WHERE inn.ins_id = i.ins_id
+             ), '')                                                   AS cursos,
+             COALESCE((
+               SELECT string_agg(COALESCE(NULLIF(inn.insnino_datos->>'paralelo', ''), '—'), ', ' ORDER BY inn.insnino_orden)
+                 FROM public.inscripcion_nino inn
+                WHERE inn.ins_id = i.ins_id
+             ), '')                                                   AS paralelos,
              (SELECT count(*) FROM public.inscripcion_nino WHERE ins_id = i.ins_id)::int AS cantidad_hijos,
              COALESCE((
                SELECT string_agg(DISTINCT c.col_nombre, ', ' ORDER BY c.col_nombre)
@@ -1043,6 +1093,17 @@ const SQL_INSCRIPCIONES = `
                 WHERE inn.ins_id = i.ins_id
              ), '')                                                   AS disciplinas,
              ${VALOR_INSCRIPCION}::float8                             AS valor,
+             COALESCE((
+               SELECT string_agg(
+                        btrim(
+                          COALESCE(inn.insnino_datos->>'nombres', inn.insnino_datos->>'nombre', '') ||
+                          ' ' || COALESCE(inn.insnino_datos->>'apellidos', '')
+                        ) || ': ' || btrim(inn.insnino_datos->>'observacion_extra'),
+                        ' | ' ORDER BY inn.insnino_orden)
+                 FROM public.inscripcion_nino inn
+                WHERE inn.ins_id = i.ins_id
+                  AND btrim(COALESCE(inn.insnino_datos->>'observacion_extra', '')) <> ''
+             ), '')                                                   AS observaciones,
              COALESCE(ap.usu_nombre, '')                              AS aprobada_por,
              COALESCE(${textoEc('i.ins_fecha_aprobacion', 'DD/MM/YYYY')}, '') AS fecha_aprobacion,
              ''                                                       AS anulada_por,
@@ -1084,10 +1145,13 @@ const inscripciones: Definicion = {
     { clave: 'correo', cabecera: 'Correo', ancho: 30 },
     { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
     { clave: 'hijos', cabecera: 'Hijos', ancho: 40 },
+    { clave: 'cursos', cabecera: 'Curso', ancho: 30 },
+    { clave: 'paralelos', cabecera: 'Paralelo', ancho: 10 },
     { clave: 'cantidad_hijos', cabecera: 'N° hijos', ancho: 10 },
     { clave: 'colegios', cabecera: 'Colegios', ancho: 30 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 40 },
     { clave: 'valor', cabecera: 'Valor ($)', ancho: 12 },
+    { clave: 'observaciones', cabecera: 'Observaciones', ancho: 50 },
     { clave: 'aprobada_por', cabecera: 'Aprobada por', ancho: 28 },
     { clave: 'fecha_aprobacion', cabecera: 'Aprobada el', ancho: 14 },
     { clave: 'anulada_por', cabecera: 'Anulada por', ancho: 28 },
@@ -1139,7 +1203,7 @@ const inscripciones: Definicion = {
  *
  * Lo que se debe no se guarda: por eso las filas salen de código.
  */
-const ETIQUETA_REGISTRO: Record<string, string> = {
+export const ETIQUETA_REGISTRO: Record<string, string> = {
   pagado: 'Pagado',
   inscripcion: 'Pagado (Inscripción)',
   revision: 'En revisión',
@@ -1149,23 +1213,23 @@ const ETIQUETA_REGISTRO: Record<string, string> = {
 };
 const ORDEN_REGISTRO = ['atrasado', 'pendiente', 'revision', 'inscripcion_revision', 'pagado', 'inscripcion'];
 /** Filtro de estado: 1 pagado (también por inscripción), 2 en revisión, 3 pendiente, 4 atrasado. */
-const ESTADOS_DEL_FILTRO: Record<number, string[]> = {
+export const ESTADOS_DEL_FILTRO: Record<number, string[]> = {
   1: ['pagado', 'inscripcion'],
   2: ['revision', 'inscripcion_revision'],
   3: ['pendiente'],
   4: ['atrasado'],
 };
-const NOMBRES_MES = [
+export const NOMBRES_MES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 /** Para buscar sin tildes ni mayúsculas en filas calculadas en código. */
-const plano = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const diaLegible = (dia: string | null) => (dia ? dia.split('-').reverse().join('/') : '');
+export const plano = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+export const diaLegible = (dia: string | null) => (dia ? dia.split('-').reverse().join('/') : '');
 
 /** "Todo": del año pasado al siguiente, como el filtro de la pantalla. */
-function mesesDeTodo(): string[] {
+export function mesesDeTodo(): string[] {
   const ano = Number(hoyEc().slice(0, 4));
   return [ano - 1, ano, ano + 1].flatMap((a) =>
     NOMBRES_MES.map((_, i) => `${a}-${String(i + 1).padStart(2, '0')}-01`),
@@ -1201,6 +1265,8 @@ const mensualidades: Definicion = {
     { clave: 'mes', cabecera: 'Mes', ancho: 12 },
     { clave: 'colegio', cabecera: 'Colegio', ancho: 28 },
     { clave: 'alumno', cabecera: 'Alumno', ancho: 30 },
+    { clave: 'curso', cabecera: 'Curso', ancho: 20 },
+    { clave: 'paralelo', cabecera: 'Paralelo', ancho: 10 },
     { clave: 'estado', cabecera: 'Estado', ancho: 22 },
     { clave: 'valor', cabecera: 'Valor ($)', ancho: 11 },
     { clave: 'recaudado', cabecera: 'Recaudado en el periodo ($)', ancho: 16 },
@@ -1209,6 +1275,7 @@ const mensualidades: Definicion = {
     { clave: 'mes_pago', cabecera: 'Mes de pago', ancho: 15 },
     { clave: 'disciplinas', cabecera: 'Disciplinas', ancho: 30 },
     { clave: 'representante', cabecera: 'Representante', ancho: 30 },
+    { clave: 'cedula', cabecera: 'Cédula', ancho: 14 },
     { clave: 'telefono', cabecera: 'Teléfono', ancho: 14 },
     { clave: 'correo', cabecera: 'Correo', ancho: 30 },
   ],
@@ -1216,6 +1283,9 @@ const mensualidades: Definicion = {
     const explicitos = Boolean(f.meses && f.meses.length > 0);
     const elegidos = new Set(explicitos ? f.meses : mesesDeTodo());
     const registros = await registrosMensuales(f.colegio && f.colegio.length > 0 ? f.colegio : null);
+    const cursos = await cursosDeAlumnos([
+      ...new Set(registros.map((r) => r.nino_id).filter((id): id is number => id !== null)),
+    ]);
     const estados = f.estado ? ESTADOS_DEL_FILTRO[f.estado] : null;
     const buscar = f.buscar?.trim() ? plano(f.buscar.trim()) : null;
 
@@ -1228,7 +1298,7 @@ const mensualidades: Definicion = {
       // Con «Todo», lo que aún no llega y está sin pagar no sale; eligiendo el mes, sí.
       if (r.futuro && !explicitos) continue;
       if (estados && !estados.includes(r.estado)) continue;
-      if (buscar && !plano(`${r.alumno} ${r.representante} ${r.correo}`).includes(buscar)) continue;
+      if (buscar && !plano(`${r.alumno} ${r.representante} ${r.cedula} ${r.correo}`).includes(buscar)) continue;
       const recaudado = entroEnElPeriodo ? r.valor : 0;
       const adelantado = r.mes_pago !== null && r.mes_pago < r.mes;
       const con = r.pagado_con === 'inscripcion' ? 'Inscripción' : r.pagado_con === 'mensualidad' ? 'Mensualidad' : 'Sin pagar';
@@ -1237,6 +1307,8 @@ const mensualidades: Definicion = {
         mes: NOMBRES_MES[Number(r.mes.slice(5, 7)) - 1],
         colegio: r.col_nombre,
         alumno: r.baja ? `${r.alumno} (dado de baja)` : r.alumno,
+        curso: (r.nino_id !== null && cursos.get(r.nino_id)?.curso) || '',
+        paralelo: (r.nino_id !== null && cursos.get(r.nino_id)?.paralelo) || '',
         estado: ETIQUETA_REGISTRO[r.estado],
         valor: r.valor,
         recaudado,
@@ -1245,6 +1317,7 @@ const mensualidades: Definicion = {
         mes_pago: r.mes_pago ? nombreDeMes(r.mes_pago) : '',
         disciplinas: r.disciplinas.join(', '),
         representante: r.representante,
+        cedula: r.cedula,
         telefono: r.telefono,
         correo: r.correo,
         _mes: r.mes,

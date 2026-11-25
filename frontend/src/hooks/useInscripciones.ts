@@ -14,6 +14,38 @@ function mensajeDe(error: unknown): string {
   return 'Error inesperado';
 }
 
+/** Alumnos nuevos de sus disciplinas (vista del coordinador). */
+export function useAlumnosNuevos(filtros: {
+  buscar?: string;
+  colegio?: number;
+  disciplina?: number;
+  page?: number;
+}) {
+  return useQuery({
+    queryKey: ['inscripciones', 'nuevos', filtros],
+    queryFn: () => inscripcionesApi.nuevos(filtros),
+    placeholderData: (anterior) => anterior,
+  });
+}
+
+/** Ficha de un alumno nuevo (coordinador). */
+export function useFichaDeNuevo(insninoId: number | null) {
+  return useQuery({
+    queryKey: ['inscripciones', 'nuevos', 'ficha', insninoId ?? 0],
+    queryFn: () => inscripcionesApi.fichaDeNuevo(insninoId as number),
+    enabled: insninoId !== null,
+  });
+}
+
+/** Opciones del filtro de disciplinas de alumnos nuevos (su alcance). */
+export function useDisciplinasDeNuevos() {
+  return useQuery({
+    queryKey: ['inscripciones', 'nuevos', 'disciplinas'],
+    queryFn: () => inscripcionesApi.disciplinasDeNuevos(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useInscripciones(filtros: {
   estado?: EstadoInscripcion;
   buscar?: string;

@@ -1,3 +1,5 @@
+import type { ConstanciaDetalle } from '@/api/inscripciones';
+
 /** Formatos de fecha y contacto que comparten las pantallas de Inscripciones. */
 
 import { ZONA } from '@/lib/fecha';
@@ -33,4 +35,16 @@ export function enlaceWhatsApp(telefono: string): string | null {
   if (digitos.length === 10 && digitos.startsWith('09')) digitos = `593${digitos.slice(1)}`;
   if (digitos.length < 11) return null;
   return `https://wa.me/${digitos}`;
+}
+
+export const siNo = (v: unknown) => (v ? 'Sí' : 'No');
+
+/** Lo que marcó en cada documento, en corto. */
+export function resumenConstancia(c: ConstanciaDetalle): string {
+  const o = c.opciones;
+  if (c.tipo === 'datos_medicos') return `Condición: ${siNo(o.tiene)} · Autoriza: ${siNo(o.autoriza)}`;
+  if (c.tipo === 'imagen') {
+    return `Familias: ${siNo(o.familias)} · Redes: ${siNo(o.redes)} · Promocional: ${siNo(o.promocional)}`;
+  }
+  return 'Aceptado';
 }

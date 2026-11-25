@@ -1,4 +1,5 @@
 import { Eye, Pencil, RotateCcw, StickyNote, Trash2, UserX } from 'lucide-react';
+import { cursoConParalelo } from '@/lib/paralelo';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,11 +17,11 @@ interface Props {
 
 /**
  * Dos modos (2026-10-15): hasta 1024 px tarjeta apilada; desde 1024 px, las
- * 6 columnas con Grado y Estado visibles. El escalón intermedio se quita
+ * 7 columnas con Grado, Paralelo y Estado visibles. El escalón intermedio se quita
  * porque antes amontonaba columnas en pantallas de ~900 px.
  */
 const REJILLA =
-  'grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_8rem_6rem_6rem_11rem] lg:items-center lg:gap-4';
+  'grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_8rem_4.5rem_6rem_6rem_11rem] lg:items-center lg:gap-4';
 
 const iniciales = (nombre: string) =>
   nombre
@@ -67,6 +68,7 @@ const EstudiantesLista = ({
         <div>Estudiante</div>
         <div>Colegio</div>
         <div className="lg:block">Grado</div>
+        <div className="lg:block">Paralelo</div>
         <div>Disciplinas</div>
         <div className="lg:block">Estado</div>
         <div>Acciones</div>
@@ -102,6 +104,13 @@ const EstudiantesLista = ({
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {e.nino_edad ? `${e.nino_edad} años` : 'Edad sin registrar'}
+                    {/* En móvil no hay columnas de grado y paralelo: van aquí. */}
+                    {e.catninograd_nombre && (
+                      <span className="lg:hidden">
+                        {' · '}
+                        {cursoConParalelo(e.catninograd_nombre, e.nino_paralelo)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -112,6 +121,10 @@ const EstudiantesLista = ({
 
               <div className="hidden text-sm text-muted-foreground lg:block">
                 {e.catninograd_nombre ?? '—'}
+              </div>
+
+              <div className="hidden text-sm text-muted-foreground lg:block">
+                {e.nino_paralelo ?? '—'}
               </div>
 
               {/*

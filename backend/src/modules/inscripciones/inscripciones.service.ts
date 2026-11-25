@@ -6,9 +6,11 @@ import { frontendBaseUrl } from '../../config/env.js';
 import { ApiError } from '../../middleware/error.js';
 import type { AuthUser } from '../../middleware/auth.js';
 import { auditar } from '../../lib/auditoria.js';
-import { ESTADO, ROL, ROLES_GLOBALES } from '../../lib/constants.js';
+import { ESTADO, ROL } from '../../lib/constants.js';
+import { alcanceDe } from '../../lib/alcance.js';
 import { diaDeCruce, horarioLargo, type HorarioDisciplina } from '../../lib/horarios.js';
 import { enTransaccion } from '../../lib/tx.js';
+import { cursoConParalelo } from '../../lib/paralelo.js';
 import { armarPagina, type Pagina } from '../../lib/paginacion.js';
 import { escaparHtml } from '../../lib/correo.js';
 import { borrarFoto } from '../../lib/storage.js';
@@ -48,6 +50,7 @@ import {
   PARENTESCOS,
   type EnvioInscripcion,
   type ListarInscripcionesQuery,
+  type ListarNuevosQuery,
   type RepresentanteFormulario,
 } from './inscripciones.schemas.js';
 
@@ -230,7 +233,8 @@ export function datosDelPaquete(
     alumno: {
       nombre: nino.nombre,
       fecha_nacimiento: nino.fecha_nacimiento,
-      curso: nino.documento.curso,
+      // Con su paralelo (0048). Las guardadas antes no lo traen: salen igual que siempre.
+      curso: cursoConParalelo(nino.documento.curso, nino.paralelo),
       actividades: nino.documento.actividades,
       horarios: nino.documento.horarios,
       modalidad_salida: nino.modalidad_salida,
@@ -808,8 +812,110 @@ export function veAvisoDelMenu(actor: AuthUser): boolean {
   return actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO);
 }
 
+/**
+ * Quien administra Inscripciones y Mensualidades: solo el Propietario
+ * (cliente, 2026-11-18: "nadie más"). Antes también el Admin. El resto, con
+ * permiso de ver, tiene la vista de alumnos nuevos (`nuevos`) o, si es
+ * representante, las suyas.
+ */
 export function esPersonal(actor: AuthUser): boolean {
-  return actor.usuario.roles.some((r) => ROLES_GLOBALES.includes(r.rol_id));
+  return actor.usuario.roles.some((r) => r.rol_id === ROL.PROPIETARIO);
+}
+
+/**
+ * Alumnos nuevos de las disciplinas de su alcance (cliente, 2026-11-18): el
+ * coordinador ve quién entró en sus colegios. Solo aprobadas, una fila por
+ * alumno, sin montos, comprobantes ni documentos.
+ */
+export async function nuevos(
+  actor: AuthUser,
+  query: ListarNuevosQuery,
+): Promise<Pagina<repo.AlumnoNuevo>> {
+  const alcance = await alcanceDe(actor.usuario);
+  if (!alcance.global && alcance.disciplinas.length === 0) return armarPagina([], 0, query);
+  // Una disciplina fuera de su alcance no amplía nada: no hay nadie que ver.
+  if (query.disciplina && !alcance.global && !alcance.disciplinas.includes(query.disciplina)) {
+    return armarPagina([], 0, query);
+  }
+  const { items, total } = await repo.listarNuevos(query, alcance.global ? null : alcance.disciplinas);
+  return armarPagina(items, total, query);
+}
+
+/**
+ * La ficha de un alumno nuevo para el coordinador (cliente, 2026-11-18): lo
+ * que le sirve para recibirlo —datos, contactos, salud, permisos de imagen y
+ * lo que aceptó en cada documento— y nada de dinero: sin comprobante, sin
+ * cobro, sin factura, sin el PDF (lleva tarifas) y sin la foto del colegio
+ * con sus precios. Solo aprobadas y con alguna disciplina de su alcance; de
+ * las disciplinas, solo las suyas.
+ */
+export interface FichaDeNuevo {
+  ins_id: number;
+  ins_fecha: string;
+  ins_fecha_aprobacion: string | null;
+  representante: { nombre: string; cedula: string; correo: string; telefono: string };
+  alumno: {
+    insnino_id: number;
+    datos: Omit<repo.NinoGuardado, 'documento'>;
+    curso: string | null;
+    colegio: string | null;
+    disciplinas: string[];
+    constancias: ConstanciaDetalle[];
+  };
+}
+
+export async function fichaDeNuevo(actor: AuthUser, insninoId: number): Promise<FichaDeNuevo> {
+  const noEsta = new ApiError(404, 'Alumno no encontrado');
+  const insId = await repo.inscripcionDeNino(insninoId);
+  if (insId === null) throw noEsta;
+  const fila = await repo.obtener(insId);
+  if (!fila || fila.ins_estado !== 'aprobada') throw noEsta;
+
+  const alcance = await alcanceDe(actor.usuario);
+  const [ninos, aceptaciones] = await Promise.all([repo.ninosDe(insId), repo.aceptacionesDe(insId)]);
+  const n = ninos.find((x) => x.insnino_id === insninoId);
+  if (!n) throw noEsta;
+  const suyas = alcance.global
+    ? n.insnino_disciplinas
+    : n.insnino_disciplinas.filter((id) => alcance.disciplinas.includes(id));
+  if (suyas.length === 0) throw noEsta;
+
+  const [disciplinas, grados] = await Promise.all([
+    repo.disciplinasPorId(suyas),
+    repo.nombresDeGrados([n.insnino_datos.catninograd_id]),
+  ]);
+  const { documento, ...datos } = n.insnino_datos;
+  const rep = fila.ins_representante;
+  return {
+    ins_id: fila.ins_id,
+    ins_fecha: fila.ins_fecha,
+    ins_fecha_aprobacion: fila.ins_fecha_aprobacion,
+    representante: { nombre: rep.nombre, cedula: rep.cedula, correo: rep.correo, telefono: rep.telefono },
+    alumno: {
+      insnino_id: n.insnino_id,
+      datos,
+      curso: cursoConParalelo(
+        grados.get(n.insnino_datos.catninograd_id) ?? documento?.curso ?? null,
+        n.insnino_datos.paralelo,
+      ),
+      colegio: disciplinas[0]?.col_nombre ?? documento?.colegio.sede ?? null,
+      disciplinas: disciplinas.map(describirDisciplina),
+      constancias: aceptaciones
+        .filter((a) => a.insnino_id === n.insnino_id)
+        .map((a) => ({
+          tipo: a.doc_tipo,
+          nombre: NOMBRE_DOCUMENTO[a.doc_tipo],
+          version: a.doc_version,
+          sha256: a.acep_texto_sha256,
+          opciones: a.acep_opciones,
+        })),
+    },
+  };
+}
+
+/** Las disciplinas del filtro de alumnos nuevos: las de su alcance. */
+export async function disciplinasDeNuevos(actor: AuthUser): Promise<estudiantesRepo.DisciplinaDeFiltro[]> {
+  return estudiantesRepo.listarDisciplinasDeFiltro(await alcanceDe(actor.usuario));
 }
 
 export async function listar(actor: AuthUser, query: ListarInscripcionesQuery): Promise<ListaInscripciones> {
@@ -1263,6 +1369,7 @@ export async function aprobar(
           // Si se dio de baja (p. ej. al anular una inscripción suya con
           // historia) y vuelve, vuelve activo.
           await estudiantesRepo.cambiarEstado(client, destino, ESTADO.ACTIVO);
+          if (d.paralelo) await estudiantesRepo.fijarParalelo(client, destino, d.paralelo);
           await repo.marcarSaludAutorizada(client, destino, d.salud.autoriza);
           await estudiantesRepo.sumarObservacion(client, destino, d.observacion_extra ?? null);
           await estudiantesRepo.guardarContacto(client, destino, 'emergencia', { ...d.emergencia, cedula: null });
@@ -1291,6 +1398,7 @@ export async function aprobar(
           foto: null,
         });
         await repo.marcarSaludAutorizada(client, ninoId, d.salud.autoriza);
+        if (d.paralelo) await estudiantesRepo.fijarParalelo(client, ninoId, d.paralelo);
         await estudiantesRepo.sumarObservacion(client, ninoId, d.observacion_extra ?? null);
         await estudiantesRepo.guardarContacto(client, ninoId, 'emergencia', { ...d.emergencia, cedula: null });
         await estudiantesRepo.guardarContacto(client, ninoId, 'retiro', d.retiro);

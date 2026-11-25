@@ -77,6 +77,16 @@ function paraActor(actor: AuthUser, n: repo.Novedad): NovedadVista {
   return { ...n, autor: null };
 }
 
+/**
+ * Colegios que coordina (0047): ve las ausencias y correcciones de sus
+ * alumnos, nada más (cliente, 2026-11-18). Solo por el rol Coordinador: el
+ * entrenador no las ve por sus disciplinas.
+ */
+async function colegiosQueCoordina(actor: AuthUser): Promise<number[]> {
+  if (!actor.usuario.roles.some((r) => r.rol_id === ROL.COORDINADOR)) return [];
+  return (await alcanceDe(actor.usuario)).colegios;
+}
+
 function esRepresentante(actor: AuthUser): boolean {
   return actor.usuario.roles.some((r) => r.rol_id === ROL.REPRESENTANTE);
 }
@@ -93,6 +103,9 @@ export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<N
 
   const hijos = (verHijos || verAusencias) && esRepresentante(actor)
     ? await repo.ninosDelRepresentante(actor.usuario.usu_id)
+    : [];
+  const colegiosAusencias = !global && configAusencias?.notificar_coordinador
+    ? await colegiosQueCoordina(actor)
     : [];
 
   const lista = await repo.listar({
@@ -113,6 +126,7 @@ export async function listar(actor: AuthUser, filtros: FiltrosListar): Promise<N
           verMenciones,
           verComoRepresentante: verHijos,
           ninosAusencias: verAusencias ? hijos : [],
+          colegiosAusencias,
         },
   });
   return lista.map((n) => paraActor(actor, n));
@@ -143,6 +157,14 @@ export async function obtener(actor: AuthUser, id: number): Promise<NovedadVista
     ) {
       const mios = new Set(await repo.ninosDelRepresentante(actor.usuario.usu_id));
       puedeVer = novedad.alumnos.some((a) => mios.has(a.id));
+    }
+    if (
+      !puedeVer &&
+      (novedad.nov_tipo === 'ausencia' || novedad.nov_tipo === 'correccion') &&
+      (await configuracion('ausencias'))?.notificar_coordinador
+    ) {
+      const colegios = new Set(await colegiosQueCoordina(actor));
+      puedeVer = novedad.alumnos.some((a) => a.col_id !== null && colegios.has(a.col_id));
     }
     if (!puedeVer) throw new ApiError(403, 'No puedes ver esta novedad');
   }

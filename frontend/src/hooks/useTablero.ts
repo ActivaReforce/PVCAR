@@ -99,3 +99,23 @@ export function useExportarReporte() {
     },
   });
 }
+
+/** "Sacar datos para facturación": como exportar, con su propio Excel. */
+export function useFacturacionReporte() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ modulo, filtros }: { modulo: string; filtros: FiltrosReporte }) =>
+      reportesApi.facturacion(modulo, filtros),
+    onSuccess: () => {
+      toast({ title: 'Archivo generado', description: 'Revisa tus descargas.' });
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: 'No se pudieron sacar los datos',
+        description: mensajeDe(error),
+        variant: 'destructive',
+      });
+    },
+  });
+}

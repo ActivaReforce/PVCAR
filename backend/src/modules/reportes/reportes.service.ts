@@ -20,6 +20,13 @@ import { GRAFICAS, type DefinicionGrafica, type FormaGrafica, type SerieGrafica 
 import type { ConsultaQuery, FiltrosQuery } from './reportes.schemas.js';
 import { ahoraEc, hoyEc } from '../../lib/fecha.js';
 import { resumenDe, type Bloque } from './reportes.resumen.js';
+import {
+  COLUMNAS_FACTURA,
+  filasInscripciones,
+  filasMensualidades,
+  type ColumnaFactura,
+  type FilaFactura,
+} from './reportes.facturacion.js';
 
 /**
  * Reportes.
@@ -407,6 +414,137 @@ export async function exportar(
 
   const sello = hoyEc();
   return { nombreArchivo: `${definicion.id}-${sello}.xlsx`, filas: rows.length };
+}
+
+// ---------------------------------------------------------------------------
+// Datos para facturación (Reportes → Pagos, cliente 2026-11-18)
+
+/** Los reportes que tienen el botón. */
+const CON_FACTURACION: Record<string, (f: FiltrosReporte, tope: number) => Promise<FilaFactura[]>> = {
+  inscripciones: filasInscripciones,
+  mensualidades: filasMensualidades,
+};
+
+/** Lanza 403/404 si no puede ver ese reporte: se llama antes de mandar cabeceras. */
+export function comprobarAcceso(actor: AuthUser, id: string): void {
+  exigirDefinicion(actor, id);
+}
+
+export function tieneFacturacion(id: string): boolean {
+  return id in CON_FACTURACION;
+}
+
+/*
+ * Colores del Excel de facturación: un tono suave por bloque de columnas
+ * (pago, montos, factura) para que se separen a la vista, y la fila entera en
+ * rojo (no pagado) o en amarillo (pagado con la inscripción), que manda sobre
+ * el del bloque. Los de rojo y amarillo son los de "Incorrecto" y "Neutral"
+ * de Excel: quien lo abre ya los reconoce.
+ */
+const FACTURA_COLOR = {
+  montos: { cabecera: 'FFC6E0B4', celda: 'FFEFF6E9' },
+  factura: { cabecera: 'FFBDD7EE', celda: 'FFEAF2FA' },
+  rojo: { relleno: 'FFFFC7CE', letra: 'FF9C0006' },
+  amarillo: { relleno: 'FFFFEB9C', letra: 'FF9C5700' },
+} as const;
+
+const FORMATO_DINERO = '"$"#,##0.00';
+
+function resumenFacturacion(id: string, filas: FilaFactura[]): Bloque[] {
+  const suma = (xs: FilaFactura[], k: string) =>
+    Math.round(xs.reduce((s, f) => s + (typeof f[k] === 'number' ? (f[k] as number) : 0), 0) * 100) / 100;
+  const linea = (nombre: string, xs: FilaFactura[]) => [
+    nombre,
+    xs.length,
+    suma(xs, 'subtotal'),
+    suma(xs, 'descuento'),
+    suma(xs, 'iva'),
+    suma(xs, 'total'),
+  ];
+  const porEstado = new Map<string, FilaFactura[]>();
+  for (const f of filas) porEstado.set(String(f.estado), [...(porEstado.get(String(f.estado)) ?? []), f]);
+  const aFacturar = filas.filter((f) => f._factura);
+  const filasTabla = [...porEstado.entries()].map(([estado, xs]) => linea(estado, xs));
+  filasTabla.push(linea('Total a facturar', aFacturar));
+  return [
+    {
+      titulo: 'Por estado',
+      nota:
+        id === 'mensualidades'
+          ? 'Una fila por pago (una transferencia = una factura). En rojo, lo que no está pagado: en revisión o por cobrar (una fila por representante y mes). En amarillo, lo pagado con la inscripción: suma al total a facturar.'
+          : 'Una fila por inscripción. En rojo, las que no están aprobadas (pendientes y anuladas): no suman al total a facturar.',
+      cabeceras: ['Estado', 'Filas', 'Subtotal ($)', 'Descuento ($)', 'IVA ($)', 'Total ($)'],
+      filas: filasTabla,
+      destacadas: [filasTabla.length - 1],
+    },
+  ];
+}
+
+/**
+ * "Sacar datos para facturación": el mismo estilo que la exportación normal
+ * (Resumen primero, cabecera fija, bordes y filtros), con las columnas que
+ * necesita quien factura y los colores por bloque y por estado. Mismos
+ * filtros y mismos permisos que Exportar a Excel.
+ */
+export async function exportarFacturacion(
+  actor: AuthUser,
+  id: string,
+  filtrosQuery: FiltrosQuery,
+  destino: Writable,
+): Promise<Exportacion> {
+  const definicion = exigirDefinicion(actor, id);
+  const deFilas = CON_FACTURACION[id];
+  if (!deFilas) throw new ApiError(404, 'Este reporte no tiene datos para facturación');
+  const filtros = exigirRango(definicion, filtrosQuery);
+  const columnas: ColumnaFactura[] = COLUMNAS_FACTURA[id]!;
+
+  const filas = await deFilas(filtros, TOPE_EXPORTACION);
+  const titulo = `Facturación — ${definicion.titulo}`;
+
+  const libro = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: destino, useStyles: true });
+  libro.creator = 'Activa Reforce — PVCAR';
+  libro.created = new Date();
+
+  const avisos = [`Generado el ${ahoraEc()} (hora de Ecuador) por ${actor.usuario.usu_nombre}.`];
+  if (filtros.desde && filtros.hasta) avisos.unshift(`Del ${diaTexto(filtros.desde)} al ${diaTexto(filtros.hasta)}.`);
+  if (definicion.filtros.meses) {
+    avisos.unshift(
+      filtros.meses && filtros.meses.length > 0
+        ? `Meses: ${filtros.meses.map((m) => nombreDeMes(m)).join(', ')}.`
+        : 'Meses: todos (del año pasado al siguiente).',
+    );
+  }
+  if (filas.length === TOPE_EXPORTACION) avisos.push(`Cortado en el tope de ${TOPE_EXPORTACION} filas: acota los filtros.`);
+  escribirResumen(libro, titulo, avisos, resumenFacturacion(id, filas));
+
+  const filtrosExcel = filtrosDeHojas(libro);
+  const nombreHoja = 'Facturación';
+  const hoja = libro.addWorksheet(nombreHoja, { views: [{ state: 'frozen', ySplit: 1 }] });
+  hoja.columns = columnas.map((c) => ({ header: c.cabecera, key: c.clave, width: c.ancho }));
+  const cabecera = hoja.getRow(1);
+  estiloCabecera(cabecera, columnas.length);
+  columnas.forEach((c, i) => {
+    if (c.grupo !== 'pago') cabecera.getCell(i + 1).fill = relleno(FACTURA_COLOR[c.grupo].cabecera);
+  });
+  filtrosExcel.poner(hoja, nombreHoja, 1, columnas.length, filas.length);
+
+  for (const f of filas) {
+    const fila = hoja.addRow(columnas.map((c) => f[c.clave] ?? ''));
+    const marca = f._color ? FACTURA_COLOR[f._color] : null;
+    if (marca) fila.font = { color: { argb: marca.letra } };
+    columnas.forEach((c, i) => {
+      const celda = fila.getCell(i + 1);
+      celda.border = BORDES;
+      if (c.moneda) celda.numFmt = FORMATO_DINERO;
+      if (marca) celda.fill = relleno(marca.relleno);
+      else if (c.grupo !== 'pago') celda.fill = relleno(FACTURA_COLOR[c.grupo].celda);
+    });
+    fila.commit();
+  }
+  hoja.commit();
+  await libro.commit();
+
+  return { nombreArchivo: `facturacion-${definicion.id}-${hoyEc()}.xlsx`, filas: filas.length };
 }
 
 /** `2026-10-07` → `07/10/2026`. */

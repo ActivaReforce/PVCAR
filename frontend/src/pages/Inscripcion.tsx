@@ -36,6 +36,7 @@ import { ApiError } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { diaDeCruce, horarioLargo } from '@/lib/horarios';
 import { esParaCurso } from '@/lib/cursos';
+import { PARALELO_VALIDO, cursoConParalelo, limpiarParalelo } from '@/lib/paralelo';
 import { compressImage } from '@/lib/imageCompression';
 import PagarMensualidad from '@/components/mensualidades/PagarMensualidad';
 import { nombreDeMes } from '@/api/mensualidades';
@@ -116,6 +117,8 @@ interface Alumno {
   fecha_nacimiento: string;
   col_id: string;
   catninograd_id: string;
+  /** Una letra mayúscula (0048). */
+  paralelo: string;
   parentesco: string;
   disciplinas: number[];
   emergencia: { nombre: string; relacion: string; telefono: string };
@@ -141,6 +144,7 @@ const alumnoVacio = (): Alumno => ({
   fecha_nacimiento: '',
   col_id: '',
   catninograd_id: '',
+  paralelo: '',
   parentesco: '',
   disciplinas: [],
   emergencia: { nombre: '', relacion: '', telefono: '' },
@@ -165,6 +169,7 @@ const alumnoDeHijo = (h: HijoDelRepresentante): Alumno => ({
   fecha_nacimiento: h.fecha_nacimiento ?? '',
   col_id: String(h.col_id),
   catninograd_id: h.catninograd_id ? String(h.catninograd_id) : '',
+  paralelo: h.paralelo ?? '',
   parentesco: h.parentesco ?? '',
   emergencia: h.emergencia
     ? { nombre: h.emergencia.nombre, relacion: h.emergencia.relacion, telefono: h.emergencia.telefono }
@@ -242,6 +247,7 @@ function erroresAlumnos(alumnos: Alumno[]): string[] {
     if (!a.col_id) e.push(`${quien}elige el colegio.`);
     else if (a.disciplinas.length === 0) e.push(`${quien}elige al menos una disciplina.`);
     if (!a.catninograd_id) e.push(`${quien}elige el curso.`);
+    if (!PARALELO_VALIDO.test(a.paralelo ?? '')) e.push(`${quien}escribe el paralelo (una letra: A, B, C…).`);
     const em = a.emergencia;
     if (em.nombre.trim().length < 3 || em.relacion.trim().length < 2 || !TELEFONO.test(em.telefono.trim()))
       e.push(`${quien}completa el contacto de emergencia (nombre, relación y teléfono).`);
@@ -398,7 +404,7 @@ function datosDocumento(
     alumno: {
       nombre: alumno.nombre.trim(),
       fecha_nacimiento: alumno.fecha_nacimiento ? fechaNacimiento(alumno.fecha_nacimiento) : '',
-      curso: curso?.catninograd_nombre ?? '',
+      curso: cursoConParalelo(curso?.catninograd_nombre, alumno.paralelo || null) ?? '',
       actividades: [...new Set(elegidas.map((d) => d.actividad))].join(', '),
       horarios: elegidas.map((d) => `${d.actividad}: ${horarioLargo(d.horarios)}`).join('; '),
       emergencia: alumno.emergencia,
@@ -618,6 +624,7 @@ const Inscripcion = () => {
           fecha_nacimiento: a.fecha_nacimiento,
           col_id: Number(a.col_id),
           catninograd_id: Number(a.catninograd_id),
+          paralelo: a.paralelo,
           parentesco: a.parentesco,
           nino_id: a.nino_id,
           disciplinas: a.disciplinas,
@@ -1198,7 +1205,7 @@ const FichaAlumno = ({
         </Campo>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_6rem]">
         <Campo id={id('colegio')} etiqueta="Colegio">
           <Select
             value={alumno.col_id}
@@ -1230,6 +1237,25 @@ const FichaAlumno = ({
               ))}
             </SelectContent>
           </Select>
+        </Campo>
+        {/* Paralelo (0048): una sola letra, siempre en mayúscula. */}
+        <Campo id={id('paralelo')} etiqueta="Paralelo">
+          <Input
+            id={id('paralelo')}
+            value={alumno.paralelo ?? ''}
+            onChange={(e) => onChange({ paralelo: limpiarParalelo(e.target.value) })}
+            placeholder="A"
+            maxLength={1}
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            inputMode="text"
+            aria-describedby={id('paralelo-ayuda')}
+            className="h-11 text-center text-lg font-semibold uppercase"
+          />
+          <span id={id('paralelo-ayuda')} className="sr-only">
+            Una letra, por ejemplo A
+          </span>
         </Campo>
       </div>
 

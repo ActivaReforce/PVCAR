@@ -30,6 +30,9 @@ export interface FiltrosDisponibles {
   ausencias?: boolean;
   /** Selector de meses (varios) en vez de fechas (Mensualidades). */
   meses?: boolean;
+  /** Desplegables de grado y paralelo (Alumnos). Opcionales: Vercel puede publicar antes que Railway. */
+  grado?: boolean;
+  paralelo?: boolean;
 }
 
 export interface ReporteDisponible {
@@ -114,6 +117,10 @@ export interface FiltrosReporte {
   ausencias?: boolean;
   /** Meses elegidos, 'YYYY-MM'. Vacío = todo. */
   meses?: string[];
+  /** Alumnos: grado (catninograd_id). */
+  grado?: number;
+  /** Alumnos: una letra, o 'sin'. */
+  paralelo?: string;
 }
 
 function queryString(filtros: object): string {
@@ -138,6 +145,10 @@ export const reportesApi = {
   /** Los filtros van en el cuerpo: no quedan escritos en los logs del servidor. */
   exportar: (modulo: string, filtros: FiltrosReporte) =>
     api.descargar(`/reportes/${modulo}/export`, filtros, `${modulo}.xlsx`),
+
+  /** "Sacar datos para facturación" (Inscripciones y Mensualidades). Mismos filtros. */
+  facturacion: (modulo: string, filtros: FiltrosReporte) =>
+    api.descargar(`/reportes/${modulo}/facturacion`, filtros, `facturacion-${modulo}.xlsx`),
 };
 
 /**
@@ -146,6 +157,9 @@ export const reportesApi = {
  * una sola tarjeta con dos pestañas (/reportes/pagos). Ocupa el lugar de
  * Inscripciones en el orden.
  */
+/** Los reportes con el botón "Sacar datos para facturación". */
+export const CON_FACTURACION = ['inscripciones', 'mensualidades'];
+
 export const PAGOS = {
   id: 'pagos',
   titulo: 'Pagos',

@@ -27,6 +27,8 @@ export const configCorreoSchema = z.object({
   /** Solo cuenta en 'novedades'; en el resto se guarda como false. */
   notificar_mencionado: z.boolean().default(false),
   notificar_representante: z.boolean().default(false),
+  /** Solo cuenta en 'ausencias'. Sin él, se queda como estaba. */
+  notificar_coordinador: z.boolean().optional(),
 });
 
 export type ConfigCorreoInput = z.infer<typeof configCorreoSchema>;

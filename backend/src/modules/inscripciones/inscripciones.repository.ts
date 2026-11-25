@@ -4,10 +4,12 @@ import { ESTADO, ROL } from '../../lib/constants.js';
 import { horarioTexto, horariosJson, primerHorario, type HorarioDisciplina } from '../../lib/horarios.js';
 import { contieneSinTildes, sinTildes } from '../../lib/sql.js';
 import { offsetDe } from '../../lib/paginacion.js';
+import { cursoConParaleloSql } from '../../lib/paralelo.js';
 import type { CobroAlumno, PrecioColegio } from './inscripciones.precios.js';
 import type { TipoDocumento } from './inscripciones.documentos.js';
 import type {
   ListarInscripcionesQuery,
+  ListarNuevosQuery,
   NinoFormulario,
   RepresentanteFormulario,
 } from './inscripciones.schemas.js';
@@ -543,7 +545,9 @@ export async function insertarInscripcion(
  * curso, disciplinas y horarios). Con eso el paquete se vuelve a generar
  * idéntico al aprobar, aunque luego cambien los precios o las disciplinas.
  */
-export type NinoGuardado = Omit<NinoFormulario, 'disciplinas' | 'nino_id'> & {
+export type NinoGuardado = Omit<NinoFormulario, 'disciplinas' | 'nino_id' | 'paralelo'> & {
+  /** Desde 0048; las guardadas antes no lo traen (undefined) o llegó sin él (null). */
+  paralelo?: string | null;
   documento: {
     colegio: ColegioDocumento;
     curso: string | null;
@@ -727,6 +731,75 @@ export async function listar(
 }
 
 /**
+ * Alumnos nuevos (vista del coordinador, 2026-11-18): una fila por alumno de
+ * las inscripciones aprobadas que traen alguna disciplina de `disciplinas`
+ * (null = todas). Solo se listan esas disciplinas: lo de otros colegios no se
+ * enseña. Sin montos.
+ */
+export interface AlumnoNuevo {
+  insnino_id: number;
+  ins_id: number;
+  alumno: string;
+  /** Trae observaciones extra (borde ámbar, como en la lista del Propietario). */
+  con_observacion: boolean;
+  curso: string | null;
+  colegio: string | null;
+  disciplinas: string[];
+  representante: string;
+  telefono: string | null;
+  fecha_aprobacion: string | null;
+  /** El alumno sigue activo en la plataforma. */
+  activo: boolean;
+}
+
+export async function listarNuevos(
+  query: ListarNuevosQuery,
+  disciplinas: number[] | null,
+): Promise<{ items: AlumnoNuevo[]; total: number }> {
+  const buscar = query.buscar && query.buscar.length > 0 ? query.buscar : null;
+  const { rows } = await getPool().query<AlumnoNuevo & { total: string }>(
+    `SELECT n.insnino_id,
+            i.ins_id,
+            n.insnino_datos->>'nombre'                 AS alumno,
+            btrim(COALESCE(n.insnino_datos->>'observacion_extra', '')) <> '' AS con_observacion,
+            ${cursoConParaleloSql("n.insnino_datos->'documento'->>'curso'", "n.insnino_datos->>'paralelo'")} AS curso,
+            d.colegio,
+            d.disciplinas,
+            COALESCE(i.ins_representante->>'nombre', '') AS representante,
+            i.ins_representante->>'telefono'           AS telefono,
+            i.ins_fecha_aprobacion                     AS fecha_aprobacion,
+            COALESCE(ni.est_id = ${ESTADO.ACTIVO}, false) AS activo,
+            count(*) OVER() AS total
+       FROM public.inscripcion_nino n
+       JOIN public.inscripcion i ON i.ins_id = n.ins_id
+       LEFT JOIN public.nino ni ON ni.nino_id = n.nino_id
+       CROSS JOIN LATERAL (
+         SELECT min(c.col_nombre) AS colegio,
+                min(c.col_id)     AS col_id,
+                array_agg(act.act_nombre || COALESCE(' · ' || ${horarioTexto('cah')}, '')
+                          ORDER BY act.act_nombre) AS disciplinas
+           FROM unnest(n.insnino_disciplinas) AS cid
+           JOIN public.colegio_actividad_horario cah ON cah.colacthor_id = cid
+           JOIN public.colegio   c   ON c.col_id = cah.col_id
+           JOIN public.actividad act ON act.act_id = cah.act_id
+          WHERE $1::int[] IS NULL OR cah.colacthor_id = ANY($1::int[])
+       ) d
+      WHERE i.ins_estado = 'aprobada'
+        AND d.disciplinas IS NOT NULL
+        AND ($3::int IS NULL OR d.col_id = $3)
+        AND ($6::int IS NULL OR $6 = ANY(n.insnino_disciplinas))
+        AND ($2::text IS NULL
+             OR ${contieneSinTildes("COALESCE(n.insnino_datos->>'nombre', '')", '$2')}
+             OR ${contieneSinTildes("COALESCE(i.ins_representante->>'nombre', '')", '$2')})
+      ORDER BY i.ins_fecha_aprobacion DESC NULLS LAST, i.ins_id DESC, n.insnino_orden
+      LIMIT $4 OFFSET $5`,
+    [disciplinas, buscar, query.colegio ?? null, query.limit, offsetDe(query), query.disciplina ?? null],
+  );
+  const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
+  return { items: rows.map(({ total: _t, ...resto }) => resto), total };
+}
+
+/**
  * El aviso del menú (2026-10-07): cuántas pendientes y si el interruptor
  * general está encendido. Una sola consulta, sin listas: se pide cada minuto.
  */
@@ -809,6 +882,15 @@ export async function obtener(
     [insId],
   );
   return rows[0] ?? null;
+}
+
+/** La inscripción de un alumno inscrito (ficha del coordinador). */
+export async function inscripcionDeNino(insninoId: number): Promise<number | null> {
+  const { rows } = await getPool().query<{ ins_id: number }>(
+    'SELECT ins_id FROM public.inscripcion_nino WHERE insnino_id = $1',
+    [insninoId],
+  );
+  return rows[0]?.ins_id ?? null;
 }
 
 export async function ninosDe(insId: number, client?: PoolClient): Promise<NinoDeInscripcion[]> {
@@ -1090,6 +1172,8 @@ export interface HijoDelRepresentante {
   col_id: number;
   col_nombre: string;
   catninograd_id: number | null;
+  /** 0048: null en los anteriores. */
+  paralelo: string | null;
   parentesco: string | null;
   modalidad_salida: 'escolar' | 'privado' | null;
   detalle_retiro: string | null;
@@ -1126,7 +1210,8 @@ export async function hijosDe(usuId: number, client?: PoolClient): Promise<HijoD
   const { rows } = await (client ?? getPool()).query<HijoDelRepresentante>(
     `SELECT n.nino_id, n.nino_nombre AS nombre,
             to_char(n.nino_fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento,
-            n.col_id, col.col_nombre, n.catninograd_id, np.ninopadre_parentesco AS parentesco,
+            n.col_id, col.col_nombre, n.catninograd_id, n.nino_paralelo AS paralelo,
+            np.ninopadre_parentesco AS parentesco,
             n.nino_modalidad_salida AS modalidad_salida, n.nino_detalle_retiro AS detalle_retiro,
             n.nino_info_salud AS salud,
             json_build_object('familias', COALESCE(n.nino_imagen_familias, false),
@@ -1365,7 +1450,12 @@ export async function anulables(
 export interface FotoDeAnulada {
   ins_fecha: string;
   representante: { nombre: string; cedula: string; correo: string; telefono: string };
-  hijos: Array<{ nombre: string; col_id: number | null; colegio: string | null; disciplinas: string[]; valor: number }>;
+  hijos: Array<{
+    nombre: string;
+    curso: string | null;
+    paralelo: string | null;
+    observacion: string | null;
+    col_id: number | null; colegio: string | null; disciplinas: string[]; valor: number }>;
   valor: number;
   aprobada_por: string | null;
   ins_fecha_aprobacion: string | null;
@@ -1383,6 +1473,9 @@ export async function fotoDeAnulada(insId: number, client: PoolClient): Promise<
               SELECT json_agg(json_build_object(
                        'nombre', btrim(COALESCE(inn.insnino_datos->>'nombres', inn.insnino_datos->>'nombre', '') ||
                                        ' ' || COALESCE(inn.insnino_datos->>'apellidos', '')),
+                       'curso', inn.insnino_datos->'documento'->>'curso',
+                       'paralelo', NULLIF(inn.insnino_datos->>'paralelo', ''),
+                       'observacion', NULLIF(btrim(COALESCE(inn.insnino_datos->>'observacion_extra', '')), ''),
                        'col_id', c.col_id,
                        'colegio', c.col_nombre,
                        'disciplinas', ARRAY(
